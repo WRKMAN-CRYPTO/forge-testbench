@@ -5,130 +5,33 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>WRKMAN Craft — Forge Testbench</title>
 <style>
-  :root{color-scheme:dark;--ink:#f4f0df;--muted:#c6bea2;--panel:#171812e8;--line:#6d704d;--accent:#d8c85c;--danger:#d76b4e}
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0f120d;color:var(--ink);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-  body{display:grid;place-items:center}
-  #app{position:relative;width:100vw;height:100dvh;max-width:1200px;background:#11150e;overflow:hidden;touch-action:none}
-  canvas{display:block;width:100%;height:100%}
-  .hud{position:absolute;inset:0;pointer-events:none;padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));display:flex;flex-direction:column;justify-content:space-between}
-  .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
-  .card{background:var(--panel);border:1px solid #52563b;border-radius:10px;box-shadow:0 5px 18px #0008;padding:8px 10px;backdrop-filter:blur(6px)}
-  .brand{font-weight:900;letter-spacing:.12em;font-size:14px}.brand b{color:var(--accent)}
-  .stats{display:flex;gap:10px;align-items:center;font-size:12px;white-space:nowrap}
-  .meter{width:92px;height:8px;border:1px solid #74775e;border-radius:99px;overflow:hidden;background:#24271d}.meter i{display:block;height:100%;background:var(--accent);width:100%}
-  .bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
-  .controls{pointer-events:auto;display:grid;grid-template-columns:56px 56px 56px;grid-template-rows:56px 56px 56px;gap:5px;opacity:.92}
-  .btn,.build button{border:1px solid #76795d;background:#20241a;color:var(--ink);border-radius:10px;font:inherit;font-weight:800;box-shadow:0 3px 0 #0a0c08;touch-action:none}
-  .btn:active,.build button:active{transform:translateY(2px);box-shadow:0 1px 0 #0a0c08;background:#343a26}.up{grid-column:2}.left{grid-column:1;grid-row:2}.action{grid-column:2;grid-row:2;background:#514d27;border-color:#aaa14e}.right{grid-column:3;grid-row:2}.down{grid-column:2;grid-row:3}
-  .build{pointer-events:auto;display:flex;flex-direction:column;gap:6px;align-items:stretch}.build small{text-align:right;color:var(--muted)}.build button{min-width:144px;padding:9px 10px;text-align:left}.build button.active{outline:2px solid var(--accent);background:#484526}.build button:disabled{opacity:.42}
-  .toast{position:absolute;left:50%;top:18%;translate:-50% -50%;background:#13160fee;border:1px solid #7e805c;border-radius:9px;padding:8px 12px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;text-align:center;max-width:80%}.toast.show{opacity:1}
-  .center{position:absolute;inset:0;display:grid;place-items:center;background:#080a07c9;padding:20px;z-index:5}.panel{max-width:580px;background:#171a12;border:1px solid #6f7250;border-radius:14px;padding:20px;box-shadow:0 20px 60px #000b}.panel h1{margin:0 0 6px;font-size:clamp(24px,6vw,44px);letter-spacing:.05em}.panel h1 b{color:var(--accent)}.panel p{color:#d2ccb6;line-height:1.45}.panel ul{padding-left:20px;color:#d2ccb6;line-height:1.5}.panel button{width:100%;padding:13px;border-radius:9px;border:1px solid #b6ab50;background:#5d572a;color:white;font:inherit;font-weight:900;letter-spacing:.08em}.legend{font-size:11px;color:#bdb69e}.kbd{display:none}
-  @media (hover:hover) and (pointer:fine){.controls{opacity:.55}.kbd{display:block}}
-  @media (max-width:540px){.hud{padding-left:7px;padding-right:7px}.card{padding:7px 8px}.stats{gap:6px;font-size:11px}.meter{width:64px}.build button{min-width:128px;font-size:11px;padding:8px}.controls{grid-template-columns:50px 50px 50px;grid-template-rows:50px 50px 50px}.brand{font-size:12px}}
+:root{color-scheme:dark;--ink:#f4f0df;--muted:#c6bea2;--panel:#171812e8;--accent:#d8c85c;--danger:#d76b4e}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0f120d;color:var(--ink);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}body{display:grid;place-items:center}#app{position:relative;width:100vw;height:100dvh;max-width:1200px;background:#11150e;overflow:hidden;touch-action:none}canvas{display:block;width:100%;height:100%}.hud{position:absolute;inset:0;pointer-events:none;padding:10px;display:flex;flex-direction:column;justify-content:space-between}.top,.bottom{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.bottom{align-items:flex-end}.card{background:var(--panel);border:1px solid #52563b;border-radius:10px;box-shadow:0 5px 18px #0008;padding:8px 10px}.brand{font-weight:900;letter-spacing:.12em;font-size:14px}.brand b{color:var(--accent)}.legend{font-size:11px;color:#bdb69e}.stats{display:flex;gap:10px;align-items:center;font-size:12px;white-space:nowrap}.meter{display:inline-block;vertical-align:middle;width:92px;height:9px;border:1px solid #74775e;border-radius:99px;overflow:hidden;background:#24271d}.meter i{display:block;height:100%;background:var(--accent);width:100%}.controls{pointer-events:auto;display:grid;grid-template-columns:56px 56px 56px;grid-template-rows:56px 56px 56px;gap:5px}.btn,.build button{border:1px solid #76795d;background:#20241a;color:var(--ink);border-radius:10px;font:inherit;font-weight:800;box-shadow:0 3px 0 #0a0c08}.up{grid-column:2}.left{grid-column:1;grid-row:2}.action{grid-column:2;grid-row:2;background:#514d27}.right{grid-column:3;grid-row:2}.down{grid-column:2;grid-row:3}.build{pointer-events:auto;display:flex;flex-direction:column;gap:6px}.build button{min-width:160px;padding:9px 10px;text-align:left}.build button:disabled{opacity:.42}.toast{position:absolute;left:50%;top:18%;translate:-50% -50%;background:#13160fee;border:1px solid #7e805c;border-radius:9px;padding:8px 12px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:80%}.toast.show{opacity:1}.center{position:absolute;inset:0;display:grid;place-items:center;background:#080a07c9;padding:20px;z-index:5}.panel{max-width:580px;background:#171a12;border:1px solid #6f7250;border-radius:14px;padding:20px;box-shadow:0 20px 60px #000b}.panel h1{margin:0 0 6px;font-size:clamp(24px,6vw,44px)}.panel h1 b{color:var(--accent)}.panel p,.panel li{color:#d2ccb6;line-height:1.45}.panel button{width:100%;padding:13px;border-radius:9px;border:1px solid #b6ab50;background:#5d572a;color:white;font:inherit;font-weight:900}.kbd{font-size:11px;color:#bdb69e}@media(max-width:540px){.stats{gap:6px;font-size:11px}.meter{width:64px}.build button{min-width:132px;font-size:11px}.controls{grid-template-columns:50px 50px 50px;grid-template-rows:50px 50px 50px}.brand{font-size:12px}}
 </style>
 </head>
-<body>
-<div id="app">
-  <canvas id="game"></canvas>
-  <div class="hud">
-    <div class="top">
-      <div class="card"><div class="brand"><b>WRKMAN</b> CRAFT</div><div class="legend">CLOCK IN. BUILD SOMETHING.</div></div>
-      <div class="card stats">
-        <span>WOOD <b id="wood">0</b></span><span>SCRAP <b id="scrap">0</b></span>
-        <span>GRIT <span class="meter"><i id="grit"></i></span></span>
-        <span id="clock">DAY 1 · 06:00</span>
-      </div>
-    </div>
-    <div class="bottom">
-      <div class="controls" aria-label="movement controls">
-        <button class="btn up" data-key="up">▲</button><button class="btn left" data-key="left">◀</button><button class="btn action" data-key="action">E</button><button class="btn right" data-key="right">▶</button><button class="btn down" data-key="down">▼</button>
-      </div>
-      <div class="build card">
-        <small>BUILD AT YOUR FEET</small>
-        <button id="fireBtn">[1] FIRE · 3 wood + 1 scrap</button>
-        <button id="shelterBtn">[2] LEAN-TO · 6 wood + 2 scrap</button>
-        <div class="kbd">WASD / arrows · E gather · 1/2 build</div>
-      </div>
-    </div>
-  </div>
-  <div id="toast" class="toast"></div>
-  <div id="intro" class="center">
-    <div class="panel">
-      <h1><b>WRKMAN</b> CRAFT</h1>
-      <p>The world gives you daylight. Night sends the cold. Build enough to make tomorrow easier than today.</p>
-      <ul>
-        <li>Walk to trees and scrap piles. Press <b>E</b> or the center button to gather.</li>
-        <li><b>Fire</b> creates a warm safe radius at night.</li>
-        <li><b>Lean-to</b> slowly restores grit while you stay near it.</li>
-        <li>Survive <b>3 nights</b>.</li>
-      </ul>
-      <button id="start">CLOCK IN</button>
-    </div>
-  </div>
-</div>
+<body><div id="app"><canvas id="game"></canvas><div class="hud"><div class="top"><div class="card"><div class="brand"><b>WRKMAN</b> CRAFT</div><div class="legend">CLOCK IN. BUILD SOMETHING.</div></div><div class="card stats"><span>WOOD <b id="wood">0</b></span><span>SCRAP <b id="scrap">0</b></span><span>GRIT <span class="meter"><i id="grit"></i></span> <b id="gritN">100</b></span><span id="clock">DAY 1 · 06:00</span></div></div><div class="bottom"><div class="controls"><button class="btn up" data-key="up">▲</button><button class="btn left" data-key="left">◀</button><button class="btn action" data-key="action">E</button><button class="btn right" data-key="right">▶</button><button class="btn down" data-key="down">▼</button></div><div class="build card"><small>BUILD / MAINTAIN</small><button id="fireBtn">[1] FIRE · 3 wood + 1 scrap</button><button id="shelterBtn">[2] LEAN-TO · 6 wood + 2 scrap</button><div class="kbd">E near fire: feed 1 wood · WASD / arrows move</div></div></div></div><div id="toast" class="toast"></div><div id="intro" class="center"><div class="panel"><h1><b>WRKMAN</b> CRAFT</h1><p>Daylight is your work window. Night gets colder. Your builds help, but they do not work forever.</p><ul><li>Gather wood and scrap with <b>E</b>.</li><li>Fires burn fuel. Stand near one and press <b>E</b> to feed it 1 wood.</li><li>Lean-tos restore some Grit during daylight.</li><li>Each night bites harder. Survive 3 nights.</li></ul><button id="start">CLOCK IN</button></div></div></div>
 <script>
-(() => {
-'use strict';
-const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
-const app=document.querySelector('#app');
-const woodEl=document.querySelector('#wood'),scrapEl=document.querySelector('#scrap'),gritEl=document.querySelector('#grit'),clockEl=document.querySelector('#clock');
-const fireBtn=document.querySelector('#fireBtn'),shelterBtn=document.querySelector('#shelterBtn'),toastEl=document.querySelector('#toast'),intro=document.querySelector('#intro');
-let W=0,H=0,dpr=1,last=0,running=false,toastTimer=0;
-const keys={up:false,down:false,left:false,right:false};
-const DAY_LENGTH=72, NIGHT_START=.68, WIN_DAY=4;
-let worldTime=0,day=1,wood=0,scrap=0,grit=100;
-const player={x:0,y:0,r:13,speed:150,dir:0};
-let nodes=[],buildings=[],particles=[];
-const rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-function resize(){const r=app.getBoundingClientRect();dpr=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);if(!player.x){player.x=W*.5;player.y=H*.52}}
-addEventListener('resize',resize);resize();
-function reset(){worldTime=0;day=1;wood=0;scrap=0;grit=100;buildings=[];particles=[];player.x=W*.5;player.y=H*.52;spawnNodes();updateHUD();}
-function spawnNodes(){nodes=[];for(let i=0;i<20;i++) addNode('tree');for(let i=0;i<13;i++) addNode('scrap');}
-function addNode(type){let x,y,tries=0;do{x=rand(35,W-35);y=rand(70,H-70);tries++}while(Math.hypot(x-player.x,y-player.y)<95&&tries<20);nodes.push({type,x,y,hits:type==='tree'?2:1,phase:rand(0,6.28)});}
-function toast(t){toastEl.textContent=t;toastEl.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastEl.classList.remove('show'),1300)}
-function nearestNode(){let best=null,bd=56;for(const n of nodes){const d=Math.hypot(n.x-player.x,n.y-player.y);if(d<bd){best=n;bd=d}}return best}
-function gather(){const n=nearestNode();if(!n){toast('Nothing within reach.');return}n.hits--;burst(n.x,n.y,n.type==='tree'?'leaf':'spark');if(n.type==='tree'){wood+=2;toast('+2 WOOD')}else{scrap+=2;toast('+2 SCRAP')}if(n.hits<=0){nodes.splice(nodes.indexOf(n),1);setTimeout(()=>{if(running)addNode(n.type)},9000)}updateHUD()}
-function build(type){const cost=type==='fire'?{w:3,s:1}:{w:6,s:2};if(wood<cost.w||scrap<cost.s){toast('Need more material.');return}for(const b of buildings){if(Math.hypot(b.x-player.x,b.y-player.y)<38){toast('Too close to another build.');return}}wood-=cost.w;scrap-=cost.s;buildings.push({type,x:player.x,y:player.y,age:0});burst(player.x,player.y,'build');toast(type==='fire'?'FIRE BUILT.':'LEAN-TO BUILT.');updateHUD()}
-function burst(x,y,type){for(let i=0;i<10;i++)particles.push({x,y,vx:rand(-45,45),vy:rand(-60,10),life:rand(.35,.8),type})}
-function isNight(){return (worldTime%DAY_LENGTH)/DAY_LENGTH>=NIGHT_START}
-function warmth(){let v=0;for(const b of buildings)if(b.type==='fire'){const d=Math.hypot(b.x-player.x,b.y-player.y);if(d<115)v=Math.max(v,1-d/115)}return v}
-function shelter(){for(const b of buildings)if(b.type==='shelter'&&Math.hypot(b.x-player.x,b.y-player.y)<80)return true;return false}
-function update(dt){
-  let dx=(keys.right?1:0)-(keys.left?1:0),dy=(keys.down?1:0)-(keys.up?1:0);if(dx||dy){const l=Math.hypot(dx,dy);dx/=l;dy/=l;player.x+=dx*player.speed*dt;player.y+=dy*player.speed*dt;player.dir=Math.atan2(dy,dx)}
-  player.x=clamp(player.x,18,W-18);player.y=clamp(player.y,55,H-18);
-  worldTime+=dt;const newDay=Math.floor(worldTime/DAY_LENGTH)+1;if(newDay!==day){day=newDay;toast(day>=WIN_DAY?'THREE NIGHTS SURVIVED.':'DAY '+day+' · STILL CLOCKED IN');if(day>=WIN_DAY){running=false;setTimeout(()=>end(true),450)}}
-  if(isNight()){const w=warmth();grit-=dt*(w>0?0.35:3.4)}else grit+=dt*(shelter()?2.5:.45);grit=clamp(grit,0,100);
-  if(grit<=0){running=false;end(false)}
-  for(const b of buildings)b.age+=dt;
-  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=70*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);updateHUD();
-}
-function updateHUD(){woodEl.textContent=wood;scrapEl.textContent=scrap;gritEl.style.width=grit+'%';gritEl.style.background=grit<30?'var(--danger)':'var(--accent)';fireBtn.disabled=wood<3||scrap<1;shelterBtn.disabled=wood<6||scrap<2;const f=(worldTime%DAY_LENGTH)/DAY_LENGTH;const hours=(6+f*24)%24;const hh=Math.floor(hours).toString().padStart(2,'0'),mm=Math.floor((hours%1)*60).toString().padStart(2,'0');clockEl.textContent=(isNight()?'NIGHT ':'DAY ')+day+' · '+hh+':'+mm}
-function ground(){
-  const f=(worldTime%DAY_LENGTH)/DAY_LENGTH;let night=isNight();ctx.fillStyle=night?'#111922':'#52643c';ctx.fillRect(0,0,W,H);
-  ctx.globalAlpha=.15;ctx.strokeStyle=night?'#8ca3a7':'#263520';ctx.lineWidth=1;for(let x=-20;x<W+30;x+=42){for(let y=20;y<H+30;y+=42){ctx.beginPath();ctx.moveTo(x+(y%84?10:0),y);ctx.lineTo(x+5+(y%84?10:0),y-8);ctx.stroke()}}ctx.globalAlpha=1;
-  if(!night){const dusk=clamp((f-.50)/.18,0,1);ctx.fillStyle=`rgba(141,75,43,${dusk*.28})`;ctx.fillRect(0,0,W,H)}
-}
-function drawNode(n){ctx.save();ctx.translate(n.x,n.y);if(n.type==='tree'){ctx.strokeStyle='#352d1c';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(0,12);ctx.lineTo(0,-9);ctx.stroke();ctx.fillStyle='#263d28';ctx.strokeStyle='#111b13';ctx.lineWidth=2;for(const [x,y,r] of [[0,-18,16],[-10,-9,12],[11,-8,12]]){ctx.beginPath();ctx.arc(x,y,r,0,6.3);ctx.fill();ctx.stroke()}}else{ctx.fillStyle='#777764';ctx.strokeStyle='#2c2e28';ctx.lineWidth=2;ctx.rotate(n.phase);for(let i=0;i<5;i++){ctx.rotate(1.25);ctx.fillRect(1,-4,17,8)}ctx.beginPath();ctx.arc(0,0,8,0,6.3);ctx.fill();ctx.stroke()}ctx.restore()}
-function drawBuilding(b){ctx.save();ctx.translate(b.x,b.y);if(b.type==='fire'){const flick=Math.sin(performance.now()/90+b.x)*3;ctx.strokeStyle='#45301d';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-13,10);ctx.lineTo(13,-4);ctx.moveTo(-13,-4);ctx.lineTo(13,10);ctx.stroke();ctx.fillStyle='#edb83b';ctx.beginPath();ctx.moveTo(0,4);ctx.quadraticCurveTo(-12,-10,0,-23-flick);ctx.quadraticCurveTo(13,-8,0,4);ctx.fill();if(isNight()){const g=ctx.createRadialGradient(0,0,10,0,0,115);g.addColorStop(0,'#e8b85055');g.addColorStop(1,'#e8b85000');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,115,0,6.3);ctx.fill()}}else{ctx.strokeStyle='#463b25';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-25,14);ctx.lineTo(0,-20);ctx.lineTo(26,14);ctx.stroke();ctx.fillStyle='#74613a';ctx.beginPath();ctx.moveTo(-23,10);ctx.lineTo(0,-17);ctx.lineTo(22,10);ctx.closePath();ctx.fill();ctx.strokeStyle='#b8a065';ctx.lineWidth=2;for(let x=-14;x<17;x+=8){ctx.beginPath();ctx.moveTo(x,8);ctx.lineTo(x+14,-8);ctx.stroke()}}ctx.restore()}
-function drawPlayer(){ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.dir);ctx.fillStyle='#2c3028';ctx.beginPath();ctx.ellipse(0,5,12,15,0,0,6.3);ctx.fill();ctx.fillStyle='#d2bd82';ctx.beginPath();ctx.arc(0,-8,8,0,6.3);ctx.fill();ctx.fillStyle='#6e8b45';ctx.fillRect(-10,-16,20,5);ctx.fillRect(-7,-20,14,5);ctx.strokeStyle='#111';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(5,-7);ctx.lineTo(8,-6);ctx.stroke();ctx.restore()}
-function drawPrompt(){const n=nearestNode();if(!n)return;ctx.save();ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.fillStyle='#12150ddd';ctx.fillRect(n.x-36,n.y-48,72,20);ctx.fillStyle='#f2edcf';ctx.fillText('E · GATHER',n.x,n.y-34);ctx.restore()}
-function drawParticles(){for(const p of particles){ctx.globalAlpha=clamp(p.life*2,0,1);ctx.fillStyle=p.type==='leaf'?'#9cb45d':p.type==='spark'?'#e6c45a':'#e5dec3';ctx.fillRect(p.x,p.y,3,3)}ctx.globalAlpha=1}
-function drawNight(){if(!isNight())return;const w=warmth();ctx.fillStyle=`rgba(5,8,13,${.28-w*.18})`;ctx.fillRect(0,0,W,H);ctx.fillStyle='#d7e5dd';for(let i=0;i<20;i++){const x=(i*83+31)%W,y=(i*47+18)%(H*.55);ctx.globalAlpha=.2+((i*7)%10)/20;ctx.fillRect(x,y,1.5,1.5)}ctx.globalAlpha=1}
-function draw(){ground();for(const n of nodes)drawNode(n);for(const b of buildings)drawBuilding(b);drawPlayer();drawPrompt();drawParticles();drawNight()}
-function loop(t){const dt=Math.min((t-last)/1000,.033)||0;last=t;if(running)update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
-function end(win){intro.innerHTML=`<div class="panel"><h1>${win?'<b>SHIFT COMPLETE</b>':'SHIFT LOST'}</h1><p>${win?'You turned loose material into a place that could keep you alive. The loop works.':'The cold took your grit. Gather earlier, build smarter, stay near your work.'}</p><p><b>Built:</b> ${buildings.length} structures · <b>Reached:</b> Day ${day}</p><button id="again">${win?'CLOCK IN AGAIN':'TRY AGAIN'}</button></div>`;intro.style.display='grid';document.querySelector('#again').onclick=startGame}
-function startGame(){reset();intro.style.display='none';running=true;last=performance.now();toast('DAYLIGHT IS BURNING.')}
-document.querySelector('#start').onclick=startGame;
-function setKey(k,v){if(k in keys)keys[k]=v}
-const map={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right'};
-addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(map[k]){setKey(map[k],true);e.preventDefault()}if(k==='e')gather();if(k==='1')build('fire');if(k==='2')build('shelter')});
-addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(map[k])setKey(map[k],false)});
-document.querySelectorAll('[data-key]').forEach(btn=>{const k=btn.dataset.key;const on=e=>{e.preventDefault();if(k==='action')gather();else setKey(k,true)};const off=e=>{e.preventDefault();if(k!=='action')setKey(k,false)};btn.addEventListener('pointerdown',on);btn.addEventListener('pointerup',off);btn.addEventListener('pointercancel',off);btn.addEventListener('pointerleave',off)});
-fireBtn.onclick=()=>build('fire');shelterBtn.onclick=()=>build('shelter');
-document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.up=keys.down=keys.left=keys.right=false;last=performance.now()}});
-reset();
+(()=>{'use strict';
+const $=s=>document.querySelector(s),canvas=$('#game'),ctx=canvas.getContext('2d'),app=$('#app');const woodEl=$('#wood'),scrapEl=$('#scrap'),gritEl=$('#grit'),gritN=$('#gritN'),clockEl=$('#clock'),fireBtn=$('#fireBtn'),shelterBtn=$('#shelterBtn'),toastEl=$('#toast'),intro=$('#intro');
+let W=0,H=0,last=0,running=false,toastTimer=0,worldTime=0,day=1,wood=0,scrap=0,grit=100;const DAY=72,NIGHT=.68,WIN=4,keys={up:0,down:0,left:0,right:0},player={x:0,y:0,speed:150,dir:0};let nodes=[],buildings=[],particles=[];const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function resize(){const r=app.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=W*d;canvas.height=H*d;ctx.setTransform(d,0,0,d,0,0);if(!player.x){player.x=W/2;player.y=H*.52}}addEventListener('resize',resize);resize();
+function toast(t){toastEl.textContent=t;toastEl.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastEl.classList.remove('show'),1100)}
+function addNode(type){let x,y;do{x=rand(35,W-35);y=rand(70,H-50)}while(Math.hypot(x-player.x,y-player.y)<80);nodes.push({type,x,y,hits:type==='tree'?2:1,phase:rand(0,6.28)})}function spawn(){nodes=[];for(let i=0;i<20;i++)addNode('tree');for(let i=0;i<13;i++)addNode('scrap')}
+function reset(){worldTime=0;day=1;wood=0;scrap=0;grit=100;buildings=[];particles=[];player.x=W/2;player.y=H*.52;spawn();hud()}
+function nearestNode(){let best=null,d0=55;for(const n of nodes){const d=Math.hypot(n.x-player.x,n.y-player.y);if(d<d0){best=n;d0=d}}return best}function nearestFire(){let best=null,d0=62;for(const b of buildings)if(b.type==='fire'){const d=Math.hypot(b.x-player.x,b.y-player.y);if(d<d0){best=b;d0=d}}return best}
+function burst(x,y,type){for(let i=0;i<9;i++)particles.push({x,y,vx:rand(-45,45),vy:rand(-60,10),life:rand(.3,.7),type})}
+function action(){const fire=nearestFire();if(fire&&fire.fuel<35&&wood>0){wood--;fire.fuel=Math.min(45,fire.fuel+12);burst(fire.x,fire.y,'spark');toast('FIRE FED +12s');hud();return}const n=nearestNode();if(!n){toast(fire&&wood===0?'Need wood to feed fire.':'Nothing within reach.');return}n.hits--;if(n.type==='tree'){wood+=2;toast('+2 WOOD')}else{scrap+=2;toast('+2 SCRAP')}burst(n.x,n.y,n.type==='tree'?'leaf':'spark');if(n.hits<=0){nodes.splice(nodes.indexOf(n),1);setTimeout(()=>running&&addNode(n.type),9000)}hud()}
+function build(type){const c=type==='fire'?{w:3,s:1}:{w:6,s:2};if(wood<c.w||scrap<c.s){toast('Need more material.');return}for(const b of buildings)if(Math.hypot(b.x-player.x,b.y-player.y)<38){toast('Too close to another build.');return}wood-=c.w;scrap-=c.s;buildings.push({type,x:player.x,y:player.y,fuel:type==='fire'?28:0});burst(player.x,player.y,'build');toast(type==='fire'?'FIRE BUILT · 28s FUEL':'LEAN-TO BUILT');hud()}
+function isNight(){return(worldTime%DAY)/DAY>=NIGHT}function shelter(){return buildings.some(b=>b.type==='shelter'&&Math.hypot(b.x-player.x,b.y-player.y)<80)}function warmth(){let v=0;for(const b of buildings)if(b.type==='fire'&&b.fuel>0){const d=Math.hypot(b.x-player.x,b.y-player.y);if(d<115)v=Math.max(v,1-d/115)}return v}
+function update(dt){let dx=keys.right-keys.left,dy=keys.down-keys.up;if(dx||dy){const l=Math.hypot(dx,dy);dx/=l;dy/=l;player.x+=dx*player.speed*dt;player.y+=dy*player.speed*dt;player.dir=Math.atan2(dy,dx)}player.x=clamp(player.x,18,W-18);player.y=clamp(player.y,55,H-18);worldTime+=dt;const nd=Math.floor(worldTime/DAY)+1;if(nd!==day){day=nd;if(day>=WIN){running=false;setTimeout(()=>end(true),350)}else toast('DAY '+day+' · NIGHT WILL BE COLDER')}
+for(const b of buildings)if(b.type==='fire'&&b.fuel>0)b.fuel=Math.max(0,b.fuel-dt);
+if(isNight()){const w=warmth(),drain=[0,3.8,5.2,6.8][Math.min(day,3)];grit-=dt*(w>0?Math.max(.65,drain*(1-w)*.55):drain)}else grit+=dt*(shelter()?1.45:.18);grit=clamp(grit,0,100);if(grit<=0){running=false;end(false)}for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=70*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);hud()}
+function hud(){woodEl.textContent=wood;scrapEl.textContent=scrap;gritEl.style.width=grit+'%';gritEl.style.background=grit<30?'var(--danger)':'var(--accent)';gritN.textContent=Math.round(grit);fireBtn.disabled=wood<3||scrap<1;shelterBtn.disabled=wood<6||scrap<2;const f=(worldTime%DAY)/DAY,h=(6+f*24)%24;clockEl.textContent=(isNight()?'NIGHT ':'DAY ')+day+' · '+Math.floor(h).toString().padStart(2,'0')+':'+Math.floor(h%1*60).toString().padStart(2,'0')}
+function ground(){const f=(worldTime%DAY)/DAY,n=isNight();ctx.fillStyle=n?'#111922':'#52643c';ctx.fillRect(0,0,W,H);ctx.globalAlpha=.14;ctx.strokeStyle=n?'#8ca3a7':'#263520';for(let x=-20;x<W+30;x+=42)for(let y=20;y<H+30;y+=42){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+5,y-8);ctx.stroke()}ctx.globalAlpha=1;if(!n){const dusk=clamp((f-.5)/.18,0,1);ctx.fillStyle=`rgba(141,75,43,${dusk*.28})`;ctx.fillRect(0,0,W,H)}}
+function node(n){ctx.save();ctx.translate(n.x,n.y);if(n.type==='tree'){ctx.strokeStyle='#352d1c';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(0,12);ctx.lineTo(0,-9);ctx.stroke();ctx.fillStyle='#36583a';ctx.strokeStyle='#172519';for(const q of [[0,-18,16],[-10,-9,12],[11,-8,12]]){ctx.beginPath();ctx.arc(...q,0,6.3);ctx.fill();ctx.stroke()}}else{ctx.fillStyle='#9a9881';ctx.strokeStyle='#33352e';ctx.rotate(n.phase);for(let i=0;i<5;i++){ctx.rotate(1.25);ctx.fillRect(1,-4,17,8)}ctx.beginPath();ctx.arc(0,0,8,0,6.3);ctx.fill();ctx.stroke()}ctx.restore()}
+function building(b){ctx.save();ctx.translate(b.x,b.y);if(b.type==='fire'){ctx.strokeStyle='#45301d';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-13,10);ctx.lineTo(13,-4);ctx.moveTo(-13,-4);ctx.lineTo(13,10);ctx.stroke();if(b.fuel>0){const flick=Math.sin(performance.now()/90+b.x)*3;ctx.fillStyle='#edb83b';ctx.beginPath();ctx.moveTo(0,4);ctx.quadraticCurveTo(-12,-10,0,-23-flick);ctx.quadraticCurveTo(13,-8,0,4);ctx.fill()}else{ctx.fillStyle='#3b3a31';ctx.beginPath();ctx.arc(0,2,5,0,6.3);ctx.fill()}ctx.font='10px monospace';ctx.textAlign='center';ctx.fillStyle='#f4f0df';ctx.fillText(Math.ceil(b.fuel)+'s',0,27)}else{ctx.strokeStyle='#463b25';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-25,14);ctx.lineTo(0,-20);ctx.lineTo(26,14);ctx.stroke();ctx.fillStyle='#74613a';ctx.beginPath();ctx.moveTo(-23,10);ctx.lineTo(0,-17);ctx.lineTo(22,10);ctx.closePath();ctx.fill()}ctx.restore()}
+function person(){ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.dir);ctx.fillStyle='#2c3028';ctx.beginPath();ctx.ellipse(0,5,12,15,0,0,6.3);ctx.fill();ctx.fillStyle='#d2bd82';ctx.beginPath();ctx.arc(0,-8,8,0,6.3);ctx.fill();ctx.fillStyle='#6e8b45';ctx.fillRect(-10,-16,20,5);ctx.fillRect(-7,-20,14,5);ctx.restore()}
+function draw(){ground();nodes.forEach(node);buildings.forEach(building);person();for(const p of particles){ctx.globalAlpha=clamp(p.life*2,0,1);ctx.fillStyle=p.type==='leaf'?'#9cb45d':'#e6c45a';ctx.fillRect(p.x,p.y,3,3)}ctx.globalAlpha=1;if(isNight()){ctx.fillStyle='rgba(5,8,13,.25)';ctx.fillRect(0,0,W,H)}}function loop(t){const dt=Math.min((t-last)/1000,.033)||0;last=t;if(running)update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+function end(win){intro.innerHTML=`<div class="panel"><h1>${win?'<b>SHIFT COMPLETE</b>':'SHIFT LOST'}</h1><p>${win?'You survived because the work kept being maintained.':'The cold emptied your Grit. Build earlier, feed the fire, and use daylight to recover.'}</p><p><b>Built:</b> ${buildings.length} · <b>Reached:</b> Day ${day}</p><button id="again">CLOCK IN AGAIN</button></div>`;intro.style.display='grid';$('#again').onclick=start}function start(){reset();intro.style.display='none';running=true;last=performance.now();toast('DAYLIGHT IS BURNING.')}$('#start').onclick=start;
+const map={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right'};addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(map[k]){keys[map[k]]=1;e.preventDefault()}if(k==='e')action();if(k==='1')build('fire');if(k==='2')build('shelter')});addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(map[k])keys[map[k]]=0});document.querySelectorAll('[data-key]').forEach(b=>{const k=b.dataset.key;b.onpointerdown=e=>{e.preventDefault();k==='action'?action():keys[k]=1};b.onpointerup=b.onpointercancel=b.onpointerleave=e=>{if(k!=='action')keys[k]=0}});fireBtn.onclick=()=>build('fire');shelterBtn.onclick=()=>build('shelter');document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.up=keys.down=keys.left=keys.right=0;last=performance.now()}});reset();
 })();
-</script>
-</body>
-</html>
+</script></body></html>
