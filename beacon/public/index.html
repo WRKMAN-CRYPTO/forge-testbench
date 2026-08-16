@@ -53,12 +53,13 @@
 
     <section class="card pair-card">
       <p class="eyebrow">FORGE DISPLAY</p>
-      <h2>Pair a screen</h2>
-      <p>Create a one-time display link, then assign that URL to FORGE. It expires in 10 minutes and cannot be reused.</p>
-      <button id="pairButton" class="secondary">CREATE PAIR LINK</button>
-      <div id="pairResult" class="pair-result" hidden>
-        <input id="pairUrl" readonly />
-        <button id="copyPair" class="ghost">Copy</button>
+      <h2>Permanent display link</h2>
+      <p id="displayNote">Create this once, save it as a FORGE channel, and reuse it indefinitely.</p>
+      <button id="displayButton" class="secondary">CREATE DISPLAY LINK</button>
+      <button id="revokeDisplay" class="ghost" hidden>REVOKE DISPLAY LINK</button>
+      <div id="displayResult" class="pair-result" hidden>
+        <input id="displayUrl" readonly />
+        <button id="copyDisplay" class="ghost">Copy</button>
       </div>
     </section>
   </main>
