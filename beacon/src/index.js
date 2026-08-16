@@ -1,8 +1,5 @@
 const TASKS_KEY = "beacon:tasks";
-const PAIR_PREFIX = "beacon:pair:";
-const SESSION_PREFIX = "beacon:session:";
-const PAIR_TTL_MS = 10 * 60 * 1000;
-const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const DISPLAY_KEY = "beacon:display-key";
 const LANES = new Set(["now", "soon", "later"]);
 
 function json(data, init = {}) {
@@ -12,7 +9,7 @@ function json(data, init = {}) {
   return new Response(JSON.stringify(data), { ...init, headers });
 }
 
-function randomToken(bytes = 24) {
+function randomToken(bytes = 32) {
   const data = new Uint8Array(bytes);
   crypto.getRandomValues(data);
   return btoa(String.fromCharCode(...data))
@@ -44,31 +41,25 @@ function bearer(request) {
   return header.startsWith("Bearer ") ? header.slice(7) : "";
 }
 
-function cookieValue(request, name) {
-  const cookie = request.headers.get("cookie") || "";
-  for (const part of cookie.split(";")) {
-    const [key, ...rest] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(rest.join("="));
-  }
-  return "";
+function displayCredential(request) {
+  return request.headers.get("x-beacon-display") || "";
 }
 
 async function hasControlAuth(request, env) {
   return Boolean(env.BEACON_KEY) && constantTimeEqual(bearer(request), env.BEACON_KEY);
 }
 
-async function hasDisplaySession(request, env) {
-  const token = cookieValue(request, "beacon_session");
+async function hasDisplayAuth(request, env) {
+  const token = displayCredential(request);
   if (!token) return false;
-  const hash = await sha256Hex(token);
-  const session = await env.BEACON_STATE.get(`${SESSION_PREFIX}${hash}`, "json");
-  if (!session || Number(session.expiresAt || 0) <= Date.now()) return false;
-  return true;
+  const record = await env.BEACON_STATE.get(DISPLAY_KEY, "json");
+  if (!record?.hash) return false;
+  return constantTimeEqual(await sha256Hex(token), record.hash);
 }
 
 async function canRead(request, env) {
   if (await hasControlAuth(request, env)) return true;
-  return hasDisplaySession(request, env);
+  return hasDisplayAuth(request, env);
 }
 
 async function readTasks(env) {
@@ -99,8 +90,7 @@ function normalizeTaskInput(input) {
 async function handleTasks(request, env, url) {
   if (request.method === "GET") {
     if (!(await canRead(request, env))) return json({ error: "Unauthorized." }, { status: 401 });
-    const tasks = await readTasks(env);
-    return json({ tasks });
+    return json({ tasks: await readTasks(env) });
   }
 
   if (!(await hasControlAuth(request, env))) {
@@ -135,8 +125,7 @@ async function handleTasks(request, env, url) {
     const index = tasks.findIndex((task) => task.id === match[1]);
     if (index < 0) return json({ error: "Task not found." }, { status: 404 });
 
-    const current = tasks[index];
-    const next = { ...current };
+    const next = { ...tasks[index] };
     if (body.lane !== undefined) {
       const lane = String(body.lane).toLowerCase();
       if (!LANES.has(lane)) return json({ error: "Invalid lane." }, { status: 400 });
@@ -153,47 +142,31 @@ async function handleTasks(request, env, url) {
   return json({ error: "Method not allowed." }, { status: 405 });
 }
 
-async function createPair(request, env, url) {
+async function handleDisplayLink(request, env, url) {
   if (!(await hasControlAuth(request, env))) return json({ error: "Unauthorized." }, { status: 401 });
-  const token = randomToken(24);
-  const hash = await sha256Hex(token);
-  await env.BEACON_STATE.put(`${PAIR_PREFIX}${hash}`, JSON.stringify({ expiresAt: Date.now() + PAIR_TTL_MS }), {
-    expirationTtl: Math.ceil(PAIR_TTL_MS / 1000),
-  });
-  const displayUrl = `${url.origin}/display?pair=${encodeURIComponent(token)}`;
-  return json({ displayUrl, expiresInSeconds: PAIR_TTL_MS / 1000 });
-}
 
-async function exchangePair(request, env) {
-  let body;
-  try { body = await request.json(); } catch { return json({ error: "Invalid JSON body." }, { status: 400 }); }
-  const pair = String(body?.pair || "");
-  if (!pair) return json({ error: "Pair token is required." }, { status: 400 });
-
-  const pairHash = await sha256Hex(pair);
-  const key = `${PAIR_PREFIX}${pairHash}`;
-  const record = await env.BEACON_STATE.get(key, "json");
-  if (!record || Number(record.expiresAt || 0) <= Date.now()) {
-    return json({ error: "Pair token is invalid or expired." }, { status: 401 });
+  if (request.method === "GET") {
+    const record = await env.BEACON_STATE.get(DISPLAY_KEY, "json");
+    return json({ configured: Boolean(record?.hash), createdAt: record?.createdAt || null });
   }
-  await env.BEACON_STATE.delete(key);
 
-  const session = randomToken(32);
-  const sessionHash = await sha256Hex(session);
-  await env.BEACON_STATE.put(
-    `${SESSION_PREFIX}${sessionHash}`,
-    JSON.stringify({ expiresAt: Date.now() + SESSION_TTL_MS }),
-    { expirationTtl: Math.ceil(SESSION_TTL_MS / 1000) },
-  );
+  if (request.method === "POST") {
+    const token = randomToken(32);
+    const record = {
+      hash: await sha256Hex(token),
+      createdAt: new Date().toISOString(),
+    };
+    await env.BEACON_STATE.put(DISPLAY_KEY, JSON.stringify(record));
+    const displayUrl = `${url.origin}/display#key=${encodeURIComponent(token)}`;
+    return json({ displayUrl, createdAt: record.createdAt }, { status: 201 });
+  }
 
-  return json(
-    { ok: true },
-    {
-      headers: {
-        "set-cookie": `beacon_session=${encodeURIComponent(session)}; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}; HttpOnly; Secure; SameSite=Lax`,
-      },
-    },
-  );
+  if (request.method === "DELETE") {
+    await env.BEACON_STATE.delete(DISPLAY_KEY);
+    return json({ ok: true });
+  }
+
+  return json({ error: "Method not allowed." }, { status: 405, headers: { allow: "GET, POST, DELETE" } });
 }
 
 export default {
@@ -210,11 +183,8 @@ export default {
       if (url.pathname === "/api/tasks" || url.pathname.startsWith("/api/tasks/")) {
         return handleTasks(request, env, url);
       }
-      if (url.pathname === "/api/pair" && request.method === "POST") {
-        return createPair(request, env, url);
-      }
-      if (url.pathname === "/api/display-session" && request.method === "POST") {
-        return exchangePair(request, env);
+      if (url.pathname === "/api/display-link") {
+        return handleDisplayLink(request, env, url);
       }
 
       return env.ASSETS.fetch(request);
