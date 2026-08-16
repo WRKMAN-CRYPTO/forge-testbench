@@ -30,8 +30,10 @@ button { cursor: pointer; }
 
 .card { background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 14px; }
 .eyebrow { margin: 0 0 8px; color: var(--muted); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; }
-.device-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.device-row, .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .device-name { margin: 0; font-size: 1.55rem; }
+.section-title { font-size: 1.15rem; font-weight: 800; }
+.channel-count { min-width: 34px; height: 34px; display: grid; place-items: center; border-radius: 999px; background: #0c1115; border: 1px solid var(--line); color: var(--muted); font-weight: 800; }
 .status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .86rem; }
 .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .status.good::before { background: var(--good); box-shadow: 0 0 12px rgba(111,224,154,.4); }
@@ -48,15 +50,31 @@ input:focus { border-color: #66727d; box-shadow: 0 0 0 3px rgba(255,255,255,.04)
 .primary { background: var(--accent); color: #101500; }
 .secondary { background: #202830; color: var(--text); border-color: var(--line); }
 .danger { background: transparent; color: var(--bad); border-color: rgba(255,122,122,.35); }
+.compact { width: auto; padding-inline: 18px; }
+.button-row { display: flex; gap: 8px; align-items: stretch; }
+.button-row .primary { flex: 1; }
 button:disabled { opacity: .45; cursor: default; }
 
 .message { min-height: 20px; margin: 10px 2px 0; font-size: .84rem; color: var(--muted); }
 .message.good { color: var(--good); }
 .message.bad { color: var(--bad); }
 
-.history { display: grid; gap: 8px; margin-top: 10px; }
-.history button { text-align: left; background: #0d1216; border: 1px solid var(--line); border-radius: 12px; color: var(--text); padding: 12px; }
-.history small { display: block; color: var(--muted); margin-top: 3px; overflow-wrap: anywhere; }
+.channels { display: grid; gap: 10px; margin-top: 14px; }
+.empty-note { border: 1px dashed var(--line); border-radius: 13px; padding: 18px; color: var(--muted); text-align: center; font-size: .88rem; }
+.channel-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+.channel-send { min-width: 0; text-align: left; background: #0c1115; border: 1px solid var(--line); border-radius: 14px; color: var(--text); padding: 14px 15px; }
+.channel-send:active { transform: scale(.99); border-color: var(--accent); }
+.channel-send strong { display: block; font-size: 1.05rem; letter-spacing: .04em; }
+.channel-send small { display: block; color: var(--muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.channel-tools { display: grid; gap: 6px; width: 70px; }
+.channel-tools button { border: 1px solid var(--line); border-radius: 10px; background: #151c22; color: var(--muted); font-size: .66rem; font-weight: 800; letter-spacing: .05em; }
+.channel-tools .channel-delete { color: var(--bad); border-color: rgba(255,122,122,.25); background: transparent; }
+
+.custom-card summary { cursor: pointer; list-style: none; font-weight: 800; color: var(--muted); }
+.custom-card summary::-webkit-details-marker { display: none; }
+.custom-card summary::after { content: "+"; float: right; color: var(--accent); font-size: 1.2rem; }
+.custom-card[open] summary::after { content: "−"; }
+.custom-body { padding-top: 10px; }
 
 .viewer, .viewer body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 #stage { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
@@ -69,3 +87,9 @@ button:disabled { opacity: .45; cursor: default; }
 .viewer-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); margin-right: 8px; }
 .viewer-dot.good { background: var(--good); }
 .viewer-dot.bad { background: var(--bad); }
+
+@media (max-width: 430px) {
+  .control-shell { padding-inline: 12px; }
+  .card { padding: 15px; border-radius: 16px; }
+  .channel-tools { width: 62px; }
+}
