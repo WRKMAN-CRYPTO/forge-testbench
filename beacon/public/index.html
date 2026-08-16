@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f0d" />
+  <title>BEACON</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="app-shell">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">FORGE // BEACON</p>
+      <h1>Catch it before it runs.</h1>
+    </div>
+    <span id="status" class="status">LOCKED</span>
+  </header>
+
+  <main>
+    <section class="card auth-card">
+      <label for="keyInput">Control key</label>
+      <div class="row">
+        <input id="keyInput" type="password" autocomplete="current-password" placeholder="BEACON_KEY" />
+        <button id="unlockButton" class="secondary">Unlock</button>
+      </div>
+      <label class="remember"><input id="rememberKey" type="checkbox" /> Remember on this phone</label>
+    </section>
+
+    <section class="card capture-card">
+      <label for="taskInput">What just crossed your mind?</label>
+      <textarea id="taskInput" rows="3" maxlength="240" placeholder="Call the dentist, buy filter, check valve order…"></textarea>
+      <div class="lanes" role="group" aria-label="Task timing">
+        <button data-lane="now">NOW</button>
+        <button data-lane="soon" class="active">SOON</button>
+        <button data-lane="later">LATER</button>
+      </div>
+      <details>
+        <summary>Add due time</summary>
+        <input id="dueInput" type="datetime-local" />
+      </details>
+      <button id="addButton" class="primary">ADD TO BEACON</button>
+      <p id="message" class="message" aria-live="polite"></p>
+    </section>
+
+    <section class="section-head">
+      <div>
+        <p class="eyebrow">ACTIVE SIGNALS</p>
+        <h2 id="taskCount">0 tasks</h2>
+      </div>
+      <button id="refreshButton" class="ghost">Refresh</button>
+    </section>
+    <section id="taskList" class="task-list"></section>
+
+    <section class="card pair-card">
+      <p class="eyebrow">FORGE DISPLAY</p>
+      <h2>Pair a screen</h2>
+      <p>Create a one-time display link, then assign that URL to FORGE. It expires in 10 minutes and cannot be reused.</p>
+      <button id="pairButton" class="secondary">CREATE PAIR LINK</button>
+      <div id="pairResult" class="pair-result" hidden>
+        <input id="pairUrl" readonly />
+        <button id="copyPair" class="ghost">Copy</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
