@@ -6,10 +6,12 @@ const els = {
   dueInput: document.querySelector('#dueInput'),
   addButton: document.querySelector('#addButton'),
   refreshButton: document.querySelector('#refreshButton'),
-  pairButton: document.querySelector('#pairButton'),
-  pairResult: document.querySelector('#pairResult'),
-  pairUrl: document.querySelector('#pairUrl'),
-  copyPair: document.querySelector('#copyPair'),
+  displayButton: document.querySelector('#displayButton'),
+  revokeDisplay: document.querySelector('#revokeDisplay'),
+  displayResult: document.querySelector('#displayResult'),
+  displayUrl: document.querySelector('#displayUrl'),
+  copyDisplay: document.querySelector('#copyDisplay'),
+  displayNote: document.querySelector('#displayNote'),
   message: document.querySelector('#message'),
   taskList: document.querySelector('#taskList'),
   taskCount: document.querySelector('#taskCount'),
@@ -20,6 +22,7 @@ const els = {
 const KEY_STORE = 'beacon:control-key';
 let lane = 'soon';
 let tasks = [];
+let displayConfigured = false;
 
 function key() { return els.keyInput.value; }
 function authHeaders(json = false) {
@@ -42,6 +45,13 @@ function dueLabel(task) {
   return `Due ${d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
 }
 function laneLabel(value) { return value.toUpperCase(); }
+function renderDisplayState() {
+  els.displayButton.textContent = displayConfigured ? 'REPLACE DISPLAY LINK' : 'CREATE DISPLAY LINK';
+  els.revokeDisplay.hidden = !displayConfigured;
+  els.displayNote.textContent = displayConfigured
+    ? 'A permanent read-only display link is active. Keep using the one already saved in FORGE unless you replace it.'
+    : 'Create this once, save it as a FORGE channel, and reuse it indefinitely.';
+}
 
 function render() {
   const active = tasks.filter((task) => !task.completedAt);
@@ -102,6 +112,13 @@ async function api(path, init = {}) {
   return payload;
 }
 
+async function refreshDisplayState() {
+  if (!key()) return;
+  const data = await api('/api/display-link', { headers: authHeaders() });
+  displayConfigured = Boolean(data.configured);
+  renderDisplayState();
+}
+
 async function refresh() {
   if (!key()) {
     setStatus('LOCKED');
@@ -111,6 +128,7 @@ async function refresh() {
     const data = await api('/api/tasks', { headers: authHeaders() });
     tasks = data.tasks || [];
     render();
+    await refreshDisplayState();
     setStatus('CONNECTED', true);
     if (els.rememberKey.checked) localStorage.setItem(KEY_STORE, key());
   } catch (error) {
@@ -155,24 +173,42 @@ els.addButton.addEventListener('click', async () => {
   finally { els.addButton.disabled = false; }
 });
 
-els.pairButton.addEventListener('click', async () => {
+els.displayButton.addEventListener('click', async () => {
   message();
-  els.pairButton.disabled = true;
+  if (displayConfigured && !confirm('Replace the permanent display link? The old BEACON channel link will stop working immediately.')) return;
+  els.displayButton.disabled = true;
   try {
-    const data = await api('/api/pair', { method: 'POST', headers: authHeaders() });
-    els.pairUrl.value = data.displayUrl;
-    els.pairResult.hidden = false;
-    message('Pair link ready. It works once and expires in 10 minutes.', 'good');
+    const data = await api('/api/display-link', { method: 'POST', headers: authHeaders() });
+    displayConfigured = true;
+    els.displayUrl.value = data.displayUrl;
+    els.displayResult.hidden = false;
+    renderDisplayState();
+    message('Permanent display link ready. Save this URL as your BEACON channel in FORGE.', 'good');
   } catch (error) { message(error.message, 'bad'); }
-  finally { els.pairButton.disabled = false; }
+  finally { els.displayButton.disabled = false; }
 });
 
-els.copyPair.addEventListener('click', async () => {
+els.revokeDisplay.addEventListener('click', async () => {
+  if (!confirm('Revoke the current display link? BEACON will disappear from every screen using it.')) return;
+  message();
+  els.revokeDisplay.disabled = true;
   try {
-    await navigator.clipboard.writeText(els.pairUrl.value);
-    els.copyPair.textContent = 'COPIED';
-    setTimeout(() => { els.copyPair.textContent = 'Copy'; }, 1200);
-  } catch { els.pairUrl.select(); }
+    await api('/api/display-link', { method: 'DELETE', headers: authHeaders() });
+    displayConfigured = false;
+    els.displayResult.hidden = true;
+    els.displayUrl.value = '';
+    renderDisplayState();
+    message('Display link revoked.', 'good');
+  } catch (error) { message(error.message, 'bad'); }
+  finally { els.revokeDisplay.disabled = false; }
+});
+
+els.copyDisplay.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(els.displayUrl.value);
+    els.copyDisplay.textContent = 'COPIED';
+    setTimeout(() => { els.copyDisplay.textContent = 'Copy'; }, 1200);
+  } catch { els.displayUrl.select(); }
 });
 
 els.rememberKey.addEventListener('change', () => {
@@ -186,3 +222,4 @@ if (stored) {
   refresh();
 }
 render();
+renderDisplayState();

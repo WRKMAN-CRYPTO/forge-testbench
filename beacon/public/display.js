@@ -12,6 +12,10 @@ const els = {
   laterCount: document.querySelector('#laterCount'),
 };
 
+function displayKey() {
+  const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
+  return new URLSearchParams(hash).get('key') || '';
+}
 function setStatus(text, good = false) {
   els.status.textContent = text;
   els.status.className = `status ${good ? 'good' : ''}`.trim();
@@ -53,29 +57,22 @@ function render(tasks) {
   renderLane(els.laterTasks, els.laterCount, active.filter((task) => task.lane === 'later'));
 }
 
-async function exchangePair() {
-  const params = new URLSearchParams(location.search);
-  const pair = params.get('pair');
-  if (!pair) return;
-  showOverlay('Pairing screen…', 'Trading the one-time link for a display session.');
-  const response = await fetch('/api/display-session', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pair }),
-  });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.error || 'Pairing failed.');
-  }
-  history.replaceState({}, '', '/display');
-}
-
 async function poll() {
+  const key = displayKey();
+  if (!key) {
+    setStatus('UNPAIRED');
+    showOverlay('This screen needs a display link.', 'Create a permanent display link from your BEACON phone controller and save it as a FORGE channel.');
+    return;
+  }
+
   try {
-    const response = await fetch('/api/tasks', { cache: 'no-store' });
+    const response = await fetch('/api/tasks', {
+      cache: 'no-store',
+      headers: { 'x-beacon-display': key },
+    });
     if (response.status === 401) {
-      setStatus('UNPAIRED');
-      showOverlay('This screen needs pairing.', 'Create a fresh pair link from your BEACON phone controller and send it here through FORGE.');
+      setStatus('LINK INVALID');
+      showOverlay('Display link no longer valid.', 'Create or regenerate the permanent BEACON display link, then update the saved FORGE channel once.');
       return;
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -88,11 +85,5 @@ async function poll() {
   }
 }
 
-try {
-  await exchangePair();
-  await poll();
-} catch (error) {
-  setStatus('PAIR FAILED');
-  showOverlay('Pairing failed.', error.message || 'Create a new pair link and try again.');
-}
+await poll();
 setInterval(poll, POLL_MS);
