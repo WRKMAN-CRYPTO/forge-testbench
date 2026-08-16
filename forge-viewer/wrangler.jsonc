@@ -16,6 +16,20 @@
       "id": "c6d9433d802f4c56897e58200cdddf42"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "FORGE_DEVICE",
+        "class_name": "ForgeDevice"
+      }
+    ]
+  },
+  "exports": {
+    "ForgeDevice": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1

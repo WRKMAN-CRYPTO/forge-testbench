@@ -1,4 +1,5 @@
-const POLL_MS = 10000;
+const FALLBACK_POLL_MS = 30000;
+const RECONNECT_MS = 2000;
 const CACHE_PREFIX = "forge:last-assignment:";
 const DEVICE_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
@@ -14,6 +15,8 @@ const cacheKey = CACHE_PREFIX + device;
 let activeUrl = "";
 let activeRevision = -1;
 let hasLoadedFrame = false;
+let socket = null;
+let reconnectTimer = null;
 
 function status(text, kind = "") {
   noteEl.textContent = text;
@@ -43,10 +46,11 @@ function applyAssignment(state, source = "remote") {
   }
 
   const nextUrl = state.assignment.url;
-  if (nextUrl === activeUrl && Number(state.revision || 0) === activeRevision) return;
+  const nextRevision = Number(state.revision || 0);
+  if (nextUrl === activeUrl && nextRevision === activeRevision) return;
 
   activeUrl = nextUrl;
-  activeRevision = Number(state.revision || 0);
+  activeRevision = nextRevision;
   hasLoadedFrame = false;
   showOverlay(true);
   status(source === "cache" ? "Restoring last assignment…" : `Loading ${state.assignment.label || "project"}…`);
@@ -58,7 +62,7 @@ stage.addEventListener("load", () => {
   if (!activeUrl) return;
   hasLoadedFrame = true;
   showOverlay(false);
-  status("Project loaded.", "good");
+  status(socket?.readyState === WebSocket.OPEN ? "Live switchboard connected." : "Project loaded.", "good");
 });
 
 async function poll() {
@@ -73,14 +77,13 @@ async function poll() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const state = await response.json();
     if (state.assignment) {
-      applyAssignment(state);
+      applyAssignment(state, "poll");
       if (hasLoadedFrame) showOverlay(false);
     } else if (!activeUrl) {
       showOverlay(true);
       status("Waiting for assignment…");
     }
   } catch {
-    // Core failure rule: never destroy a working display because control-plane polling failed.
     if (!activeUrl) {
       const cached = readCached();
       if (cached?.assignment?.url) {
@@ -93,8 +96,45 @@ async function poll() {
   }
 }
 
+function scheduleReconnect() {
+  clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(connectLive, RECONNECT_MS);
+}
+
+function connectLive() {
+  if (!device) return;
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  socket = new WebSocket(`${protocol}//${location.host}/api/device/${encodeURIComponent(device)}/stream`);
+
+  socket.addEventListener("open", () => {
+    if (hasLoadedFrame) status("Live switchboard connected.", "good");
+  });
+
+  socket.addEventListener("message", (event) => {
+    try {
+      const message = JSON.parse(event.data);
+      if (message?.type === "state" && message.state) {
+        applyAssignment(message.state, "live");
+      }
+    } catch {}
+  });
+
+  socket.addEventListener("close", () => {
+    socket = null;
+    if (hasLoadedFrame) status("Reconnecting live switchboard…");
+    scheduleReconnect();
+  });
+
+  socket.addEventListener("error", () => {
+    try { socket.close(); } catch {}
+  });
+}
+
 deviceEl.textContent = device ? device.toUpperCase() : "INVALID SCREEN";
 const cached = readCached();
 if (cached?.assignment?.url) applyAssignment(cached, "cache");
 poll();
-setInterval(poll, POLL_MS);
+connectLive();
+setInterval(poll, FALLBACK_POLL_MS);
