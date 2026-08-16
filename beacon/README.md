@@ -1,4 +1,4 @@
-# BEACON v0.1
+# BEACON v0.2
 
 **Capture anywhere. See what matters. Finish what’s next.**
 
@@ -11,17 +11,19 @@ BEACON is a single-user task hub designed around fast capture on a phone and a p
 - Optional due time.
 - Mark tasks done.
 - Live ambient display for a TV or other FORGE screen.
-- One-time display pairing links. The permanent BEACON control key is never placed in the FORGE assignment URL.
+- Permanent read-only display links. The permanent BEACON control key is never placed in the FORGE assignment URL.
 
 ## Architecture
 
 - Cloudflare Worker + Static Assets.
 - Workers KV binding named `BEACON_STATE`.
 - Worker secret named `BEACON_KEY` protects task writes and phone access.
-- TV display gets a long-lived HttpOnly session by exchanging a one-time pairing link.
+- A separate random display credential grants read-only task access.
+- Only a SHA-256 hash of the display credential is stored in KV.
+- The display credential travels in the URL fragment (`#key=...`), so it is not sent to the server as part of the page request. Display JavaScript presents it only to the read API in the `x-beacon-display` header.
 - Task state is stored under the `beacon:` KV key prefix.
 
-The task list intentionally lives as one small JSON document in KV for v0.1. BEACON is a personal tool with low write concurrency; a relational database would add machinery without improving the first job.
+The task list intentionally lives as one small JSON document in KV. BEACON is a personal tool with low write concurrency; a relational database would add machinery without improving the first job.
 
 ## Routes
 
@@ -29,37 +31,25 @@ The task list intentionally lives as one small JSON document in KV for v0.1. BEA
 - `/display` ambient display.
 - `/api/tasks` read/add tasks.
 - `/api/tasks/:id` move/complete task.
-- `/api/pair` create a one-time display link.
-- `/api/display-session` exchange a pair token for a display session.
+- `/api/display-link` inspect, create/replace, or revoke the permanent display credential.
 
 ## Cloudflare setup
 
-Before production deploy, add a dedicated KV namespace and put it in `wrangler.jsonc`:
-
-```jsonc
-"kv_namespaces": [
-  {
-    "binding": "BEACON_STATE",
-    "id": "YOUR_NAMESPACE_ID"
-  }
-]
-```
-
-Then add a Worker secret named `BEACON_KEY`.
+BEACON needs a dedicated KV namespace bound in `wrangler.jsonc` as `BEACON_STATE`, plus a Worker secret named `BEACON_KEY`.
 
 Do not commit the secret.
 
 ## FORGE setup
 
 1. Open BEACON on the phone and unlock it with `BEACON_KEY`.
-2. Tap **CREATE PAIR LINK**.
-3. Copy the returned one-time `/display?pair=...` URL.
-4. Assign that URL to the desired FORGE device.
-5. On first load, BEACON exchanges the token for an HttpOnly display session and removes the pair token from its visible URL.
+2. Tap **CREATE DISPLAY LINK**.
+3. Copy the returned `/display#key=...` URL.
+4. Save that URL as the BEACON channel in FORGE.
+5. Reuse the channel indefinitely.
 
-Pair links expire after 10 minutes and can only be used once.
+The display link is read-only and does not expire or get consumed. Replacing or revoking it immediately invalidates the old link. The control key remains separate and never enters FORGE.
 
-## Deliberately not in v0.1
+## Deliberately not in v0.2
 
 - accounts
 - projects or nested task lists
