@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#080a0c" />
+  <title>FORGE Control</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="control-shell">
+    <div class="brand"><span class="brand-mark"></span><strong>FORGE // CONTROL</strong></div>
+
+    <section class="card">
+      <p class="eyebrow">Screen</p>
+      <div class="device-row">
+        <h1 class="device-name" id="deviceTitle">FORGE-01</h1>
+        <span class="status" id="connectionStatus">CHECKING</span>
+      </div>
+      <label for="deviceInput">Device ID</label>
+      <input id="deviceInput" autocapitalize="none" autocomplete="off" spellcheck="false" value="forge-01" />
+    </section>
+
+    <section class="card">
+      <p class="eyebrow">Now Displaying</p>
+      <div class="current-label" id="currentLabel">Unassigned</div>
+      <div class="current-url" id="currentUrl">No project URL assigned.</div>
+    </section>
+
+    <section class="card">
+      <p class="eyebrow">Assign Project</p>
+      <label for="labelInput">Label</label>
+      <input id="labelInput" placeholder="CONSTELLATION" maxlength="80" />
+      <label for="urlInput">Project URL</label>
+      <input id="urlInput" type="url" inputmode="url" autocapitalize="none" autocomplete="url" spellcheck="false" placeholder="https://…" />
+      <label for="keyInput">Control Key</label>
+      <input id="keyInput" type="password" autocomplete="current-password" placeholder="Stored only for this tab" />
+      <button class="primary" id="assignButton">PUT IT ON THE FORGE</button>
+      <button class="danger" id="clearButton">CLEAR SCREEN ASSIGNMENT</button>
+      <p class="message" id="message"></p>
+    </section>
+
+    <section class="card" id="historyCard" hidden>
+      <p class="eyebrow">Recent Projects</p>
+      <div class="history" id="history"></div>
+    </section>
+  </main>
+  <script type="module" src="/control.js"></script>
+</body>
+</html>
