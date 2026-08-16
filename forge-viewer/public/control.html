@@ -28,21 +28,55 @@
     </section>
 
     <section class="card">
-      <p class="eyebrow">Assign Project</p>
-      <label for="labelInput">Label</label>
-      <input id="labelInput" placeholder="CONSTELLATION" maxlength="80" />
-      <label for="urlInput">Project URL</label>
-      <input id="urlInput" type="url" inputmode="url" autocapitalize="none" autocomplete="url" spellcheck="false" placeholder="https://…" />
+      <p class="eyebrow">Control Access</p>
       <label for="keyInput">Control Key</label>
-      <input id="keyInput" type="password" autocomplete="current-password" placeholder="Stored only for this tab" />
-      <button class="primary" id="assignButton">PUT IT ON THE FORGE</button>
-      <button class="danger" id="clearButton">CLEAR SCREEN ASSIGNMENT</button>
-      <p class="message" id="message"></p>
+      <input id="keyInput" type="password" autocomplete="current-password" placeholder="Kept only in this tab" />
+      <button class="secondary" id="loadChannelsButton">LOAD CHANNELS</button>
+      <p class="message" id="authMessage"></p>
     </section>
 
-    <section class="card" id="historyCard" hidden>
-      <p class="eyebrow">Recent Projects</p>
-      <div class="history" id="history"></div>
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Channels</p>
+          <div class="section-title">Saved destinations</div>
+        </div>
+        <span class="channel-count" id="channelCount">0</span>
+      </div>
+      <div class="channels" id="channels">
+        <div class="empty-note" id="channelsEmpty">Enter the control key to load channels.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <p class="eyebrow">Save Channel</p>
+      <input id="channelIdInput" type="hidden" />
+      <label for="channelNameInput">Channel Name</label>
+      <input id="channelNameInput" maxlength="40" placeholder="BEACON" />
+      <label for="channelUrlInput">Destination URL</label>
+      <input id="channelUrlInput" type="url" inputmode="url" autocapitalize="none" autocomplete="url" spellcheck="false" placeholder="https://…" />
+      <div class="button-row">
+        <button class="primary" id="saveChannelButton">SAVE CHANNEL</button>
+        <button class="secondary compact" id="cancelChannelButton" hidden>CANCEL</button>
+      </div>
+      <p class="message" id="channelMessage"></p>
+    </section>
+
+    <details class="card custom-card">
+      <summary>Custom URL</summary>
+      <div class="custom-body">
+        <p class="eyebrow">One-off destination</p>
+        <label for="labelInput">Label</label>
+        <input id="labelInput" placeholder="CONSTELLATION" maxlength="80" />
+        <label for="urlInput">Project URL</label>
+        <input id="urlInput" type="url" inputmode="url" autocapitalize="none" autocomplete="url" spellcheck="false" placeholder="https://…" />
+        <button class="primary" id="assignButton">PUT IT ON THE FORGE</button>
+      </div>
+    </details>
+
+    <section class="card">
+      <button class="danger" id="clearButton">CLEAR SCREEN ASSIGNMENT</button>
+      <p class="message" id="message"></p>
     </section>
   </main>
   <script type="module" src="/control.js"></script>
