@@ -10,6 +10,12 @@
     "html_handling": "none",
     "run_worker_first": ["/api/*", "/view/*", "/"]
   },
+  "kv_namespaces": [
+    {
+      "binding": "FORGE_STATE",
+      "id": "c6d9433d802f4c56897e58200cdddf42"
+    }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
