@@ -1,6 +1,9 @@
 const DEVICE_ID_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const MAX_LABEL_LENGTH = 80;
+const MAX_CHANNEL_NAME_LENGTH = 40;
 const MAX_URL_LENGTH = 2048;
+const MAX_CHANNELS = 40;
+const CHANNELS_KEY = "forge:channels";
 
 function json(data, init = {}) {
   const headers = new Headers(init.headers || {});
@@ -50,6 +53,20 @@ function validateAssignment(input) {
   };
 }
 
+function validateChannel(input) {
+  const name = String(input?.name || "").trim().slice(0, MAX_CHANNEL_NAME_LENGTH);
+  if (!name) return { ok: false, error: "Channel name is required." };
+  const assignment = validateAssignment({ url: input?.url, label: name });
+  if (!assignment.ok) return assignment;
+  return {
+    ok: true,
+    value: {
+      name,
+      url: assignment.value.url,
+    },
+  };
+}
+
 async function verifyControlKey(request, expected) {
   if (!expected) return false;
   const header = request.headers.get("authorization") || "";
@@ -76,7 +93,82 @@ async function getDevice(env, deviceId) {
   };
 }
 
-async function handleApi(request, env, pathname) {
+async function getChannels(env) {
+  const value = await env.FORGE_STATE.get(CHANNELS_KEY, "json");
+  return Array.isArray(value) ? value : [];
+}
+
+async function saveChannels(env, channels) {
+  await env.FORGE_STATE.put(CHANNELS_KEY, JSON.stringify(channels));
+}
+
+async function handleChannels(request, env, pathname) {
+  if (!(await verifyControlKey(request, env.CONTROL_KEY))) {
+    return json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  if (pathname === "/api/channels" && request.method === "GET") {
+    return json({ channels: await getChannels(env) });
+  }
+
+  if (pathname === "/api/channels" && request.method === "POST") {
+    let body;
+    try { body = await request.json(); }
+    catch { return json({ error: "Invalid JSON body." }, { status: 400 }); }
+
+    const parsed = validateChannel(body);
+    if (!parsed.ok) return json({ error: parsed.error }, { status: 400 });
+
+    const channels = await getChannels(env);
+    if (channels.length >= MAX_CHANNELS) {
+      return json({ error: `FORGE supports up to ${MAX_CHANNELS} saved channels.` }, { status: 409 });
+    }
+
+    const now = new Date().toISOString();
+    const channel = {
+      id: crypto.randomUUID(),
+      ...parsed.value,
+      createdAt: now,
+      updatedAt: now,
+    };
+    channels.push(channel);
+    await saveChannels(env, channels);
+    return json({ channel }, { status: 201 });
+  }
+
+  const match = pathname.match(/^\/api\/channels\/([0-9a-f-]{36})$/i);
+  if (!match) return json({ error: "Not found." }, { status: 404 });
+
+  const channels = await getChannels(env);
+  const index = channels.findIndex((channel) => channel.id === match[1]);
+  if (index < 0) return json({ error: "Channel not found." }, { status: 404 });
+
+  if (request.method === "PUT") {
+    let body;
+    try { body = await request.json(); }
+    catch { return json({ error: "Invalid JSON body." }, { status: 400 }); }
+
+    const parsed = validateChannel(body);
+    if (!parsed.ok) return json({ error: parsed.error }, { status: 400 });
+    channels[index] = {
+      ...channels[index],
+      ...parsed.value,
+      updatedAt: new Date().toISOString(),
+    };
+    await saveChannels(env, channels);
+    return json({ channel: channels[index] });
+  }
+
+  if (request.method === "DELETE") {
+    const [removed] = channels.splice(index, 1);
+    await saveChannels(env, channels);
+    return json({ channel: removed });
+  }
+
+  return json({ error: "Method not allowed." }, { status: 405 });
+}
+
+async function handleDevice(request, env, pathname) {
   const match = pathname.match(/^\/api\/device\/([^/]+)$/);
   if (!match) return json({ error: "Not found." }, { status: 404 });
 
@@ -93,11 +185,8 @@ async function handleApi(request, env, pathname) {
     }
 
     let body;
-    try {
-      body = await request.json();
-    } catch {
-      return json({ error: "Invalid JSON body." }, { status: 400 });
-    }
+    try { body = await request.json(); }
+    catch { return json({ error: "Invalid JSON body." }, { status: 400 }); }
 
     const assignment = validateAssignment(body);
     if (!assignment.ok) return json({ error: assignment.error }, { status: 400 });
@@ -133,6 +222,16 @@ async function handleApi(request, env, pathname) {
   return json({ error: "Method not allowed." }, { status: 405, headers: { allow: "GET, PUT, DELETE" } });
 }
 
+async function handleApi(request, env, pathname) {
+  if (pathname === "/api/channels" || pathname.startsWith("/api/channels/")) {
+    return handleChannels(request, env, pathname);
+  }
+  if (pathname.startsWith("/api/device/")) {
+    return handleDevice(request, env, pathname);
+  }
+  return json({ error: "Not found." }, { status: 404 });
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -161,4 +260,4 @@ export default {
   },
 };
 
-export { normalizeDeviceId, validateAssignment };
+export { normalizeDeviceId, validateAssignment, validateChannel };
