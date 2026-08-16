@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#050806" />
+  <title>BEACON Display</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="display-shell">
+  <header class="display-header">
+    <div>
+      <p class="eyebrow">BEACON // LIVE</p>
+      <h1>What matters next.</h1>
+    </div>
+    <span id="displayStatus" class="status">CONNECTING</span>
+  </header>
+
+  <main id="board" class="board">
+    <section class="column column-now">
+      <div class="column-head"><span>NOW</span><b id="nowCount">0</b></div>
+      <div id="nowTasks" class="display-tasks"></div>
+    </section>
+    <section class="column column-soon">
+      <div class="column-head"><span>SOON</span><b id="soonCount">0</b></div>
+      <div id="soonTasks" class="display-tasks"></div>
+    </section>
+    <section class="column column-later">
+      <div class="column-head"><span>LATER</span><b id="laterCount">0</b></div>
+      <div id="laterTasks" class="display-tasks"></div>
+    </section>
+  </main>
+
+  <div id="displayOverlay" class="display-overlay" hidden>
+    <div>
+      <p class="eyebrow">BEACON</p>
+      <h2 id="overlayTitle">Pairing screen…</h2>
+      <p id="overlayText">One moment.</p>
+    </div>
+  </div>
+
+  <script src="/display.js" type="module"></script>
+</body>
+</html>
