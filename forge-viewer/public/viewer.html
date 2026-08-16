@@ -1,0 +1,21 @@
+<!doctype html>
+<html class="viewer" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <title>FORGE Viewer</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <iframe id="stage" title="Assigned project" allow="autoplay; fullscreen; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  <div class="viewer-overlay" id="overlay">
+    <div class="viewer-card">
+      <div class="viewer-logo">FORGE</div>
+      <div class="viewer-device" id="device">SCREEN</div>
+      <div class="viewer-note"><span class="viewer-dot" id="dot"></span><span id="note">Waiting for assignment…</span></div>
+    </div>
+  </div>
+  <script type="module" src="/viewer.js"></script>
+</body>
+</html>
