@@ -1,1 +1,0 @@
-Temporary recovery marker: this test was accidentally started on main before branch isolation. The branch will preserve the test artifacts; main will be cleaned immediately after branch creation. Record as PATCH candidate: execution intent was not enforced before write.
