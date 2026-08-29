@@ -1,1 +1,121 @@
-<!-- placeholder; branch isolation recovery in progress -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>FORGE Hammer Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#08090d;--panel:#11141b;--card:#171b24;--text:#f4f6fb;--muted:#aab2c2;--border:#343b4b;--accent:#8ec5ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}body{padding:12px}.app{max-width:900px;margin:0 auto}.stage{position:relative;width:100%;aspect-ratio:4/3;min-height:320px;border:1px solid var(--border);border-radius:16px;overflow:hidden;background:radial-gradient(circle at 50% 35%,#1c2230 0,#0b0d13 50%,#050609 100%)}canvas{display:block;width:100%;height:100%}.loading{position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;background:#08090ddd}.toolbar,.panel,.status{margin-top:10px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}.toolbar{display:flex;gap:8px;flex-wrap:wrap;padding:10px}.panel{padding:10px}.panel[hidden]{display:none}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.group{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.label{font-size:13px;color:var(--muted);margin:8px 0 6px}.status{padding:10px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:13px}button,select,input{font:inherit}button,select{min-height:44px;border-radius:11px;border:1px solid var(--border);background:#171c27;color:var(--text);padding:0 12px}button.active{outline:2px solid var(--accent);outline-offset:1px}button.primary{background:#24334a}.grow{flex:1}.swatch{width:44px;padding:0}.swatch span{display:block;width:22px;height:22px;border-radius:999px;margin:auto;border:2px solid #ffffff88}input[type=range]{width:100%;min-height:44px}.hint{font-size:12px;color:var(--muted);line-height:1.35;margin-top:8px}@media(max-width:520px){.group{grid-template-columns:1fr}.stage{aspect-ratio:1/1.08;min-height:300px}}
+</style>
+</head>
+<body>
+<main class="app" id="hammerApp">
+  <section class="stage" id="stage" aria-label="Rotating 3D claw hammer preview"><div class="loading" id="loading">Forging geometry…</div></section>
+
+  <section class="toolbar" aria-label="Hammer controls">
+    <button id="toggle" class="primary grow" type="button" disabled>Pause</button>
+    <button id="left" type="button" disabled>↶ Rotate</button>
+    <button id="right" type="button" disabled>Rotate ↷</button>
+    <button id="customize" type="button" disabled aria-expanded="true">Hide controls</button>
+  </section>
+
+  <section class="panel" id="panel">
+    <div class="label">Handle construction</div>
+    <div class="group" id="handleTypes">
+      <button type="button" data-handle="hickory" class="active">Hickory + wedge</button>
+      <button type="button" data-handle="fiberglass">Fiberglass + grip</button>
+      <button type="button" data-handle="steel">Steel shank + grip</button>
+    </div>
+
+    <div class="label">Handle finish</div>
+    <div class="row" id="swatches">
+      <button type="button" class="swatch active" data-color="#b87b3f" aria-label="Natural"><span style="background:#b87b3f"></span></button>
+      <button type="button" class="swatch" data-color="#5a2e18" aria-label="Dark brown"><span style="background:#5a2e18"></span></button>
+      <button type="button" class="swatch" data-color="#b73535" aria-label="Red"><span style="background:#b73535"></span></button>
+      <button type="button" class="swatch" data-color="#1f5f94" aria-label="Blue"><span style="background:#1f5f94"></span></button>
+      <button type="button" class="swatch" data-color="#23272f" aria-label="Black"><span style="background:#23272f"></span></button>
+    </div>
+
+    <label class="label" for="length">Handle length <span id="lengthValue">14 in</span></label>
+    <input id="length" type="range" min="11" max="18" step="1" value="14" />
+    <div class="hint" id="constructionHint">A shaped wood handle passes through the head eye and is locked with a visible wedge detail.</div>
+  </section>
+
+  <section class="status"><span id="statusText" aria-live="polite">Loading 3D engine</span><span>FORGE test • model-first geometry</span></section>
+</main>
+
+<script type="module">
+(async()=>{
+const root=document.getElementById('hammerApp');if(!root||root.dataset.ready==='1')return;root.dataset.ready='1';
+const stage=root.querySelector('#stage'),loading=root.querySelector('#loading'),toggle=root.querySelector('#toggle'),left=root.querySelector('#left'),right=root.querySelector('#right'),customize=root.querySelector('#customize'),panel=root.querySelector('#panel'),lengthInput=root.querySelector('#length'),lengthValue=root.querySelector('#lengthValue'),statusText=root.querySelector('#statusText'),hint=root.querySelector('#constructionHint');
+let THREE;try{THREE=await import('https://cdn.jsdelivr.net/npm/three@0.180.0/+esm')}catch(e){loading.textContent='Three.js could not load in this environment.';statusText.textContent='3D unavailable';return}
+
+const state={domain:{handleType:'hickory',handleColor:'#b87b3f',handleLength:14},ui:{running:true,panelOpen:true,manualYaw:0,hidden:false,lastTime:performance.now()}};
+const queue=[];function capture(type,payload={}){if(queue.length<48)queue.push({type,payload})}
+function processInput(){while(queue.length){const e=queue.shift();if(e.type==='toggle')state.ui.running=!state.ui.running;if(e.type==='rotate')state.ui.manualYaw+=e.payload.delta;if(e.type==='panel')state.ui.panelOpen=!state.ui.panelOpen;if(e.type==='handle')state.domain.handleType=e.payload.value;if(e.type==='color')state.domain.handleColor=e.payload.value;if(e.type==='length')state.domain.handleLength=e.payload.value;if(e.type==='hidden'){state.ui.hidden=e.payload.value;state.ui.lastTime=performance.now()}}}
+
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x080a0f);const camera=new THREE.PerspectiveCamera(40,1,.1,50);camera.position.set(4.8,1.25,5.3);camera.lookAt(0,-.8,0);const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.outputColorSpace=THREE.SRGBColorSpace;stage.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xe8f0ff,0x232833,1.25));const key=new THREE.DirectionalLight(0xffffff,2.1);key.position.set(4,5,5);scene.add(key);const rim=new THREE.DirectionalLight(0x8eb8ff,1.0);rim.position.set(-4,2,-3);scene.add(rim);
+const floor=new THREE.Mesh(new THREE.CircleGeometry(4.2,64),new THREE.MeshPhongMaterial({color:0x111722,shininess:24,specular:0x263548}));floor.rotation.x=-Math.PI/2;floor.position.y=-3.65;scene.add(floor);
+
+const hammer=new THREE.Group();scene.add(hammer);hammer.rotation.z=.12;
+const steelMat=new THREE.MeshStandardMaterial({color:0x9ba4af,metalness:.88,roughness:.24});const darkSteel=new THREE.MeshStandardMaterial({color:0x535b65,metalness:.78,roughness:.32});
+function add(mesh,x,y,z,rx=0,ry=0,rz=0){mesh.position.set(x,y,z);mesh.rotation.set(rx,ry,rz);hammer.add(mesh);return mesh}
+
+// forged head assembly: face -> bell/neck -> eye/body -> split curved claw
+add(new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,.34,40),steelMat),-1.25,.42,0,0,0,Math.PI/2);
+add(new THREE.Mesh(new THREE.CylinderGeometry(.30,.40,.72,32),steelMat),-.72,.42,0,0,0,Math.PI/2);
+const body=add(new THREE.Mesh(new THREE.BoxGeometry(.78,.68,.66,3,3,3),steelMat),-.12,.42,0);body.geometry.translate(0,0,0);
+
+function makeClawTine(zOff){
+ const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(.18,.46,zOff),new THREE.Vector3(.70,.42,zOff),new THREE.Vector3(1.18,.18,zOff),new THREE.Vector3(1.48,-.28,zOff)]);
+ const geo=new THREE.TubeGeometry(curve,28,.115,8,false);const tine=new THREE.Mesh(geo,steelMat);tine.scale.z=.72;hammer.add(tine);
+ const tip=new THREE.Mesh(new THREE.BoxGeometry(.42,.10,.19),steelMat);tip.position.set(1.57,-.37,zOff);tip.rotation.z=-.38;hammer.add(tip);
+}
+makeClawTine(-.16);makeClawTine(.16);
+const clawBridge=add(new THREE.Mesh(new THREE.BoxGeometry(.62,.42,.56),steelMat),.38,.40,0,0,0,-.04);
+
+// visible top-eye insert/wedge detail changes with handle type
+const eyeInsert=new THREE.Group();hammer.add(eyeInsert);eyeInsert.position.set(-.12,.79,0);
+const handleMount=new THREE.Group();hammer.add(handleMount);
+
+function latheHandleMaterial(color,wood){return wood?new THREE.MeshStandardMaterial({color,roughness:.52,metalness:0}):new THREE.MeshStandardMaterial({color,roughness:.42,metalness:.05})}
+function buildHandle(){
+ while(handleMount.children.length)handleMount.remove(handleMount.children[0]);while(eyeInsert.children.length)eyeInsert.remove(eyeInsert.children[0]);
+ const type=state.domain.handleType,color=new THREE.Color(state.domain.handleColor),scale=state.domain.handleLength/14;
+ if(type==='hickory'){
+   const pts=[new THREE.Vector2(.23,-3.15*scale),new THREE.Vector2(.26,-2.78*scale),new THREE.Vector2(.20,-2.15*scale),new THREE.Vector2(.145,-.80*scale),new THREE.Vector2(.13,.20),new THREE.Vector2(.125,.63)];
+   const mesh=new THREE.Mesh(new THREE.LatheGeometry(pts,28),latheHandleMaterial(color,true));mesh.position.x=-.12;mesh.rotation.z=.025;handleMount.add(mesh);
+   const wedge=new THREE.Mesh(new THREE.BoxGeometry(.26,.05,.10),new THREE.MeshStandardMaterial({color:0x3d424a,metalness:.75,roughness:.32}));wedge.position.set(-.12,.01,0);wedge.rotation.y=.28;eyeInsert.add(wedge);
+   hint.textContent='A shaped wood handle passes through the head eye and is locked with a visible wedge detail.';
+ }else if(type==='fiberglass'){
+   const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.13,.17,3.05*scale,20),new THREE.MeshStandardMaterial({color,roughness:.38}));shaft.position.set(-.12,-1.05*scale,0);shaft.rotation.z=.025;handleMount.add(shaft);
+   const grip=new THREE.Mesh(new THREE.CapsuleGeometry(.25,1.05*scale,8,20),new THREE.MeshStandardMaterial({color:0x20242b,roughness:.75}));grip.position.set(-.10,-2.65*scale,0);grip.rotation.z=.02;handleMount.add(grip);
+   const collar=new THREE.Mesh(new THREE.CylinderGeometry(.20,.17,.34,20),darkSteel);collar.position.set(-.12,.16,0);handleMount.add(collar);
+   const cap=new THREE.Mesh(new THREE.CylinderGeometry(.21,.21,.07,20),new THREE.MeshStandardMaterial({color,roughness:.42}));cap.position.set(-.12,.02,0);eyeInsert.add(cap);
+   hint.textContent='A reinforced fiberglass shaft carries the load, with a molded lower grip and reinforced head connection.';
+ }else{
+   const shank=new THREE.Mesh(new THREE.BoxGeometry(.22,3.25*scale,.26),new THREE.MeshStandardMaterial({color:0x818992,metalness:.82,roughness:.26}));shank.position.set(-.12,-1.02*scale,0);shank.rotation.z=.018;handleMount.add(shank);
+   const grip=new THREE.Mesh(new THREE.CapsuleGeometry(.27,1.12*scale,8,20),new THREE.MeshStandardMaterial({color,roughness:.72}));grip.position.set(-.10,-2.68*scale,0);handleMount.add(grip);
+   const neck=new THREE.Mesh(new THREE.BoxGeometry(.28,.30,.30),darkSteel);neck.position.set(-.12,.16,0);handleMount.add(neck);
+   const plug=new THREE.Mesh(new THREE.BoxGeometry(.23,.05,.22),steelMat);plug.position.set(-.12,.01,0);eyeInsert.add(plug);
+   hint.textContent='A steel shank visually continues into the head, while the lower grip changes comfort and finish rather than core structure.';
+ }
+ lengthValue.textContent=state.domain.handleLength+' in';
+}
+buildHandle();
+
+let rebuildKey='';function syncDerived(){const key=state.domain.handleType+'|'+state.domain.handleColor+'|'+state.domain.handleLength;if(key!==rebuildKey){rebuildKey=key;buildHandle()}panel.hidden=!state.ui.panelOpen;customize.textContent=state.ui.panelOpen?'Hide controls':'Customize';customize.setAttribute('aria-expanded',String(state.ui.panelOpen));toggle.textContent=state.ui.running?'Pause':'Resume';root.querySelectorAll('[data-handle]').forEach(b=>b.classList.toggle('active',b.dataset.handle===state.domain.handleType));root.querySelectorAll('[data-color]').forEach(b=>b.classList.toggle('active',b.dataset.color.toLowerCase()===state.domain.handleColor.toLowerCase()));statusText.textContent=(state.ui.running?'Rotating':'Paused')+' • '+state.domain.handleType+' • '+state.domain.handleLength+' in'}
+function update(dt){if(state.ui.running&&!state.ui.hidden)hammer.rotation.y+=dt*.62;hammer.rotation.y+=state.ui.manualYaw;state.ui.manualYaw=0}
+function render(){syncDerived();renderer.render(scene,camera)}
+function resize(){const r=stage.getBoundingClientRect(),w=Math.max(280,r.width),h=Math.max(280,r.height);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+if('ResizeObserver'in window)new ResizeObserver(resize).observe(stage);resize();
+
+toggle.addEventListener('click',()=>capture('toggle'));left.addEventListener('click',()=>capture('rotate',{delta:-.18}));right.addEventListener('click',()=>capture('rotate',{delta:.18}));customize.addEventListener('click',()=>capture('panel'));root.querySelectorAll('[data-handle]').forEach(b=>b.addEventListener('click',()=>capture('handle',{value:b.dataset.handle})));root.querySelectorAll('[data-color]').forEach(b=>b.addEventListener('click',()=>capture('color',{value:b.dataset.color})));lengthInput.addEventListener('input',()=>capture('length',{value:Math.max(11,Math.min(18,Number(lengthInput.value)||14))}));document.addEventListener('visibilitychange',()=>capture('hidden',{value:document.hidden}));
+[root.querySelector('#toggle'),left,right,customize,...root.querySelectorAll('[data-handle],[data-color]')].forEach(b=>b.disabled=false);loading.remove();
+let last=performance.now();function frame(now){let dt=(now-last)/1000;last=now;if(state.ui.hidden)dt=0;dt=Math.min(.05,Math.max(0,dt));processInput();update(dt);render();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
