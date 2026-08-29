@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111318">
+  <title>FORGE Tic-Tac-Toe</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app" aria-labelledby="title">
+    <header>
+      <p class="eyebrow">FORGE // TESTBENCH</p>
+      <h1 id="title">Tic-Tac-Toe</h1>
+      <p id="status" class="status" aria-live="polite">X to move</p>
+    </header>
+
+    <section id="board" class="board" aria-label="Tic-tac-toe board"></section>
+
+    <section class="score" aria-label="Score">
+      <div><strong id="xScore">0</strong><span>X wins</span></div>
+      <div><strong id="drawScore">0</strong><span>Draws</span></div>
+      <div><strong id="oScore">0</strong><span>O wins</span></div>
+    </section>
+
+    <div class="actions">
+      <button id="newRound" type="button">New round</button>
+      <button id="menuButton" class="secondary" type="button" aria-expanded="false" aria-controls="menu">Options</button>
+    </div>
+
+    <section id="menu" class="menu" hidden>
+      <button id="resetScore" class="danger" type="button">Reset score</button>
+    </section>
+
+    <p id="notice" class="notice" role="status" aria-live="polite"></p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
