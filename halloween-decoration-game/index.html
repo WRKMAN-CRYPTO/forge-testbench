@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10091b">
+<title>Haunt the House</title>
+<style>
+:root{color-scheme:dark;--bg:#10091b;--panel:#1a1027;--panel2:#241432;--ink:#fff6df;--muted:#baaacb;--line:#4f3a62;--orange:#ff8a2a;--green:#7ed957;--danger:#ff6174}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% -10%,#392351 0,#160c24 40%,#0c0812 100%);color:var(--ink);font:500 16px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;overscroll-behavior:none}button{font:inherit;color:inherit}.app{max-width:760px;margin:0 auto;padding:12px 12px 24px}.topbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}.brand h1{font-size:1.12rem;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:.78rem}.pill{border:1px solid var(--line);background:#1a1027;border-radius:999px;padding:8px 11px;font-size:.82rem;white-space:nowrap}.scene{position:relative;aspect-ratio:4/5;max-height:72vh;min-height:430px;border:1px solid #58416a;border-radius:22px;overflow:hidden;background:linear-gradient(#17102b 0 48%,#241734 48% 49%,#1f2a19 49% 100%);touch-action:none;box-shadow:0 16px 60px #0008}.moon{position:absolute;width:74px;height:74px;border-radius:50%;right:8%;top:7%;background:#f3df9d;box-shadow:0 0 30px #f3df9d55}.cloud{position:absolute;left:5%;top:15%;width:92px;height:24px;border-radius:999px;background:#584d66aa;box-shadow:46px -6px 0 2px #584d66aa}.house{position:absolute;left:14%;right:14%;top:30%;height:40%;background:#3f3544;border:5px solid #241d29;border-radius:4px 4px 10px 10px}.roof{position:absolute;left:8%;right:8%;top:20%;height:19%;clip-path:polygon(50% 0,100% 100%,0 100%);background:#27202d}.door{position:absolute;width:24%;height:46%;left:38%;bottom:0;background:#1f171f;border:3px solid #161018;border-radius:8px 8px 0 0}.window{position:absolute;width:22%;height:21%;top:20%;background:#c87935;border:4px solid #211923;box-shadow:inset 0 0 18px #ffb13c88}.window:after,.window:before{content:"";position:absolute;background:#2b2030}.window:before{left:46%;top:0;width:8%;height:100%}.window:after{left:0;top:46%;height:8%;width:100%}.w1{left:10%}.w2{right:10%}.yard-label{position:absolute;left:12px;bottom:12px;font-size:.72rem;color:#d8c9df99;pointer-events:none}.item{position:absolute;display:grid;place-items:center;width:64px;height:64px;border:0;background:transparent;font-size:48px;line-height:1;transform:translate(-50%,-50%);filter:drop-shadow(0 4px 3px #0009);touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}.item.selected{outline:2px solid #fff7;border-radius:14px;background:#fff1}.item.dragging{cursor:grabbing;transform:translate(-50%,-50%) scale(1.08)}.toolbar{margin-top:10px;border:1px solid var(--line);background:#171020;border-radius:18px;overflow:hidden}.toolhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px}.toolhead strong{font-size:.9rem}.score{color:#ffd19d}.tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 10px 10px}.decor{min-height:58px;border:1px solid #503b61;background:#251634;border-radius:14px;display:grid;place-items:center;font-size:30px}.decor:active{transform:scale(.97)}.actions{display:flex;gap:8px;flex-wrap:wrap;padding:10px;border-top:1px solid var(--line)}.actions button{flex:1 1 100px;min-height:44px;border:1px solid #514060;background:#21172b;border-radius:12px}.actions .primary{background:#5a2e17;border-color:#9c5427}.actions .danger{color:#ffc5cc}.status{font-size:.76rem;color:var(--muted);padding:0 10px 10px}.good{color:#9be67a}.bad{color:#ff8997}.tip{position:absolute;left:50%;top:16px;transform:translateX(-50%);background:#0e0a14dd;border:1px solid #59446a;border-radius:999px;padding:7px 11px;font-size:.76rem;pointer-events:none;opacity:0;transition:opacity .18s}.tip.show{opacity:1}@media(max-width:420px){.app{padding:8px 8px 18px}.scene{min-height:390px;border-radius:18px}.item{width:58px;height:58px;font-size:44px}.tools{grid-template-columns:repeat(4,1fr);gap:6px}.decor{min-height:54px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <div class="topbar">
+    <div class="brand"><h1>🎃 Haunt the House</h1><p>Decorate the yard. Make it gloriously spooky.</p></div>
+    <div class="pill" id="goalPill">Goal 100</div>
+  </div>
+
+  <section class="scene" id="scene" aria-label="Halloween yard decorating area">
+    <div class="moon"></div><div class="cloud"></div><div class="roof"></div>
+    <div class="house"><div class="door"></div><div class="window w1"></div><div class="window w2"></div></div>
+    <div class="yard-label">Tap a decoration below, then drag it anywhere in the yard.</div>
+    <div class="tip" id="tip" aria-live="polite"></div>
+  </section>
+
+  <section class="toolbar">
+    <div class="toolhead"><strong>Decoration Crate</strong><span class="score">Spooky score: <b id="score">0</b></span></div>
+    <div class="tools" id="tools" aria-label="Decoration choices"></div>
+    <div class="actions">
+      <button type="button" id="soundBtn">🔇 Sound locked</button>
+      <button type="button" id="removeBtn" class="danger">Remove selected</button>
+      <button type="button" id="resetBtn">Reset yard</button>
+      <button type="button" id="nightBtn" class="primary">🌙 Flicker lights</button>
+    </div>
+    <div class="status" id="status" aria-live="polite">Self-test: checking…</div>
+  </section>
+</main>
+<script>
+(()=>{
+'use strict';
+const root=document.getElementById('app'),scene=document.getElementById('scene'),tools=document.getElementById('tools'),scoreEl=document.getElementById('score'),statusEl=document.getElementById('status'),tipEl=document.getElementById('tip'),soundBtn=document.getElementById('soundBtn');
+const STORAGE='forge-halloween-decoration-v1';
+const CATALOG=[
+ {kind:'pumpkin',icon:'🎃',points:10},{kind:'ghost',icon:'👻',points:18},{kind:'skull',icon:'💀',points:14},{kind:'spider',icon:'🕷️',points:12},
+ {kind:'bat',icon:'🦇',points:9},{kind:'candle',icon:'🕯️',points:8},{kind:'grave',icon:'🪦',points:16},{kind:'web',icon:'🕸️',points:11}
+];
+const initialDurable=()=>({version:1,revision:0,nextId:1,items:[]});
+const state={durable:initialDurable(),ui:{selected:null,drag:null,queue:[],dirty:false,saveTimer:null,tipTimer:null,lights:false},audio:{ctx:null,state:'locked',queue:[],master:null}};
+function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+function findCatalog(kind){return CATALOG.find(x=>x.kind===kind)}
+function scoreOf(s=state.durable){return s.items.reduce((n,i)=>n+(findCatalog(i.kind)?.points||0),0)}
+function validLoaded(v){return v&&v.version===1&&Number.isInteger(v.nextId)&&Array.isArray(v.items)&&v.items.every(i=>Number.isInteger(i.id)&&findCatalog(i.kind)&&Number.isFinite(i.x)&&Number.isFinite(i.y))}
+function load(){try{const raw=localStorage.getItem(STORAGE);if(!raw)return;const parsed=JSON.parse(raw);if(validLoaded(parsed))state.durable=parsed;else showTip('Saved yard was invalid. Fresh yard loaded.')}catch{showTip('Saved yard could not be read. Fresh yard loaded.')}}
+function markDirty(){state.durable.revision++;state.ui.dirty=true;clearTimeout(state.ui.saveTimer);state.ui.saveTimer=setTimeout(save,120)}
+function save(){if(!state.ui.dirty)return;try{localStorage.setItem(STORAGE,JSON.stringify(state.durable));state.ui.dirty=false}catch{showTip('Save failed on this browser.')}}
+function capture(type,payload={}){if(state.ui.queue.length>120){if(type==='pointermove'){state.ui.queue=state.ui.queue.filter(e=>e.type!=='pointermove')}else return}state.ui.queue.push({type,payload});processQueue()}
+function processQueue(){while(state.ui.queue.length){const e=state.ui.queue.shift();reduce(e)}render()}
+function reduce(e){const p=e.payload;switch(e.type){
+ case'add':{const c=findCatalog(p.kind);if(!c)return;const id=state.durable.nextId++;state.durable.items.push({id,kind:p.kind,x:50+(Math.random()*10-5),y:78+(Math.random()*8-4)});state.ui.selected=id;markDirty();requestSound('place');showTip(`${c.icon} added +${c.points}`);break}
+ case'select':state.ui.selected=p.id;break;
+ case'dragstart':state.ui.selected=p.id;state.ui.drag={id:p.id,pointerId:p.pointerId};break;
+ case'dragmove':{if(!state.ui.drag||state.ui.drag.pointerId!==p.pointerId)return;const item=state.durable.items.find(i=>i.id===state.ui.drag.id);if(!item)return;item.x=clamp(p.x,5,95);item.y=clamp(p.y,8,95);break}
+ case'dragend':if(state.ui.drag&&state.ui.drag.pointerId===p.pointerId){state.ui.drag=null;markDirty();requestSound('drop')}break;
+ case'remove':if(state.ui.selected!=null){state.durable.items=state.durable.items.filter(i=>i.id!==state.ui.selected);state.ui.selected=null;markDirty();requestSound('remove')}break;
+ case'reset':state.durable=initialDurable();state.ui.selected=null;state.ui.drag=null;markDirty();requestSound('remove');showTip('The yard has been exorcised.');break;
+ case'lights':state.ui.lights=!state.ui.lights;requestSound('boo');break;
+ case'hidden':state.ui.drag=null;save();break;
+ }}
+function render(){scoreEl.textContent=scoreOf();const existing=new Map([...scene.querySelectorAll('.item')].map(n=>[Number(n.dataset.id),n]));for(const item of state.durable.items){let el=existing.get(item.id);if(!el){el=document.createElement('button');el.type='button';el.className='item';el.dataset.id=item.id;el.setAttribute('aria-label',`${item.kind} decoration`);el.textContent=findCatalog(item.kind).icon;scene.appendChild(el);wireItem(el);existing.delete(item.id)}else existing.delete(item.id);el.style.left=item.x+'%';el.style.top=item.y+'%';el.classList.toggle('selected',state.ui.selected===item.id);el.classList.toggle('dragging',state.ui.drag?.id===item.id)}existing.forEach(n=>n.remove());scene.classList.toggle('lit',state.ui.lights);document.querySelectorAll('.window').forEach(w=>w.style.background=state.ui.lights?'#ffd65c':'#c87935');soundBtn.textContent=state.audio.state==='ready'?'🔊 Sound on':state.audio.state==='failed'?'⚠️ Sound failed':'🔇 Sound locked';}
+function wireItem(el){el.addEventListener('pointerdown',ev=>{unlockAudio();el.setPointerCapture?.(ev.pointerId);const pos=pointerPos(ev);capture('dragstart',{id:Number(el.dataset.id),pointerId:ev.pointerId});capture('dragmove',{...pos,pointerId:ev.pointerId})});el.addEventListener('pointermove',ev=>{if(!state.ui.drag)return;const pos=pointerPos(ev);capture('dragmove',{...pos,pointerId:ev.pointerId})});for(const type of['pointerup','pointercancel'])el.addEventListener(type,ev=>capture('dragend',{pointerId:ev.pointerId}));el.addEventListener('click',()=>capture('select',{id:Number(el.dataset.id)}))}
+function pointerPos(ev){const r=scene.getBoundingClientRect();return{x:(ev.clientX-r.left)/r.width*100,y:(ev.clientY-r.top)/r.height*100}}
+function showTip(text){tipEl.textContent=text;tipEl.classList.add('show');clearTimeout(state.ui.tipTimer);state.ui.tipTimer=setTimeout(()=>tipEl.classList.remove('show'),1300)}
+function buildTools(){for(const c of CATALOG){const b=document.createElement('button');b.type='button';b.className='decor';b.textContent=c.icon;b.setAttribute('aria-label',`Add ${c.kind}, ${c.points} points`);b.addEventListener('click',()=>{unlockAudio();capture('add',{kind:c.kind})});tools.appendChild(b)}}
+function unlockAudio(){if(state.audio.state==='ready')return;if(!window.AudioContext&&!window.webkitAudioContext){state.audio.state='failed';render();return}try{if(!state.audio.ctx){const C=window.AudioContext||window.webkitAudioContext;state.audio.ctx=new C();state.audio.master=state.audio.ctx.createGain();state.audio.master.gain.value=.16;state.audio.master.connect(state.audio.ctx.destination)}const r=state.audio.ctx.resume();Promise.resolve(r).then(()=>{state.audio.state='ready';flushAudio();render()}).catch(()=>{state.audio.state='failed';render()})}catch{state.audio.state='failed';render()}}
+function requestSound(name){state.audio.queue.push(name);if(state.audio.queue.length>20)state.audio.queue.shift();flushAudio()}
+function flushAudio(){if(state.audio.state!=='ready'||!state.audio.ctx||!state.audio.master)return;while(state.audio.queue.length)playTone(state.audio.queue.shift())}
+function playTone(name){const ctx=state.audio.ctx,osc=ctx.createOscillator(),gain=ctx.createGain(),now=ctx.currentTime;const map={place:[420,.07],drop:[240,.06],remove:[120,.1],boo:[180,.24]};const [freq,len]=map[name]||[300,.05];osc.type=name==='boo'?'sawtooth':'sine';osc.frequency.setValueAtTime(freq,now);if(name==='boo')osc.frequency.exponentialRampToValueAtTime(75,now+len);gain.gain.setValueAtTime(.8,now);gain.gain.exponentialRampToValueAtTime(.001,now+len);osc.connect(gain);gain.connect(state.audio.master);osc.start(now);osc.stop(now+len)}
+function selfTest(){try{const d=initialDurable();if(scoreOf(d)!==0)throw Error('score');if(clamp(120,0,100)!==100)throw Error('clamp');const sample={version:1,revision:1,nextId:2,items:[{id:1,kind:'ghost',x:50,y:50}]};if(!validLoaded(sample))throw Error('schema');if(scoreOf(sample)!==18)throw Error('catalog');statusEl.textContent='Self-test: PASS · saved locally';statusEl.className='status good'}catch(e){statusEl.textContent='Self-test: FAIL · '+e.message;statusEl.className='status bad'}}
+function onVisibility(){if(document.hidden)capture('hidden');else{state.ui.drag=null;if(state.audio.ctx&&state.audio.ctx.state!=='running')state.audio.state='locked';render()}}
+document.getElementById('removeBtn').addEventListener('click',()=>capture('remove'));document.getElementById('resetBtn').addEventListener('click',()=>{if(state.durable.items.length===0){showTip('Yard is already empty.');return}if(confirm('Clear every decoration?'))capture('reset')});document.getElementById('nightBtn').addEventListener('click',()=>{unlockAudio();capture('lights')});soundBtn.addEventListener('click',()=>unlockAudio());document.addEventListener('visibilitychange',onVisibility);window.addEventListener('pagehide',()=>{capture('hidden');save()});window.addEventListener('resize',()=>{state.ui.drag=null});
+buildTools();load();selfTest();render();
+})();
+</script>
+</body>
+</html>
