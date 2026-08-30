@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>Goblin Slayer</title>
+<style>
+  :root{color-scheme:dark;--bg:#10150f;--panel:#182017;--ink:#f4f0df;--muted:#b9bea9;--gold:#e6c35c;--danger:#d96553;--green:#6ea84f}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overscroll-behavior:none}
+  body{min-height:100%;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  #game{display:grid;grid-template-rows:auto 1fr auto;max-width:900px;margin:0 auto;min-height:100dvh;background:#0d120d}
+  .hud{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;padding:10px 12px;background:linear-gradient(#1a2219,#131a12);border-bottom:1px solid #2a3727;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  .hud .right{text-align:right}.big{font-weight:800}.tiny{font-size:12px;color:var(--muted)}
+  .bar{height:8px;border-radius:99px;background:#2b3229;overflow:hidden;margin-top:4px}.bar>span{display:block;height:100%;background:var(--danger);width:100%}
+  .stage{position:relative;min-height:420px;overflow:hidden;background:#121812;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  canvas{display:block;width:100%;height:100%;min-height:420px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;padding:24px;pointer-events:none}
+  .card{max-width:360px;text-align:center;padding:20px 18px;border:1px solid #3a4936;background:rgba(13,18,13,.9);border-radius:16px;backdrop-filter:blur(5px)}
+  .card h1{margin:0 0 6px;font-size:32px}.card p{margin:6px 0;color:var(--muted)}
+  .controls{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;padding:12px;background:#111711;border-top:1px solid #2a3727;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  .pad{justify-self:start;width:122px;height:122px;border-radius:50%;border:2px solid #394735;background:radial-gradient(circle at center,#1c281b 0 32%,#141c13 33% 100%);position:relative;touch-action:none}
+  .nub{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;background:#53654d;border:2px solid #83917b;transform:translate(-50%,-50%);pointer-events:none}
+  button{font:inherit;color:var(--ink);border:1px solid #4b5b45;background:#202a1e;border-radius:14px;min-width:48px;min-height:48px;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+  .attack{justify-self:end;width:112px;height:112px;border-radius:50%;font-size:19px;font-weight:900;background:radial-gradient(circle at 35% 30%,#a94f40,#6c2c24);border:3px solid #d46d5c;box-shadow:inset 0 -8px 18px rgba(0,0,0,.25)}
+  .attack:active,.attack.pressed{transform:scale(.96)}
+  .pause{font-size:20px}.hidden{display:none!important}
+  .status{position:absolute;left:10px;bottom:8px;font-size:11px;color:#aab49f;background:rgba(0,0,0,.28);padding:4px 7px;border-radius:8px;pointer-events:none}
+  @media (min-width:700px){.stage,canvas{min-height:560px}.controls{padding-inline:28px}.pad{width:138px;height:138px}.attack{width:124px;height:124px}}
+</style>
+</head>
+<body>
+<main id="game">
+  <header class="hud">
+    <div><div class="big">WAVE <span id="wave">1</span></div><div class="tiny">Goblins <span id="left">0</span></div></div>
+    <button id="pause" class="pause" type="button" aria-label="Pause game">Ⅱ</button>
+    <div class="right"><div class="big"><span id="score">0</span></div><div class="tiny">Best <span id="best">0</span> · x<span id="combo">1</span></div></div>
+    <div style="grid-column:1/-1"><div class="tiny">HP <span id="hpText">100</span></div><div class="bar"><span id="hpBar"></span></div></div>
+  </header>
+  <section id="stage" class="stage" aria-label="Goblin slaying arena">
+    <canvas id="canvas"></canvas>
+    <div id="startOverlay" class="overlay"><div class="card"><h1>GOBLIN SLAYER</h1><p>Move with the left thumb. Face where you move. Tap SLASH to cut a path through the horde.</p><p class="big">Tap SLASH to begin.</p></div></div>
+    <div id="deadOverlay" class="overlay hidden"><div class="card"><h1>YOU FELL</h1><p>Score <strong id="finalScore">0</strong> · Wave <strong id="finalWave">1</strong></p><p class="big">Tap SLASH to rise again.</p></div></div>
+    <div id="pauseOverlay" class="overlay hidden"><div class="card"><h1>PAUSED</h1><p>The goblins are pretending this is honorable.</p></div></div>
+    <div id="audioStatus" class="status">audio: locked</div>
+  </section>
+  <section class="controls" aria-label="Game controls">
+    <div id="pad" class="pad" role="application" aria-label="Movement pad"><div id="nub" class="nub"></div></div>
+    <div class="tiny" style="text-align:center">MOVE<br>＋<br>SLASH</div>
+    <button id="attack" class="attack" type="button">SLASH</button>
+  </section>
+</main>
+<script>
+(()=>{
+'use strict';
+const root=document.getElementById('game'), stage=document.getElementById('stage'), canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d');
+const ui={wave:document.getElementById('wave'),left:document.getElementById('left'),score:document.getElementById('score'),best:document.getElementById('best'),combo:document.getElementById('combo'),hpText:document.getElementById('hpText'),hpBar:document.getElementById('hpBar'),start:document.getElementById('startOverlay'),dead:document.getElementById('deadOverlay'),pause:document.getElementById('pauseOverlay'),finalScore:document.getElementById('finalScore'),finalWave:document.getElementById('finalWave'),audio:document.getElementById('audioStatus'),pad:document.getElementById('pad'),nub:document.getElementById('nub'),attack:document.getElementById('attack'),pauseBtn:document.getElementById('pause')};
+const inputQueue=[], audioQueue=[]; let raf=0,last=0,dpr=1,W=0,H=0,padPointer=null; const move={x:0,y:0};
+const durable=loadSave();
+const state={mode:'ready',time:0,score:0,best:durable.best,wave:1,spawnRemaining:0,waveCooldown:0,combo:1,comboTimer:0,shake:0,flash:0,player:null,goblins:[],particles:[],slashes:[]};
+const audio={ctx:null,master:null,status:'locked'};
+function loadSave(){try{const raw=localStorage.getItem('goblinSlayerSave');if(!raw)return {version:1,best:0};const x=JSON.parse(raw);if(x&&x.version===1&&Number.isFinite(x.best)&&x.best>=0)return {version:1,best:Math.floor(x.best)};}catch(e){}return {version:1,best:0};}
+function save(){try{localStorage.setItem('goblinSlayerSave',JSON.stringify({version:1,best:state.best}));}catch(e){}}
+function newRun(){state.mode='playing';state.time=0;state.score=0;state.wave=1;state.combo=1;state.comboTimer=0;state.shake=0;state.flash=0;state.goblins.length=0;state.particles.length=0;state.slashes.length=0;state.player={x:W*.5,y:H*.58,r:17,hp:100,maxHp:100,speed:210,dir:-Math.PI/2,attackCd:0,invuln:0};beginWave();ui.start.classList.add('hidden');ui.dead.classList.add('hidden');ui.pause.classList.add('hidden');}
+function beginWave(){state.spawnRemaining=4+state.wave*2;state.waveCooldown=.5;queueSound('wave');}
+function spawnGoblin(){const edge=Math.floor(Math.random()*4),pad=35;let x,y;if(edge===0){x=Math.random()*W;y=-pad}else if(edge===1){x=W+pad;y=Math.random()*H}else if(edge===2){x=Math.random()*W;y=H+pad}else{x=-pad;y=Math.random()*H}const tough=state.wave>=4&&Math.random()<Math.min(.35,(state.wave-3)*.05);state.goblins.push({x,y,r:tough?19:15,hp:tough?3:1,maxHp:tough?3:1,speed:(tough?74:88)+state.wave*3,hit:0,dead:false,tough});}
+function enqueue(type,data={}){if(inputQueue.length<64)inputQueue.push({type,...data});}
+function processInput(){while(inputQueue.length){const e=inputQueue.shift();if(e.type==='attack'){unlockAudio();if(state.mode==='ready'||state.mode==='dead'){newRun();continue}if(state.mode==='paused')continue;attack();}else if(e.type==='pause'){if(state.mode==='playing'){state.mode='paused';ui.pause.classList.remove('hidden')}else if(state.mode==='paused'){state.mode='playing';ui.pause.classList.add('hidden');last=performance.now()}}}}
+function attack(){const p=state.player;if(!p||p.attackCd>0)return;p.attackCd=.28;state.slashes.push({x:p.x,y:p.y,dir:p.dir,t:.16,hit:new Set()});state.shake=Math.max(state.shake,3);queueSound('slash');}
+function update(dt){if(state.mode!=='playing')return;state.time+=dt;const p=state.player;p.attackCd=Math.max(0,p.attackCd-dt);p.invuln=Math.max(0,p.invuln-dt);if(move.x||move.y){const len=Math.hypot(move.x,move.y)||1;const nx=move.x/len,ny=move.y/len;p.x+=nx*p.speed*dt;p.y+=ny*p.speed*dt;p.dir=Math.atan2(ny,nx)}p.x=Math.max(p.r,Math.min(W-p.r,p.x));p.y=Math.max(p.r,Math.min(H-p.r,p.y));
+state.waveCooldown-=dt;if(state.spawnRemaining>0&&state.waveCooldown<=0){spawnGoblin();state.spawnRemaining--;state.waveCooldown=Math.max(.16,.65-state.wave*.025)}
+for(const g of state.goblins){if(g.dead)continue;g.hit=Math.max(0,g.hit-dt);const dx=p.x-g.x,dy=p.y-g.y,d=Math.hypot(dx,dy)||1;g.x+=dx/d*g.speed*dt;g.y+=dy/d*g.speed*dt;if(d<p.r+g.r+2&&p.invuln<=0){p.hp-=g.tough?18:12;p.invuln=.75;state.shake=10;state.flash=.14;state.combo=1;state.comboTimer=0;queueSound('hurt');const push=38;g.x-=dx/d*push;g.y-=dy/d*push;if(p.hp<=0){p.hp=0;die();break}}}
+for(const s of state.slashes){s.t-=dt;const reach=62,half=.9;for(const g of state.goblins){if(g.dead||s.hit.has(g))continue;const dx=g.x-p.x,dy=g.y-p.y,d=Math.hypot(dx,dy);let a=Math.atan2(dy,dx)-p.dir;a=Math.atan2(Math.sin(a),Math.cos(a));if(d<reach+g.r&&Math.abs(a)<half){s.hit.add(g);g.hp--;g.hit=.12;const nx=dx/(d||1),ny=dy/(d||1);g.x+=nx*26;g.y+=ny*26;burst(g.x,g.y,g.tough?8:5);if(g.hp<=0)killGoblin(g)}}}
+state.slashes=state.slashes.filter(s=>s.t>0);state.goblins=state.goblins.filter(g=>!g.dead);for(const q of state.particles){q.t-=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=.96;q.vy*=.96}state.particles=state.particles.filter(q=>q.t>0);if(state.comboTimer>0){state.comboTimer-=dt;if(state.comboTimer<=0)state.combo=1}if(state.spawnRemaining===0&&state.goblins.length===0){state.waveCooldown-=dt;if(state.waveCooldown<-1.2){state.wave++;beginWave()}}state.shake=Math.max(0,state.shake-28*dt);state.flash=Math.max(0,state.flash-dt);}
+function killGoblin(g){g.dead=true;state.combo=state.comboTimer>0?Math.min(9,state.combo+1):1;state.comboTimer=1.8;state.score+=10*state.combo+(g.tough?20:0);if(state.score>state.best){state.best=state.score;save()}state.shake=Math.max(state.shake,6);burst(g.x,g.y,g.tough?18:12);queueSound(g.tough?'heavyKill':'kill');}
+function die(){state.mode='dead';ui.finalScore.textContent=state.score;ui.finalWave.textContent=state.wave;ui.dead.classList.remove('hidden');queueSound('dead');save();}
+function burst(x,y,n){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=35+Math.random()*90;state.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,t:.25+Math.random()*.35,r:2+Math.random()*3})}}
+function render(){ctx.save();ctx.clearRect(0,0,W,H);const sx=state.shake?(Math.random()-.5)*state.shake:0,sy=state.shake?(Math.random()-.5)*state.shake:0;ctx.translate(sx,sy);drawGround();if(state.player)drawPlayer(state.player);for(const g of state.goblins)drawGoblin(g);for(const s of state.slashes)drawSlash(s);for(const p of state.particles)drawParticle(p);ctx.restore();if(state.flash>0){ctx.fillStyle=`rgba(220,70,55,${state.flash*2.2})`;ctx.fillRect(0,0,W,H)}renderHud();}
+function drawGround(){ctx.fillStyle='#172016';ctx.fillRect(-20,-20,W+40,H+40);ctx.strokeStyle='rgba(130,150,110,.08)';ctx.lineWidth=1;for(let x=20;x<W;x+=48){for(let y=20;y<H;y+=48){ctx.beginPath();ctx.moveTo(x-7,y);ctx.lineTo(x+7,y);ctx.stroke()}}ctx.fillStyle='rgba(0,0,0,.16)';for(let i=0;i<10;i++){const x=(i*91+37)%W,y=(i*137+59)%H;ctx.beginPath();ctx.arc(x,y,12+(i%3)*5,0,Math.PI*2);ctx.fill()}}
+function drawPlayer(p){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.dir);ctx.globalAlpha=p.invuln>0&&Math.floor(p.invuln*15)%2?0.35:1;ctx.fillStyle='#d7d0b7';ctx.beginPath();ctx.arc(0,0,p.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#3f4b55';ctx.fillRect(-12,-15,24,12);ctx.fillStyle='#c9a84b';ctx.fillRect(2,-18,4,9);ctx.fillStyle='#eee9d7';ctx.beginPath();ctx.moveTo(11,-2);ctx.lineTo(34,-2);ctx.lineTo(38,0);ctx.lineTo(34,2);ctx.lineTo(11,2);ctx.closePath();ctx.fill();ctx.fillStyle='#5e3c27';ctx.fillRect(7,-4,8,8);ctx.restore()}
+function drawGoblin(g){ctx.save();ctx.translate(g.x,g.y);ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(0,g.r*.78,g.r*.85,g.r*.35,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=g.hit>0?'#d7e6bf':g.tough?'#56734a':'#739953';ctx.beginPath();ctx.arc(0,0,g.r,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.moveTo(-g.r*.75,-4);ctx.lineTo(-g.r*1.45,-12);ctx.lineTo(-g.r*.9,7);ctx.fill();ctx.beginPath();ctx.moveTo(g.r*.75,-4);ctx.lineTo(g.r*1.45,-12);ctx.lineTo(g.r*.9,7);ctx.fill();ctx.fillStyle='#171717';ctx.beginPath();ctx.arc(-5,-2,2.3,0,Math.PI*2);ctx.arc(5,-2,2.3,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#301d18';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-5,7);ctx.lineTo(0,4);ctx.lineTo(5,7);ctx.stroke();if(g.tough){ctx.strokeStyle='#c1a653';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,g.r+3,Math.PI*.12,Math.PI*.88);ctx.stroke()}ctx.restore()}
+function drawSlash(s){const p=state.player;if(!p)return;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.dir);ctx.strokeStyle=`rgba(239,232,200,${Math.min(1,s.t*7)})`;ctx.lineWidth=8;ctx.lineCap='round';ctx.beginPath();ctx.arc(0,0,49,-.9,.9);ctx.stroke();ctx.strokeStyle='rgba(230,195,92,.75)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,58,-.78,.78);ctx.stroke();ctx.restore()}
+function drawParticle(p){ctx.fillStyle='rgba(128,164,82,.9)';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill()}
+function renderHud(){const hp=state.player?state.player.hp:100,max=state.player?state.player.maxHp:100;ui.wave.textContent=state.wave;ui.left.textContent=state.goblins.length+state.spawnRemaining;ui.score.textContent=state.score;ui.best.textContent=state.best;ui.combo.textContent=state.combo;ui.hpText.textContent=Math.max(0,Math.ceil(hp));ui.hpBar.style.width=`${Math.max(0,hp/max*100)}%`;ui.audio.textContent='audio: '+audio.status;}
+function resize(){const r=stage.getBoundingClientRect();dpr=Math.min(2,window.devicePixelRatio||1);W=Math.max(320,Math.round(r.width));H=Math.max(420,Math.round(r.height));canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0);if(state.player){state.player.x=Math.min(W-state.player.r,state.player.x);state.player.y=Math.min(H-state.player.r,state.player.y)}}
+function frame(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;processInput();processAudio();update(dt);render();raf=requestAnimationFrame(frame)}
+function padMove(clientX,clientY){const r=ui.pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=clientX-cx,dy=clientY-cy,max=r.width*.34,len=Math.hypot(dx,dy)||1,scale=Math.min(1,max/len),px=dx*scale,py=dy*scale;move.x=px/max;move.y=py/max;ui.nub.style.transform=`translate(calc(-50% + ${px}px),calc(-50% + ${py}px))`;}
+function padReset(){move.x=move.y=0;padPointer=null;ui.nub.style.transform='translate(-50%,-50%)'}
+ui.pad.addEventListener('pointerdown',e=>{e.preventDefault();padPointer=e.pointerId;ui.pad.setPointerCapture(e.pointerId);padMove(e.clientX,e.clientY);unlockAudio()});ui.pad.addEventListener('pointermove',e=>{if(e.pointerId===padPointer){e.preventDefault();padMove(e.clientX,e.clientY)}});ui.pad.addEventListener('pointerup',e=>{if(e.pointerId===padPointer){e.preventDefault();padReset()}});ui.pad.addEventListener('pointercancel',padReset);
+ui.attack.addEventListener('pointerdown',e=>{e.preventDefault();ui.attack.classList.add('pressed');enqueue('attack')});ui.attack.addEventListener('pointerup',()=>ui.attack.classList.remove('pressed'));ui.attack.addEventListener('pointercancel',()=>ui.attack.classList.remove('pressed'));ui.pauseBtn.addEventListener('click',()=>enqueue('pause'));
+for(const el of [stage,ui.pad,ui.attack]){el.addEventListener('contextmenu',e=>e.preventDefault());el.addEventListener('dragstart',e=>e.preventDefault());el.addEventListener('touchstart',e=>{if(e.cancelable)e.preventDefault()},{passive:false})}
+function unlockAudio(){if(audio.status==='ready')return;if(!audio.ctx){try{audio.ctx=new (window.AudioContext||window.webkitAudioContext)();audio.master=audio.ctx.createGain();audio.master.gain.value=.22;audio.master.connect(audio.ctx.destination)}catch(e){audio.status='failed';return}}audio.ctx.resume().then(()=>audio.status='ready').catch(()=>audio.status='suspended')}
+function queueSound(name){if(audioQueue.length<24)audioQueue.push(name)}
+function processAudio(){if(!audioQueue.length)return;if(audio.status!=='ready'){audioQueue.length=0;return}while(audioQueue.length){playTone(audioQueue.shift())}}
+function playTone(name){const now=audio.ctx.currentTime,o=audio.ctx.createOscillator(),g=audio.ctx.createGain();let f=180,d=.08,type='square';if(name==='slash'){f=420;d=.045;type='sawtooth'}else if(name==='kill'){f=110;d=.07}else if(name==='heavyKill'){f=72;d=.13}else if(name==='hurt'){f=55;d=.18;type='sawtooth'}else if(name==='wave'){f=260;d=.12;type='triangle'}else if(name==='dead'){f=70;d=.4;type='sawtooth'}o.type=type;o.frequency.setValueAtTime(f,now);if(name==='slash')o.frequency.exponentialRampToValueAtTime(160,now+d);if(name==='dead')o.frequency.exponentialRampToValueAtTime(35,now+d);g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(1,now+.008);g.gain.exponentialRampToValueAtTime(.0001,now+d);o.connect(g);g.connect(audio.master);o.start(now);o.stop(now+d+.02)}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(state.mode==='playing'){state.mode='paused';ui.pause.classList.remove('hidden')}}else if(audio.ctx&&audio.ctx.state!=='running'){audio.status='suspended'}});
+window.addEventListener('resize',resize,{passive:true});
+resize();render();raf=requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
