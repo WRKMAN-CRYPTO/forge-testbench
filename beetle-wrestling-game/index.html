@@ -62,9 +62,9 @@ function processInput(){while(inputQueue.length){const e=inputQueue.shift();if(e
 function update(dt){if(state.mode!=='playing')return;state.time+=dt;if(state.roundDelay>0){state.roundDelay-=dt;if(state.roundDelay<=0)startBout();return}const p=state.player,f=state.foe;if(!p||!f)return;p.hit=Math.max(0,p.hit-dt);f.hit=Math.max(0,f.hit-dt);p.stun=Math.max(0,p.stun-dt);f.stun=Math.max(0,f.stun-dt);
  const postureTarget=Math.max(-1,Math.min(1,-move.y));p.posture+=(postureTarget-p.posture)*Math.min(1,dt*10);ai(f,p,dt);
  const edges=branchEdge(),gap=f.x-p.x-(p.body+f.body)*.5,contact=gap<30;
- if(!contact){p.hooked=f.hooked=false;p.hook=Math.max(0,p.hook-dt*2);f.hook=Math.max(0,f.hook-dt*2);const px=p.stun>0?0:move.x*115;p.x+=px*dt;f.x+=f.aiMode==='approach'?-f.side*0:0;p.traction=Math.min(100,p.traction+dt*18);f.traction=Math.min(100,f.traction+dt*15)}
+ if(!contact){p.hooked=f.hooked=false;p.hook=Math.max(0,p.hook-dt*2);f.hook=Math.max(0,f.hook-dt*2);const px=p.stun>0?0:move.x*115;p.x+=px*dt;p.traction=Math.min(100,p.traction+dt*18);f.traction=Math.min(100,f.traction+dt*15)}
  else resolveContact(p,f,dt);
- p.angle+=(0-p.angle)*Math.min(1,dt*5);if(!f.hooked)f.angle+=(0-f.angle)*Math.min(1,dt*5);
+ if(!f.hooked)p.angle+=(0-p.angle)*Math.min(1,dt*5);if(!p.hooked)f.angle+=(0-f.angle)*Math.min(1,dt*5);
  p.x=Math.max(edges.left-24,Math.min(edges.right+24,p.x));f.x=Math.max(edges.left-24,Math.min(edges.right+24,f.x));
  if(f.angle<-1.28||f.x>edges.right+8){winBout(f.angle<-1.28?'FLIPPED!':'RING OUT!')}else if(p.angle>1.28||p.x<edges.left-8){loseRun()}
  updateParticles(dt);state.shake=Math.max(0,state.shake-dt*26);state.flash=Math.max(0,state.flash-dt);if(state.messageT>0)state.messageT-=dt;}
@@ -78,9 +78,9 @@ function resolveContact(p,f,dt){const forward=Math.max(0,move.x),back=Math.max(0
  if(Math.abs(net)>.04){const shift=net*dt*29;p.x+=shift*.48;f.x+=shift*.52;p.traction-=Math.max(0,-net)*dt*8;f.traction-=Math.max(0,net)*dt*8;if(Math.abs(net)>.45)state.shake=Math.max(state.shake,1.6)}
  if(pLift>.12)f.x+=pLift*dt*14;if(fLift>.12)p.x-=fLift*dt*14;
  if(!pLift)p.traction=Math.min(100,p.traction+dt*(pEngage?4:10));if(!fLift)f.traction=Math.min(100,f.traction+dt*5);p.traction=Math.max(0,p.traction);f.traction=Math.max(0,f.traction);
- if(p.traction<=2&&fDrive>pPressure){p.x-=dt*44;p.angle+=dt*.18;callout('SLIPPING');}if(f.traction<=2&&pPressure>fDrive){f.x+=dt*44;f.angle-=dt*.18}
+ if(p.traction<=2&&fDrive>pPressure){p.x-=dt*44;p.angle+=dt*.18;callout('SLIPPING')}if(f.traction<=2&&pPressure>fDrive){f.x+=dt*44;f.angle-=dt*.18}
  if(!hornHeld&&p.hooked){p.hooked=false;p.hook=0}if(p.posture<-.55&&f.hooked&&Math.random()<dt*4){f.hooked=false;f.hook=.2;callout('ESCAPE');queueSound('escape')}
- separate(p,f);}
+ separate(p,f)}
 function separate(p,f){const min=(p.body+f.body)*.5+18,g=f.x-p.x;if(g<min){const d=(min-g)*.5;p.x-=d;f.x+=d}}
 function winBout(kind){if(state.roundDelay>0)return;state.streak++;state.score+=100+state.bout*25+Math.round(state.player.traction);state.best=Math.max(state.best,state.streak);save();callout(kind);burst(state.foe.x,logY()-18,18);queueSound('win');state.shake=10;state.bout++;state.roundDelay=1.15}
 function loseRun(){if(state.mode!=='playing')return;state.mode='dead';state.best=Math.max(state.best,state.streak);save();ui.finalStreak.textContent=state.streak;ui.finalScore.textContent=state.score;ui.dead.classList.remove('hidden');hornHeld=false;ui.horn.classList.remove('pressed');burst(state.player.x,logY()-12,22);state.shake=12;queueSound('lose')}
