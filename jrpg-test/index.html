@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>EMBER//ROAD</title><style>
+:root{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#f8f2da;background:#17131b}*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#17131b}body{touch-action:none}.app{height:100%;display:flex;flex-direction:column;padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));gap:8px}.hud{display:flex;justify-content:space-between;gap:8px;font-size:12px}.card{background:#241f2a;border:1px solid #4a4252;border-radius:12px;padding:8px}.screen{position:relative;flex:1;min-height:0}.screen canvas{width:100%;height:100%;display:block;border-radius:14px;background:#1e2930;border:1px solid #4a4252;image-rendering:pixelated}.msg{position:absolute;left:8px;right:8px;bottom:8px;background:#16121ad9;border:1px solid #6a6073;border-radius:10px;padding:8px;font-size:12px;min-height:42px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}.dpad{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,48px);justify-content:center}.dpad button:nth-child(1){grid-column:2}.dpad button:nth-child(2){grid-column:1;grid-row:2}.dpad button:nth-child(3){grid-column:2;grid-row:2}.dpad button:nth-child(4){grid-column:3;grid-row:2}button{font:inherit;color:#fff;background:#342c3d;border:1px solid #665d71;border-radius:12px;min-height:44px}button:active{transform:scale(.98);background:#44374f}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.battle{position:absolute;inset:0;display:none;flex-direction:column;justify-content:flex-end;padding:8px;background:linear-gradient(#0000,#0008)}.battle.show{display:flex}.enemybox{margin-bottom:auto;margin-top:18px;align-self:center;width:min(280px,80%);text-align:center}.enemy{font-size:54px}.battlelog{font-size:12px;min-height:54px}.menu{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.small{opacity:.75}.win{font-weight:700;color:#ffe58a}.dead{color:#ff9a9a}</style></head><body><div class="app">
+<div class="hud"><div class="card" id="stats"></div><div class="card" id="quest"></div></div>
+<div class="screen"><canvas id="game" width="320" height="360"></canvas><div class="msg" id="msg">Find the old gate beyond the woods.</div><div class="battle" id="battle"><div class="enemybox card"><div class="enemy" id="enemyIcon">👁️</div><div id="enemyName"></div><div id="enemyHp"></div></div><div class="card"><div class="battlelog" id="battleLog"></div><div class="menu"><button data-act="attack">ATTACK</button><button data-act="skill">EMBER</button><button data-act="guard">GUARD</button><button data-act="item">POTION</button></div></div></div></div>
+<div class="controls"><div class="dpad"><button data-move="0,-1">▲</button><button data-move="-1,0">◀</button><button id="talk">◎</button><button data-move="1,0">▶</button><button data-move="0,1" style="grid-column:2;grid-row:3">▼</button></div><div class="actions"><button id="save">SAVE</button><button id="rest">REST</button><button id="reset">NEW</button><button id="sound">SOUND</button></div></div>
+</div><script>
+const c=document.getElementById('game'),x=c.getContext('2d'); const $=id=>document.getElementById(id);
+const map=[
+'################',
+'#......TT......#',
+'#..H...TT..N...#',
+'#......TT......#',
+'#..............#',
+'#..TTTT..TT....#',
+'#..T......T....#',
+'#..T..~~~~T....#',
+'#.....~~~~.....#',
+'#..TT....TT....#',
+'#...........G..#',
+'#..............#',
+'#......TT......#',
+'#......TT......#',
+'#..............#',
+'################'];
+const SAVE='ember-road-v1';
+let s={px:2,py:2,hp:32,maxHp:32,mp:8,maxMp:8,lv:1,xp:0,gold:0,potions:2,steps:0,boss:false,sound:true,battle:null,guard:false,msg:'Find the old gate beyond the woods.'};
+const enemies=[{n:'Moss Slime',i:'🟢',hp:14,atk:4,xp:5,g:4},{n:'Ash Bat',i:'🦇',hp:18,atk:5,xp:7,g:5},{n:'Briar Wolf',i:'🐺',hp:22,atk:6,xp:9,g:7}];
+function tone(f=440,d=.06){if(!s.sound)return; try{audio||(audio=new AudioContext()); if(audio.state==='suspended')audio.resume(); let o=audio.createOscillator(),g=audio.createGain();o.frequency.value=f;o.connect(g);g.connect(audio.destination);g.gain.setValueAtTime(.04,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.start();o.stop(audio.currentTime+d)}catch{}}
+let audio;
+function tile(ch,px,py){let col={ '#':'#4e4655','.':'#4f6f4a','T':'#263c2d','~':'#274c69','H':'#8b6c45','N':'#6e5c86','G':'#7a4c3d'}[ch]||'#333';x.fillStyle=col;x.fillRect(px,py,20,20); if(ch==='T'){x.fillStyle='#35543d';x.fillRect(px+5,py+2,10,14)} if(ch==='H'){x.fillStyle='#d3b36a';x.fillRect(px+3,py+5,14,11)} if(ch==='N'){x.fillStyle='#f1d8b5';x.fillRect(px+6,py+5,8,10)} if(ch==='G'){x.fillStyle='#d08452';x.fillRect(px+4,py+2,12,16)}}
+function draw(){x.clearRect(0,0,c.width,c.height);for(let y=0;y<16;y++)for(let q=0;q<16;q++)tile(map[y][q],q*20,y*20);x.fillStyle='#ffd66b';x.beginPath();x.arc(s.px*20+10,s.py*20+10,7,0,7);x.fill();x.fillStyle='#492d1f';x.fillRect(s.px*20+7,s.py*20+3,6,4); renderHud()}
+function renderHud(){ $('stats').innerHTML=`L${s.lv} HP ${s.hp}/${s.maxHp}<br>MP ${s.mp}/${s.maxMp} · XP ${s.xp}/${s.lv*12}`;$('quest').innerHTML=`${s.gold}G · 🧪${s.potions}<br>${s.boss?'Gate cleared':'Gate sealed'}`;$('msg').textContent=s.msg}
+function walkable(ch){return ch!== '#'&&ch!=='T'&&ch!=='~'}
+function move(dx,dy){if(s.battle)return;let nx=s.px+dx,ny=s.py+dy;if(!walkable(map[ny][nx])){s.msg='Blocked.';tone(150);draw();return}s.px=nx;s.py=ny;s.steps++;tone(260,.03);let t=map[ny][nx];if(t==='G'&&!s.boss){startBattle({n:'Gate Warden',i:'🗿',hp:48,atk:8,xp:30,g:25,boss:true});return}if((t==='.'||t==='N')&&s.steps>3&&Math.random()<.16)startBattle(enemies[Math.floor(Math.random()*enemies.length)]);else {if(t==='N')s.msg='A traveler waits nearby. Tap ◎ to speak.'; else s.msg='The road hums under your boots.';draw()}}
+function talk(){if(s.battle)return;let found=false;for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++)if(map[s.py+oy]?.[s.px+ox]==='N'){found=true;s.msg='Traveler: “The Gate Warden hates Ember magic. Rest at the house if you must.”'}if(map[s.py][s.px]==='H'||map[s.py-1]?.[s.px]==='H'){found=true;rest()}if(!found)s.msg='Only wind answers.';draw()}
+function startBattle(e){s.battle={...e,hpNow:e.hp};s.guard=false;$('battle').classList.add('show');$('enemyIcon').textContent=e.i;$('enemyName').textContent=e.n;log(`${e.n} blocks the road.`);renderBattle();tone(110)}
+function renderBattle(){$('enemyHp').textContent=`HP ${Math.max(0,s.battle.hpNow)}/${s.battle.hp}`;renderHud()}
+function log(v){$('battleLog').innerHTML=v}
+function playerAct(a){if(!s.battle)return;let b=s.battle,msg=''; if(a==='attack'){let d=6+s.lv*2+Math.floor(Math.random()*4);b.hpNow-=d;msg=`You strike for ${d}.`;tone(520)}else if(a==='skill'){if(s.mp<3){log('Not enough MP.');tone(120);return} s.mp-=3;let d=11+s.lv*3+Math.floor(Math.random()*4);b.hpNow-=d;msg=`EMBER burns for ${d}!`;tone(760)}else if(a==='guard'){s.guard=true;msg='You brace for the counter.';tone(320)}else if(a==='item'){if(s.potions<1){log('No potions left.');return}s.potions--;let h=Math.min(16,s.maxHp-s.hp);s.hp+=h;msg=`Potion restores ${h} HP.`;tone(660)} if(b.hpNow<=0){winBattle(msg);return} setTimeout(()=>enemyTurn(msg),260);renderBattle()}
+function enemyTurn(prefix){let b=s.battle;if(!b)return;let d=Math.max(1,b.atk+Math.floor(Math.random()*3)-s.lv-(s.guard?4:0));s.guard=false;s.hp-=d;log(`${prefix}<br>${b.n} hits for ${d}.`);tone(170);if(s.hp<=0){s.hp=0;log(`<span class="dead">You fall. The road sends you home.</span>`);setTimeout(()=>{s.hp=s.maxHp;s.mp=s.maxMp;s.px=2;s.py=2;s.gold=Math.max(0,s.gold-3);endBattle();s.msg='You wake at the village house, lighter by a few coins.';draw()},800)}renderBattle()}
+function winBattle(prefix){let b=s.battle;s.xp+=b.xp;s.gold+=b.g;let out=`${prefix}<br><span class="win">Victory! +${b.xp} XP · +${b.g}G</span>`;if(b.boss){s.boss=true;out+='<br>The old gate opens.'}while(s.xp>=s.lv*12){s.xp-=s.lv*12;s.lv++;s.maxHp+=6;s.maxMp+=2;s.hp=s.maxHp;s.mp=s.maxMp;out+=`<br>LEVEL UP → ${s.lv}`;tone(900,.16)}log(out);setTimeout(()=>{endBattle();s.msg=s.boss?'The gate is open. You finished this tiny JRPG.':'Stronger now. Keep moving toward the gate.';save();draw()},700)}
+function endBattle(){s.battle=null;$('battle').classList.remove('show')}
+function rest(){if(s.battle)return;s.hp=s.maxHp;s.mp=s.maxMp;s.msg='You rest. HP and MP restored.';tone(600);draw()}
+function save(){localStorage.setItem(SAVE,JSON.stringify({...s,battle:null}));s.msg='Game saved locally.';draw()}
+function load(){try{let v=JSON.parse(localStorage.getItem(SAVE));if(v)s={...s,...v,battle:null}}catch{}draw()}
+function reset(){localStorage.removeItem(SAVE);location.reload()}
+document.querySelectorAll('[data-move]').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();move(...b.dataset.move.split(',').map(Number))}));document.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();playerAct(b.dataset.act)}));$('talk').onclick=talk;$('save').onclick=save;$('rest').onclick=rest;$('reset').onclick=reset;$('sound').onclick=()=>{s.sound=!s.sound;s.msg=`Sound ${s.sound?'on':'off'}.`;tone(440);draw()};document.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('visibilitychange',()=>{if(document.hidden)save()});window.addEventListener('pointerdown',()=>{if(audio?.state==='suspended')audio.resume()},{once:false});load();
+</script></body></html>
