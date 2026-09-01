@@ -1,0 +1,2787 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#140f12">
+  <title>The Price of Home</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+      --ink: #f6e7c3;
+      --muted: #bba98f;
+      --night: #140f12;
+      --panel: #21181c;
+      --panel-2: #2b2024;
+      --line: #695344;
+      --gold: #e6b85c;
+      --red: #9f3d38;
+      --green: #67925f;
+      --blue: #638fa3;
+      --shadow: #090709;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--night);
+      color: var(--ink);
+      overscroll-behavior: none;
+    }
+
+    body {
+      touch-action: none;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid #765f50;
+      border-radius: 12px;
+      background: linear-gradient(#3a2c30, #2a2024);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 800;
+      min-height: 46px;
+      padding: 7px 9px;
+      touch-action: manipulation;
+    }
+
+    button:active,
+    button.pressed {
+      transform: translateY(1px) scale(.985);
+      background: #463238;
+      border-color: var(--gold);
+    }
+
+    button:disabled {
+      opacity: .38;
+      filter: grayscale(.55);
+      transform: none;
+    }
+
+    button .sub {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+
+    .app {
+      width: min(100%, 520px);
+      height: 100vh;
+      height: 100dvh;
+      margin: 0 auto;
+      padding: max(8px, env(safe-area-inset-top)) 9px max(8px, env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      background:
+        radial-gradient(circle at 50% -10%, #4b2926 0, #21161a 38%, #110d10 78%);
+      border-inline: 1px solid #2d2226;
+    }
+
+    .hud {
+      display: grid;
+      grid-template-columns: 1.35fr .9fr;
+      gap: 7px;
+      flex: 0 0 auto;
+    }
+
+    .hud-card,
+    .objective,
+    .floating-card,
+    .sheet,
+    .dialogue,
+    .title-card,
+    .ending-card {
+      border: 1px solid var(--line);
+      background: linear-gradient(145deg, #2a1e22f2, #1b1418f6);
+      box-shadow: 0 8px 26px #0008, inset 0 1px #ffffff0a;
+    }
+
+    .hud-card {
+      min-width: 0;
+      border-radius: 11px;
+      padding: 7px 8px;
+      font-size: 10px;
+    }
+
+    .hud-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    .hud-line + .hud-line {
+      margin-top: 5px;
+    }
+
+    .label {
+      color: var(--muted);
+    }
+
+    .bar {
+      position: relative;
+      flex: 1;
+      min-width: 42px;
+      height: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      border: 1px solid #0008;
+      background: #0d0b0d;
+    }
+
+    .bar > i {
+      display: block;
+      width: 0;
+      height: 100%;
+      transition: width .18s ease;
+      background: linear-gradient(90deg, #7e2f32, #d45a4e);
+    }
+
+    .bar.focus > i {
+      background: linear-gradient(90deg, #376d7e, #70aec1);
+    }
+
+    .bar.freedom > i {
+      background: linear-gradient(90deg, #9c6e2c, #f1c96d);
+    }
+
+    .objective {
+      flex: 0 0 auto;
+      min-height: 30px;
+      border-radius: 10px;
+      padding: 6px 9px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #e9d8b6;
+      font-size: 10px;
+      line-height: 1.2;
+    }
+
+    .objective strong {
+      color: var(--gold);
+      letter-spacing: .06em;
+    }
+
+    .viewport {
+      position: relative;
+      min-height: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+      border: 1px solid #665145;
+      border-radius: 15px;
+      background: #20191b;
+      box-shadow: 0 10px 30px #0009;
+      isolation: isolate;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background: #30251f;
+    }
+
+    .location {
+      position: absolute;
+      top: 7px;
+      left: 7px;
+      z-index: 2;
+      max-width: 70%;
+      padding: 4px 7px;
+      border-radius: 7px;
+      background: #130e11d9;
+      border: 1px solid #7a6050;
+      color: #f2d896;
+      font-size: 9px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      bottom: 9px;
+      z-index: 8;
+      width: max-content;
+      max-width: calc(100% - 18px);
+      padding: 7px 10px;
+      transform: translate(-50%, 8px);
+      opacity: 0;
+      pointer-events: none;
+      border: 1px solid #947251;
+      border-radius: 9px;
+      background: #140e11ed;
+      color: #f7e4b8;
+      font-size: 10px;
+      text-align: center;
+      transition: opacity .14s ease, transform .14s ease;
+    }
+
+    .toast.show {
+      transform: translate(-50%, 0);
+      opacity: 1;
+    }
+
+    .battle-info {
+      position: absolute;
+      inset: 7px 7px auto;
+      z-index: 4;
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .battle-info.show {
+      display: grid;
+    }
+
+    .floating-card {
+      min-width: 0;
+      border-radius: 9px;
+      padding: 6px 7px;
+      font-size: 9px;
+    }
+
+    .enemy-title {
+      overflow: hidden;
+      color: #ffe5bd;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .enemy-hp {
+      margin-top: 4px;
+      color: var(--muted);
+    }
+
+    .intent-card {
+      border-color: #a16e42;
+      text-align: right;
+    }
+
+    .intent-name {
+      color: #ffd27b;
+      font-weight: 900;
+    }
+
+    .intent-text {
+      display: block;
+      margin-top: 3px;
+      color: #d6c3a5;
+      line-height: 1.15;
+    }
+
+    .battle-log {
+      position: absolute;
+      left: 7px;
+      right: 7px;
+      bottom: 7px;
+      z-index: 4;
+      display: none;
+      min-height: 43px;
+      padding: 7px 8px;
+      border: 1px solid #71594b;
+      border-radius: 9px;
+      background: #130e11e8;
+      color: #f0deba;
+      font-size: 10px;
+      line-height: 1.25;
+      pointer-events: none;
+    }
+
+    .battle-log.show {
+      display: block;
+    }
+
+    .battle-log .good { color: #f2cb70; }
+    .battle-log .bad { color: #ff8c84; }
+    .battle-log .quiet { color: var(--muted); }
+
+    .dialogue,
+    .sheet,
+    .title-screen,
+    .ending-screen {
+      position: absolute;
+      z-index: 12;
+    }
+
+    .dialogue {
+      display: none;
+      left: 7px;
+      right: 7px;
+      bottom: 7px;
+      min-height: 104px;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .dialogue.show {
+      display: block;
+    }
+
+    .speaker {
+      margin-bottom: 5px;
+      color: var(--gold);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .dialogue-text {
+      min-height: 38px;
+      color: #f7e8c9;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .dialogue-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .page-mark {
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .dialogue-row button {
+      min-height: 38px;
+      padding-inline: 18px;
+      color: #21150e;
+      background: linear-gradient(#f0c970, #bd8335);
+      border-color: #f6dc9c;
+    }
+
+    .choice-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-top: 9px;
+    }
+
+    .sheet {
+      display: none;
+      inset: auto 7px 7px;
+      max-height: calc(100% - 14px);
+      overflow: auto;
+      border-radius: 13px;
+      padding: 10px;
+      touch-action: pan-y;
+    }
+
+    .sheet.show {
+      display: block;
+    }
+
+    .sheet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 9px;
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .08em;
+    }
+
+    .sheet-head button {
+      min-height: 36px;
+      padding: 5px 10px;
+    }
+
+    .sheet-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .sheet-grid button.wide {
+      grid-column: 1 / -1;
+    }
+
+    .sheet-copy {
+      margin: 0 0 9px;
+      color: #d8c5a7;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .sheet-stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 5px 0;
+      border-bottom: 1px solid #ffffff0e;
+      color: #ead9b8;
+      font-size: 10px;
+    }
+
+    .sheet-stat span:first-child {
+      color: var(--muted);
+    }
+
+    .title-screen,
+    .ending-screen {
+      display: none;
+      inset: 0;
+      place-items: center;
+      padding: 16px;
+      background:
+        linear-gradient(#120c0fdd, #120c0ff2),
+        radial-gradient(circle at 50% 24%, #8a4935, #1b1014 62%);
+    }
+
+    .title-screen.show,
+    .ending-screen.show {
+      display: grid;
+    }
+
+    .title-card,
+    .ending-card {
+      width: min(100%, 350px);
+      border-radius: 16px;
+      padding: 18px;
+      text-align: center;
+    }
+
+    .rudis {
+      position: relative;
+      width: 20px;
+      height: 92px;
+      margin: 0 auto 10px;
+      transform: rotate(35deg);
+      border-radius: 8px 8px 2px 2px;
+      background: linear-gradient(90deg, #80542f, #d69b53 50%, #704423);
+      box-shadow: 0 0 0 2px #3b281c, 0 0 24px #d59a4a55;
+    }
+
+    .rudis::before {
+      content: "";
+      position: absolute;
+      left: -12px;
+      bottom: 13px;
+      width: 44px;
+      height: 8px;
+      border-radius: 4px;
+      background: #a76d36;
+      box-shadow: 0 0 0 2px #3b281c;
+    }
+
+    .rudis::after {
+      content: "";
+      position: absolute;
+      left: 5px;
+      bottom: -14px;
+      width: 10px;
+      height: 19px;
+      border-radius: 2px 2px 8px 8px;
+      background: #754829;
+      box-shadow: 0 0 0 2px #3b281c;
+    }
+
+    h1,
+    h2,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 5px;
+      color: #f5d487;
+      font-size: clamp(23px, 7vw, 32px);
+      letter-spacing: .06em;
+      line-height: 1;
+    }
+
+    .subtitle {
+      margin-bottom: 16px;
+      color: #c8b393;
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .title-actions {
+      display: grid;
+      gap: 8px;
+    }
+
+    .title-actions button:first-child {
+      color: #25180e;
+      background: linear-gradient(#f0cf7d, #bc8439);
+      border-color: #f6dda1;
+    }
+
+    .ending-card h2 {
+      margin-bottom: 7px;
+      color: #f5d487;
+      font-size: 21px;
+    }
+
+    .ending-copy {
+      margin-bottom: 12px;
+      color: #eedfbe;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .ending-stats {
+      margin: 12px 0;
+      padding: 9px;
+      border-radius: 9px;
+      background: #120e10aa;
+      color: #d7c2a2;
+      font-size: 10px;
+      line-height: 1.55;
+    }
+
+    .controls {
+      flex: 0 0 auto;
+      min-height: 142px;
+    }
+
+    .explore-controls {
+      display: grid;
+      grid-template-columns: minmax(178px, 1.2fr) minmax(120px, .8fr);
+      gap: 8px;
+    }
+
+    .explore-controls.hide,
+    .battle-controls.hide {
+      display: none;
+    }
+
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(48px, 58px));
+      grid-template-rows: repeat(3, 44px);
+      justify-content: center;
+      gap: 3px;
+    }
+
+    .dpad button {
+      min-height: 44px;
+      padding: 0;
+      font-size: 18px;
+    }
+
+    .dpad .up { grid-column: 2; }
+    .dpad .left { grid-column: 1; grid-row: 2; }
+    .dpad .act {
+      grid-column: 2;
+      grid-row: 2;
+      color: #23170f;
+      background: linear-gradient(#e8c06d, #ad7632);
+      border-color: #f4d792;
+      font-size: 11px;
+    }
+    .dpad .right { grid-column: 3; grid-row: 2; }
+    .dpad .down { grid-column: 2; grid-row: 3; }
+
+    .utility {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      align-content: center;
+    }
+
+    .utility button {
+      min-height: 56px;
+    }
+
+    .battle-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .battle-controls button {
+      min-height: 65px;
+    }
+
+    .battle-controls .continue {
+      grid-column: 1 / -1;
+      min-height: 132px;
+      color: #25180e;
+      background: linear-gradient(#f0cf7d, #bc8439);
+      border-color: #f6dda1;
+      font-size: 14px;
+    }
+
+    .viewport.hit {
+      animation: hit .18s linear;
+    }
+
+    .viewport.heal {
+      animation: heal .28s ease;
+    }
+
+    .viewport.victory {
+      animation: victory .45s ease;
+    }
+
+    @keyframes hit {
+      0%, 100% { transform: translateX(0); filter: none; }
+      25% { transform: translateX(-3px); filter: sepia(1) saturate(3); }
+      70% { transform: translateX(3px); }
+    }
+
+    @keyframes heal {
+      40% { box-shadow: 0 0 28px #76bc78aa, inset 0 0 28px #76bc7844; }
+    }
+
+    @keyframes victory {
+      45% { box-shadow: 0 0 36px #f0c964aa, inset 0 0 30px #f0c944; }
+    }
+
+    @media (max-height: 680px) {
+      .app { gap: 5px; padding-top: max(5px, env(safe-area-inset-top)); }
+      .objective { min-height: 25px; padding-block: 4px; }
+      .controls { min-height: 120px; }
+      .dpad { grid-template-rows: repeat(3, 38px); }
+      .dpad button { min-height: 38px; }
+      .utility button { min-height: 47px; }
+      .battle-controls button { min-height: 55px; }
+      .battle-controls .continue { min-height: 112px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="hud" aria-label="Player status">
+      <div class="hud-card">
+        <div class="hud-line"><strong id="heroLabel">CASSIAN · L1</strong><span id="xpLabel">XP 0/25</span></div>
+        <div class="hud-line"><span class="label">HP</span><span class="bar"><i id="hpBar"></i></span><span id="hpLabel">50/50</span></div>
+        <div class="hud-line"><span class="label">FOCUS</span><span class="bar focus"><i id="focusBar"></i></span><span id="focusLabel">8/8</span></div>
+      </div>
+      <div class="hud-card">
+        <div class="hud-line"><strong>FREEDOM</strong><span id="moneyLabel">0 / 300</span></div>
+        <div class="hud-line"><span class="bar freedom"><i id="freedomBar"></i></span></div>
+        <div class="hud-line"><span id="supplyLabel">BANDAGE ×2</span><span id="edgeLabel">EDGE ○○○</span></div>
+      </div>
+    </header>
+
+    <div class="objective"><strong>ROAD</strong><span id="objectiveText">Speak with Varro about your price.</span></div>
+
+    <main class="viewport" id="viewport">
+      <canvas id="game" width="320" height="320" role="img" aria-label="The House of Varro training yard"></canvas>
+      <div class="location" id="location">HOUSE OF VARRO</div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+      <div class="battle-info" id="battleInfo">
+        <div class="floating-card">
+          <div class="enemy-title" id="enemyName">Opponent</div>
+          <div class="enemy-hp" id="enemyHp">HP 0/0</div>
+        </div>
+        <div class="floating-card intent-card">
+          <span class="intent-name" id="intentName">WATCH</span>
+          <span class="intent-text" id="intentText">Read the shoulders.</span>
+        </div>
+      </div>
+      <div class="battle-log" id="battleLog" aria-live="polite"></div>
+
+      <section class="dialogue" id="dialogue" aria-live="polite">
+        <div class="speaker" id="speaker">Narrator</div>
+        <div class="dialogue-text" id="dialogueText"></div>
+        <div class="dialogue-row" id="dialogueRow">
+          <span class="page-mark" id="pageMark">1 / 1</span>
+          <button type="button" data-ui="dialogue-next" id="dialogueNext">CONTINUE</button>
+        </div>
+        <div class="choice-buttons" id="choiceButtons"></div>
+      </section>
+
+      <section class="sheet" id="sheet">
+        <div class="sheet-head"><span id="sheetTitle">MENU</span><button type="button" data-ui="sheet-close">CLOSE</button></div>
+        <div id="sheetBody"></div>
+      </section>
+
+      <section class="title-screen show" id="titleScreen">
+        <div class="title-card">
+          <div class="rudis" aria-hidden="true"></div>
+          <h1>THE PRICE<br>OF HOME</h1>
+          <p class="subtitle">Every victory buys one step home.<br>A pocket gladiator JRPG.</p>
+          <div class="title-actions">
+            <button type="button" data-ui="continue" id="continueButton">CONTINUE JOURNEY</button>
+            <button type="button" data-ui="new-game" id="newButton">BEGIN JOURNEY</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="ending-screen" id="endingScreen">
+        <div class="ending-card">
+          <div class="rudis" aria-hidden="true"></div>
+          <h2>CASSIAN IS HOME</h2>
+          <p class="ending-copy">The price is paid.<br>The sea kept the road.</p>
+          <div class="ending-stats" id="endingStats"></div>
+          <button type="button" data-ui="ending-close">KEEP THIS MEMORY</button>
+        </div>
+      </section>
+    </main>
+
+    <section class="controls explore-controls" id="exploreControls" aria-label="Exploration controls">
+      <div class="dpad">
+        <button type="button" class="up" data-move="0,-1" aria-label="Move up">▲</button>
+        <button type="button" class="left" data-move="-1,0" aria-label="Move left">◀</button>
+        <button type="button" class="act" data-ui="interact" aria-label="Interact">ACT</button>
+        <button type="button" class="right" data-move="1,0" aria-label="Move right">▶</button>
+        <button type="button" class="down" data-move="0,1" aria-label="Move down">▼</button>
+      </div>
+      <div class="utility">
+        <button type="button" data-ui="interact">INTERACT<span class="sub">Talk · open · enter</span></button>
+        <button type="button" data-ui="menu">MENU<span class="sub">Save · journal · sound</span></button>
+      </div>
+    </section>
+
+    <section class="controls battle-controls hide" id="battleControls" aria-label="Battle controls">
+      <button type="button" data-battle="strike" id="strikeButton">STRIKE<span class="sub" id="strikeSub">Build 1 Edge</span></button>
+      <button type="button" data-battle="break" id="breakButton">BREAK<span class="sub" id="breakSub">3 Focus · spend Edge</span></button>
+      <button type="button" data-battle="guard" id="guardButton">GUARD<span class="sub" id="guardSub">Reduce harm · regain Focus</span></button>
+      <button type="button" data-battle="bandage" id="bandageButton">BANDAGE<span class="sub" id="bandageSub">2 left · enemy still acts</span></button>
+    </section>
+  </div>
+
+  <script>
+  (() => {
+    "use strict";
+
+    const $ = (id) => document.getElementById(id);
+    const canvas = $("game");
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const SAVE_KEY = "the-price-of-home-v1";
+    const SAVE_VERSION = 1;
+    const FREEDOM_PRICE = 300;
+    const TILE = 20;
+    const DEBUG = new URLSearchParams(location.search).has("debug");
+
+    const MAPS = {
+      ludus: {
+        name: "House of Varro",
+        aria: "The House of Varro training yard",
+        theme: "ludus",
+        rows: [
+          "################",
+          "#....#....#....#",
+          "#.B..#....#..M.#",
+          "#....#....#....#",
+          "#....######....#",
+          "#..............#",
+          "#..T........L..#",
+          "#..............#",
+          "#######..#######",
+          "#......ss......#",
+          "#......ss......#",
+          "#..............#",
+          "#...K......V...#",
+          "#..............#",
+          "#Q.....A......H#",
+          "################"
+        ]
+      },
+      quarry: {
+        name: "Red Quarry Road",
+        aria: "A red stone quarry road beyond the city",
+        theme: "quarry",
+        encounterPool: ["quarry-wolf", "dust-raider", "yard-veteran"],
+        rows: [
+          "################",
+          "#Q.............#",
+          "#.####....###..#",
+          "#....#....#....#",
+          "#....#....#....#",
+          "#....#.........#",
+          "#.##....~~~~...#",
+          "#......~~~~....#",
+          "#..C...~~~~....#",
+          "#......~~~~....#",
+          "#....####......#",
+          "#..............#",
+          "#..####....##c.#",
+          "#...........X..#",
+          "#..............#",
+          "################"
+        ]
+      },
+      arena: {
+        name: "The Sand",
+        aria: "The arena sand before a roaring crowd",
+        theme: "arena",
+        rows: [
+          "################",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "#ssssssssssssss#",
+          "################"
+        ]
+      },
+      harbor: {
+        name: "South Harbor",
+        aria: "A harbor at dawn with a ship waiting at the pier",
+        theme: "harbor",
+        rows: [
+          "~~~~~~~~~~~~~~~~",
+          "~~~~~~SS~~~~~~~~",
+          "~~~~~~==~~~~~~~~",
+          "~~~~~~==~~~~~~~~",
+          "##....==....####",
+          "#.....==.......#",
+          "#.....==.......#",
+          "#.....==.......#",
+          "#.....==.......#",
+          "#.....==.......#",
+          "#..............#",
+          "#..........V...#",
+          "#..............#",
+          "#..............#",
+          "#..............#",
+          "################"
+        ]
+      }
+    };
+
+    const INTENTS = {
+      quick: { name: "QUICK CUT", text: "A fast, honest attack.", icon: "!" },
+      heavy: { name: "HEAVY WINDUP", text: "Brutal. BREAK interrupts it.", icon: "!!" },
+      guard: { name: "SHIELD HIGH", text: "Halves STRIKE; builds power.", icon: "▣" },
+      feint: { name: "HOOK FEINT", text: "Slips GUARD and steals Edge.", icon: "?" },
+      recover: { name: "CATCH BREATH", text: "No attack; recovers health.", icon: "+" }
+    };
+
+    const ENEMIES = {
+      trial: {
+        name: "Otho the Rook", title: "Trial Bout", shape: "shield", colors: ["#657477", "#c6a86b", "#542f2b"],
+        hp: 32, attack: 6, defense: 0, xp: 12, purse: 15,
+        intents: ["quick", "heavy", "quick", "guard"],
+        intro: [
+          { speaker: "OTHO", text: "First day on the sand? Keep your feet under you." },
+          { speaker: "ORIN", text: "Watch his intent. Your eyes win before your blade does." }
+        ],
+        win: [{ speaker: "OTHO", text: "Good. You fight like the road is waiting." }]
+      },
+      vela: {
+        name: "Vela of the Net", title: "Bronze I", shape: "net", colors: ["#80684f", "#d3bd8b", "#36525d"],
+        hp: 42, attack: 7, defense: 0, xp: 15, purse: 18,
+        intents: ["quick", "feint", "heavy", "quick"],
+        intro: [{ speaker: "VELA", text: "A net catches the impatient. Show me what catches you." }],
+        win: [{ speaker: "VELA", text: "Not impatience, then. Good to know." }]
+      },
+      doran: {
+        name: "Doran the Wall", title: "Bronze II", shape: "shield", colors: ["#7a6043", "#d5b061", "#623834"],
+        hp: 55, attack: 8, defense: 2, xp: 18, purse: 22,
+        intents: ["guard", "quick", "heavy", "guard", "feint"],
+        intro: [{ speaker: "DORAN", text: "They pay me to remain standing. Try to change the contract." }],
+        win: [{ speaker: "DORAN", text: "Changed." }]
+      },
+      maro: {
+        name: "Maro of the Hook", title: "Bronze Champion", shape: "chain", colors: ["#6d4740", "#d09a57", "#39343e"],
+        hp: 72, attack: 9, defense: 1, xp: 30, purse: 35,
+        intents: ["quick", "heavy", "guard", "feint", "recover"],
+        intro: [
+          { speaker: "MARO", text: "I heard you are buying a road." },
+          { speaker: "CASSIAN", text: "Just the part that leads home." }
+        ],
+        win: [{ speaker: "MARO", text: "Then buy it. Do not let this place spend you first." }]
+      },
+      "quarry-ambush": {
+        name: "Quarry Hound Pack", title: "Road Ambush", shape: "beast", colors: ["#6b553b", "#b08752", "#342923"],
+        hp: 58, attack: 9, defense: 0, xp: 20, purse: 20,
+        intents: ["quick", "quick", "heavy", "feint"],
+        intro: [{ speaker: "NARRATOR", text: "The stolen purse is here. So are the hounds left to guard it." }],
+        win: [{ speaker: "CASSIAN", text: "Varro's purse. Heavy enough to start a war over." }]
+      },
+      kest: {
+        name: "Kest Chainbreaker", title: "Quarry Chief", shape: "chain", colors: ["#775045", "#c58c56", "#4b3a30"],
+        hp: 82, attack: 10, defense: 1, xp: 35, purse: 35,
+        intents: ["feint", "heavy", "guard", "quick", "recover"],
+        intro: [
+          { speaker: "KEST", text: "You carried chains all this way to defend the man holding yours?" },
+          { speaker: "CASSIAN", text: "I came for the price of my key." }
+        ],
+        win: [{ speaker: "KEST", text: "Then take it. I hope the lock remembers its promise." }]
+      },
+      sava: {
+        name: "Sava Two-Blades", title: "Silver I", shape: "dual", colors: ["#5a536b", "#d7b985", "#7d3f44"],
+        hp: 78, attack: 10, defense: 0, xp: 25, purse: 25,
+        intents: ["quick", "feint", "quick", "heavy"],
+        intro: [{ speaker: "SAVA", text: "One blade asks. The other answers." }],
+        win: [{ speaker: "SAVA", text: "Today, yours had the last word." }]
+      },
+      brutus: {
+        name: "Brutus the Hammer", title: "Silver II", shape: "hammer", colors: ["#68645c", "#c6a86c", "#3f5261"],
+        hp: 96, attack: 12, defense: 3, xp: 30, purse: 30,
+        intents: ["heavy", "guard", "heavy", "quick", "recover"],
+        intro: [{ speaker: "BRUTUS", text: "You can block iron. You cannot block the ground beneath it." }],
+        win: [{ speaker: "BRUTUS", text: "Apparently the ground can move." }]
+      },
+      ilyra: {
+        name: "Ilyra the Lioness", title: "Silver Champion", shape: "champion", colors: ["#8a5a35", "#e1bd68", "#6e2f34"],
+        hp: 112, attack: 13, defense: 2, xp: 50, purse: 45,
+        intents: ["quick", "guard", "feint", "heavy", "recover", "heavy"],
+        intro: [
+          { speaker: "ILYRA", text: "The crowd loves a man with somewhere else to be." },
+          { speaker: "CASSIAN", text: "Let them love quickly." }
+        ],
+        win: [{ speaker: "ILYRA", text: "Go home, Cassian. Before the sand learns your true name." }]
+      },
+      aurex: {
+        name: "Aurex the Unbroken", title: "Festival Final", shape: "champion", colors: ["#6c4930", "#edc871", "#803d33"],
+        hp: 155, attack: 15, defense: 3, xp: 80, purse: 95,
+        intents: ["quick", "heavy", "guard", "feint", "recover", "heavy", "quick"],
+        intro: [
+          { speaker: "AUREX", text: "Your purse buys a road. Mine feeds three children behind those doors." },
+          { speaker: "CASSIAN", text: "Then we both leave this sand alive." },
+          { speaker: "AUREX", text: "Give the crowd doubt. I will give you everything else." }
+        ],
+        win: [
+          { speaker: "AUREX", text: "Enough. I yield." },
+          { speaker: "AUREX", text: "Do not look back when the gate opens. Places like this mistake looking for longing." }
+        ]
+      },
+      "quarry-wolf": {
+        name: "Red Quarry Wolf", title: "Road Encounter", shape: "beast", colors: ["#6e563e", "#b58a51", "#362925"],
+        hp: 38, attack: 7, defense: 0, xp: 8, purse: 7,
+        intents: ["quick", "heavy", "quick", "feint"],
+        intro: [{ speaker: "NARRATOR", text: "A quarry wolf circles the road." }],
+        win: [{ speaker: "NARRATOR", text: "The wolf flees into the red cut." }]
+      },
+      "dust-raider": {
+        name: "Dust Raider", title: "Road Encounter", shape: "dual", colors: ["#725144", "#b98d5d", "#3e3b42"],
+        hp: 50, attack: 9, defense: 1, xp: 10, purse: 9,
+        intents: ["feint", "quick", "guard", "heavy"],
+        intro: [{ speaker: "RAIDER", text: "Leave the purse. Keep the scars." }],
+        win: [{ speaker: "NARRATOR", text: "The raider leaves both behind." }]
+      },
+      "yard-veteran": {
+        name: "Runaway Veteran", title: "Road Encounter", shape: "shield", colors: ["#5f6664", "#bfa875", "#523532"],
+        hp: 66, attack: 10, defense: 2, xp: 13, purse: 12,
+        intents: ["guard", "quick", "heavy", "recover"],
+        intro: [{ speaker: "VETERAN", text: "No crowd. No rules. Just the road." }],
+        win: [{ speaker: "CASSIAN", text: "Then keep walking." }]
+      }
+    };
+
+    const STORY_FIGHTS = {
+      3: "trial",
+      5: "vela",
+      6: "doran",
+      7: "maro",
+      13: "sava",
+      14: "brutus",
+      15: "ilyra",
+      16: "aurex"
+    };
+
+    const STORY_AFTER_WIN = {
+      trial: 4,
+      vela: 6,
+      doran: 7,
+      maro: 8,
+      "quarry-ambush": 11,
+      kest: 12,
+      sava: 14,
+      brutus: 15,
+      ilyra: 16,
+      aurex: 17
+    };
+
+    const OBJECTIVES = {
+      0: "Begin Cassian's last season.",
+      1: "Speak with Varro about your price.",
+      2: "Ask Orin how to read an opponent.",
+      3: "Enter the arena gate for your trial.",
+      4: "Report your first purse to Varro.",
+      5: "Arena gate: defeat Vela of the Net.",
+      6: "Arena gate: break Doran the Wall.",
+      7: "Arena gate: face the bronze champion.",
+      8: "Find Tavi in the lower yard.",
+      9: "Leave through the quarry gate.",
+      10: "Find Varro's stolen purse in the quarry.",
+      11: "Face Kest at the south quarry cut.",
+      12: "Return the recovered purse to Varro.",
+      13: "Arena gate: enter the silver card.",
+      14: "Arena gate: survive the Hammer.",
+      15: "Arena gate: face the silver champion.",
+      16: "Arena gate: fight Aurex in the festival final.",
+      17: "Pay 300 marks to Varro and claim the rudis.",
+      18: "Walk through the harbor gate.",
+      19: "Board the ship at the end of the pier.",
+      20: "Home."
+    };
+
+    function freshState() {
+      return {
+        version: SAVE_VERSION,
+        started: false,
+        ended: false,
+        free: false,
+        story: 1,
+        mapId: "ludus",
+        px: 2,
+        py: 3,
+        facing: "down",
+        safe: { mapId: "ludus", px: 2, py: 3 },
+        hp: 50,
+        maxHp: 50,
+        focus: 8,
+        maxFocus: 8,
+        level: 1,
+        xp: 0,
+        gold: 0,
+        bandages: 2,
+        attackUpgrade: 0,
+        defenseUpgrade: 0,
+        focusUpgrade: false,
+        spent: 0,
+        steps: 0,
+        encounterSteps: 0,
+        victories: 0,
+        optionalVictories: 0,
+        deaths: 0,
+        playSeconds: 0,
+        rng: 0x6d2b79f5,
+        completed: {},
+        flags: {},
+        settings: { sound: true },
+        battle: null
+      };
+    }
+
+    let state = freshState();
+    const ui = {
+      title: true,
+      dialogue: null,
+      choice: null,
+      sheet: null,
+      toastTimer: 0,
+      active: true,
+      lastFrame: performance.now(),
+      battleToken: 0,
+      hold: null,
+      flashTimer: 0,
+      audioStatus: "locked"
+    };
+
+    const inputQueue = [];
+    let processing = false;
+
+    const AudioSystem = {
+      context: null,
+      master: null,
+      sfx: null,
+      queue: [],
+      failed: false,
+
+      unlock() {
+        if (!state.settings.sound) return;
+        try {
+          if (!this.context) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) throw new Error("Web Audio unavailable");
+            this.context = new AudioCtx();
+            this.master = this.context.createGain();
+            this.sfx = this.context.createGain();
+            this.master.gain.value = .7;
+            this.sfx.gain.value = .5;
+            this.sfx.connect(this.master);
+            this.master.connect(this.context.destination);
+          }
+          if (this.context.state === "suspended") this.context.resume().catch(() => {});
+          ui.audioStatus = this.context.state === "running" ? "ready" : this.context.state;
+          this.flush();
+        } catch (error) {
+          this.failed = true;
+          ui.audioStatus = "failed";
+        }
+      },
+
+      request(name) {
+        if (!state.settings.sound) return;
+        this.queue.push(name);
+        if (this.queue.length > 12) this.queue.shift();
+        this.unlock();
+        this.flush();
+      },
+
+      flush() {
+        if (!this.context || this.context.state !== "running" || !this.sfx) return;
+        while (this.queue.length) this.play(this.queue.shift());
+      },
+
+      play(name) {
+        const patterns = {
+          step: [[180, .025, .025]],
+          blocked: [[105, .06, .04]],
+          select: [[380, .035, .035]],
+          strike: [[210, .035, .05], [150, .05, .035]],
+          break: [[420, .04, .04], [680, .08, .055]],
+          guard: [[260, .07, .035]],
+          heal: [[480, .05, .035], [650, .09, .04]],
+          enemy: [[135, .08, .045]],
+          victory: [[440, .05, .04], [590, .06, .04], [820, .15, .045]],
+          level: [[520, .06, .04], [690, .06, .04], [930, .2, .05]],
+          save: [[360, .04, .03], [520, .08, .035]],
+          death: [[190, .1, .04], [120, .2, .035]],
+          freedom: [[392, .08, .04], [523, .08, .04], [659, .08, .04], [784, .28, .05]]
+        };
+        let at = this.context.currentTime;
+        for (const [frequency, duration, gain] of (patterns[name] || patterns.select)) {
+          const osc = this.context.createOscillator();
+          const amp = this.context.createGain();
+          osc.type = name === "break" ? "sawtooth" : "triangle";
+          osc.frequency.setValueAtTime(frequency, at);
+          amp.gain.setValueAtTime(gain, at);
+          amp.gain.exponentialRampToValueAtTime(.001, at + duration);
+          osc.connect(amp);
+          amp.connect(this.sfx);
+          osc.start(at);
+          osc.stop(at + duration);
+          at += duration * .75;
+        }
+      },
+
+      hidden() {
+        if (this.context?.state === "running") this.context.suspend().catch(() => {});
+        ui.audioStatus = this.context ? "suspended" : "locked";
+      },
+
+      visible() {
+        if (state.settings.sound) this.unlock();
+      }
+    };
+
+    function enqueue(event) {
+      if (!event || !event.type) return;
+      if (inputQueue.length >= 32) {
+        const moveIndex = inputQueue.findIndex((entry) => entry.type === "MOVE");
+        if (moveIndex >= 0) inputQueue.splice(moveIndex, 1);
+        else inputQueue.shift();
+      }
+      inputQueue.push(event);
+      if (!processing) queueMicrotask(processQueue);
+    }
+
+    function processQueue() {
+      if (processing) return;
+      processing = true;
+      while (inputQueue.length) reduce(inputQueue.shift());
+      processing = false;
+      render();
+    }
+
+    function reduce(event) {
+      switch (event.type) {
+        case "START_NEW": startNewJourney(); break;
+        case "CONTINUE": continueJourney(); break;
+        case "MOVE": movePlayer(event.dx, event.dy); break;
+        case "INTERACT": interact(); break;
+        case "DIALOGUE_NEXT": advanceDialogue(); break;
+        case "CHOICE": choose(event.index); break;
+        case "OPEN_SHEET": openSheet(event.kind); break;
+        case "CLOSE_SHEET": ui.sheet = null; break;
+        case "SHEET_ACTION": handleSheetAction(event.action); break;
+        case "ADVANCE_STORY": advanceStory(event.story); break;
+        case "ENTER_MAP": enterMap(event.mapId, event.px, event.py); break;
+        case "ENTER_ARENA": enterArena(event.enemyId); break;
+        case "BEGIN_BATTLE": beginBattle(event.enemyId, event.context || "story"); break;
+        case "BATTLE_ACTION": playerBattleAction(event.action); break;
+        case "ENEMY_TURN": resolveEnemyTurn(event.token); break;
+        case "BATTLE_CONTINUE": continueAfterBattle(); break;
+        case "PAY_FREEDOM": payFreedom(); break;
+        case "END_JOURNEY": endJourney(); break;
+        case "APP_HIDDEN": onHidden(); break;
+        case "APP_VISIBLE": onVisible(); break;
+      }
+    }
+
+    function rand() {
+      let value = state.rng >>> 0;
+      value ^= value << 13;
+      value ^= value >>> 17;
+      value ^= value << 5;
+      state.rng = value >>> 0;
+      return (state.rng >>> 0) / 4294967296;
+    }
+
+    function randInt(min, max) {
+      return min + Math.floor(rand() * (max - min + 1));
+    }
+
+    function xpNeeded(level = state.level) {
+      return 13 + level * 12;
+    }
+
+    function playerAttack() {
+      return 7 + (state.level - 1) * 2 + state.attackUpgrade;
+    }
+
+    function playerDefense() {
+      return Math.floor((state.level - 1) / 2) + state.defenseUpgrade;
+    }
+
+    function currentMap() {
+      return MAPS[state.mapId] || MAPS.ludus;
+    }
+
+    function tileAt(mapId, x, y) {
+      return MAPS[mapId]?.rows[y]?.[x] || "#";
+    }
+
+    function isWalkable(tile) {
+      return tile === "." || tile === "s" || tile === "=";
+    }
+
+    function canAcceptWorldInput() {
+      return state.started && !state.ended && !ui.title && !ui.dialogue && !ui.choice && !ui.sheet && !state.battle;
+    }
+
+    function startNewJourney() {
+      const hadSave = hasSave();
+      if (hadSave && ui.title) {
+        openChoice("NEW JOURNEY", "Erase the current journey and begin again?", [
+          { label: "KEEP SAVE", event: { type: "CONTINUE" } },
+          { label: "ERASE & BEGIN", event: { type: "SHEET_ACTION", action: "confirm-restart" } }
+        ]);
+        ui.title = false;
+        return;
+      }
+      actuallyStartNew();
+    }
+
+    function actuallyStartNew() {
+      const sound = state.settings?.sound !== false;
+      localStorage.removeItem(SAVE_KEY);
+      state = freshState();
+      state.settings.sound = sound;
+      state.started = true;
+      ui.title = false;
+      ui.sheet = null;
+      ui.choice = null;
+      ui.dialogue = null;
+      openDialogue([
+        { speaker: "NARRATOR", text: "Every fighter in the House of Varro wears a price around his neck." },
+        { speaker: "NARRATOR", text: "Cassian's is 300 marks." },
+        { speaker: "NARRATOR", text: "Enough victories, and the wooden rudis is his. Beyond it: a ship. Beyond the ship: home." }
+      ]);
+      saveGame(false);
+      AudioSystem.request("select");
+    }
+
+    function continueJourney() {
+      const loaded = loadGame();
+      if (!loaded) {
+        actuallyStartNew();
+        return;
+      }
+      ui.title = false;
+      if (state.ended) showEnding();
+      else toast("Journey restored.");
+      AudioSystem.request("select");
+    }
+
+    function movePlayer(dx, dy) {
+      if (!canAcceptWorldInput()) return;
+      state.facing = dx < 0 ? "left" : dx > 0 ? "right" : dy < 0 ? "up" : "down";
+      const nx = state.px + dx;
+      const ny = state.py + dy;
+      const tile = tileAt(state.mapId, nx, ny);
+      if (!isWalkable(tile)) {
+        toast("Blocked.");
+        AudioSystem.request("blocked");
+        return;
+      }
+      state.px = nx;
+      state.py = ny;
+      state.steps += 1;
+      state.encounterSteps += 1;
+      state.safe = { mapId: state.mapId, px: state.px, py: state.py };
+      AudioSystem.request("step");
+      if (state.steps % 8 === 0) saveGame(false);
+      maybeRandomEncounter(tile);
+    }
+
+    function maybeRandomEncounter(tile) {
+      const map = currentMap();
+      if (!map.encounterPool || state.mapId !== "quarry" || !isWalkable(tile)) return;
+      if (state.encounterSteps < 6) return;
+      if (rand() >= .135) return;
+      state.encounterSteps = 0;
+      const pool = map.encounterPool;
+      const enemyId = pool[randInt(0, pool.length - 1)];
+      stopMoveHold();
+      openDialogue(ENEMIES[enemyId].intro, { type: "BEGIN_BATTLE", enemyId, context: "random" });
+    }
+
+    function interactionCandidates() {
+      const vectors = {
+        up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0]
+      };
+      const first = vectors[state.facing] || [0, 1];
+      const all = [first, [0, 0], [0, -1], [-1, 0], [1, 0], [0, 1]];
+      const seen = new Set();
+      return all.map(([dx, dy]) => ({ x: state.px + dx, y: state.py + dy }))
+        .filter(({ x, y }) => {
+          const key = `${x},${y}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    }
+
+    function interact() {
+      if (!canAcceptWorldInput()) return;
+      AudioSystem.request("select");
+      const candidates = interactionCandidates();
+      const specials = new Set("BMTLKVQAHCcXS");
+      const target = candidates.find(({ x, y }) => specials.has(tileAt(state.mapId, x, y)));
+      if (!target) {
+        toast(state.mapId === "harbor" ? "Salt wind. Open water." : "Only dust answers.");
+        return;
+      }
+      handleWorldTarget(tileAt(state.mapId, target.x, target.y));
+    }
+
+    function handleWorldTarget(tile) {
+      if (state.mapId === "ludus") {
+        if (tile === "B") return restAtBed();
+        if (tile === "M") return talkMedic();
+        if (tile === "T") return talkOrin();
+        if (tile === "L") return talkVarro();
+        if (tile === "K") return talkSmith();
+        if (tile === "V") return talkTavi();
+        if (tile === "A") return useArenaGate();
+        if (tile === "Q") return useQuarryGate();
+        if (tile === "H") return useHarborGate();
+      }
+      if (state.mapId === "quarry") {
+        if (tile === "Q") return enterMap("ludus", 2, 13);
+        if (tile === "C") return useQuarryPurse();
+        if (tile === "c") return useCourierSatchel();
+        if (tile === "X") return useQuarryChief();
+      }
+      if (state.mapId === "harbor") {
+        if (tile === "V") return harborFarewell();
+        if (tile === "S") return boardShip();
+      }
+      toast("Nothing more here.");
+    }
+
+    function talkVarro() {
+      if (state.story === 1) {
+        openDialogue([
+          { speaker: "VARRO", text: "Three hundred marks. In writing. Fill my purse, and I put the rudis in your hand." },
+          { speaker: "CASSIAN", text: "No new price at the end." },
+          { speaker: "VARRO", text: "My word is expensive. That is why you can trust it." }
+        ], { type: "ADVANCE_STORY", story: 2 });
+        return;
+      }
+      if (state.story === 4) {
+        openDialogue([
+          { speaker: "VARRO", text: "Fifteen marks. The first scratch on your tablet." },
+          { speaker: "VARRO", text: "Three bronze names wait beyond the gate. Survive all three and the purses grow." }
+        ], { type: "ADVANCE_STORY", story: 5 });
+        return;
+      }
+      if (state.story === 12) {
+        if (!state.flags.missionPaid) {
+          state.flags.missionPaid = true;
+          state.gold += 25;
+          state.spent = Math.max(0, state.spent);
+          state.story = 13;
+          openDialogue([
+            { speaker: "VARRO", text: "The stolen purse returned intact. That is either loyalty or arithmetic." },
+            { speaker: "CASSIAN", text: "Arithmetic." },
+            { speaker: "VARRO", text: "Good. Twenty-five marks. The silver card begins at dusk." }
+          ]);
+          saveGame(false);
+        }
+        return;
+      }
+      if (state.story === 17) {
+        if (state.gold < FREEDOM_PRICE) {
+          const short = FREEDOM_PRICE - state.gold;
+          openDialogue([
+            { speaker: "VARRO", text: `The tablet is ${short} marks short.` },
+            { speaker: "VARRO", text: "The arena gate still offers open contracts. I will not move the price." }
+          ]);
+        } else {
+          openChoice("VARRO", `Three hundred marks. Pay the price and take the rudis?`, [
+            { label: "NOT YET", event: { type: "DIALOGUE_NEXT" } },
+            { label: "PAY 300", event: { type: "PAY_FREEDOM" } }
+          ]);
+        }
+        return;
+      }
+      if (state.story >= 18) {
+        openDialogue([{ speaker: "VARRO", text: "You paid for the road. Do not waste it standing here." }]);
+        return;
+      }
+      const lines = state.story < 8
+        ? "A full purse is louder than a cheering crowd. Keep fighting."
+        : state.story < 13
+          ? "Bring back what was stolen. Then we speak of silver."
+          : "The final purses are large because the mistakes are expensive.";
+      openDialogue([{ speaker: "VARRO", text: lines }]);
+    }
+
+    function talkOrin() {
+      if (state.story === 2) {
+        openDialogue([
+          { speaker: "ORIN", text: "Do not watch steel. Watch shoulders. The next attack begins before the blade moves." },
+          { speaker: "ORIN", text: "STRIKE builds Edge. BREAK spends Focus and Edge—and stops a heavy windup." },
+          { speaker: "ORIN", text: "GUARD buys breath. BANDAGE buys blood. Both give the other fighter a turn." },
+          { speaker: "ORIN", text: "Understanding is cheaper than healing. Go prove it." }
+        ], { type: "ADVANCE_STORY", story: 3 });
+        return;
+      }
+      const tips = [
+        "A raised shield is not a wall. BREAK goes through it; GUARD can use the quiet turn to recover Focus.",
+        "Do not hoard Edge until the fight is over. A plan paid too late is just regret.",
+        "A feint punishes a frightened guard. Sometimes the safe move is to strike first.",
+        "You are allowed to return to the bed. Pride does not restore Focus."
+      ];
+      openDialogue([{ speaker: "ORIN", text: tips[(state.level + state.story) % tips.length] }]);
+    }
+
+    function talkMedic() {
+      openDialogue([
+        { speaker: "NIMA", text: "Every bandage costs eight marks. I hate that healing moves home farther away." }
+      ], { type: "OPEN_SHEET", kind: "medic" });
+    }
+
+    function talkSmith() {
+      openDialogue([
+        { speaker: "BOROS", text: "Iron can shorten the road. Iron also costs road. Your choice." }
+      ], { type: "OPEN_SHEET", kind: "smith" });
+    }
+
+    function talkTavi() {
+      if (state.story === 8) {
+        openDialogue([
+          { speaker: "TAVI", text: "How old is your boy now?" },
+          { speaker: "CASSIAN", text: "Ten, if the years kept their side." },
+          { speaker: "TAVI", text: "Varro's quarry purse was stolen. He needs a fighter more than a guard." },
+          { speaker: "TAVI", text: "Bring it back, and he puts you on the silver card." },
+          { speaker: "TAVI", text: "There was a courier satchel with it. If you see my name... bring me the letter." }
+        ], { type: "ADVANCE_STORY", story: 9 });
+        return;
+      }
+      if (state.flags.foundLetter && !state.flags.letterDelivered) {
+        state.flags.letterDelivered = true;
+        openDialogue([
+          { speaker: "TAVI", text: "My sister's hand. I had forgotten how the letters lean." },
+          { speaker: "TAVI", text: "She says my little brother mends boats now. Home kept moving without me." },
+          { speaker: "CASSIAN", text: "Home is allowed to move. We only need it to remain." }
+        ]);
+        saveGame(false);
+        return;
+      }
+      if (state.story === 17) {
+        openDialogue([{ speaker: "TAVI", text: "You have the price. Do not spend one mark fixing a scratch now." }]);
+        return;
+      }
+      if (state.story >= 18) {
+        openDialogue([{ speaker: "TAVI", text: "When you reach the coast, tell the sea I still exist." }]);
+        return;
+      }
+      openDialogue([{ speaker: "TAVI", text: "You can smell the sea from the high seats. Or maybe I am lying to both of us." }]);
+    }
+
+    function restAtBed() {
+      state.hp = state.maxHp;
+      state.focus = state.maxFocus;
+      state.safe = { mapId: "ludus", px: state.px, py: state.py };
+      saveGame(false);
+      flash("heal");
+      AudioSystem.request("heal");
+      openDialogue([{ speaker: "NARRATOR", text: "Cassian sleeps without dreaming. HP and Focus restored." }]);
+    }
+
+    function useArenaGate() {
+      const enemyId = STORY_FIGHTS[state.story];
+      if (enemyId) {
+        enqueue({ type: "ENTER_ARENA", enemyId });
+        return;
+      }
+      if (state.story === 17 && state.gold < FREEDOM_PRICE) {
+        const enemy = makeOpenContract();
+        ENEMIES[enemy.id] = enemy;
+        openDialogue([
+          { speaker: "HERALD", text: `Open contract: ${enemy.name}. Purse ${enemy.purse} marks.` }
+        ], { type: "ENTER_ARENA", enemyId: enemy.id });
+        return;
+      }
+      if (state.story === 17) return toast("You have the price. Varro is waiting.");
+      if (state.story < 3) return toast("Orin has not cleared you for the sand.");
+      if (state.story === 4 || state.story === 8 || state.story === 12) return toast("Your next road begins in the yard.");
+      toast("No bout bears your name yet.");
+    }
+
+    function useQuarryGate() {
+      if (state.story < 9) return toast("Varro keeps the quarry gate locked.");
+      if (state.story === 9) {
+        state.story = 10;
+        saveGame(false);
+      }
+      enterMap("quarry", 2, 1);
+    }
+
+    function useHarborGate() {
+      if (state.story < 18) return toast("Only free hands open this gate.");
+      state.story = Math.max(state.story, 19);
+      enterMap("harbor", 7, 14);
+      openDialogue([
+        { speaker: "NARRATOR", text: "For the first time in six years, no one tells Cassian where to stand." }
+      ]);
+    }
+
+    function useQuarryPurse() {
+      if (state.story === 10) {
+        openDialogue(ENEMIES["quarry-ambush"].intro, { type: "BEGIN_BATTLE", enemyId: "quarry-ambush", context: "story" });
+        return;
+      }
+      toast(state.flags.purseRecovered ? "The broken strongbox is empty." : "A locked strongbox. Not yours yet.");
+    }
+
+    function useQuarryChief() {
+      if (state.story === 11) {
+        openDialogue(ENEMIES.kest.intro, { type: "BEGIN_BATTLE", enemyId: "kest", context: "story" });
+        return;
+      }
+      toast(state.story < 11 ? "Someone watches from the quarry cut." : "Kest is gone. The road is open.");
+    }
+
+    function useCourierSatchel() {
+      if (state.flags.foundLetter) return toast("The courier satchel is empty.");
+      state.flags.foundLetter = true;
+      state.bandages = Math.min(5, state.bandages + 1);
+      saveGame(false);
+      openDialogue([
+        { speaker: "NARRATOR", text: "A dry bandage. Beneath it, a salt-stiff letter addressed to Tavi." },
+        { speaker: "CASSIAN", text: "One more thing trying to get home." }
+      ]);
+    }
+
+    function harborFarewell() {
+      if (state.flags.farewell) return openDialogue([{ speaker: "TAVI", text: "Go. Before I become sentimental and charge you for it." }]);
+      state.flags.farewell = true;
+      saveGame(false);
+      openDialogue([
+        { speaker: "TAVI", text: "I asked Varro to let me carry your bag. He said free men carry their own." },
+        { speaker: "CASSIAN", text: "Then walk with me as far as the pier." },
+        { speaker: "TAVI", text: "Tell the sea I still exist." },
+        { speaker: "CASSIAN", text: "I will tell it to wait for you." }
+      ]);
+    }
+
+    function boardShip() {
+      if (state.story < 19) return toast("The ship is not yours yet.");
+      openDialogue([
+        { speaker: "NARRATOR", text: "The sea takes nine days." },
+        { speaker: "NARRATOR", text: "Cassian counts none of them." },
+        { speaker: "NARRATOR", text: "He hears home before he sees it: gulls, nets, a hammer on the old pier." },
+        { speaker: "NARRATOR", text: "A boy who had learned not to wait looks up." },
+        { speaker: "NARRATOR", text: "Then he runs." }
+      ], { type: "END_JOURNEY" });
+    }
+
+    function advanceStory(next) {
+      if (!Number.isInteger(next) || next < state.story || next > 20) return;
+      state.story = next;
+      saveGame(false);
+      if (next === 5) toast("ACT II · BRONZE SAND");
+      if (next === 9) toast("ACT III · RED QUARRY");
+      if (next === 13) toast("ACT IV · SILVER SAND");
+      if (next === 16) toast("ACT V · THE LAST PRICE");
+    }
+
+    function enterMap(mapId, px, py) {
+      if (!MAPS[mapId]) return;
+      state.mapId = mapId;
+      state.px = px;
+      state.py = py;
+      state.encounterSteps = 0;
+      state.safe = { mapId, px, py };
+      saveGame(false);
+      toast(MAPS[mapId].name);
+    }
+
+    function enterArena(enemyId) {
+      const enemy = ENEMIES[enemyId];
+      if (!enemy) return;
+      stopMoveHold();
+      state.safe = { mapId: "ludus", px: state.px, py: state.py };
+      state.mapId = "arena";
+      state.px = 7;
+      state.py = 13;
+      openDialogue(enemy.intro, { type: "BEGIN_BATTLE", enemyId, context: enemyId.startsWith("open-") ? "open" : "story" });
+    }
+
+    function beginBattle(enemyId, context) {
+      const enemy = ENEMIES[enemyId];
+      if (!enemy || state.battle || state.completed[enemyId]) return;
+      stopMoveHold();
+      const token = ++ui.battleToken;
+      const offset = Math.floor(rand() * enemy.intents.length);
+      state.battle = {
+        token,
+        enemyId,
+        context,
+        enemyHp: enemy.hp,
+        enemyMaxHp: enemy.hp,
+        intentIndex: offset,
+        edge: 0,
+        playerGuard: false,
+        guardStreak: 0,
+        enemyPower: 0,
+        phase: "player",
+        round: 1,
+        log: `${enemy.name} waits for your decision.`,
+        result: null,
+        rewards: null,
+        interrupted: false
+      };
+      saveGame(false);
+      AudioSystem.request("enemy");
+    }
+
+    function currentEnemy() {
+      return state.battle ? ENEMIES[state.battle.enemyId] : null;
+    }
+
+    function currentIntentKey() {
+      const battle = state.battle;
+      const enemy = currentEnemy();
+      if (!battle || !enemy) return "quick";
+      return enemy.intents[battle.intentIndex % enemy.intents.length];
+    }
+
+    function playerBattleAction(action) {
+      const battle = state.battle;
+      const enemy = currentEnemy();
+      if (!battle || !enemy || battle.phase !== "player" || ui.dialogue || ui.sheet) return;
+      const intent = currentIntentKey();
+      battle.interrupted = false;
+      let prefix = "";
+
+      if (action === "strike") {
+        battle.guardStreak = 0;
+        let damage = Math.max(1, playerAttack() + randInt(0, 3) - enemy.defense);
+        if (intent === "guard") damage = Math.max(1, Math.floor(damage * .5));
+        battle.enemyHp -= damage;
+        battle.edge = Math.min(3, battle.edge + 1);
+        prefix = `You STRIKE for <b>${damage}</b>. Edge rises.`;
+        AudioSystem.request("strike");
+        flash("hit");
+      } else if (action === "break") {
+        if (state.focus < 3) {
+          toast("Not enough Focus.");
+          AudioSystem.request("blocked");
+          return;
+        }
+        state.focus -= 3;
+        const spentEdge = battle.edge;
+        const damage = Math.max(1, playerAttack() + 5 + spentEdge * 4 + randInt(0, 2) - Math.floor(enemy.defense / 2));
+        battle.edge = 0;
+        battle.enemyHp -= damage;
+        battle.interrupted = intent === "heavy" || intent === "guard";
+        prefix = `BREAK lands for <b>${damage}</b>${spentEdge ? ` with ${spentEdge} Edge` : ""}.`;
+        if (battle.interrupted) prefix += " <span class=\"good\">Intent broken!</span>";
+        battle.guardStreak = 0;
+        AudioSystem.request("break");
+        flash("hit");
+      } else if (action === "guard") {
+        battle.playerGuard = true;
+        battle.guardStreak += 1;
+        const restored = battle.guardStreak >= 3 ? 1 : 2;
+        state.focus = Math.min(state.maxFocus, state.focus + restored);
+        if (battle.guardStreak >= 3) battle.enemyPower += 2;
+        prefix = `You GUARD and recover <b>${restored} Focus</b>.`;
+        if (battle.guardStreak >= 3) prefix += " <span class=\"bad\">Your stance is becoming readable.</span>";
+        AudioSystem.request("guard");
+      } else if (action === "bandage") {
+        if (state.bandages < 1) {
+          toast("No bandages left.");
+          return;
+        }
+        if (state.hp >= state.maxHp) {
+          toast("HP is already full.");
+          return;
+        }
+        battle.guardStreak = 0;
+        state.bandages -= 1;
+        const healed = Math.min(22 + state.level * 2, state.maxHp - state.hp);
+        state.hp += healed;
+        prefix = `Bandage restores <b>${healed} HP</b>.`;
+        AudioSystem.request("heal");
+        flash("heal");
+      } else {
+        return;
+      }
+
+      battle.enemyHp = Math.max(0, battle.enemyHp);
+      if (battle.enemyHp <= 0) {
+        winBattle(prefix);
+        return;
+      }
+      battle.phase = "enemy";
+      battle.log = `${prefix}<br><span class="quiet">${enemy.name} commits...</span>`;
+      setTimeout(() => enqueue({ type: "ENEMY_TURN", token: battle.token }), 360);
+    }
+
+    function resolveEnemyTurn(token) {
+      const battle = state.battle;
+      const enemy = currentEnemy();
+      if (!battle || !enemy || battle.token !== token || battle.phase !== "enemy") return;
+      const intentKey = currentIntentKey();
+      const intent = INTENTS[intentKey];
+      let message = "";
+      let damage = 0;
+
+      if (intentKey === "quick") {
+        damage = enemyDamage(1);
+        message = `${enemy.name}'s quick cut deals <b>${damage}</b>.`;
+      } else if (intentKey === "heavy") {
+        if (battle.interrupted) {
+          message = `<span class="good">The heavy blow never comes.</span>`;
+        } else {
+          damage = enemyDamage(1.75);
+          message = `${enemy.name}'s heavy blow deals <b>${damage}</b>.`;
+        }
+      } else if (intentKey === "guard") {
+        if (battle.interrupted) {
+          message = `<span class="good">The shield line breaks before it can set.</span>`;
+        } else {
+          battle.enemyPower += 2;
+          message = `${enemy.name} braces. The next attack gains power.`;
+        }
+      } else if (intentKey === "feint") {
+        damage = enemyDamage(.75, true);
+        const lost = Math.min(1, battle.edge);
+        battle.edge -= lost;
+        if (battle.playerGuard) state.focus = Math.max(0, state.focus - 1);
+        message = `${enemy.name}'s feint slips the guard for <b>${damage}</b>${lost ? " and steals 1 Edge" : ""}.`;
+      } else if (intentKey === "recover") {
+        const healed = Math.min(Math.ceil(enemy.hp * .09), battle.enemyMaxHp - battle.enemyHp);
+        battle.enemyHp += healed;
+        message = healed > 0 ? `${enemy.name} recovers <b>${healed} HP</b>.` : `${enemy.name} finds no room to recover.`;
+      } else {
+        message = `${intent.name} passes.`;
+      }
+
+      if (damage > 0) {
+        state.hp = Math.max(0, state.hp - damage);
+        AudioSystem.request("enemy");
+        flash("hit");
+        if (battle.playerGuard) battle.edge = Math.min(3, battle.edge + (intentKey === "heavy" ? 2 : 1));
+      }
+
+      battle.playerGuard = false;
+      battle.interrupted = false;
+      battle.log = message;
+      if (state.hp <= 0) {
+        loseBattle();
+        return;
+      }
+      battle.round += 1;
+      battle.intentIndex += 1;
+      battle.phase = "player";
+      saveGame(false);
+    }
+
+    function enemyDamage(multiplier, feint = false) {
+      const battle = state.battle;
+      const enemy = currentEnemy();
+      let raw = Math.max(1, enemy.attack + battle.enemyPower + randInt(0, 2) - playerDefense());
+      battle.enemyPower = 0;
+      raw *= multiplier;
+      if (battle.playerGuard) raw *= feint ? .72 : .35;
+      return Math.max(1, Math.floor(raw));
+    }
+
+    function winBattle(prefix) {
+      const battle = state.battle;
+      const enemy = currentEnemy();
+      if (!battle || !enemy || battle.result) return;
+      battle.result = "victory";
+      battle.phase = "victory";
+      state.victories += 1;
+      if (battle.context === "random" || battle.context === "open") state.optionalVictories += 1;
+      state.gold += enemy.purse;
+      state.focus = Math.min(state.maxFocus, state.focus + 1);
+      const levelLines = addXp(enemy.xp);
+      battle.rewards = { xp: enemy.xp, purse: enemy.purse, levels: levelLines };
+      if (battle.context === "story") {
+        state.completed[battle.enemyId] = true;
+        const nextStory = STORY_AFTER_WIN[battle.enemyId];
+        if (nextStory) state.story = nextStory;
+        if (battle.enemyId === "quarry-ambush") state.flags.purseRecovered = true;
+      }
+      battle.log = `${prefix}<br><span class="good">VICTORY · +${enemy.xp} XP · +${enemy.purse} marks</span>${levelLines.length ? `<br>${levelLines.join("<br>")}` : ""}`;
+      AudioSystem.request(levelLines.length ? "level" : "victory");
+      flash("victory");
+      saveGame(false);
+    }
+
+    function addXp(amount) {
+      const lines = [];
+      state.xp += amount;
+      while (state.xp >= xpNeeded() && state.level < 9) {
+        state.xp -= xpNeeded();
+        state.level += 1;
+        state.maxHp += 8;
+        if (state.level % 2 === 0) state.maxFocus += 1;
+        state.hp = state.maxHp;
+        state.focus = state.maxFocus;
+        lines.push(`<span class="good">LEVEL ${state.level} · body and breath restored</span>`);
+      }
+      return lines;
+    }
+
+    function loseBattle() {
+      const battle = state.battle;
+      if (!battle || battle.result) return;
+      const fee = Math.min(state.gold, Math.max(0, Math.min(18, Math.ceil(state.gold * .08))));
+      state.gold -= fee;
+      state.deaths += 1;
+      state.hp = state.maxHp;
+      state.focus = state.maxFocus;
+      state.safe = { mapId: "ludus", px: 2, py: 3 };
+      battle.result = "defeat";
+      battle.phase = "defeat";
+      battle.rewards = { fee };
+      battle.log = `<span class="bad">Cassian falls.</span><br>Nima pulls him from the sand${fee ? ` · treatment costs ${fee} marks` : ""}.`;
+      AudioSystem.request("death");
+      saveGame(false);
+    }
+
+    function continueAfterBattle() {
+      const battle = state.battle;
+      const enemy = currentEnemy();
+      if (!battle || (battle.phase !== "victory" && battle.phase !== "defeat")) return;
+      const result = battle.result;
+      const context = battle.context;
+      const winDialogue = enemy?.win || [];
+      const fee = battle.rewards?.fee || 0;
+      state.battle = null;
+
+      if (result === "defeat") {
+        state.mapId = "ludus";
+        state.px = 2;
+        state.py = 3;
+        state.safe = { mapId: "ludus", px: 2, py: 3 };
+        openDialogue([
+          { speaker: "NIMA", text: `You are still alive. That is the useful part.${fee ? ` I took ${fee} marks for the stitching.` : ""}` }
+        ]);
+      } else {
+        if (context === "story" && state.mapId === "arena" || context === "open") {
+          state.mapId = "ludus";
+          state.px = 7;
+          state.py = 13;
+          state.safe = { mapId: "ludus", px: 7, py: 13 };
+        }
+        if (winDialogue.length) openDialogue(winDialogue);
+        if (state.story === 8) toast("ACT III · THE STOLEN PURSE");
+        if (state.story === 17) toast("THE PRICE IS WITHIN REACH");
+      }
+      saveGame(false);
+    }
+
+    function makeOpenContract() {
+      const count = (state.flags.openContracts || 0) + 1;
+      state.flags.openContracts = count;
+      const names = ["Red Secutor", "Numidian Spear", "Old Arena Fox", "Masked Thracian"];
+      const shapes = ["shield", "dual", "chain", "champion"];
+      const id = `open-${count}`;
+      const scale = Math.max(0, state.level - 4);
+      return {
+        id,
+        name: names[(count - 1) % names.length],
+        title: "Open Contract",
+        shape: shapes[(count - 1) % shapes.length],
+        colors: ["#66514b", "#caa467", "#4a3940"],
+        hp: 70 + scale * 12,
+        attack: 10 + scale * 2,
+        defense: 1 + Math.floor(scale / 2),
+        xp: 16 + scale * 3,
+        purse: 16 + scale * 2,
+        intents: count % 2 ? ["quick", "heavy", "guard", "feint"] : ["guard", "quick", "recover", "heavy"],
+        intro: [{ speaker: "HERALD", text: "An open contract. No title—only a purse." }],
+        win: [{ speaker: "NARRATOR", text: "Another purse. Another step back toward the exact price." }]
+      };
+    }
+
+    function payFreedom() {
+      if (state.story !== 17 || state.gold < FREEDOM_PRICE) return;
+      state.gold -= FREEDOM_PRICE;
+      state.spent += FREEDOM_PRICE;
+      state.free = true;
+      state.story = 18;
+      ui.choice = null;
+      state.safe = { mapId: "ludus", px: state.px, py: state.py };
+      saveGame(false);
+      AudioSystem.request("freedom");
+      openDialogue([
+        { speaker: "VARRO", text: "Three hundred. Counted twice." },
+        { speaker: "CASSIAN", text: "Then give me the road." },
+        { speaker: "NARRATOR", text: "Varro lays a wooden sword across Cassian's open hands." },
+        { speaker: "VARRO", text: "I bought you as a weapon. You leave as a man." },
+        { speaker: "CASSIAN", text: "I was a man when you bought me." },
+        { speaker: "VARRO", text: "Yes. That was always the expensive part." }
+      ]);
+    }
+
+    function endJourney() {
+      state.story = 20;
+      state.ended = true;
+      state.battle = null;
+      saveGame(false);
+      showEnding();
+      AudioSystem.request("freedom");
+    }
+
+    function showEnding() {
+      ui.title = false;
+      ui.dialogue = null;
+      ui.choice = null;
+      ui.sheet = null;
+      $("endingScreen").classList.add("show");
+      $("endingStats").innerHTML = [
+        `Journey · ${formatTime(state.playSeconds)}`,
+        `Victories · ${state.victories}`,
+        `Optional bouts · ${state.optionalVictories}`,
+        `Falls survived · ${state.deaths}`,
+        `Level · ${state.level}`
+      ].join("<br>");
+    }
+
+    function openDialogue(pages, after = null) {
+      const normalized = (Array.isArray(pages) ? pages : [pages])
+        .filter(Boolean)
+        .map((page) => typeof page === "string" ? { speaker: "NARRATOR", text: page } : page);
+      if (!normalized.length) {
+        if (after) enqueue(after);
+        return;
+      }
+      stopMoveHold();
+      ui.sheet = null;
+      ui.choice = null;
+      ui.dialogue = { pages: normalized, index: 0, after };
+    }
+
+    function advanceDialogue() {
+      if (ui.choice) {
+        ui.choice = null;
+        return;
+      }
+      if (!ui.dialogue) return;
+      if (ui.dialogue.index < ui.dialogue.pages.length - 1) {
+        ui.dialogue.index += 1;
+        AudioSystem.request("select");
+        return;
+      }
+      const after = ui.dialogue.after;
+      ui.dialogue = null;
+      if (after) enqueue(after);
+    }
+
+    function openChoice(speaker, text, options) {
+      stopMoveHold();
+      ui.sheet = null;
+      ui.dialogue = null;
+      ui.choice = { speaker, text, options };
+    }
+
+    function choose(index) {
+      if (!ui.choice) return;
+      const option = ui.choice.options[index];
+      ui.choice = null;
+      if (option?.event) enqueue(option.event);
+    }
+
+    function openSheet(kind) {
+      if (state.battle || ui.title || ui.dialogue || ui.choice) return;
+      stopMoveHold();
+      ui.sheet = { kind };
+    }
+
+    function handleSheetAction(action) {
+      if (action === "save") {
+        saveGame(true);
+        ui.sheet = null;
+      } else if (action === "sound") {
+        state.settings.sound = !state.settings.sound;
+        if (state.settings.sound) AudioSystem.unlock();
+        else AudioSystem.hidden();
+        saveGame(false);
+        toast(`Sound ${state.settings.sound ? "on" : "off"}.`);
+      } else if (action === "journal") {
+        ui.sheet = { kind: "journal" };
+      } else if (action === "restart") {
+        ui.sheet = null;
+        openChoice("RESTART", "Erase this journey? This cannot be undone.", [
+          { label: "CANCEL", event: { type: "DIALOGUE_NEXT" } },
+          { label: "ERASE", event: { type: "SHEET_ACTION", action: "confirm-restart" } }
+        ]);
+      } else if (action === "confirm-restart") {
+        actuallyStartNew();
+      } else if (action === "buy-bandage") {
+        buyBandage();
+      } else if (action === "buy-attack") {
+        buyUpgrade("attack");
+      } else if (action === "buy-defense") {
+        buyUpgrade("defense");
+      } else if (action === "buy-focus") {
+        buyUpgrade("focus");
+      } else if (action === "back-menu") {
+        ui.sheet = { kind: "menu" };
+      }
+    }
+
+    function buyBandage() {
+      if (state.bandages >= 5) return toast("You can carry only five.");
+      if (state.gold < 8) return toast("Eight marks required.");
+      state.gold -= 8;
+      state.spent += 8;
+      state.bandages += 1;
+      saveGame(false);
+      AudioSystem.request("select");
+      toast("Bandage purchased.");
+    }
+
+    function buyUpgrade(kind) {
+      if (state.gold < 30) return toast("Thirty marks required.");
+      if (kind === "attack" && state.attackUpgrade) return toast("Blade already honed.");
+      if (kind === "defense" && state.defenseUpgrade) return toast("Guard already padded.");
+      if (kind === "focus" && state.focusUpgrade) return toast("Breath drill already learned.");
+      state.gold -= 30;
+      state.spent += 30;
+      if (kind === "attack") state.attackUpgrade = 3;
+      if (kind === "defense") state.defenseUpgrade = 2;
+      if (kind === "focus") {
+        state.focusUpgrade = true;
+        state.maxFocus += 2;
+        state.focus += 2;
+      }
+      saveGame(false);
+      AudioSystem.request("level");
+      toast(kind === "attack" ? "Blade honed: +3 attack." : kind === "defense" ? "Guard padded: +2 defense." : "Breath trained: +2 max Focus.");
+    }
+
+    function onHidden() {
+      ui.active = false;
+      stopMoveHold();
+      saveGame(false);
+      AudioSystem.hidden();
+    }
+
+    function onVisible() {
+      ui.active = true;
+      ui.lastFrame = performance.now();
+      AudioSystem.visible();
+    }
+
+    function durableSnapshot() {
+      const useSafe = !!state.battle || state.mapId === "arena";
+      const position = useSafe ? state.safe : { mapId: state.mapId, px: state.px, py: state.py };
+      return {
+        ...state,
+        version: SAVE_VERSION,
+        mapId: position.mapId,
+        px: position.px,
+        py: position.py,
+        safe: { ...position },
+        battle: null
+      };
+    }
+
+    function saveGame(showFeedback = false) {
+      if (!state.started) return;
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(durableSnapshot()));
+        if (showFeedback) {
+          toast("Journey saved on this device.");
+          AudioSystem.request("save");
+        }
+      } catch (error) {
+        toast("Save failed. Storage is unavailable.");
+      }
+    }
+
+    function hasSave() {
+      try { return !!localStorage.getItem(SAVE_KEY); }
+      catch { return false; }
+    }
+
+    function loadGame() {
+      let parsed;
+      try {
+        parsed = JSON.parse(localStorage.getItem(SAVE_KEY));
+      } catch {
+        toast("Save was unreadable. Starting safely.");
+        return false;
+      }
+      if (!parsed || parsed.version !== SAVE_VERSION || !parsed.started) return false;
+      const base = freshState();
+      const candidate = {
+        ...base,
+        ...parsed,
+        settings: { ...base.settings, ...(parsed.settings || {}) },
+        completed: parsed.completed && typeof parsed.completed === "object" ? parsed.completed : {},
+        flags: parsed.flags && typeof parsed.flags === "object" ? parsed.flags : {},
+        battle: null
+      };
+      candidate.story = clampInt(candidate.story, 1, 20, 1);
+      candidate.level = clampInt(candidate.level, 1, 9, 1);
+      candidate.maxHp = clampInt(candidate.maxHp, 1, 999, 50);
+      candidate.hp = clampInt(candidate.hp, 1, candidate.maxHp, candidate.maxHp);
+      candidate.maxFocus = clampInt(candidate.maxFocus, 1, 99, 8);
+      candidate.focus = clampInt(candidate.focus, 0, candidate.maxFocus, candidate.maxFocus);
+      candidate.gold = clampInt(candidate.gold, 0, 99999, 0);
+      candidate.bandages = clampInt(candidate.bandages, 0, 5, 2);
+      candidate.xp = clampInt(candidate.xp, 0, 9999, 0);
+      candidate.playSeconds = Number.isFinite(candidate.playSeconds) ? Math.max(0, candidate.playSeconds) : 0;
+      candidate.rng = Number.isInteger(candidate.rng) ? candidate.rng >>> 0 : base.rng;
+      const safe = validatePosition(candidate.safe) || validatePosition({ mapId: candidate.mapId, px: candidate.px, py: candidate.py }) || base.safe;
+      candidate.mapId = safe.mapId;
+      candidate.px = safe.px;
+      candidate.py = safe.py;
+      candidate.safe = { ...safe };
+      state = candidate;
+      return true;
+    }
+
+    function validatePosition(position) {
+      if (!position || !MAPS[position.mapId]) return null;
+      const px = clampInt(position.px, 0, 15, -1);
+      const py = clampInt(position.py, 0, 15, -1);
+      if (px < 0 || py < 0 || !isWalkable(tileAt(position.mapId, px, py))) return null;
+      if (position.mapId === "arena") return null;
+      return { mapId: position.mapId, px, py };
+    }
+
+    function clampInt(value, min, max, fallback) {
+      return Number.isInteger(value) ? Math.max(min, Math.min(max, value)) : fallback;
+    }
+
+    function toast(message) {
+      const el = $("toast");
+      el.textContent = message;
+      el.classList.add("show");
+      clearTimeout(ui.toastTimer);
+      ui.toastTimer = setTimeout(() => el.classList.remove("show"), 1450);
+    }
+
+    function flash(kind) {
+      const viewport = $("viewport");
+      viewport.classList.remove("hit", "heal", "victory");
+      void viewport.offsetWidth;
+      viewport.classList.add(kind);
+      clearTimeout(ui.flashTimer);
+      ui.flashTimer = setTimeout(() => viewport.classList.remove(kind), 520);
+    }
+
+    function formatTime(seconds) {
+      const total = Math.floor(seconds || 0);
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const secs = total % 60;
+      return hours ? `${hours}h ${String(minutes).padStart(2, "0")}m` : `${minutes}m ${String(secs).padStart(2, "0")}s`;
+    }
+
+    function render() {
+      renderHud();
+      renderWorld();
+      renderBattleUi();
+      renderDialogue();
+      renderSheet();
+      renderTitle();
+      renderControls();
+    }
+
+    function renderHud() {
+      $("heroLabel").textContent = `CASSIAN · L${state.level}`;
+      $("xpLabel").textContent = `XP ${state.xp}/${xpNeeded()}`;
+      $("hpLabel").textContent = `${state.hp}/${state.maxHp}`;
+      $("focusLabel").textContent = `${state.focus}/${state.maxFocus}`;
+      $("hpBar").style.width = `${Math.max(0, state.hp / state.maxHp * 100)}%`;
+      $("focusBar").style.width = `${Math.max(0, state.focus / state.maxFocus * 100)}%`;
+      $("moneyLabel").textContent = `${state.gold} / ${FREEDOM_PRICE}`;
+      $("freedomBar").style.width = `${Math.min(100, state.gold / FREEDOM_PRICE * 100)}%`;
+      $("supplyLabel").textContent = `BANDAGE ×${state.bandages}`;
+      const edge = state.battle?.edge || 0;
+      $("edgeLabel").textContent = `EDGE ${"●".repeat(edge)}${"○".repeat(3 - edge)}`;
+      $("objectiveText").textContent = OBJECTIVES[state.story] || OBJECTIVES[1];
+    }
+
+    function renderWorld() {
+      if (state.battle) drawBattleScene();
+      else if (state.ended) drawHomeScene();
+      else drawMap();
+      const map = currentMap();
+      $("location").textContent = state.battle ? currentEnemy()?.title || "THE SAND" : map.name;
+      canvas.setAttribute("aria-label", state.battle ? `Battle against ${currentEnemy()?.name || "an opponent"}` : map.aria);
+    }
+
+    function drawMap() {
+      const map = currentMap();
+      ctx.clearRect(0, 0, 320, 320);
+      for (let y = 0; y < 16; y += 1) {
+        for (let x = 0; x < 16; x += 1) drawTile(map.rows[y][x], x * TILE, y * TILE, map.theme, x, y);
+      }
+      drawPlayer(state.px * TILE + 10, state.py * TILE + 11, state.facing);
+    }
+
+    function drawTile(tile, x, y, theme, gx, gy) {
+      const checker = (gx + gy) % 2;
+      if (theme === "harbor") {
+        if (tile === "~" || tile === "S") {
+          ctx.fillStyle = checker ? "#315f72" : "#35697e";
+          ctx.fillRect(x, y, 20, 20);
+          ctx.fillStyle = "#76a5b055";
+          ctx.fillRect(x + ((gy * 3 + gx * 5) % 9), y + 5, 8, 1);
+        } else {
+          ctx.fillStyle = checker ? "#806a52" : "#776047";
+          ctx.fillRect(x, y, 20, 20);
+        }
+      } else if (theme === "quarry") {
+        ctx.fillStyle = tile === "~" ? (checker ? "#405b58" : "#3a5552") : (checker ? "#8a6045" : "#825a41");
+        ctx.fillRect(x, y, 20, 20);
+        if (tile !== "~" && tile !== "#") {
+          ctx.fillStyle = "#bf876033";
+          ctx.fillRect(x + 3 + ((gx * 7) % 8), y + 4 + ((gy * 5) % 9), 2, 2);
+        }
+      } else if (theme === "arena") {
+        ctx.fillStyle = checker ? "#a87b4b" : "#9f7346";
+        ctx.fillRect(x, y, 20, 20);
+        ctx.fillStyle = "#d8ae7333";
+        ctx.fillRect(x + ((gx * 7 + gy) % 13), y + ((gy * 5 + gx) % 15), 2, 1);
+      } else {
+        ctx.fillStyle = tile === "s" ? (checker ? "#a87946" : "#a17444") : (checker ? "#735545" : "#6d5042");
+        ctx.fillRect(x, y, 20, 20);
+        ctx.fillStyle = "#a47b5a25";
+        ctx.fillRect(x + 2, y + 2, 1, 1);
+      }
+
+      if (tile === "#") drawWall(x, y, theme, checker);
+      if (tile === "~") drawWater(x, y, gx, gy);
+      if (tile === "=") drawDock(x, y);
+      if (tile === "B") drawBed(x, y);
+      if (tile === "M") drawNpc(x, y, "#d9d1b6", "#6f8a72", "+");
+      if (tile === "T") drawNpc(x, y, "#c7a36a", "#4b5660", "T");
+      if (tile === "L") drawNpc(x, y, "#c49a67", "#6b3d57", "V");
+      if (tile === "K") drawNpc(x, y, "#ac7651", "#3d4449", "K");
+      if (tile === "V") drawNpc(x, y, "#d0a06a", "#36636a", "T");
+      if (tile === "A") drawGate(x, y, "#b78a4a", "A");
+      if (tile === "Q") drawGate(x, y, "#865337", "Q");
+      if (tile === "H") drawGate(x, y, "#4f7d87", "H");
+      if (tile === "C") drawChest(x, y, false);
+      if (tile === "c") drawChest(x, y, true);
+      if (tile === "X") drawNpc(x, y, "#a36a50", "#4b332d", "X");
+      if (tile === "S") drawShip(x, y);
+    }
+
+    function drawWall(x, y, theme, checker) {
+      ctx.fillStyle = theme === "quarry" ? (checker ? "#5f4037" : "#563932") : theme === "harbor" ? "#4c453f" : "#4c3836";
+      ctx.fillRect(x, y, 20, 20);
+      ctx.fillStyle = "#8d6b5a55";
+      ctx.fillRect(x, y + 5, 20, 1);
+      ctx.fillRect(x, y + 14, 20, 1);
+      ctx.fillRect(x + (checker ? 6 : 12), y, 1, 6);
+      ctx.fillRect(x + (checker ? 13 : 5), y + 6, 1, 9);
+    }
+
+    function drawWater(x, y, gx, gy) {
+      ctx.fillStyle = "#7ea1a944";
+      ctx.fillRect(x + ((gx * 4 + gy) % 8), y + 5, 9, 1);
+      ctx.fillRect(x + ((gy * 3 + gx) % 10), y + 14, 7, 1);
+    }
+
+    function drawDock(x, y) {
+      ctx.fillStyle = "#8a673f";
+      ctx.fillRect(x, y, 20, 20);
+      ctx.fillStyle = "#4f3b28";
+      ctx.fillRect(x, y + 2, 20, 2);
+      ctx.fillRect(x, y + 17, 20, 2);
+      ctx.fillRect(x + 9, y, 2, 20);
+    }
+
+    function drawBed(x, y) {
+      ctx.fillStyle = "#4b2f26";
+      ctx.fillRect(x + 2, y + 5, 16, 12);
+      ctx.fillStyle = "#c9b89a";
+      ctx.fillRect(x + 4, y + 6, 5, 5);
+      ctx.fillStyle = "#765342";
+      ctx.fillRect(x + 9, y + 6, 7, 9);
+    }
+
+    function drawNpc(x, y, skin, cloth, mark) {
+      ctx.fillStyle = "#0005";
+      ctx.fillRect(x + 5, y + 16, 10, 2);
+      ctx.fillStyle = cloth;
+      ctx.fillRect(x + 5, y + 8, 10, 8);
+      ctx.fillStyle = skin;
+      ctx.fillRect(x + 7, y + 3, 6, 6);
+      ctx.fillStyle = "#2b1c1c";
+      ctx.fillRect(x + 6, y + 2, 8, 2);
+      ctx.fillStyle = "#f1d47d";
+      ctx.font = "bold 7px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(mark, x + 10, y + 15);
+    }
+
+    function drawGate(x, y, color, mark) {
+      ctx.fillStyle = "#3c2c29";
+      ctx.fillRect(x + 1, y + 2, 18, 18);
+      ctx.fillStyle = color;
+      ctx.fillRect(x + 3, y + 3, 3, 17);
+      ctx.fillRect(x + 14, y + 3, 3, 17);
+      ctx.fillRect(x + 5, y + 2, 10, 3);
+      ctx.fillStyle = "#ead08b";
+      ctx.font = "bold 8px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(mark, x + 10, y + 14);
+    }
+
+    function drawChest(x, y, small) {
+      ctx.fillStyle = "#3b261c";
+      ctx.fillRect(x + (small ? 5 : 3), y + (small ? 8 : 6), small ? 10 : 14, small ? 8 : 11);
+      ctx.fillStyle = small ? "#8e6c45" : "#b27a38";
+      ctx.fillRect(x + (small ? 6 : 4), y + (small ? 9 : 7), small ? 8 : 12, small ? 5 : 7);
+      ctx.fillStyle = "#e1bd64";
+      ctx.fillRect(x + 9, y + 11, 2, 4);
+    }
+
+    function drawShip(x, y) {
+      ctx.fillStyle = "#4c3022";
+      ctx.fillRect(x + 2, y + 10, 16, 5);
+      ctx.fillStyle = "#d8c39a";
+      ctx.beginPath();
+      ctx.moveTo(x + 10, y + 2);
+      ctx.lineTo(x + 10, y + 11);
+      ctx.lineTo(x + 17, y + 9);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawPlayer(x, y, facing) {
+      ctx.save();
+      ctx.translate(x, y);
+      if (facing === "left") ctx.scale(-1, 1);
+      ctx.fillStyle = "#0006";
+      ctx.fillRect(-7, 7, 14, 3);
+      ctx.fillStyle = "#5e3430";
+      ctx.fillRect(-5, -1, 10, 9);
+      ctx.fillStyle = "#c28e5c";
+      ctx.fillRect(-3, -7, 6, 6);
+      ctx.fillStyle = "#b88745";
+      ctx.fillRect(-5, -9, 10, 3);
+      ctx.fillStyle = "#e0b95e";
+      ctx.fillRect(5, -2, 2, 10);
+      ctx.fillStyle = "#2e2222";
+      ctx.fillRect(-4, 7, 3, 4);
+      ctx.fillRect(2, 7, 3, 4);
+      ctx.restore();
+    }
+
+    function drawBattleScene() {
+      const enemy = currentEnemy();
+      const battle = state.battle;
+      const sky = ctx.createLinearGradient(0, 0, 0, 210);
+      sky.addColorStop(0, "#3b2021");
+      sky.addColorStop(.55, "#9f5d3b");
+      sky.addColorStop(1, "#d49a5f");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, 320, 320);
+      ctx.fillStyle = "#2f2021";
+      ctx.fillRect(0, 78, 320, 68);
+      for (let row = 0; row < 3; row += 1) {
+        for (let i = 0; i < 18; i += 1) {
+          ctx.fillStyle = (i + row) % 3 === 0 ? "#c18b60" : (i + row) % 3 === 1 ? "#6f4d45" : "#3f3438";
+          ctx.fillRect(i * 19 - (row % 2) * 8, 87 + row * 18, 7, 10);
+        }
+      }
+      ctx.fillStyle = "#8f623d";
+      ctx.fillRect(0, 146, 320, 174);
+      ctx.fillStyle = "#c89a6255";
+      for (let i = 0; i < 36; i += 1) ctx.fillRect((i * 47) % 320, 165 + ((i * 31) % 145), 2, 1);
+      ctx.fillStyle = "#0005";
+      ctx.beginPath(); ctx.ellipse(78, 260, 34, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(241, 238, 38, 10, 0, 0, Math.PI * 2); ctx.fill();
+      drawBattleFighter(80, 238, 2.3, "player", ["#5b322f", "#d1a05f", "#b98745"]);
+      drawBattleFighter(240, 210, 2.7, enemy?.shape || "shield", enemy?.colors || ["#555", "#aaa", "#733"]);
+      if (battle.phase === "victory") {
+        ctx.fillStyle = "#f5d882";
+        ctx.font = "bold 18px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("VICTORY", 160, 175);
+      }
+      if (battle.phase === "defeat") {
+        ctx.fillStyle = "#f08a82";
+        ctx.font = "bold 18px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("FALLEN", 160, 175);
+      }
+    }
+
+    function drawBattleFighter(x, y, scale, shape, colors) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      const [cloth, metal, accent] = colors;
+      ctx.fillStyle = cloth;
+      ctx.fillRect(-7, -28, 14, 22);
+      ctx.fillStyle = "#b77f55";
+      ctx.fillRect(-5, -38, 10, 10);
+      ctx.fillStyle = metal;
+      ctx.fillRect(-7, -40, 14, 5);
+      ctx.fillRect(-8, -35, 3, 9);
+      ctx.fillStyle = accent;
+      ctx.fillRect(-6, -7, 5, 14);
+      ctx.fillRect(2, -7, 5, 14);
+      ctx.fillStyle = "#4b3028";
+      ctx.fillRect(-7, 7, 6, 3);
+      ctx.fillRect(2, 7, 6, 3);
+      ctx.strokeStyle = metal;
+      ctx.lineWidth = 2;
+      if (shape === "net") {
+        ctx.beginPath(); ctx.moveTo(7, -25); ctx.lineTo(16, -39); ctx.stroke();
+        ctx.strokeStyle = "#d9cfaa"; ctx.lineWidth = .7; ctx.strokeRect(-17, -29, 11, 13);
+      } else if (shape === "hammer") {
+        ctx.beginPath(); ctx.moveTo(7, -26); ctx.lineTo(16, -6); ctx.stroke();
+        ctx.fillStyle = metal; ctx.fillRect(12, -10, 10, 5);
+      } else if (shape === "dual") {
+        ctx.beginPath(); ctx.moveTo(-7, -23); ctx.lineTo(-18, -10); ctx.moveTo(7, -23); ctx.lineTo(18, -10); ctx.stroke();
+      } else if (shape === "chain") {
+        ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.arc(10, -18, 12, -1.2, 1.4); ctx.stroke(); ctx.setLineDash([]);
+      } else if (shape === "beast") {
+        ctx.restore();
+        ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+        ctx.fillStyle = cloth; ctx.fillRect(-14, -16, 26, 13); ctx.fillRect(7, -24, 13, 11);
+        ctx.fillStyle = metal; ctx.fillRect(14, -22, 2, 2); ctx.fillRect(17, -22, 2, 2);
+        ctx.fillStyle = accent; ctx.fillRect(-12, -3, 5, 11); ctx.fillRect(4, -3, 5, 11);
+      } else {
+        ctx.fillStyle = metal;
+        ctx.fillRect(-18, -28, 10, 18);
+        ctx.strokeStyle = metal;
+        ctx.beginPath(); ctx.moveTo(8, -27); ctx.lineTo(18, -7); ctx.stroke();
+      }
+      if (shape === "champion") {
+        ctx.fillStyle = "#d9b04f";
+        ctx.fillRect(-10, -42, 20, 2);
+        ctx.fillRect(-11, -31, 4, 19);
+      }
+      ctx.restore();
+    }
+
+    function drawHomeScene() {
+      const sky = ctx.createLinearGradient(0, 0, 0, 320);
+      sky.addColorStop(0, "#e6b56e");
+      sky.addColorStop(.45, "#8eb5b4");
+      sky.addColorStop(1, "#315f73");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, 320, 320);
+      ctx.fillStyle = "#e7cb8a";
+      ctx.beginPath(); ctx.arc(245, 60, 28, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#3c7484";
+      ctx.fillRect(0, 170, 320, 150);
+      ctx.fillStyle = "#244f5e55";
+      for (let y = 185; y < 320; y += 18) ctx.fillRect((y * 7) % 31, y, 280, 2);
+      ctx.fillStyle = "#624932";
+      ctx.fillRect(0, 235, 235, 22);
+      ctx.fillStyle = "#92714c";
+      ctx.fillRect(0, 238, 235, 5);
+      drawPlayer(226, 232, "left");
+      ctx.fillStyle = "#4d3731";
+      ctx.fillRect(168, 220, 7, 18);
+      ctx.fillStyle = "#c6915f";
+      ctx.fillRect(169, 214, 5, 7);
+      ctx.fillStyle = "#efe1bf";
+      ctx.font = "bold 14px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("HOME", 160, 110);
+    }
+
+    function renderBattleUi() {
+      const battle = state.battle;
+      const enemy = currentEnemy();
+      $("battleInfo").classList.toggle("show", !!battle);
+      $("battleLog").classList.toggle("show", !!battle);
+      if (!battle || !enemy) return;
+      const intent = INTENTS[currentIntentKey()];
+      $("enemyName").textContent = enemy.name;
+      $("enemyHp").textContent = `HP ${battle.enemyHp}/${battle.enemyMaxHp}`;
+      $("intentName").textContent = `${intent.icon} ${intent.name}`;
+      $("intentText").textContent = intent.text;
+      $("battleLog").innerHTML = battle.log;
+      const intentKey = currentIntentKey();
+      $("strikeSub").textContent = intentKey === "guard" ? "Shield halves this hit" : "Build 1 Edge";
+      $("breakSub").textContent = intentKey === "heavy" ? "3 Focus · INTERRUPTS" : intentKey === "guard" ? "3 Focus · PIERCES SHIELD" : `3 Focus · spend ${battle.edge} Edge`;
+      $("guardSub").textContent = intentKey === "feint" ? "Feint slips this guard" : "Reduce harm · regain Focus";
+      const locked = battle.phase !== "player";
+      $("strikeButton").disabled = locked;
+      $("breakButton").disabled = locked || state.focus < 3;
+      $("guardButton").disabled = locked;
+      $("bandageButton").disabled = locked || state.bandages < 1 || state.hp >= state.maxHp;
+      $("bandageSub").textContent = `${state.bandages} left · enemy still acts`;
+    }
+
+    function renderDialogue() {
+      const el = $("dialogue");
+      if (ui.choice) {
+        el.classList.add("show");
+        $("speaker").textContent = ui.choice.speaker;
+        $("dialogueText").textContent = ui.choice.text;
+        $("dialogueRow").style.display = "none";
+        $("choiceButtons").innerHTML = ui.choice.options.map((option, index) => `<button type="button" data-choice="${index}">${option.label}</button>`).join("");
+        return;
+      }
+      $("choiceButtons").innerHTML = "";
+      $("dialogueRow").style.display = "flex";
+      if (!ui.dialogue) {
+        el.classList.remove("show");
+        return;
+      }
+      const page = ui.dialogue.pages[ui.dialogue.index];
+      el.classList.add("show");
+      $("speaker").textContent = page.speaker || "NARRATOR";
+      $("dialogueText").textContent = page.text || "";
+      $("pageMark").textContent = `${ui.dialogue.index + 1} / ${ui.dialogue.pages.length}`;
+      $("dialogueNext").textContent = ui.dialogue.index === ui.dialogue.pages.length - 1 ? "CONTINUE" : "NEXT";
+    }
+
+    function renderSheet() {
+      const el = $("sheet");
+      if (!ui.sheet) {
+        el.classList.remove("show");
+        return;
+      }
+      el.classList.add("show");
+      if (ui.sheet.kind === "menu") {
+        $("sheetTitle").textContent = "ROAD MENU";
+        $("sheetBody").innerHTML = `
+          <p class="sheet-copy">The game also saves after victories, travel, rest, and when the app is hidden.</p>
+          <div class="sheet-grid">
+            <button type="button" data-sheet="journal">JOURNAL<span class="sub">Objective · stats · combat notes</span></button>
+            <button type="button" data-sheet="sound">SOUND ${state.settings.sound ? "ON" : "OFF"}<span class="sub">Audio: ${ui.audioStatus}</span></button>
+            <button type="button" data-sheet="save">SAVE<span class="sub">Store safe overworld state</span></button>
+            <button type="button" data-sheet="restart">NEW JOURNEY<span class="sub">Requires confirmation</span></button>
+          </div>`;
+      } else if (ui.sheet.kind === "journal") {
+        $("sheetTitle").textContent = "JOURNAL";
+        $("sheetBody").innerHTML = `
+          <p class="sheet-copy"><strong>${OBJECTIVES[state.story]}</strong></p>
+          <div class="sheet-stat"><span>Freedom purse</span><b>${state.gold} / ${FREEDOM_PRICE}</b></div>
+          <div class="sheet-stat"><span>Attack / Defense</span><b>${playerAttack()} / ${playerDefense()}</b></div>
+          <div class="sheet-stat"><span>Victories / Falls</span><b>${state.victories} / ${state.deaths}</b></div>
+          <div class="sheet-stat"><span>Journey time</span><b>${formatTime(state.playSeconds)}</b></div>
+          <p class="sheet-copy" style="margin-top:9px">STRIKE builds Edge. BREAK costs 3 Focus, spends Edge, pierces shields, and interrupts HEAVY WINDUP. GUARD reduces honest attacks and restores Focus, but repeated guarding becomes readable. BANDAGE heals while conceding the enemy turn.</p>
+          <div class="sheet-grid"><button class="wide" type="button" data-sheet="back-menu">BACK</button></div>`;
+      } else if (ui.sheet.kind === "medic") {
+        $("sheetTitle").textContent = "NIMA · MEDIC";
+        $("sheetBody").innerHTML = `
+          <p class="sheet-copy">Bandages restore HP in battle. You can carry five.</p>
+          <div class="sheet-stat"><span>Your purse</span><b>${state.gold} marks</b></div>
+          <div class="sheet-stat"><span>Bandages</span><b>${state.bandages} / 5</b></div>
+          <div class="sheet-grid"><button class="wide" type="button" data-sheet="buy-bandage" ${state.bandages >= 5 || state.gold < 8 ? "disabled" : ""}>BUY BANDAGE · 8<span class="sub">Safety now · distance from home</span></button></div>`;
+      } else if (ui.sheet.kind === "smith") {
+        $("sheetTitle").textContent = "BOROS · ARMORY";
+        $("sheetBody").innerHTML = `
+          <p class="sheet-copy">Each improvement is permanent. The same marks also buy freedom.</p>
+          <div class="sheet-stat"><span>Your purse</span><b>${state.gold} marks</b></div>
+          <div class="sheet-grid">
+            <button type="button" data-sheet="buy-attack" ${state.attackUpgrade || state.gold < 30 ? "disabled" : ""}>HONE BLADE · 30<span class="sub">+3 attack</span></button>
+            <button type="button" data-sheet="buy-defense" ${state.defenseUpgrade || state.gold < 30 ? "disabled" : ""}>PAD GUARD · 30<span class="sub">+2 defense</span></button>
+            <button class="wide" type="button" data-sheet="buy-focus" ${state.focusUpgrade || state.gold < 30 ? "disabled" : ""}>BREATH DRILL · 30<span class="sub">+2 maximum Focus</span></button>
+          </div>`;
+      }
+    }
+
+    function renderTitle() {
+      $("titleScreen").classList.toggle("show", ui.title);
+      $("continueButton").style.display = hasSave() ? "block" : "none";
+      $("newButton").textContent = hasSave() ? "NEW JOURNEY" : "BEGIN JOURNEY";
+    }
+
+    function renderControls() {
+      const inBattle = !!state.battle;
+      $("exploreControls").classList.toggle("hide", inBattle);
+      $("battleControls").classList.toggle("hide", !inBattle);
+      if (!inBattle) return;
+      const battle = state.battle;
+      const controls = $("battleControls");
+      let continueButton = controls.querySelector(".continue");
+      if (battle.phase === "victory" || battle.phase === "defeat") {
+        if (!continueButton) {
+          controls.querySelectorAll("button").forEach((button) => button.style.display = "none");
+          continueButton = document.createElement("button");
+          continueButton.type = "button";
+          continueButton.className = "continue";
+          continueButton.dataset.battle = "continue";
+          controls.appendChild(continueButton);
+        }
+        continueButton.textContent = battle.phase === "victory" ? "CLAIM VICTORY" : "RISE AGAIN";
+        continueButton.style.display = "block";
+      } else {
+        if (continueButton) continueButton.style.display = "none";
+        controls.querySelectorAll("button:not(.continue)").forEach((button) => button.style.display = "block");
+      }
+    }
+
+    function stopMoveHold() {
+      if (!ui.hold) return;
+      clearTimeout(ui.hold.delay);
+      clearInterval(ui.hold.interval);
+      ui.hold.button?.classList.remove("pressed");
+      ui.hold = null;
+    }
+
+    function startMoveHold(button, dx, dy, pointerId) {
+      stopMoveHold();
+      button.classList.add("pressed");
+      try { button.setPointerCapture(pointerId); } catch {}
+      enqueue({ type: "MOVE", dx, dy });
+      const hold = { button, pointerId, dx, dy, delay: 0, interval: 0 };
+      hold.delay = setTimeout(() => {
+        if (ui.hold !== hold) return;
+        hold.interval = setInterval(() => enqueue({ type: "MOVE", dx, dy }), 105);
+      }, 260);
+      ui.hold = hold;
+    }
+
+    function handlePress(target) {
+      const uiAction = target.closest("[data-ui]")?.dataset.ui;
+      if (uiAction === "interact") enqueue({ type: "INTERACT" });
+      if (uiAction === "menu") enqueue({ type: "OPEN_SHEET", kind: "menu" });
+      if (uiAction === "dialogue-next") enqueue({ type: "DIALOGUE_NEXT" });
+      if (uiAction === "sheet-close") enqueue({ type: "CLOSE_SHEET" });
+      if (uiAction === "continue") enqueue({ type: "CONTINUE" });
+      if (uiAction === "new-game") enqueue({ type: "START_NEW" });
+      if (uiAction === "ending-close") $("endingScreen").classList.remove("show");
+      const battleAction = target.closest("[data-battle]")?.dataset.battle;
+      if (battleAction === "continue") enqueue({ type: "BATTLE_CONTINUE" });
+      else if (battleAction) enqueue({ type: "BATTLE_ACTION", action: battleAction });
+      const choice = target.closest("[data-choice]")?.dataset.choice;
+      if (choice !== undefined) enqueue({ type: "CHOICE", index: Number(choice) });
+      const sheetAction = target.closest("[data-sheet]")?.dataset.sheet;
+      if (sheetAction) enqueue({ type: "SHEET_ACTION", action: sheetAction });
+    }
+
+    document.addEventListener("pointerdown", (event) => {
+      AudioSystem.unlock();
+      const moveButton = event.target.closest?.("[data-move]");
+      if (moveButton) {
+        event.preventDefault();
+        const [dx, dy] = moveButton.dataset.move.split(",").map(Number);
+        startMoveHold(moveButton, dx, dy, event.pointerId);
+        return;
+      }
+      const button = event.target.closest?.("button");
+      if (button && !button.disabled) {
+        event.preventDefault();
+        button.classList.add("pressed");
+        setTimeout(() => button.classList.remove("pressed"), 120);
+        handlePress(button);
+      }
+    }, { passive: false });
+
+    document.addEventListener("pointerup", stopMoveHold);
+    document.addEventListener("pointercancel", stopMoveHold);
+    document.addEventListener("lostpointercapture", stopMoveHold);
+    document.addEventListener("click", (event) => {
+      if (event.detail === 0) {
+        const button = event.target.closest?.("button");
+        if (button && !button.disabled) handlePress(button);
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.repeat) return;
+      const moves = {
+        ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+        w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0]
+      };
+      if (moves[event.key]) {
+        event.preventDefault();
+        enqueue({ type: "MOVE", dx: moves[event.key][0], dy: moves[event.key][1] });
+      } else if ((event.key === " " || event.key === "Enter") && canAcceptWorldInput()) {
+        event.preventDefault();
+        enqueue({ type: "INTERACT" });
+      } else if (event.key === "Escape") {
+        if (ui.sheet) enqueue({ type: "CLOSE_SHEET" });
+        else enqueue({ type: "OPEN_SHEET", kind: "menu" });
+      }
+    });
+
+    document.addEventListener("contextmenu", (event) => {
+      if (event.target.closest?.("#app")) event.preventDefault();
+    });
+    document.addEventListener("dragstart", (event) => {
+      if (event.target.closest?.("#app")) event.preventDefault();
+    });
+    document.addEventListener("visibilitychange", () => enqueue({ type: document.hidden ? "APP_HIDDEN" : "APP_VISIBLE" }));
+    window.addEventListener("pagehide", () => enqueue({ type: "APP_HIDDEN" }));
+    window.addEventListener("pageshow", () => enqueue({ type: "APP_VISIBLE" }));
+
+    function frame(now) {
+      const delta = Math.min(.25, Math.max(0, (now - ui.lastFrame) / 1000));
+      ui.lastFrame = now;
+      if (ui.active && state.started && !ui.title && !state.ended) state.playSeconds += delta;
+      requestAnimationFrame(frame);
+    }
+
+    if (DEBUG) {
+      window.__PRICE_OF_HOME__ = {
+        getState: () => JSON.parse(JSON.stringify(state)),
+        enqueue,
+        maps: MAPS,
+        enemies: ENEMIES,
+        reset: actuallyStartNew,
+        setState(patch) { state = { ...state, ...patch }; render(); },
+        beginBattle(id, context = "story") { beginBattle(id, context); render(); },
+        save: () => saveGame(false),
+        load: loadGame
+      };
+    }
+
+    render();
+    requestAnimationFrame(frame);
+  })();
+  </script>
+</body>
+</html>
