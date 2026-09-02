@@ -13,7 +13,12 @@
 <iframe id="gameFrame" src="game.html" title="Last Shift: Blackout" allow="autoplay"></iframe>
 <a id="archiveBtn" class="archive" href="monster-gallery.html">VIEW NUMBERED SPECIMENS</a>
 <script>
-(()=>{'use strict';const frame=document.getElementById('gameFrame'),btn=document.getElementById('archiveBtn');let timer=0;function sync(){try{const d=frame.contentDocument,start=d&&d.getElementById('startOverlay');btn.classList.toggle('hidden',!start||start.classList.contains('hidden'));}catch(_){btn.classList.add('hidden')}}frame.addEventListener('load',()=>{sync();clearInterval(timer);timer=setInterval(sync,180)});document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});})();
+(()=>{'use strict';
+const frame=document.getElementById('gameFrame'),btn=document.getElementById('archiveBtn');let timer=0;
+function sync(){try{const d=frame.contentDocument,start=d&&d.getElementById('startOverlay');btn.classList.toggle('hidden',!start||start.classList.contains('hidden'));}catch(_){btn.classList.add('hidden')}}
+function installChosenMonsters(){try{const w=frame.contentWindow,P=w.CanvasRenderingContext2D&&w.CanvasRenderingContext2D.prototype;if(!P||P.__lastShiftChosenMonsters)return;const arc=P.arc,TAU=Math.PI*2;P.arc=function(x,y,r,a0,a1,ccw){const full=Math.abs(Math.abs(a1-a0)-TAU)<.01,fill=String(this.fillStyle).toLowerCase(),enemy=['#687b66','#9b6659','#72714e','#73514b','#414b50','#8b3f3b','#e4ddd2'].includes(fill);if(!full||x!==0||y!==0||r<10||r>36||!enemy)return arc.call(this,x,y,r,a0,a1,ccw);const deer=fill==='#687b66'||fill==='#73514b'||fill==='#8b3f3b'||(fill==='#e4ddd2'&&r>=14);if(deer){this.moveTo(-.58*r,-.95*r);this.lineTo(-.98*r,-.58*r);this.lineTo(-.67*r,-.62*r);this.bezierCurveTo(-.58*r,-1.3*r,.45*r,-1.5*r,.67*r,-.67*r);this.lineTo(1.02*r,-.76*r);this.lineTo(.73*r,-.36*r);this.lineTo(.92*r,.18*r);this.lineTo(.55*r,1.08*r);this.lineTo(.12*r,1.34*r);this.lineTo(-.54*r,1.03*r);this.lineTo(-.91*r,.17*r);this.closePath();}else{this.moveTo(-.28*r,-1.24*r);this.bezierCurveTo(.05*r,-1.48*r,.52*r,-1.18*r,.48*r,-.72*r);this.lineTo(.88*r,-.23*r);this.lineTo(1.23*r,.44*r);this.lineTo(.55*r,.24*r);this.lineTo(.78*r,1.16*r);this.lineTo(.18*r,1.38*r);this.lineTo(-.2*r,.72*r);this.lineTo(-.72*r,1.18*r);this.lineTo(-.55*r,.25*r);this.lineTo(-1.18*r,.54*r);this.lineTo(-.83*r,-.34*r);this.lineTo(-.5*r,-.7*r);this.closePath();}};P.__lastShiftChosenMonsters=true;}catch(_){}}
+frame.addEventListener('load',()=>{installChosenMonsters();sync();clearInterval(timer);timer=setInterval(sync,180)});document.addEventListener('visibilitychange',()=>{if(!document.hidden){installChosenMonsters();sync()}});
+})();
 </script>
 </body>
 </html>
