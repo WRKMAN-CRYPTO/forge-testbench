@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+const file=new URL('./index.html',import.meta.url);const html=fs.readFileSync(file,'utf8');
+const tests=[];const check=(name,ok)=>tests.push([name,!!ok]);
+check('single-file static build',html.includes('<canvas id="canvas">')&&html.includes("(()=>{'use strict';"));
+check('certified joystick acquisition',html.includes('adoptPad(e)')&&html.includes('REACQUIRE_DWELL=75')&&html.includes('REACQUIRE_SCALE=1.18'));
+check('pointer release and cancellation stop movement',html.includes("addEventListener('pointerup'")&&html.includes("addEventListener('pointercancel'")&&html.includes('padReset()'));
+check('simultaneous movement and fire ownership',html.includes('padPointer')&&html.includes('firePointer')&&html.includes("enqueue('fireDown')"));
+check('bounded frame delta',html.includes("Math.min(.033,(ts-last)/1000"));
+check('central input and audio queues',html.includes('const inputQueue=[],audioQueue=[]')&&html.includes('processInput()')&&html.includes('processAudio()'));
+check('eight tactical weapons',Object.keys({pistol:1,shotgun:1,smg:1,rifle:1,magnum:1,lmg:1,flamer:1,launcher:1}).every(k=>html.includes(`${k}:{name:`)));
+check('six sector authored arc',html.includes("['RECEIVING'")&&html.includes("['SURFACE SHAFT'")&&html.includes('state.sector>6'));
+check('nine minute sector clock and boss gate',html.includes('Math.max(0,540-state.time)')&&html.includes('state.time>=510')&&html.includes('spawnBoss()'));
+check('manual and empty reload paths',html.includes("e.type==='reload'")&&html.includes("queueSound('empty');startReload()"));
+check('staged reload audio',html.includes("queueSound('magOut')")&&html.includes("queueSound('magIn')")&&html.includes("'reloadEnd'"));
+check('near-death pulse shake',html.includes('ratio<.3')&&html.includes("queueSound('heart')")&&html.includes('pulseShake'));
+check('upgrade decision system',html.includes('const UPGRADES=[')&&html.includes('offerThree(UPGRADES)')&&html.includes('applyUpgrade'));
+check('versioned checkpoint persistence',html.includes("SAVE_KEY='lastShiftBlackoutSave'")&&html.includes('version===2')&&html.includes('snapshot()'));
+check('failed sectors restore true checkpoint',html.includes('checkpointRun')&&html.includes("e.type==='retry'){continueRun()")&&html.includes("save('meta')"));
+check('arsenal choice is resumable',html.includes('pendingArsenal')&&html.includes('state.pendingArsenal=true;save();openArsenal()'));
+check('lifecycle pause and audio recovery',html.includes("document.addEventListener('visibilitychange'")&&html.includes("audio.status='suspended'"));
+check('mobile browser hardening',html.includes('-webkit-touch-callout:none')&&html.includes("addEventListener('contextmenu'")&&html.includes('touch-action:none'));
+check('one-screen overlays preserve playfield',html.includes('choiceOverlay')&&html.includes('pauseOverlay')&&html.includes('position:absolute;inset:0'));
+const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];try{new vm.Script(script);check('javascript parses',true)}catch(e){console.error(e);check('javascript parses',false)}
+let failed=0;for(const [name,ok] of tests){console.log(`${ok?'PASS':'FAIL'}  ${name}`);if(!ok)failed++}console.log(`\n${tests.length-failed}/${tests.length} checks passed`);process.exitCode=failed?1:0;
