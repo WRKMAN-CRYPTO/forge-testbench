@@ -14,6 +14,8 @@ check('nine minute sector clock and boss gate',html.includes('Math.max(0,540-sta
 check('manual and empty reload paths',html.includes("e.type==='reload'")&&html.includes("queueSound('empty');startReload()"));
 check('staged reload audio',html.includes("queueSound('magOut')")&&html.includes("queueSound('magIn')")&&html.includes("'reloadEnd'"));
 check('near-death pulse shake',html.includes('ratio<.3')&&html.includes("queueSound('heart')")&&html.includes('pulseShake'));
+check('darkness uses isolated compositing mask',html.includes("shadeCanvas=document.createElement('canvas')")&&html.includes("shade.globalCompositeOperation='destination-out'")&&html.includes('ctx.drawImage(shadeCanvas,0,0,W,H)'));
+check('readable ambient light floor',html.includes("shade.fillStyle='rgba(0,0,0,.46)'")&&html.includes('r=175+state.mods.night')&&html.includes("ratio<.3?red:.45"));
 check('upgrade decision system',html.includes('const UPGRADES=[')&&html.includes('offerThree(UPGRADES)')&&html.includes('applyUpgrade'));
 check('versioned checkpoint persistence',html.includes("SAVE_KEY='lastShiftBlackoutSave'")&&html.includes('version===2')&&html.includes('snapshot()'));
 check('failed sectors restore true checkpoint',html.includes('checkpointRun')&&html.includes("e.type==='retry'){continueRun()")&&html.includes("save('meta')"));
