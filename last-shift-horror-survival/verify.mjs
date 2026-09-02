@@ -25,6 +25,10 @@ check('failed sectors restore true checkpoint',html.includes('checkpointRun')&&h
 check('arsenal choice is resumable',html.includes('pendingArsenal')&&html.includes('state.pendingArsenal=true;save();openArsenal()'));
 check('lifecycle pause and audio recovery',html.includes("document.addEventListener('visibilitychange'")&&html.includes("audio.status='suspended'"));
 check('mobile browser hardening',html.includes('-webkit-touch-callout:none')&&html.includes("addEventListener('contextmenu'")&&html.includes('touch-action:none'));
+check('global browser zoom is suppressed',html.includes('touch-action:manipulation;-ms-touch-action:manipulation')&&html.includes("game.addEventListener('dblclick'")&&html.includes("['gesturestart','gesturechange','gestureend']"));
+check('rapid nearby taps suppress smart zoom',html.includes("game.addEventListener('touchend'")&&html.includes('lastTouchEnd.time<360')&&html.includes('close'));
+check('viewport scale change pauses combat',html.includes('window.visualViewport')&&html.includes('Math.abs(next-viewportScale)>.01)enterPause()'));
+check('fire near-miss forgiveness',html.includes('function inFireForgiveness')&&html.includes('m=20')&&html.includes('pressFire(e,ui.controls)'));
 check('one-screen overlays preserve playfield',html.includes('choiceOverlay')&&html.includes('pauseOverlay')&&html.includes('position:absolute;inset:0'));
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];try{new vm.Script(script);check('javascript parses',true)}catch(e){console.error(e);check('javascript parses',false)}
 let failed=0;for(const [name,ok] of tests){console.log(`${ok?'PASS':'FAIL'}  ${name}`);if(!ok)failed++}console.log(`\n${tests.length-failed}/${tests.length} checks passed`);process.exitCode=failed?1:0;
