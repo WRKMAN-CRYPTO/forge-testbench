@@ -17,6 +17,9 @@ check('near-death pulse shake',html.includes('ratio<.3')&&html.includes("queueSo
 check('darkness uses isolated compositing mask',html.includes("shadeCanvas=document.createElement('canvas')")&&html.includes("shade.globalCompositeOperation='destination-out'")&&html.includes('ctx.drawImage(shadeCanvas,0,0,W,H)'));
 check('readable ambient light floor',html.includes("shade.fillStyle='rgba(0,0,0,.46)'")&&html.includes('r=175+state.mods.night')&&html.includes("ratio<.3?red:.45"));
 check('upgrade decision system',html.includes('const UPGRADES=[')&&html.includes('offerThree(UPGRADES)')&&html.includes('applyUpgrade'));
+check('choice cards commit on direct pointer release',html.includes("button.addEventListener('pointerup',commit)")&&html.includes("wireChoice(b,'upgrade',u[0])")&&html.includes("wireChoice(b,'arsenal',id)"));
+check('mobile hardening preserves button taps',html.includes("if(e.target.closest?.('button'))return")&&html.includes("if(e.cancelable)e.preventDefault()"));
+check('upgrade choice exits overlay',html.includes("ui.choice.classList.add('hidden');state.mode='playing'"));
 check('versioned checkpoint persistence',html.includes("SAVE_KEY='lastShiftBlackoutSave'")&&html.includes('version===2')&&html.includes('snapshot()'));
 check('failed sectors restore true checkpoint',html.includes('checkpointRun')&&html.includes("e.type==='retry'){continueRun()")&&html.includes("save('meta')"));
 check('arsenal choice is resumable',html.includes('pendingArsenal')&&html.includes('state.pendingArsenal=true;save();openArsenal()'));
