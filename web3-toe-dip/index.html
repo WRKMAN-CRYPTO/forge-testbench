@@ -22,13 +22,12 @@
     .step:first-of-type{border-top:0;padding-top:0}.num{height:34px;width:34px;border-radius:10px;display:grid;place-items:center;background:#0f151a;border:1px solid var(--line);color:var(--hot);font-weight:800}
     .step h2{font-size:14px;margin:2px 0 5px}.step p{font-size:12px;color:var(--muted);line-height:1.45;margin:0 0 10px}
     button,a.action{appearance:none;border:0;width:100%;min-height:52px;border-radius:14px;padding:12px 14px;font:800 14px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;background:var(--hot);color:#07110a;display:flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer}
-    button.secondary,a.secondary{background:#202a33;color:var(--text);border:1px solid #33414d}.danger{background:#2d1d1d!important;color:#ffc1c1!important;border-color:#523030!important}
+    button.secondary,a.secondary{background:#202a33;color:var(--text);border:1px solid #33414d}
     button:disabled{opacity:.42;cursor:not-allowed}
     input{width:100%;height:52px;border:1px solid #34414c;background:#0f151a;color:var(--text);border-radius:14px;padding:0 14px;font:16px ui-monospace,SFMono-Regular,Menlo,monospace;outline:none;margin-bottom:9px}input:focus{border-color:var(--hot)}
     .status{margin-top:14px;border-radius:14px;padding:12px 13px;background:#0f151a;border:1px solid var(--line);font-size:12px;line-height:1.5;color:var(--muted);min-height:44px;word-break:break-word}.status.good{color:var(--hot)}.status.bad{color:var(--bad)}
-    .wallet{font-size:11px;color:var(--muted);margin-top:8px;word-break:break-all}.balance{color:var(--text);font-weight:700}
-    .tiny{margin:14px 2px 0;text-align:center;color:#697b87;font-size:10px;line-height:1.5}
-    .hidden{display:none!important}
+    .wallet{font-size:11px;color:var(--muted);margin-top:8px;word-break:break-all}.balance{color:var(--text);font-weight:700}.mode{color:var(--warn);font-weight:800}
+    .tiny{margin:14px 2px 0;text-align:center;color:#697b87;font-size:10px;line-height:1.5}.hidden{display:none!important}
   </style>
 </head>
 <body>
@@ -51,9 +50,10 @@
     <div class="step">
       <div class="num">2</div>
       <div>
-        <h2>Get fake gas</h2>
-        <p>Devnet SOL has no monetary value. The public faucet can rate-limit, so this step is optional if your wallet already has devSOL.</p>
-        <button id="airdrop" class="secondary" disabled>GET 0.1 DEVNET SOL</button>
+        <h2>Slow Signal Mode</h2>
+        <p>Recent-blockhash transactions have a short fuse. This creates a small devnet nonce account so future stamps use a durable nonce instead.</p>
+        <button id="setupNonce" class="secondary" disabled>ENABLE SLOW SIGNAL MODE</button>
+        <div id="nonceLine" class="wallet hidden"></div>
       </div>
     </div>
 
@@ -61,7 +61,7 @@
       <div class="num">3</div>
       <div>
         <h2>Stamp the chain</h2>
-        <p>A fresh blockhash is fetched when you tap. If signal is poor, CHAIN STAMP re-checks the signature after returning from Phantom instead of assuming a timeout means failure.</p>
+        <p id="stampHint">Normal mode uses a recent blockhash. Slow Signal Mode removes that short expiration window after one-time setup.</p>
         <input id="memo" maxlength="80" value="Clocked in. My first Web3 stamp." aria-label="Memo text" />
         <button id="stamp" disabled>STAMP DEVNET</button>
       </div>
@@ -82,43 +82,41 @@
 </main>
 <script>
 (() => {
-  const {Connection, PublicKey, Transaction, TransactionInstruction, LAMPORTS_PER_SOL} = solanaWeb3;
-  const RPC = 'https://api.devnet.solana.com';
-  const MEMO_PROGRAM = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
-  const connection = new Connection(RPC, 'confirmed');
+  const {
+    Connection, PublicKey, Transaction, TransactionInstruction, LAMPORTS_PER_SOL,
+    SystemProgram, Keypair, NONCE_ACCOUNT_LENGTH, NonceAccount
+  } = solanaWeb3;
+  const RPC='https://api.devnet.solana.com';
+  const MEMO_PROGRAM=new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+  const connection=new Connection(RPC,'confirmed');
 
-  let provider = null;
-  let publicKey = null;
-  let pending = null;
-  let recovering = false;
+  let provider=null;
+  let publicKey=null;
+  let noncePubkey=null;
+  let pending=null;
+  let recovering=false;
 
-  const $ = id => document.getElementById(id);
-  const connectBtn=$('connect'), airdropBtn=$('airdrop'), stampBtn=$('stamp'), status=$('status');
-  const walletLine=$('walletLine'), memo=$('memo'), resultStep=$('resultStep'), explorer=$('explorer'), openPhantom=$('openPhantom');
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const $=id=>document.getElementById(id);
+  const connectBtn=$('connect'), setupNonceBtn=$('setupNonce'), stampBtn=$('stamp'), status=$('status');
+  const walletLine=$('walletLine'), nonceLine=$('nonceLine'), memo=$('memo'), resultStep=$('resultStep'), explorer=$('explorer'), openPhantom=$('openPhantom'), stampHint=$('stampHint');
+  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const shorten=s=>s.slice(0,5)+'…'+s.slice(-5);
+  const phantomBrowse=()=> 'https://phantom.app/ul/browse/'+encodeURIComponent(location.href)+'?ref='+encodeURIComponent(location.origin);
 
-  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-  const phantomBrowse = () => 'https://phantom.app/ul/browse/' + encodeURIComponent(location.href) + '?ref=' + encodeURIComponent(location.origin);
-  const shorten = s => s.slice(0,5)+'…'+s.slice(-5);
-
-  function setStatus(text, kind='') {
-    status.textContent=text;
-    status.className='status' + (kind ? ' '+kind : '');
-  }
-
-  function detectProvider(){
-    const p = window.phantom?.solana || (window.solana?.isPhantom ? window.solana : null);
-    return p?.isPhantom ? p : null;
-  }
+  function setStatus(text,kind=''){status.textContent=text;status.className='status'+(kind?' '+kind:'');}
+  function detectProvider(){const p=window.phantom?.solana||(window.solana?.isPhantom?window.solana:null);return p?.isPhantom?p:null;}
+  function nonceStorageKey(){return publicKey?'chain-stamp:nonce:'+publicKey.toBase58():null;}
+  function pendingStorageKey(){return publicKey?'chain-stamp:pending:'+publicKey.toBase58():null;}
 
   function showSuccess(signature){
     explorer.href='https://explorer.solana.com/tx/'+signature+'?cluster=devnet';
     resultStep.classList.remove('hidden');
-    setStatus('Confirmed: '+signature, 'good');
+    setStatus('Confirmed: '+signature,'good');
   }
 
   async function refreshBalance(){
-    if(!publicKey) return 0;
+    if(!publicKey)return 0;
     const lamports=await connection.getBalance(publicKey,'confirmed');
     const sol=lamports/LAMPORTS_PER_SOL;
     walletLine.innerHTML=`${shorten(publicKey.toBase58())} · <span class="balance">${sol.toFixed(4)} devSOL</span>`;
@@ -131,148 +129,202 @@
     return response.value[0];
   }
 
-  async function recoverOutcome(job){
-    if(recovering || !job) return;
+  async function loadNonce(){
+    noncePubkey=null;
+    const key=nonceStorageKey();
+    if(!key)return null;
+    const stored=localStorage.getItem(key);
+    if(!stored){renderNonce();return null;}
+    try{
+      const pk=new PublicKey(stored);
+      const info=await connection.getAccountInfo(pk,'confirmed');
+      if(!info){localStorage.removeItem(key);renderNonce();return null;}
+      const parsed=NonceAccount.fromAccountData(info.data);
+      if(!parsed.authorizedPubkey.equals(publicKey)){localStorage.removeItem(key);renderNonce();return null;}
+      noncePubkey=pk;
+      renderNonce();
+      return {pubkey:pk,data:parsed};
+    }catch{
+      localStorage.removeItem(key);
+      renderNonce();
+      return null;
+    }
+  }
+
+  function renderNonce(){
+    if(noncePubkey){
+      setupNonceBtn.textContent='SLOW SIGNAL MODE ENABLED';
+      setupNonceBtn.disabled=true;
+      nonceLine.innerHTML=`Nonce ${shorten(noncePubkey.toBase58())} · <span class="mode">DURABLE</span>`;
+      nonceLine.classList.remove('hidden');
+      stampHint.textContent='Durable mode: your stamp uses an on-chain nonce and is not tied to the normal recent-blockhash expiration window.';
+    }else{
+      setupNonceBtn.textContent='ENABLE SLOW SIGNAL MODE';
+      setupNonceBtn.disabled=!publicKey;
+      nonceLine.classList.add('hidden');
+      stampHint.textContent='Normal mode uses a recent blockhash. Slow Signal Mode removes that short expiration window after one-time setup.';
+    }
+  }
+
+  async function waitRecent(signature,lastValidBlockHeight,onConfirmed){
+    for(;;){
+      try{
+        const state=await signatureState(signature);
+        if(state){
+          if(state.err)throw new Error('Solana recorded the transaction, but it failed: '+JSON.stringify(state.err));
+          if(state.confirmationStatus==='confirmed'||state.confirmationStatus==='finalized'){
+            await onConfirmed();
+            return;
+          }
+        }
+        const height=await connection.getBlockHeight('confirmed');
+        if(height>lastValidBlockHeight)throw new Error('The setup transaction expired before confirmation. Try enabling Slow Signal Mode again when the connection catches a better moment.');
+        setStatus('Submitted. Checking Solana for confirmation…');
+      }catch(e){
+        if(e?.message?.startsWith('The setup transaction expired')||e?.message?.startsWith('Solana recorded'))throw e;
+        setStatus('Connection dropped while checking. The signature is saved; checking again…');
+      }
+      await sleep(1800);
+    }
+  }
+
+  async function recoverDurable(job){
+    if(recovering||!job)return;
     recovering=true;
     try{
       for(;;){
-        let state=null;
         try{
-          state=await signatureState(job.signature);
+          const state=await signatureState(job.signature);
           if(state){
-            if(state.err) throw new Error('Solana recorded the transaction, but it failed: '+JSON.stringify(state.err));
-            if(state.confirmationStatus==='confirmed' || state.confirmationStatus==='finalized'){
+            if(state.err)throw new Error('Solana recorded the durable transaction, but it failed: '+JSON.stringify(state.err));
+            if(state.confirmationStatus==='confirmed'||state.confirmationStatus==='finalized'){
               pending=null;
+              if(pendingStorageKey())localStorage.removeItem(pendingStorageKey());
               showSuccess(job.signature);
               try{await refreshBalance();}catch{}
               return;
             }
           }
-
-          const height=await connection.getBlockHeight('confirmed');
-          if(height>job.lastValidBlockHeight){
-            const finalState=await signatureState(job.signature);
-            if(finalState && !finalState.err && (finalState.confirmationStatus==='confirmed' || finalState.confirmationStatus==='finalized')){
-              pending=null;
-              showSuccess(job.signature);
-              try{await refreshBalance();}catch{}
-              return;
-            }
-            pending=null;
-            throw new Error('This transaction expired before Solana confirmed it. Tap STAMP DEVNET again to retry with a fresh blockhash.');
-          }
-
-          setStatus('Submitted. Checking Solana for confirmation…');
+          setStatus('Durable stamp submitted. Waiting for Solana; there is no recent-blockhash countdown now…');
         }catch(e){
-          if(e?.message?.startsWith('This transaction expired') || e?.message?.startsWith('Solana recorded')) throw e;
-          setStatus('Signal is shaky. Your signature is saved; reconnecting and checking Solana again…');
+          if(e?.message?.startsWith('Solana recorded'))throw e;
+          setStatus('Signal is shaky, but the durable stamp has no short expiration fuse. Re-checking…');
         }
-        await sleep(1800);
+        await sleep(2200);
       }
-    }finally{
-      recovering=false;
-    }
+    }finally{recovering=false;}
   }
 
   async function connect(){
     provider=detectProvider();
     if(!provider){
-      if(isMobile){
-        openPhantom.href=phantomBrowse();
-        openPhantom.classList.remove('hidden');
-        setStatus('Phantom is not injected into this browser. Open this page inside Phantom to continue.');
-      }else{
-        setStatus('Phantom extension not detected. Install or open Phantom, then reload.', 'bad');
-      }
+      if(isMobile){openPhantom.href=phantomBrowse();openPhantom.classList.remove('hidden');setStatus('Open this page inside Phantom to continue.');}
+      else setStatus('Phantom extension not detected. Install or open Phantom, then reload.','bad');
       return;
     }
     try{
       setStatus('Waiting for wallet approval…');
       const r=await provider.connect();
-      publicKey = r.publicKey || provider.publicKey;
+      publicKey=r.publicKey||provider.publicKey;
       connectBtn.textContent='WALLET CONNECTED';
       connectBtn.disabled=true;
-      airdropBtn.disabled=false;
       stampBtn.disabled=false;
       await refreshBalance();
-      setStatus('Connected. Your key stayed inside your wallet.', 'good');
-    }catch(e){
-      setStatus('Connection cancelled or failed: '+(e?.message||e), 'bad');
-    }
+      await loadNonce();
+      const saved=pendingStorageKey()?localStorage.getItem(pendingStorageKey()):null;
+      if(saved){
+        try{pending=JSON.parse(saved);recoverDurable(pending).catch(e=>setStatus(e?.message||String(e),'bad'));}
+        catch{localStorage.removeItem(pendingStorageKey());}
+      }else setStatus(noncePubkey?'Connected. Slow Signal Mode is ready.':'Connected. Enable Slow Signal Mode for this bad-signal test.','good');
+    }catch(e){setStatus('Connection cancelled or failed: '+(e?.message||e),'bad');}
   }
 
-  async function airdrop(){
+  async function setupNonce(){
+    if(!provider||!publicKey)return connect();
     try{
-      airdropBtn.disabled=true;
-      setStatus('Requesting 0.1 fake SOL from devnet faucet…');
-      const sig=await connection.requestAirdrop(publicKey, 0.1*LAMPORTS_PER_SOL);
-      const latest=await connection.getLatestBlockhash('confirmed');
-      await connection.confirmTransaction({signature:sig,...latest},'confirmed');
-      await refreshBalance();
-      setStatus('Fake SOL arrived. No real value, just devnet fuel.', 'good');
-    }catch(e){
-      setStatus('Devnet faucet refused or rate-limited the request. If your wallet already has devSOL, skip this step. '+(e?.message||''), 'bad');
-    }finally{
-      airdropBtn.disabled=false;
-    }
-  }
-
-  async function stamp(){
-    if(!provider || !publicKey) return connect();
-    const text=memo.value.trim();
-    if(!text){setStatus('Give the chain something to remember first.', 'bad');return;}
-
-    try{
+      setupNonceBtn.disabled=true;
       stampBtn.disabled=true;
-      resultStep.classList.add('hidden');
-      pending=null;
-
-      setStatus('Fetching a fresh Solana blockhash…');
-      const latest=await connection.getLatestBlockhash('confirmed');
+      setStatus('Preparing a one-time durable nonce account…');
+      const rent=await connection.getMinimumBalanceForRentExemption(NONCE_ACCOUNT_LENGTH,'confirmed');
+      const nonceKeypair=Keypair.generate();
+      const latest=await connection.getLatestBlockhash('processed');
       const tx=new Transaction({feePayer:publicKey,recentBlockhash:latest.blockhash});
-      tx.add(new TransactionInstruction({keys:[],programId:MEMO_PROGRAM,data:new TextEncoder().encode(text)}));
-
-      setStatus('Check Phantom. Approve the devnet memo transaction.');
+      tx.add(
+        SystemProgram.createAccount({fromPubkey:publicKey,newAccountPubkey:nonceKeypair.publicKey,lamports:rent,space:NONCE_ACCOUNT_LENGTH,programId:SystemProgram.programId}),
+        SystemProgram.nonceInitialize({noncePubkey:nonceKeypair.publicKey,authorizedPubkey:publicKey})
+      );
+      tx.partialSign(nonceKeypair);
+      setStatus('Approve the one-time nonce setup in Phantom. After this, stamps lose the short expiration fuse.');
       let signature;
       if(provider.signAndSendTransaction){
-        const r=await provider.signAndSendTransaction(tx);
+        const r=await provider.signAndSendTransaction(tx,{preflightCommitment:'processed',maxRetries:12});
         signature=typeof r==='string'?r:r.signature;
       }else{
         const signed=await provider.signTransaction(tx);
-        signature=await connection.sendRawTransaction(signed.serialize());
+        signature=await connection.sendRawTransaction(signed.serialize(),{preflightCommitment:'processed',maxRetries:12});
       }
+      await waitRecent(signature,latest.lastValidBlockHeight,async()=>{
+        localStorage.setItem(nonceStorageKey(),nonceKeypair.publicKey.toBase58());
+        noncePubkey=nonceKeypair.publicKey;
+        renderNonce();
+        await refreshBalance();
+        setStatus('Slow Signal Mode enabled. Future stamps use a durable nonce.','good');
+      });
+    }catch(e){setStatus(e?.message||String(e),'bad');}
+    finally{stampBtn.disabled=false;if(!noncePubkey)setupNonceBtn.disabled=false;}
+  }
 
-      pending={signature,lastValidBlockHeight:latest.lastValidBlockHeight};
-      setStatus('Signed and submitted. Verifying the result from Solana…');
-      await recoverOutcome(pending);
-    }catch(e){
-      setStatus(e?.message||String(e), 'bad');
-    }finally{
-      stampBtn.disabled=false;
-    }
+  async function stamp(){
+    if(!provider||!publicKey)return connect();
+    const text=memo.value.trim();
+    if(!text){setStatus('Give the chain something to remember first.','bad');return;}
+    resultStep.classList.add('hidden');
+    stampBtn.disabled=true;
+    try{
+      const loaded=await loadNonce();
+      if(!loaded){
+        setStatus('Slow Signal Mode is not enabled. Enable it first for this test.','bad');
+        return;
+      }
+      const durableNonce=loaded.data.nonce;
+      const tx=new Transaction({feePayer:publicKey,recentBlockhash:durableNonce});
+      tx.add(SystemProgram.nonceAdvance({noncePubkey:loaded.pubkey,authorizedPubkey:publicKey}));
+      tx.add(new TransactionInstruction({keys:[],programId:MEMO_PROGRAM,data:new TextEncoder().encode(text)}));
+      setStatus('Approve the durable devnet stamp in Phantom. This one is not racing the recent-blockhash clock.');
+      let signature;
+      if(provider.signAndSendTransaction){
+        const r=await provider.signAndSendTransaction(tx,{preflightCommitment:'confirmed',maxRetries:20});
+        signature=typeof r==='string'?r:r.signature;
+      }else{
+        const signed=await provider.signTransaction(tx);
+        signature=await connection.sendRawTransaction(signed.serialize(),{preflightCommitment:'confirmed',maxRetries:20});
+      }
+      pending={signature,mode:'durable',noncePubkey:loaded.pubkey.toBase58()};
+      localStorage.setItem(pendingStorageKey(),JSON.stringify(pending));
+      await recoverDurable(pending);
+    }catch(e){setStatus(e?.message||String(e),'bad');}
+    finally{stampBtn.disabled=false;}
   }
 
   connectBtn.addEventListener('click',connect);
-  airdropBtn.addEventListener('click',airdrop);
+  setupNonceBtn.addEventListener('click',setupNonce);
   stampBtn.addEventListener('click',stamp);
 
   document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible' && pending){
-      setStatus('Back from wallet. Re-checking the submitted signature against Solana…');
-      recoverOutcome(pending).catch(e=>setStatus(e?.message||String(e),'bad'));
+    if(document.visibilityState==='visible'&&pending?.mode==='durable'){
+      setStatus('Back from Phantom. Re-checking the durable signature against Solana…');
+      recoverDurable(pending).catch(e=>setStatus(e?.message||String(e),'bad'));
     }
   });
 
   provider=detectProvider();
-  if(!provider && isMobile){
-    openPhantom.href=phantomBrowse();
-    openPhantom.classList.remove('hidden');
-    connectBtn.classList.add('hidden');
+  if(!provider&&isMobile){
+    openPhantom.href=phantomBrowse();openPhantom.classList.remove('hidden');connectBtn.classList.add('hidden');
     setStatus('Mobile browser detected. Open this page in Phantom to inject the wallet provider.');
   }
   if(provider){
     provider.on?.('disconnect',()=>location.reload());
-    provider.on?.('accountChanged',pk=>{ publicKey=pk; if(pk) refreshBalance(); else location.reload(); });
+    provider.on?.('accountChanged',pk=>{publicKey=pk;if(pk){refreshBalance();loadNonce();}else location.reload();});
   }
 })();
 </script>
