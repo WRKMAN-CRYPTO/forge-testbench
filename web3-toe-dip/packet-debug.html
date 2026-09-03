@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0c1014">
+<title>CHAIN STAMP · Packet Microscope</title>
+<script src="https://unpkg.com/@solana/web3.js@1.98.4/lib/index.iife.min.js"></script>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;background:#0c1014;color:#edf4f8;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}body{padding:18px;min-height:100dvh}main{max-width:620px;margin:auto}h1{font-size:24px;margin:0 0 8px}p{color:#8fa1ad;line-height:1.5;font-size:13px}.box{margin-top:14px;background:#151b22;border:1px solid #27313b;border-radius:16px;padding:14px;white-space:pre-wrap;word-break:break-all;font-size:12px;line-height:1.55}.good{color:#9df6b7}.bad{color:#ff8f8f}.warn{color:#ffd479}button{width:100%;min-height:52px;border:0;border-radius:14px;margin-top:14px;font:800 14px ui-monospace,SFMono-Regular,Menlo,monospace;background:#9df6b7;color:#07110a}.tiny{font-size:10px;color:#697b87;margin-top:14px;text-align:center}</style>
+</head>
+<body>
+<main>
+<h1>PACKET MICROSCOPE</h1>
+<p>Read-only. Decodes CHAIN STAMP's saved signed transaction from this browser. It does not connect, sign, submit, retry, or alter local storage.</p>
+<button id="inspect">INSPECT SAVED PACKET</button>
+<div id="out" class="box">Ready.</div>
+<div class="tiny">DEVNET DIAGNOSTIC · NO NETWORK SUBMISSION</div>
+</main>
+<script>
+(()=>{
+const out=document.getElementById('out');
+const SYSTEM='11111111111111111111111111111111';
+const MEMO='MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
+const COMPUTE='ComputeBudget111111111111111111111111111111';
+function b64(s){const x=atob(s),a=new Uint8Array(x.length);for(let i=0;i<x.length;i++)a[i]=x.charCodeAt(i);return a}
+function label(id){if(id===SYSTEM)return'SYSTEM';if(id===MEMO)return'MEMO';if(id===COMPUTE)return'COMPUTE BUDGET';return'OTHER'}
+function inspect(){
+ try{
+  if(!window.solanaWeb3)throw new Error('Solana Web3 failed to load');
+  const keys=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('chain-stamp:pending:'))keys.push(k)}
+  if(!keys.length){out.textContent='No CHAIN STAMP pending packet found in this browser.';return}
+  const key=keys[0],job=JSON.parse(localStorage.getItem(key));
+  if(!job?.raw)throw new Error('Pending record has no signed bytes');
+  const tx=solanaWeb3.Transaction.from(b64(job.raw));
+  const lines=[];
+  lines.push('Storage key: '+key);
+  lines.push('Instruction count: '+tx.instructions.length);
+  lines.push('Recent blockhash: '+tx.recentBlockhash);
+  lines.push('Stored nonce: '+(job.nonce||'unknown'));
+  lines.push('Blockhash = stored nonce: '+(tx.recentBlockhash===job.nonce?'PASS':'FAIL'));
+  lines.push('Fee payer: '+(tx.feePayer?.toBase58()||'none'));
+  lines.push('');
+  tx.instructions.forEach((ix,n)=>{
+   const pid=ix.programId.toBase58();
+   lines.push('INSTRUCTION '+n+' · '+label(pid));
+   lines.push('Program: '+pid);
+   ix.keys.forEach((k,j)=>lines.push('  key '+j+': '+k.pubkey.toBase58()+' | signer='+k.isSigner+' | writable='+k.isWritable));
+   lines.push('  data bytes: '+ix.data.length);
+   lines.push('');
+  });
+  const first=tx.instructions[0]?.programId.toBase58();
+  lines.push('FIRST INSTRUCTION IS SYSTEM: '+(first===SYSTEM?'YES':'NO'));
+  if(first===COMPUTE)lines.push('⚠ Compute Budget is before nonceAdvance. A durable nonce transaction requires nonceAdvance first.');
+  out.textContent=lines.join('\n');
+ }catch(e){out.textContent='MICROSCOPE ERROR: '+(e?.message||String(e))}
+}
+document.getElementById('inspect').addEventListener('click',inspect);inspect();
+})();
+</script>
+</body>
+</html>
