@@ -8,7 +8,8 @@
   <script src="https://unpkg.com/@solana/web3.js@1.98.4/lib/index.iife.min.js"></script>
   <style>
     :root{color-scheme:dark;--bg:#0c1014;--panel:#151b22;--line:#27313b;--text:#edf4f8;--muted:#8fa1ad;--hot:#9df6b7;--warn:#ffd479;--bad:#ff8f8f}
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+    input{-webkit-user-select:text;user-select:text}
     html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% -20%,#20313a 0,#0c1014 44%);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);overscroll-behavior:none}
     body{min-height:100dvh;display:grid;place-items:center;padding:16px;padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(16px,env(safe-area-inset-bottom));touch-action:manipulation}
     main{width:min(100%,520px)}
@@ -40,7 +41,7 @@
       <div class="num">1</div>
       <div>
         <h2>Connect a wallet</h2>
-        <p id="walletHint">Phantom works directly inside its browser. On mobile Safari, use the Phantom button if needed.</p>
+        <p>Phantom works directly inside its browser. On mobile Safari, open this page in Phantom if needed.</p>
         <button id="connect">CONNECT PHANTOM</button>
         <a id="openPhantom" class="action secondary hidden" href="#">OPEN IN PHANTOM</a>
         <div id="walletLine" class="wallet hidden"></div>
@@ -51,7 +52,7 @@
       <div class="num">2</div>
       <div>
         <h2>Get fake gas</h2>
-        <p>Devnet SOL has no monetary value. It only pays the tiny network fee for this experiment.</p>
+        <p>Devnet SOL has no monetary value. The public faucet can rate-limit, so this step is optional if your wallet already has devSOL.</p>
         <button id="airdrop" class="secondary" disabled>GET 0.1 DEVNET SOL</button>
       </div>
     </div>
@@ -60,7 +61,7 @@
       <div class="num">3</div>
       <div>
         <h2>Stamp the chain</h2>
-        <p>This text becomes data inside a signed devnet transaction using Solana's Memo program.</p>
+        <p>A fresh blockhash is fetched when you tap. If signal is poor, CHAIN STAMP re-checks the signature after returning from Phantom instead of assuming a timeout means failure.</p>
         <input id="memo" maxlength="80" value="Clocked in. My first Web3 stamp." aria-label="Memo text" />
         <button id="stamp" disabled>STAMP DEVNET</button>
       </div>
@@ -85,23 +86,37 @@
   const RPC = 'https://api.devnet.solana.com';
   const MEMO_PROGRAM = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
   const connection = new Connection(RPC, 'confirmed');
+
   let provider = null;
   let publicKey = null;
+  let pending = null;
+  let recovering = false;
 
   const $ = id => document.getElementById(id);
   const connectBtn=$('connect'), airdropBtn=$('airdrop'), stampBtn=$('stamp'), status=$('status');
   const walletLine=$('walletLine'), memo=$('memo'), resultStep=$('resultStep'), explorer=$('explorer'), openPhantom=$('openPhantom');
-
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const phantomBrowse = () => 'https://phantom.app/ul/browse/' + encodeURIComponent(location.href) + '?ref=' + encodeURIComponent(location.origin);
 
-  function setStatus(text, kind='') { status.textContent=text; status.className='status' + (kind ? ' '+kind : ''); }
-  function shorten(s){return s.slice(0,5)+'…'+s.slice(-5)}
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const phantomBrowse = () => 'https://phantom.app/ul/browse/' + encodeURIComponent(location.href) + '?ref=' + encodeURIComponent(location.origin);
+  const shorten = s => s.slice(0,5)+'…'+s.slice(-5);
+
+  function setStatus(text, kind='') {
+    status.textContent=text;
+    status.className='status' + (kind ? ' '+kind : '');
+  }
+
   function detectProvider(){
     const p = window.phantom?.solana || (window.solana?.isPhantom ? window.solana : null);
-    if(p?.isPhantom) return p;
-    return null;
+    return p?.isPhantom ? p : null;
   }
+
+  function showSuccess(signature){
+    explorer.href='https://explorer.solana.com/tx/'+signature+'?cluster=devnet';
+    resultStep.classList.remove('hidden');
+    setStatus('Confirmed: '+signature, 'good');
+  }
+
   async function refreshBalance(){
     if(!publicKey) return 0;
     const lamports=await connection.getBalance(publicKey,'confirmed');
@@ -110,6 +125,55 @@
     walletLine.classList.remove('hidden');
     return sol;
   }
+
+  async function signatureState(signature){
+    const response=await connection.getSignatureStatuses([signature],{searchTransactionHistory:true});
+    return response.value[0];
+  }
+
+  async function recoverOutcome(job){
+    if(recovering || !job) return;
+    recovering=true;
+    try{
+      for(;;){
+        let state=null;
+        try{
+          state=await signatureState(job.signature);
+          if(state){
+            if(state.err) throw new Error('Solana recorded the transaction, but it failed: '+JSON.stringify(state.err));
+            if(state.confirmationStatus==='confirmed' || state.confirmationStatus==='finalized'){
+              pending=null;
+              showSuccess(job.signature);
+              try{await refreshBalance();}catch{}
+              return;
+            }
+          }
+
+          const height=await connection.getBlockHeight('confirmed');
+          if(height>job.lastValidBlockHeight){
+            const finalState=await signatureState(job.signature);
+            if(finalState && !finalState.err && (finalState.confirmationStatus==='confirmed' || finalState.confirmationStatus==='finalized')){
+              pending=null;
+              showSuccess(job.signature);
+              try{await refreshBalance();}catch{}
+              return;
+            }
+            pending=null;
+            throw new Error('This transaction expired before Solana confirmed it. Tap STAMP DEVNET again to retry with a fresh blockhash.');
+          }
+
+          setStatus('Submitted. Checking Solana for confirmation…');
+        }catch(e){
+          if(e?.message?.startsWith('This transaction expired') || e?.message?.startsWith('Solana recorded')) throw e;
+          setStatus('Signal is shaky. Your signature is saved; reconnecting and checking Solana again…');
+        }
+        await sleep(1800);
+      }
+    }finally{
+      recovering=false;
+    }
+  }
+
   async function connect(){
     provider=detectProvider();
     if(!provider){
@@ -118,7 +182,7 @@
         openPhantom.classList.remove('hidden');
         setStatus('Phantom is not injected into this browser. Open this page inside Phantom to continue.');
       }else{
-        setStatus('Phantom extension not detected. Install/open Phantom, then reload.', 'bad');
+        setStatus('Phantom extension not detected. Install or open Phantom, then reload.', 'bad');
       }
       return;
     }
@@ -132,8 +196,11 @@
       stampBtn.disabled=false;
       await refreshBalance();
       setStatus('Connected. Your key stayed inside your wallet.', 'good');
-    }catch(e){ setStatus('Connection cancelled or failed: '+(e?.message||e), 'bad'); }
+    }catch(e){
+      setStatus('Connection cancelled or failed: '+(e?.message||e), 'bad');
+    }
   }
+
   async function airdrop(){
     try{
       airdropBtn.disabled=true;
@@ -144,25 +211,28 @@
       await refreshBalance();
       setStatus('Fake SOL arrived. No real value, just devnet fuel.', 'good');
     }catch(e){
-      setStatus('Devnet faucet refused or rate-limited the request. Try again later or use faucet.solana.com. '+(e?.message||''), 'bad');
-    }finally{airdropBtn.disabled=false;}
+      setStatus('Devnet faucet refused or rate-limited the request. If your wallet already has devSOL, skip this step. '+(e?.message||''), 'bad');
+    }finally{
+      airdropBtn.disabled=false;
+    }
   }
+
   async function stamp(){
     if(!provider || !publicKey) return connect();
     const text=memo.value.trim();
     if(!text){setStatus('Give the chain something to remember first.', 'bad');return;}
+
     try{
       stampBtn.disabled=true;
       resultStep.classList.add('hidden');
-      setStatus('Building transaction…');
-      const {blockhash,lastValidBlockHeight}=await connection.getLatestBlockhash('confirmed');
-      const tx=new Transaction({feePayer:publicKey,recentBlockhash:blockhash});
-      tx.add(new TransactionInstruction({
-        keys:[],
-        programId:MEMO_PROGRAM,
-        data:new TextEncoder().encode(text)
-      }));
-      setStatus('Check Phantom. You are approving a devnet transaction containing your memo.');
+      pending=null;
+
+      setStatus('Fetching a fresh Solana blockhash…');
+      const latest=await connection.getLatestBlockhash('confirmed');
+      const tx=new Transaction({feePayer:publicKey,recentBlockhash:latest.blockhash});
+      tx.add(new TransactionInstruction({keys:[],programId:MEMO_PROGRAM,data:new TextEncoder().encode(text)}));
+
+      setStatus('Check Phantom. Approve the devnet memo transaction.');
       let signature;
       if(provider.signAndSendTransaction){
         const r=await provider.signAndSendTransaction(tx);
@@ -171,19 +241,27 @@
         const signed=await provider.signTransaction(tx);
         signature=await connection.sendRawTransaction(signed.serialize());
       }
-      setStatus('Signed. Waiting for Solana to confirm…');
-      await connection.confirmTransaction({signature,blockhash,lastValidBlockHeight},'confirmed');
-      explorer.href='https://explorer.solana.com/tx/'+signature+'?cluster=devnet';
-      resultStep.classList.remove('hidden');
-      await refreshBalance();
-      setStatus('Confirmed: '+signature, 'good');
-    }catch(e){ setStatus('Transaction cancelled or failed: '+(e?.message||e), 'bad'); }
-    finally{stampBtn.disabled=false;}
+
+      pending={signature,lastValidBlockHeight:latest.lastValidBlockHeight};
+      setStatus('Signed and submitted. Verifying the result from Solana…');
+      await recoverOutcome(pending);
+    }catch(e){
+      setStatus(e?.message||String(e), 'bad');
+    }finally{
+      stampBtn.disabled=false;
+    }
   }
 
   connectBtn.addEventListener('click',connect);
   airdropBtn.addEventListener('click',airdrop);
   stampBtn.addEventListener('click',stamp);
+
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible' && pending){
+      setStatus('Back from wallet. Re-checking the submitted signature against Solana…');
+      recoverOutcome(pending).catch(e=>setStatus(e?.message||String(e),'bad'));
+    }
+  });
 
   provider=detectProvider();
   if(!provider && isMobile){
