@@ -34,13 +34,13 @@
 <main>
   <div class="brand"><h1>CHAIN <span class="chain">STAMP</span></h1><div class="badge">SOLANA DEVNET</div></div>
   <section class="card">
-    <p class="lead">A tiny Web3 machine. <b>Your wallet signs.</b> Solana records. This page merely asks.</p>
+    <p class="lead">A tiny Web3 machine. <b>Your wallet signs.</b> CHAIN STAMP routes and submits to devnet.</p>
 
     <div class="step">
       <div class="num">1</div>
       <div>
         <h2>Connect a wallet</h2>
-        <p>Phantom works directly inside its browser. On mobile Safari, open this page in Phantom if needed.</p>
+        <p>Phantom supplies the signature only. CHAIN STAMP keeps network routing pinned to Solana devnet.</p>
         <button id="connect">CONNECT PHANTOM</button>
         <a id="openPhantom" class="action secondary hidden" href="#">OPEN IN PHANTOM</a>
         <div id="walletLine" class="wallet hidden"></div>
@@ -51,7 +51,7 @@
       <div class="num">2</div>
       <div>
         <h2>Slow Signal Mode</h2>
-        <p>Recent-blockhash transactions have a short fuse. This creates a small devnet nonce account so future stamps use a durable nonce instead.</p>
+        <p>Before Phantom opens, CHAIN STAMP simulates the setup against devnet. If simulation fails, the wallet never sees an unsafe prompt.</p>
         <button id="setupNonce" class="secondary" disabled>ENABLE SLOW SIGNAL MODE</button>
         <div id="nonceLine" class="wallet hidden"></div>
       </div>
@@ -61,7 +61,7 @@
       <div class="num">3</div>
       <div>
         <h2>Stamp the chain</h2>
-        <p id="stampHint">Normal mode uses a recent blockhash. Slow Signal Mode removes that short expiration window after one-time setup.</p>
+        <p id="stampHint">Slow Signal Mode uses a durable nonce so the stamp is not tied to the normal recent-blockhash expiration window.</p>
         <input id="memo" maxlength="80" value="Clocked in. My first Web3 stamp." aria-label="Memo text" />
         <button id="stamp" disabled>STAMP DEVNET</button>
       </div>
@@ -71,14 +71,14 @@
       <div class="num">✓</div>
       <div>
         <h2>Transaction confirmed</h2>
-        <p>The explorer is reading the network, not this page.</p>
+        <p>The explorer is reading Solana devnet, not this page.</p>
         <a id="explorer" class="action secondary" target="_blank" rel="noopener">OPEN SOLANA EXPLORER</a>
       </div>
     </div>
 
     <div id="status" class="status">Waiting for a wallet.</div>
   </section>
-  <div class="tiny">DEVNET ONLY · never enter a seed phrase here · this app never sees your private key</div>
+  <div class="tiny">DEVNET ONLY · never enter a seed phrase here · never bypass a wallet safety warning for this test</div>
 </main>
 <script>
 (() => {
@@ -112,7 +112,7 @@
   function showSuccess(signature){
     explorer.href='https://explorer.solana.com/tx/'+signature+'?cluster=devnet';
     resultStep.classList.remove('hidden');
-    setStatus('Confirmed: '+signature,'good');
+    setStatus('Confirmed on devnet: '+signature,'good');
   }
 
   async function refreshBalance(){
@@ -127,6 +127,22 @@
   async function signatureState(signature){
     const response=await connection.getSignatureStatuses([signature],{searchTransactionHistory:true});
     return response.value[0];
+  }
+
+  async function simulateOnDevnet(tx,label){
+    setStatus('Simulating '+label+' on Solana devnet before opening Phantom…');
+    const simulation=await connection.simulateTransaction(tx);
+    if(simulation.value.err){
+      const logs=(simulation.value.logs||[]).slice(-5).join(' | ');
+      throw new Error(label+' devnet simulation failed: '+JSON.stringify(simulation.value.err)+(logs?' · '+logs:''));
+    }
+    return simulation.value;
+  }
+
+  async function signOnlyAndSendDevnet(tx,options){
+    if(!provider?.signTransaction)throw new Error('This Phantom provider does not expose signTransaction, so CHAIN STAMP will not guess the network route.');
+    const signed=await provider.signTransaction(tx);
+    return connection.sendRawTransaction(signed.serialize(),options);
   }
 
   async function loadNonce(){
@@ -157,12 +173,12 @@
       setupNonceBtn.disabled=true;
       nonceLine.innerHTML=`Nonce ${shorten(noncePubkey.toBase58())} · <span class="mode">DURABLE</span>`;
       nonceLine.classList.remove('hidden');
-      stampHint.textContent='Durable mode: your stamp uses an on-chain nonce and is not tied to the normal recent-blockhash expiration window.';
+      stampHint.textContent='Durable mode: CHAIN STAMP simulates on devnet, Phantom signs only, then the app submits to devnet using the on-chain nonce.';
     }else{
       setupNonceBtn.textContent='ENABLE SLOW SIGNAL MODE';
       setupNonceBtn.disabled=!publicKey;
       nonceLine.classList.add('hidden');
-      stampHint.textContent='Normal mode uses a recent blockhash. Slow Signal Mode removes that short expiration window after one-time setup.';
+      stampHint.textContent='Enable Slow Signal Mode first. CHAIN STAMP will refuse to open Phantom if devnet simulation fails.';
     }
   }
 
@@ -178,11 +194,11 @@
           }
         }
         const height=await connection.getBlockHeight('confirmed');
-        if(height>lastValidBlockHeight)throw new Error('The setup transaction expired before confirmation. Try enabling Slow Signal Mode again when the connection catches a better moment.');
-        setStatus('Submitted. Checking Solana for confirmation…');
+        if(height>lastValidBlockHeight)throw new Error('The nonce setup transaction expired before devnet confirmation. Try again when the connection catches a better moment.');
+        setStatus('Nonce setup submitted to devnet. Checking confirmation…');
       }catch(e){
-        if(e?.message?.startsWith('The setup transaction expired')||e?.message?.startsWith('Solana recorded'))throw e;
-        setStatus('Connection dropped while checking. The signature is saved; checking again…');
+        if(e?.message?.startsWith('The nonce setup transaction expired')||e?.message?.startsWith('Solana recorded'))throw e;
+        setStatus('Connection dropped while checking devnet. The signature is saved; checking again…');
       }
       await sleep(1800);
     }
@@ -205,10 +221,10 @@
               return;
             }
           }
-          setStatus('Durable stamp submitted. Waiting for Solana; there is no recent-blockhash countdown now…');
+          setStatus('Durable stamp submitted to devnet. Waiting for confirmation; there is no recent-blockhash countdown…');
         }catch(e){
           if(e?.message?.startsWith('Solana recorded'))throw e;
-          setStatus('Signal is shaky, but the durable stamp has no short expiration fuse. Re-checking…');
+          setStatus('Signal is shaky, but the durable stamp has no short expiration fuse. Re-checking devnet…');
         }
         await sleep(2200);
       }
@@ -235,7 +251,7 @@
       if(saved){
         try{pending=JSON.parse(saved);recoverDurable(pending).catch(e=>setStatus(e?.message||String(e),'bad'));}
         catch{localStorage.removeItem(pendingStorageKey());}
-      }else setStatus(noncePubkey?'Connected. Slow Signal Mode is ready.':'Connected. Enable Slow Signal Mode for this bad-signal test.','good');
+      }else setStatus(noncePubkey?'Connected. Slow Signal Mode is ready.':'Connected. CHAIN STAMP is pinned to devnet and ready to simulate the nonce setup.','good');
     }catch(e){setStatus('Connection cancelled or failed: '+(e?.message||e),'bad');}
   }
 
@@ -254,21 +270,18 @@
         SystemProgram.nonceInitialize({noncePubkey:nonceKeypair.publicKey,authorizedPubkey:publicKey})
       );
       tx.partialSign(nonceKeypair);
-      setStatus('Approve the one-time nonce setup in Phantom. After this, stamps lose the short expiration fuse.');
-      let signature;
-      if(provider.signAndSendTransaction){
-        const r=await provider.signAndSendTransaction(tx,{preflightCommitment:'processed',maxRetries:12});
-        signature=typeof r==='string'?r:r.signature;
-      }else{
-        const signed=await provider.signTransaction(tx);
-        signature=await connection.sendRawTransaction(signed.serialize(),{preflightCommitment:'processed',maxRetries:12});
-      }
+
+      await simulateOnDevnet(tx,'nonce setup');
+      tx.partialSign(nonceKeypair);
+      setStatus('Devnet simulation passed. Phantom will sign only; CHAIN STAMP will submit to devnet.');
+      const signature=await signOnlyAndSendDevnet(tx,{skipPreflight:false,preflightCommitment:'processed',maxRetries:20});
+
       await waitRecent(signature,latest.lastValidBlockHeight,async()=>{
         localStorage.setItem(nonceStorageKey(),nonceKeypair.publicKey.toBase58());
         noncePubkey=nonceKeypair.publicKey;
         renderNonce();
         await refreshBalance();
-        setStatus('Slow Signal Mode enabled. Future stamps use a durable nonce.','good');
+        setStatus('Slow Signal Mode enabled on devnet. Future stamps use a durable nonce.','good');
       });
     }catch(e){setStatus(e?.message||String(e),'bad');}
     finally{stampBtn.disabled=false;if(!noncePubkey)setupNonceBtn.disabled=false;}
@@ -282,23 +295,16 @@
     stampBtn.disabled=true;
     try{
       const loaded=await loadNonce();
-      if(!loaded){
-        setStatus('Slow Signal Mode is not enabled. Enable it first for this test.','bad');
-        return;
-      }
+      if(!loaded){setStatus('Slow Signal Mode is not enabled. Enable it first for this test.','bad');return;}
       const durableNonce=loaded.data.nonce;
       const tx=new Transaction({feePayer:publicKey,recentBlockhash:durableNonce});
       tx.add(SystemProgram.nonceAdvance({noncePubkey:loaded.pubkey,authorizedPubkey:publicKey}));
       tx.add(new TransactionInstruction({keys:[],programId:MEMO_PROGRAM,data:new TextEncoder().encode(text)}));
-      setStatus('Approve the durable devnet stamp in Phantom. This one is not racing the recent-blockhash clock.');
-      let signature;
-      if(provider.signAndSendTransaction){
-        const r=await provider.signAndSendTransaction(tx,{preflightCommitment:'confirmed',maxRetries:20});
-        signature=typeof r==='string'?r:r.signature;
-      }else{
-        const signed=await provider.signTransaction(tx);
-        signature=await connection.sendRawTransaction(signed.serialize(),{preflightCommitment:'confirmed',maxRetries:20});
-      }
+
+      await simulateOnDevnet(tx,'durable stamp');
+      setStatus('Devnet simulation passed. Phantom will sign only; CHAIN STAMP will submit the durable stamp to devnet.');
+      const signature=await signOnlyAndSendDevnet(tx,{skipPreflight:false,preflightCommitment:'confirmed',maxRetries:20});
+
       pending={signature,mode:'durable',noncePubkey:loaded.pubkey.toBase58()};
       localStorage.setItem(pendingStorageKey(),JSON.stringify(pending));
       await recoverDurable(pending);
@@ -312,7 +318,7 @@
 
   document.addEventListener('visibilitychange',()=>{
     if(document.visibilityState==='visible'&&pending?.mode==='durable'){
-      setStatus('Back from Phantom. Re-checking the durable signature against Solana…');
+      setStatus('Back from Phantom. Re-checking the durable signature against Solana devnet…');
       recoverDurable(pending).catch(e=>setStatus(e?.message||String(e),'bad'));
     }
   });
