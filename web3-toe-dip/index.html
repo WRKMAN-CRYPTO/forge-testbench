@@ -1,337 +1,53 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
-  <meta name="theme-color" content="#0c1014" />
-  <title>CHAIN STAMP</title>
-  <script src="https://unpkg.com/@solana/web3.js@1.98.4/lib/index.iife.min.js"></script>
-  <style>
-    :root{color-scheme:dark;--bg:#0c1014;--panel:#151b22;--line:#27313b;--text:#edf4f8;--muted:#8fa1ad;--hot:#9df6b7;--warn:#ffd479;--bad:#ff8f8f}
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-    input{-webkit-user-select:text;user-select:text}
-    html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% -20%,#20313a 0,#0c1014 44%);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);overscroll-behavior:none}
-    body{min-height:100dvh;display:grid;place-items:center;padding:16px;padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(16px,env(safe-area-inset-bottom));touch-action:manipulation}
-    main{width:min(100%,520px)}
-    .brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-    h1{font-size:clamp(28px,9vw,44px);letter-spacing:.08em;margin:0;line-height:.95}.chain{color:var(--hot)}
-    .badge{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:7px 10px;color:var(--warn);white-space:nowrap}
-    .card{background:rgba(21,27,34,.94);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
-    .lead{margin:0 0 18px;color:#c8d4db;line-height:1.55;font-size:14px}.lead b{color:var(--text)}
-    .step{display:grid;grid-template-columns:34px 1fr;gap:11px;align-items:start;padding:14px 0;border-top:1px solid var(--line)}
-    .step:first-of-type{border-top:0;padding-top:0}.num{height:34px;width:34px;border-radius:10px;display:grid;place-items:center;background:#0f151a;border:1px solid var(--line);color:var(--hot);font-weight:800}
-    .step h2{font-size:14px;margin:2px 0 5px}.step p{font-size:12px;color:var(--muted);line-height:1.45;margin:0 0 10px}
-    button,a.action{appearance:none;border:0;width:100%;min-height:52px;border-radius:14px;padding:12px 14px;font:800 14px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;background:var(--hot);color:#07110a;display:flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer}
-    button.secondary,a.secondary{background:#202a33;color:var(--text);border:1px solid #33414d}
-    button:disabled{opacity:.42;cursor:not-allowed}
-    input{width:100%;height:52px;border:1px solid #34414c;background:#0f151a;color:var(--text);border-radius:14px;padding:0 14px;font:16px ui-monospace,SFMono-Regular,Menlo,monospace;outline:none;margin-bottom:9px}input:focus{border-color:var(--hot)}
-    .status{margin-top:14px;border-radius:14px;padding:12px 13px;background:#0f151a;border:1px solid var(--line);font-size:12px;line-height:1.5;color:var(--muted);min-height:44px;word-break:break-word}.status.good{color:var(--hot)}.status.bad{color:var(--bad)}
-    .wallet{font-size:11px;color:var(--muted);margin-top:8px;word-break:break-all}.balance{color:var(--text);font-weight:700}.mode{color:var(--warn);font-weight:800}
-    .tiny{margin:14px 2px 0;text-align:center;color:#697b87;font-size:10px;line-height:1.5}.hidden{display:none!important}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="theme-color" content="#0c1014" />
+<title>CHAIN STAMP</title>
+<script src="https://unpkg.com/@solana/web3.js@1.98.4/lib/index.iife.min.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#0c1014;--panel:#151b22;--line:#27313b;--text:#edf4f8;--muted:#8fa1ad;--hot:#9df6b7;--warn:#ffd479;--bad:#ff8f8f}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}input{-webkit-user-select:text;user-select:text}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% -20%,#20313a 0,#0c1014 44%);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);overscroll-behavior:none}body{min-height:100dvh;display:grid;place-items:center;padding:16px;padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(16px,env(safe-area-inset-bottom));touch-action:manipulation}main{width:min(100%,520px)}.brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}h1{font-size:clamp(28px,9vw,44px);letter-spacing:.08em;margin:0;line-height:.95}.chain{color:var(--hot)}.badge{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:7px 10px;color:var(--warn);white-space:nowrap}.card{background:rgba(21,27,34,.94);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.lead{margin:0 0 18px;color:#c8d4db;line-height:1.55;font-size:14px}.lead b{color:var(--text)}.step{display:grid;grid-template-columns:34px 1fr;gap:11px;align-items:start;padding:14px 0;border-top:1px solid var(--line)}.step:first-of-type{border-top:0;padding-top:0}.num{height:34px;width:34px;border-radius:10px;display:grid;place-items:center;background:#0f151a;border:1px solid var(--line);color:var(--hot);font-weight:800}.step h2{font-size:14px;margin:2px 0 5px}.step p{font-size:12px;color:var(--muted);line-height:1.45;margin:0 0 10px}button,a.action{appearance:none;border:0;width:100%;min-height:52px;border-radius:14px;padding:12px 14px;font:800 14px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;background:var(--hot);color:#07110a;display:flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer}button.secondary,a.secondary{background:#202a33;color:var(--text);border:1px solid #33414d}button:disabled{opacity:.42;cursor:not-allowed}input{width:100%;height:52px;border:1px solid #34414c;background:#0f151a;color:var(--text);border-radius:14px;padding:0 14px;font:16px ui-monospace,SFMono-Regular,Menlo,monospace;outline:none;margin-bottom:9px}.status{margin-top:14px;border-radius:14px;padding:12px 13px;background:#0f151a;border:1px solid var(--line);font-size:12px;line-height:1.5;color:var(--muted);min-height:44px;word-break:break-word}.status.good{color:var(--hot)}.status.bad{color:var(--bad)}.wallet{font-size:11px;color:var(--muted);margin-top:8px;word-break:break-all}.balance{color:var(--text);font-weight:700}.mode{color:var(--warn);font-weight:800}.tiny{margin:14px 2px 0;text-align:center;color:#697b87;font-size:10px;line-height:1.5}.hidden{display:none!important}
+</style>
 </head>
 <body>
 <main>
-  <div class="brand"><h1>CHAIN <span class="chain">STAMP</span></h1><div class="badge">SOLANA DEVNET</div></div>
-  <section class="card">
-    <p class="lead">A tiny Web3 machine. <b>Your wallet signs.</b> CHAIN STAMP routes and submits to devnet.</p>
-
-    <div class="step">
-      <div class="num">1</div>
-      <div>
-        <h2>Connect a wallet</h2>
-        <p>Phantom supplies the signature only. CHAIN STAMP keeps network routing pinned to Solana devnet.</p>
-        <button id="connect">CONNECT PHANTOM</button>
-        <a id="openPhantom" class="action secondary hidden" href="#">OPEN IN PHANTOM</a>
-        <div id="walletLine" class="wallet hidden"></div>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="num">2</div>
-      <div>
-        <h2>Slow Signal Mode</h2>
-        <p>Before Phantom opens, CHAIN STAMP simulates the setup against devnet. If simulation fails, the wallet never sees an unsafe prompt.</p>
-        <button id="setupNonce" class="secondary" disabled>ENABLE SLOW SIGNAL MODE</button>
-        <div id="nonceLine" class="wallet hidden"></div>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="num">3</div>
-      <div>
-        <h2>Stamp the chain</h2>
-        <p id="stampHint">Slow Signal Mode uses a durable nonce so the stamp is not tied to the normal recent-blockhash expiration window.</p>
-        <input id="memo" maxlength="80" value="Clocked in. My first Web3 stamp." aria-label="Memo text" />
-        <button id="stamp" disabled>STAMP DEVNET</button>
-      </div>
-    </div>
-
-    <div id="resultStep" class="step hidden">
-      <div class="num">✓</div>
-      <div>
-        <h2>Transaction confirmed</h2>
-        <p>The explorer is reading Solana devnet, not this page.</p>
-        <a id="explorer" class="action secondary" target="_blank" rel="noopener">OPEN SOLANA EXPLORER</a>
-      </div>
-    </div>
-
-    <div id="status" class="status">Waiting for a wallet.</div>
-  </section>
-  <div class="tiny">DEVNET ONLY · never enter a seed phrase here · never bypass a wallet safety warning for this test</div>
+<div class="brand"><h1>CHAIN <span class="chain">STAMP</span></h1><div class="badge">SOLANA DEVNET</div></div>
+<section class="card">
+<p class="lead">A tiny Web3 machine. <b>Your wallet signs.</b> CHAIN STAMP routes and submits to devnet.</p>
+<div class="step"><div class="num">1</div><div><h2>Connect a wallet</h2><p>Phantom signs only. CHAIN STAMP owns the devnet route.</p><button id="connect">CONNECT PHANTOM</button><a id="openPhantom" class="action secondary hidden" href="#">OPEN IN PHANTOM</a><div id="walletLine" class="wallet hidden"></div></div></div>
+<div class="step"><div class="num">2</div><div><h2>Slow Signal Mode</h2><p>The durable nonce account is reused. Its rent deposit stays on-chain instead of creating another account each test.</p><button id="setupNonce" class="secondary" disabled>ENABLE SLOW SIGNAL MODE</button><div id="nonceLine" class="wallet hidden"></div></div></div>
+<div class="step"><div class="num">3</div><div><h2>Stamp the chain</h2><p id="stampHint">Before signing, CHAIN STAMP verifies the nonce account and simulates the memo path with a fresh devnet blockhash.</p><input id="memo" maxlength="80" value="Clocked in. My first Web3 stamp." aria-label="Memo text"/><button id="stamp" disabled>STAMP DEVNET</button></div></div>
+<div id="resultStep" class="step hidden"><div class="num">✓</div><div><h2>Transaction confirmed</h2><p>The explorer is reading Solana devnet, not this page.</p><a id="explorer" class="action secondary" target="_blank" rel="noopener">OPEN SOLANA EXPLORER</a></div></div>
+<div id="status" class="status">Waiting for a wallet.</div>
+</section>
+<div class="tiny">DEVNET ONLY · never enter a seed phrase here · do not bypass a Phantom safety warning</div>
 </main>
 <script>
-(() => {
-  const {
-    Connection, PublicKey, Transaction, TransactionInstruction, LAMPORTS_PER_SOL,
-    SystemProgram, Keypair, NONCE_ACCOUNT_LENGTH, NonceAccount
-  } = solanaWeb3;
-  const RPC='https://api.devnet.solana.com';
-  const MEMO_PROGRAM=new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
-  const connection=new Connection(RPC,'confirmed');
-
-  let provider=null;
-  let publicKey=null;
-  let noncePubkey=null;
-  let pending=null;
-  let recovering=false;
-
-  const $=id=>document.getElementById(id);
-  const connectBtn=$('connect'), setupNonceBtn=$('setupNonce'), stampBtn=$('stamp'), status=$('status');
-  const walletLine=$('walletLine'), nonceLine=$('nonceLine'), memo=$('memo'), resultStep=$('resultStep'), explorer=$('explorer'), openPhantom=$('openPhantom'), stampHint=$('stampHint');
-  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-  const shorten=s=>s.slice(0,5)+'…'+s.slice(-5);
-  const phantomBrowse=()=> 'https://phantom.app/ul/browse/'+encodeURIComponent(location.href)+'?ref='+encodeURIComponent(location.origin);
-
-  function setStatus(text,kind=''){status.textContent=text;status.className='status'+(kind?' '+kind:'');}
-  function detectProvider(){const p=window.phantom?.solana||(window.solana?.isPhantom?window.solana:null);return p?.isPhantom?p:null;}
-  function nonceStorageKey(){return publicKey?'chain-stamp:nonce:'+publicKey.toBase58():null;}
-  function pendingStorageKey(){return publicKey?'chain-stamp:pending:'+publicKey.toBase58():null;}
-
-  function showSuccess(signature){
-    explorer.href='https://explorer.solana.com/tx/'+signature+'?cluster=devnet';
-    resultStep.classList.remove('hidden');
-    setStatus('Confirmed on devnet: '+signature,'good');
-  }
-
-  async function refreshBalance(){
-    if(!publicKey)return 0;
-    const lamports=await connection.getBalance(publicKey,'confirmed');
-    const sol=lamports/LAMPORTS_PER_SOL;
-    walletLine.innerHTML=`${shorten(publicKey.toBase58())} · <span class="balance">${sol.toFixed(4)} devSOL</span>`;
-    walletLine.classList.remove('hidden');
-    return sol;
-  }
-
-  async function signatureState(signature){
-    const response=await connection.getSignatureStatuses([signature],{searchTransactionHistory:true});
-    return response.value[0];
-  }
-
-  async function simulateOnDevnet(tx,label){
-    setStatus('Simulating '+label+' on Solana devnet before opening Phantom…');
-    const simulation=await connection.simulateTransaction(tx);
-    if(simulation.value.err){
-      const logs=(simulation.value.logs||[]).slice(-5).join(' | ');
-      throw new Error(label+' devnet simulation failed: '+JSON.stringify(simulation.value.err)+(logs?' · '+logs:''));
-    }
-    return simulation.value;
-  }
-
-  async function signOnlyAndSendDevnet(tx,options){
-    if(!provider?.signTransaction)throw new Error('This Phantom provider does not expose signTransaction, so CHAIN STAMP will not guess the network route.');
-    const signed=await provider.signTransaction(tx);
-    return connection.sendRawTransaction(signed.serialize(),options);
-  }
-
-  async function loadNonce(){
-    noncePubkey=null;
-    const key=nonceStorageKey();
-    if(!key)return null;
-    const stored=localStorage.getItem(key);
-    if(!stored){renderNonce();return null;}
-    try{
-      const pk=new PublicKey(stored);
-      const info=await connection.getAccountInfo(pk,'confirmed');
-      if(!info){localStorage.removeItem(key);renderNonce();return null;}
-      const parsed=NonceAccount.fromAccountData(info.data);
-      if(!parsed.authorizedPubkey.equals(publicKey)){localStorage.removeItem(key);renderNonce();return null;}
-      noncePubkey=pk;
-      renderNonce();
-      return {pubkey:pk,data:parsed};
-    }catch{
-      localStorage.removeItem(key);
-      renderNonce();
-      return null;
-    }
-  }
-
-  function renderNonce(){
-    if(noncePubkey){
-      setupNonceBtn.textContent='SLOW SIGNAL MODE ENABLED';
-      setupNonceBtn.disabled=true;
-      nonceLine.innerHTML=`Nonce ${shorten(noncePubkey.toBase58())} · <span class="mode">DURABLE</span>`;
-      nonceLine.classList.remove('hidden');
-      stampHint.textContent='Durable mode: CHAIN STAMP simulates on devnet, Phantom signs only, then the app submits to devnet using the on-chain nonce.';
-    }else{
-      setupNonceBtn.textContent='ENABLE SLOW SIGNAL MODE';
-      setupNonceBtn.disabled=!publicKey;
-      nonceLine.classList.add('hidden');
-      stampHint.textContent='Enable Slow Signal Mode first. CHAIN STAMP will refuse to open Phantom if devnet simulation fails.';
-    }
-  }
-
-  async function waitRecent(signature,lastValidBlockHeight,onConfirmed){
-    for(;;){
-      try{
-        const state=await signatureState(signature);
-        if(state){
-          if(state.err)throw new Error('Solana recorded the transaction, but it failed: '+JSON.stringify(state.err));
-          if(state.confirmationStatus==='confirmed'||state.confirmationStatus==='finalized'){
-            await onConfirmed();
-            return;
-          }
-        }
-        const height=await connection.getBlockHeight('confirmed');
-        if(height>lastValidBlockHeight)throw new Error('The nonce setup transaction expired before devnet confirmation. Try again when the connection catches a better moment.');
-        setStatus('Nonce setup submitted to devnet. Checking confirmation…');
-      }catch(e){
-        if(e?.message?.startsWith('The nonce setup transaction expired')||e?.message?.startsWith('Solana recorded'))throw e;
-        setStatus('Connection dropped while checking devnet. The signature is saved; checking again…');
-      }
-      await sleep(1800);
-    }
-  }
-
-  async function recoverDurable(job){
-    if(recovering||!job)return;
-    recovering=true;
-    try{
-      for(;;){
-        try{
-          const state=await signatureState(job.signature);
-          if(state){
-            if(state.err)throw new Error('Solana recorded the durable transaction, but it failed: '+JSON.stringify(state.err));
-            if(state.confirmationStatus==='confirmed'||state.confirmationStatus==='finalized'){
-              pending=null;
-              if(pendingStorageKey())localStorage.removeItem(pendingStorageKey());
-              showSuccess(job.signature);
-              try{await refreshBalance();}catch{}
-              return;
-            }
-          }
-          setStatus('Durable stamp submitted to devnet. Waiting for confirmation; there is no recent-blockhash countdown…');
-        }catch(e){
-          if(e?.message?.startsWith('Solana recorded'))throw e;
-          setStatus('Signal is shaky, but the durable stamp has no short expiration fuse. Re-checking devnet…');
-        }
-        await sleep(2200);
-      }
-    }finally{recovering=false;}
-  }
-
-  async function connect(){
-    provider=detectProvider();
-    if(!provider){
-      if(isMobile){openPhantom.href=phantomBrowse();openPhantom.classList.remove('hidden');setStatus('Open this page inside Phantom to continue.');}
-      else setStatus('Phantom extension not detected. Install or open Phantom, then reload.','bad');
-      return;
-    }
-    try{
-      setStatus('Waiting for wallet approval…');
-      const r=await provider.connect();
-      publicKey=r.publicKey||provider.publicKey;
-      connectBtn.textContent='WALLET CONNECTED';
-      connectBtn.disabled=true;
-      stampBtn.disabled=false;
-      await refreshBalance();
-      await loadNonce();
-      const saved=pendingStorageKey()?localStorage.getItem(pendingStorageKey()):null;
-      if(saved){
-        try{pending=JSON.parse(saved);recoverDurable(pending).catch(e=>setStatus(e?.message||String(e),'bad'));}
-        catch{localStorage.removeItem(pendingStorageKey());}
-      }else setStatus(noncePubkey?'Connected. Slow Signal Mode is ready.':'Connected. CHAIN STAMP is pinned to devnet and ready to simulate the nonce setup.','good');
-    }catch(e){setStatus('Connection cancelled or failed: '+(e?.message||e),'bad');}
-  }
-
-  async function setupNonce(){
-    if(!provider||!publicKey)return connect();
-    try{
-      setupNonceBtn.disabled=true;
-      stampBtn.disabled=true;
-      setStatus('Preparing a one-time durable nonce account…');
-      const rent=await connection.getMinimumBalanceForRentExemption(NONCE_ACCOUNT_LENGTH,'confirmed');
-      const nonceKeypair=Keypair.generate();
-      const latest=await connection.getLatestBlockhash('processed');
-      const tx=new Transaction({feePayer:publicKey,recentBlockhash:latest.blockhash});
-      tx.add(
-        SystemProgram.createAccount({fromPubkey:publicKey,newAccountPubkey:nonceKeypair.publicKey,lamports:rent,space:NONCE_ACCOUNT_LENGTH,programId:SystemProgram.programId}),
-        SystemProgram.nonceInitialize({noncePubkey:nonceKeypair.publicKey,authorizedPubkey:publicKey})
-      );
-      tx.partialSign(nonceKeypair);
-
-      await simulateOnDevnet(tx,'nonce setup');
-      tx.partialSign(nonceKeypair);
-      setStatus('Devnet simulation passed. Phantom will sign only; CHAIN STAMP will submit to devnet.');
-      const signature=await signOnlyAndSendDevnet(tx,{skipPreflight:false,preflightCommitment:'processed',maxRetries:20});
-
-      await waitRecent(signature,latest.lastValidBlockHeight,async()=>{
-        localStorage.setItem(nonceStorageKey(),nonceKeypair.publicKey.toBase58());
-        noncePubkey=nonceKeypair.publicKey;
-        renderNonce();
-        await refreshBalance();
-        setStatus('Slow Signal Mode enabled on devnet. Future stamps use a durable nonce.','good');
-      });
-    }catch(e){setStatus(e?.message||String(e),'bad');}
-    finally{stampBtn.disabled=false;if(!noncePubkey)setupNonceBtn.disabled=false;}
-  }
-
-  async function stamp(){
-    if(!provider||!publicKey)return connect();
-    const text=memo.value.trim();
-    if(!text){setStatus('Give the chain something to remember first.','bad');return;}
-    resultStep.classList.add('hidden');
-    stampBtn.disabled=true;
-    try{
-      const loaded=await loadNonce();
-      if(!loaded){setStatus('Slow Signal Mode is not enabled. Enable it first for this test.','bad');return;}
-      const durableNonce=loaded.data.nonce;
-      const tx=new Transaction({feePayer:publicKey,recentBlockhash:durableNonce});
-      tx.add(SystemProgram.nonceAdvance({noncePubkey:loaded.pubkey,authorizedPubkey:publicKey}));
-      tx.add(new TransactionInstruction({keys:[],programId:MEMO_PROGRAM,data:new TextEncoder().encode(text)}));
-
-      await simulateOnDevnet(tx,'durable stamp');
-      setStatus('Devnet simulation passed. Phantom will sign only; CHAIN STAMP will submit the durable stamp to devnet.');
-      const signature=await signOnlyAndSendDevnet(tx,{skipPreflight:false,preflightCommitment:'confirmed',maxRetries:20});
-
-      pending={signature,mode:'durable',noncePubkey:loaded.pubkey.toBase58()};
-      localStorage.setItem(pendingStorageKey(),JSON.stringify(pending));
-      await recoverDurable(pending);
-    }catch(e){setStatus(e?.message||String(e),'bad');}
-    finally{stampBtn.disabled=false;}
-  }
-
-  connectBtn.addEventListener('click',connect);
-  setupNonceBtn.addEventListener('click',setupNonce);
-  stampBtn.addEventListener('click',stamp);
-
-  document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible'&&pending?.mode==='durable'){
-      setStatus('Back from Phantom. Re-checking the durable signature against Solana devnet…');
-      recoverDurable(pending).catch(e=>setStatus(e?.message||String(e),'bad'));
-    }
-  });
-
-  provider=detectProvider();
-  if(!provider&&isMobile){
-    openPhantom.href=phantomBrowse();openPhantom.classList.remove('hidden');connectBtn.classList.add('hidden');
-    setStatus('Mobile browser detected. Open this page in Phantom to inject the wallet provider.');
-  }
-  if(provider){
-    provider.on?.('disconnect',()=>location.reload());
-    provider.on?.('accountChanged',pk=>{publicKey=pk;if(pk){refreshBalance();loadNonce();}else location.reload();});
-  }
+(()=>{
+const {Connection,PublicKey,Transaction,TransactionInstruction,LAMPORTS_PER_SOL,SystemProgram,Keypair,NONCE_ACCOUNT_LENGTH,NonceAccount}=solanaWeb3;
+const RPC='https://api.devnet.solana.com';
+const MEMO_PROGRAM=new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+const connection=new Connection(RPC,'confirmed');
+let provider=null,publicKey=null,noncePubkey=null,pending=null,recovering=false;
+const $=id=>document.getElementById(id),connectBtn=$('connect'),setupNonceBtn=$('setupNonce'),stampBtn=$('stamp'),status=$('status'),walletLine=$('walletLine'),nonceLine=$('nonceLine'),memo=$('memo'),resultStep=$('resultStep'),explorer=$('explorer'),openPhantom=$('openPhantom'),stampHint=$('stampHint');
+const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent),sleep=ms=>new Promise(r=>setTimeout(r,ms)),shorten=s=>s.slice(0,5)+'…'+s.slice(-5),phantomBrowse=()=> 'https://phantom.app/ul/browse/'+encodeURIComponent(location.href)+'?ref='+encodeURIComponent(location.origin);
+function setStatus(text,kind=''){status.textContent=text;status.className='status'+(kind?' '+kind:'')}
+function detectProvider(){const p=window.phantom?.solana||(window.solana?.isPhantom?window.solana:null);return p?.isPhantom?p:null}
+function nonceStorageKey(){return publicKey?'chain-stamp:nonce:'+publicKey.toBase58():null}
+function pendingStorageKey(){return publicKey?'chain-stamp:pending:'+publicKey.toBase58():null}
+function renderNonce(){if(noncePubkey){setupNonceBtn.textContent='SLOW SIGNAL MODE ENABLED';setupNonceBtn.disabled=true;nonceLine.innerHTML=`Nonce ${shorten(noncePubkey.toBase58())} · <span class="mode">DURABLE</span>`;nonceLine.classList.remove('hidden');stampHint.textContent='Durable mode: nonce account verified on devnet. Memo behavior is simulated separately with a fresh blockhash, then Phantom signs the durable transaction.'}else{setupNonceBtn.textContent='ENABLE SLOW SIGNAL MODE';setupNonceBtn.disabled=!publicKey;nonceLine.classList.add('hidden')}}
+async function refreshBalance(){if(!publicKey)return 0;const lamports=await connection.getBalance(publicKey,'confirmed'),sol=lamports/LAMPORTS_PER_SOL;walletLine.innerHTML=`${shorten(publicKey.toBase58())} · <span class="balance">${sol.toFixed(4)} devSOL</span>`;walletLine.classList.remove('hidden');return sol}
+async function signatureState(signature){const r=await connection.getSignatureStatuses([signature],{searchTransactionHistory:true});return r.value[0]}
+async function loadNonce(){noncePubkey=null;const key=nonceStorageKey(),stored=key&&localStorage.getItem(key);if(!stored){renderNonce();return null}try{const pk=new PublicKey(stored),info=await connection.getAccountInfo(pk,'confirmed');if(!info)throw new Error('Nonce account missing');const data=NonceAccount.fromAccountData(info.data);if(!data.authorizedPubkey.equals(publicKey))throw new Error('Nonce authority mismatch');noncePubkey=pk;renderNonce();return{pubkey:pk,data}}catch(e){localStorage.removeItem(key);renderNonce();return null}}
+async function simulateRecent(tx,label){setStatus('Checking '+label+' on devnet…');const sim=await connection.simulateTransaction(tx);if(sim.value.err){const logs=(sim.value.logs||[]).slice(-5).join(' | ');throw new Error(label+' failed: '+JSON.stringify(sim.value.err)+(logs?' · '+logs:''));}return sim.value}
+async function validateDurablePath(text,loaded){const fresh=await connection.getLatestBlockhash('confirmed');const shadow=new Transaction({feePayer:publicKey,recentBlockhash:fresh.blockhash});shadow.add(new TransactionInstruction({keys:[],programId:MEMO_PROGRAM,data:new TextEncoder().encode(text)}));await simulateRecent(shadow,'Memo safety simulation');const info=await connection.getAccountInfo(loaded.pubkey,'confirmed');if(!info)throw new Error('Durable nonce account disappeared from devnet.');const current=NonceAccount.fromAccountData(info.data);if(!current.authorizedPubkey.equals(publicKey))throw new Error('Durable nonce authority no longer matches this wallet.');return current.nonce}
+async function signOnlyAndSend(tx,options){if(!provider?.signTransaction)throw new Error('Phantom signTransaction is unavailable.');setStatus('Validation passed. Check Phantom to sign the durable devnet transaction.');const signed=await provider.signTransaction(tx);setStatus('Signed. CHAIN STAMP is submitting directly to devnet…');return connection.sendRawTransaction(signed.serialize(),options)}
+async function recover(job){if(recovering||!job)return;recovering=true;try{for(;;){const s=await signatureState(job.signature);if(s){if(s.err)throw new Error('Solana recorded the transaction, but it failed: '+JSON.stringify(s.err));if(s.confirmationStatus==='confirmed'||s.confirmationStatus==='finalized'){pending=null;localStorage.removeItem(pendingStorageKey());explorer.href='https://explorer.solana.com/tx/'+job.signature+'?cluster=devnet';resultStep.classList.remove('hidden');setStatus('Confirmed on devnet: '+job.signature,'good');await refreshBalance().catch(()=>{});return}}setStatus('Durable stamp submitted. Waiting for devnet confirmation…');await sleep(2200)}}finally{recovering=false}}
+async function setupNonce(){if(!provider||!publicKey)return connect();try{setupNonceBtn.disabled=true;stampBtn.disabled=true;const rent=await connection.getMinimumBalanceForRentExemption(NONCE_ACCOUNT_LENGTH,'confirmed'),kp=Keypair.generate(),latest=await connection.getLatestBlockhash('confirmed'),tx=new Transaction({feePayer:publicKey,recentBlockhash:latest.blockhash});tx.add(SystemProgram.createAccount({fromPubkey:publicKey,newAccountPubkey:kp.publicKey,lamports:rent,space:NONCE_ACCOUNT_LENGTH,programId:SystemProgram.programId}),SystemProgram.nonceInitialize({noncePubkey:kp.publicKey,authorizedPubkey:publicKey}));tx.partialSign(kp);await simulateRecent(tx,'Nonce setup simulation');const sig=await signOnlyAndSend(tx,{preflightCommitment:'confirmed',maxRetries:12});for(;;){const s=await signatureState(sig);if(s?.err)throw new Error('Nonce setup failed: '+JSON.stringify(s.err));if(s&&(s.confirmationStatus==='confirmed'||s.confirmationStatus==='finalized'))break;const h=await connection.getBlockHeight('confirmed');if(h>latest.lastValidBlockHeight)throw new Error('Nonce setup expired before confirmation.');await sleep(1500)}localStorage.setItem(nonceStorageKey(),kp.publicKey.toBase58());noncePubkey=kp.publicKey;renderNonce();await refreshBalance();setStatus('Slow Signal Mode enabled.','good')}catch(e){setStatus(e?.message||String(e),'bad')}finally{stampBtn.disabled=false;if(!noncePubkey)setupNonceBtn.disabled=false}}
+async function stamp(){if(!provider||!publicKey)return connect();const text=memo.value.trim();if(!text)return setStatus('Give the chain something to remember first.','bad');stampBtn.disabled=true;resultStep.classList.add('hidden');try{const loaded=await loadNonce();if(!loaded)throw new Error('Slow Signal Mode is not available. Do not create another nonce account unless the existing one is actually gone.');const nonce=await validateDurablePath(text,loaded);const tx=new Transaction({feePayer:publicKey,recentBlockhash:nonce});tx.add(SystemProgram.nonceAdvance({noncePubkey:loaded.pubkey,authorizedPubkey:publicKey}));tx.add(new TransactionInstruction({keys:[],programId:MEMO_PROGRAM,data:new TextEncoder().encode(text)}));const signature=await signOnlyAndSend(tx,{skipPreflight:true,maxRetries:20});pending={signature,mode:'durable'};localStorage.setItem(pendingStorageKey(),JSON.stringify(pending));await recover(pending)}catch(e){setStatus(e?.message||String(e),'bad')}finally{stampBtn.disabled=false}}
+async function connect(){provider=detectProvider();if(!provider){if(isMobile){openPhantom.href=phantomBrowse();openPhantom.classList.remove('hidden');setStatus('Open this page inside Phantom to continue.')}else setStatus('Phantom not detected.','bad');return}try{const r=await provider.connect();publicKey=r.publicKey||provider.publicKey;connectBtn.textContent='WALLET CONNECTED';connectBtn.disabled=true;stampBtn.disabled=false;await refreshBalance();await loadNonce();const saved=pendingStorageKey()&&localStorage.getItem(pendingStorageKey());if(saved){pending=JSON.parse(saved);recover(pending).catch(e=>setStatus(e?.message||String(e),'bad'))}else setStatus(noncePubkey?'Connected. Existing durable nonce recovered.':'Connected. No stored nonce found.','good')}catch(e){setStatus('Connection failed: '+(e?.message||e),'bad')}}
+connectBtn.addEventListener('click',connect);setupNonceBtn.addEventListener('click',setupNonce);stampBtn.addEventListener('click',stamp);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&pending)recover(pending).catch(e=>setStatus(e?.message||String(e),'bad'))});provider=detectProvider();if(!provider&&isMobile){openPhantom.href=phantomBrowse();openPhantom.classList.remove('hidden');connectBtn.classList.add('hidden');setStatus('Mobile browser detected. Open this page in Phantom.')}if(provider){provider.on?.('disconnect',()=>location.reload());provider.on?.('accountChanged',pk=>{publicKey=pk;if(pk){refreshBalance();loadNonce()}else location.reload()})}
 })();
 </script>
 </body>
