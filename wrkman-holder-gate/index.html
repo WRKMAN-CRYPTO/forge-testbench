@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>WRKMAN Holder Gate</title>
+<style>
+:root{color-scheme:dark;--bg:#07100b;--panel:#101c14;--line:#294332;--ink:#f2f0df;--muted:#9fb1a3;--green:#65c466;--gold:#d9b955;--danger:#de6b60}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% 15%,#17321e 0,#07100b 45%,#040805 100%);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overscroll-behavior:none}body{min-height:100dvh;display:grid;place-items:center;padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.shell{width:min(100%,430px)}.mark{width:76px;height:76px;margin:0 auto 16px;border:2px solid var(--gold);border-radius:20px;display:grid;place-items:center;font-size:38px;background:#132219;box-shadow:0 12px 50px #0008}.eyebrow{text-align:center;color:var(--gold);font-weight:900;letter-spacing:.18em;font-size:12px}.card{margin-top:14px;padding:24px 20px;border:1px solid var(--line);border-radius:22px;background:#0d1710e8;box-shadow:0 24px 70px #0008;backdrop-filter:blur(8px)}h1{font-size:31px;line-height:1;margin:0 0 12px;text-align:center}p{margin:9px 0;color:var(--muted);line-height:1.45;text-align:center}.threshold{margin:20px 0;padding:15px;border:1px solid #4d5530;border-radius:15px;background:#171b0f;text-align:center}.threshold strong{display:block;color:var(--gold);font-size:25px}.threshold span{font-size:12px;color:#bfc4aa}.btn{width:100%;min-height:58px;border:0;border-radius:16px;font:inherit;font-weight:900;font-size:17px;color:#07100b;background:linear-gradient(#75d976,#4aa94e);box-shadow:inset 0 -3px 0 #286b2b;touch-action:manipulation}.btn:active{transform:translateY(1px)}.btn[disabled]{opacity:.55;filter:saturate(.5)}.phantom{margin-top:10px;background:#ab9ff2;color:#171329;box-shadow:inset 0 -3px 0 #6f64ba}.status{min-height:54px;margin-top:14px;padding:12px;border-radius:13px;background:#07100b;border:1px solid #1d3024;color:var(--muted);font-size:13px;text-align:center;display:grid;place-items:center}.status.bad{color:#ffc1bb;border-color:#693b36;background:#1b0e0c}.status.good{color:#b8efb9;border-color:#2b6831}.fingerprint{margin-top:15px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:#607466;word-break:break-all}.hidden{display:none!important}
+</style>
+</head>
+<body>
+<main class="shell">
+<div class="mark">⚒</div>
+<div class="eyebrow">WRKMAN HOLDER ACCESS</div>
+<section class="card">
+<h1>Clock in.</h1>
+<p>This game is served only after the connected wallet proves ownership and passes a live Solana balance check.</p>
+<div class="threshold"><strong>1,000,000 $WRKMAN</strong><span>minimum wallet balance · Solana mainnet</span></div>
+<button id="enter" class="btn" type="button">CONNECT + VERIFY</button>
+<button id="phantom" class="btn phantom hidden" type="button">OPEN IN PHANTOM</button>
+<div id="status" class="status">No wallet connected.</div>
+<div class="fingerprint">HGm8qivg…VV1Fpump</div>
+</section>
+</main>
+<script>
+(()=>{
+'use strict';
+const enter=document.getElementById('enter'),openPhantom=document.getElementById('phantom'),status=document.getElementById('status');
+function setStatus(text,kind=''){status.textContent=text;status.className='status'+(kind?' '+kind:'');}
+function provider(){const p=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;return p&&p.isPhantom?p:null;}
+function b64(bytes){let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(s);}
+function phantomUrl(){const here=location.href.split('#')[0];return 'https://phantom.app/ul/browse/'+encodeURIComponent(here)+'?ref='+encodeURIComponent(location.origin);}
+async function verify(){
+ const p=provider();
+ if(!p){setStatus('Phantom is not available in this browser. Open this page inside Phantom.','bad');openPhantom.classList.remove('hidden');return;}
+ enter.disabled=true;openPhantom.classList.add('hidden');
+ try{
+  setStatus('Connecting wallet…');
+  const connected=await p.connect();
+  const wallet=(connected.publicKey||p.publicKey).toString();
+  const nonce=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now());
+  const issued=new Date().toISOString();
+  const message='WRKMAN HOLDER GATE\nWallet: '+wallet+'\nIssued: '+issued+'\nNonce: '+nonce+'\nOrigin: '+location.origin;
+  setStatus('Sign the ownership proof in Phantom. No transaction or network fee.');
+  const signed=await p.signMessage(new TextEncoder().encode(message),'utf8');
+  const sig=signed.signature||signed;
+  setStatus('Proof signed. Checking $WRKMAN on Solana mainnet…');
+  const res=await fetch('/api/wrkman-access',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({wallet,message,signature:b64(sig)})});
+  if(res.ok){const html=await res.text();setStatus('ACCESS GRANTED','good');document.open();document.write(html);document.close();return;}
+  let data={};try{data=await res.json()}catch(_){ }
+  if(res.status===403&&typeof data.balance!=='undefined')setStatus('LOCKED · '+Number(data.balance).toLocaleString()+' $WRKMAN found. Need 1,000,000.','bad');
+  else setStatus(data.error||'Verification failed. Try again.','bad');
+ }catch(err){const msg=err&&err.message?err.message:String(err);setStatus(msg.includes('User rejected')?'Signature cancelled.':msg,'bad');}
+ finally{enter.disabled=false;}
+}
+enter.addEventListener('click',verify);openPhantom.addEventListener('click',()=>location.href=phantomUrl());
+if(!provider())openPhantom.classList.remove('hidden');
+})();
+</script>
+</body>
+</html>
