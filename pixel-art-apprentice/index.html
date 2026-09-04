@@ -1,0 +1,1871 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101820">
+  <title>PIXEL//FORGE: 16×16</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #101820;
+      --panel: #18232e;
+      --panel-2: #22313f;
+      --line: #3d4d59;
+      --paper: #d9d2c5;
+      --paper-2: #efe9dc;
+      --gold: #f2c14e;
+      --green: #68aa74;
+      --red: #dc6a65;
+      --text: #f5f1e7;
+      --muted: #aeb8bf;
+      --board: min(88vw, 40dvh, 352px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--ink);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    button,
+    canvas,
+    .interactive {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      min-height: 44px;
+      padding: 0 12px;
+      background: var(--panel-2);
+      color: var(--text);
+      font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      letter-spacing: .045em;
+      touch-action: manipulation;
+    }
+
+    button:disabled { opacity: .38; }
+    button[aria-pressed="true"],
+    button.active { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+    button.primary { background: var(--gold); border-color: #ffd978; color: #211b0d; }
+    button.danger { color: #ffd0cb; border-color: #8d4a49; }
+
+    #app {
+      height: 100dvh;
+      min-height: 100svh;
+      max-width: 720px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-rows: auto auto auto minmax(0, 1fr) auto auto auto;
+      gap: 6px;
+      padding: max(8px, env(safe-area-inset-top)) 10px max(8px, env(safe-area-inset-bottom));
+      background:
+        radial-gradient(circle at 50% -20%, #2a3b47 0, transparent 48%),
+        var(--ink);
+    }
+
+    header {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .brand { min-width: 0; }
+    .brand strong { display: block; color: var(--gold); font-size: 17px; letter-spacing: .08em; }
+    .brand small { color: var(--muted); font-size: 9px; letter-spacing: .12em; }
+
+    .header-actions { display: flex; gap: 6px; }
+    .icon-btn { min-width: 44px; padding: 0 9px; font-size: 15px; }
+
+    .hud {
+      min-height: 42px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 7px 10px;
+      background: rgba(24, 35, 46, .94);
+    }
+
+    .hud-label { display: block; color: var(--muted); font-size: 9px; letter-spacing: .08em; }
+    #lessonName { display: block; margin-top: 2px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #budgetValue { color: var(--gold); font-size: 15px; text-align: right; }
+
+    .brief {
+      min-height: 58px;
+      border-left: 3px solid var(--gold);
+      border-radius: 4px 10px 10px 4px;
+      padding: 7px 9px;
+      background: var(--panel);
+    }
+
+    #briefText { margin: 0 0 6px; color: #edf0eb; font-size: 12px; line-height: 1.25; }
+    .checks { display: flex; flex-wrap: wrap; gap: 4px; }
+    .check {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 20px;
+      border: 1px solid #465662;
+      border-radius: 999px;
+      padding: 3px 7px;
+      color: #c5cdd2;
+      font-size: 9px;
+      line-height: 1;
+    }
+    .check::before { content: "◆"; color: #778590; font-size: 8px; }
+    .check.ok { border-color: #4f8060; color: #d9f1df; background: rgba(71, 126, 83, .18); }
+    .check.ok::before { color: var(--green); }
+
+    .workbench {
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 5px;
+    }
+
+    .board-wrap {
+      position: relative;
+      width: var(--board);
+      height: var(--board);
+      min-width: 208px;
+      min-height: 208px;
+      max-width: 352px;
+      max-height: 352px;
+      overflow: hidden;
+      border: 3px solid #53626c;
+      border-radius: 8px;
+      background: var(--paper);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, .24);
+    }
+
+    #gridCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .board-badge {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      z-index: 2;
+      pointer-events: none;
+      border-radius: 5px;
+      padding: 3px 5px;
+      background: rgba(16, 24, 32, .82);
+      color: #f6ead0;
+      font-size: 8px;
+      letter-spacing: .08em;
+    }
+
+    .stress-shelf {
+      width: min(88vw, 352px);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 54px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 5px 7px;
+      background: var(--panel);
+    }
+
+    .native-box {
+      display: grid;
+      grid-template-columns: 20px auto;
+      align-items: center;
+      gap: 5px;
+    }
+
+    #nativeCanvas {
+      width: 16px;
+      height: 16px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      outline: 1px solid #70808a;
+      background: var(--paper);
+    }
+
+    .tiny-label { color: var(--muted); font-size: 8px; line-height: 1.15; }
+    .tiny-label b { color: var(--text); font-size: 9px; }
+
+    .stress-canvases { display: flex; justify-content: center; gap: 6px; min-width: 0; }
+    .stress-canvases canvas {
+      width: 40px;
+      height: 40px;
+      border: 1px solid #697680;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    #benchmarkWrap { display: none; align-items: center; gap: 5px; }
+    #benchmarkWrap.show { display: flex; }
+    #benchmarkCanvas {
+      width: 40px;
+      height: 40px;
+      border: 1px solid #8f7741;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .tools {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 7px;
+      min-height: 48px;
+    }
+
+    .palette {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .swatch {
+      flex: 1 1 30px;
+      width: 38px;
+      min-width: 30px;
+      max-width: 42px;
+      height: 44px;
+      padding: 0;
+      border: 2px solid #4e5d68;
+      background: var(--swatch);
+    }
+    .swatch.active { border-color: #fff3c8; box-shadow: 0 0 0 2px var(--gold); }
+    .swatch.locked { opacity: .24; }
+
+    .tool-actions { display: flex; gap: 5px; }
+    .tool-actions button { min-width: 44px; padding: 0 7px; }
+
+    .actions {
+      display: grid;
+      grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr);
+      gap: 7px;
+      min-height: 50px;
+    }
+    .actions button { min-height: 50px; font-size: 12px; }
+
+    .progress {
+      min-height: 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    .progress-dot { width: 25px; height: 4px; border-radius: 99px; background: #3d4a55; }
+    .progress-dot.done { background: var(--green); }
+    .progress-dot.current { background: var(--gold); }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: end center;
+      padding: 12px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      background: rgba(7, 12, 17, .72);
+      backdrop-filter: blur(3px);
+    }
+    .overlay[hidden] { display: none; }
+
+    .sheet {
+      width: min(100%, 560px);
+      max-height: 88dvh;
+      overflow: auto;
+      border: 1px solid #53626e;
+      border-radius: 18px 18px 12px 12px;
+      padding: 18px;
+      background: #17222c;
+      box-shadow: 0 -12px 36px rgba(0, 0, 0, .36);
+      overscroll-behavior: contain;
+    }
+    .sheet h1,
+    .sheet h2 { margin: 0 0 8px; color: var(--gold); letter-spacing: .04em; }
+    .sheet h1 { font-size: 25px; }
+    .sheet h2 { font-size: 19px; }
+    .sheet p { margin: 8px 0; color: #d6dde0; font-size: 13px; line-height: 1.45; }
+    .sheet .kicker { color: var(--green); font-size: 10px; letter-spacing: .14em; }
+    .sheet-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 14px; }
+    .sheet-actions.two { grid-template-columns: 1fr 1fr; }
+    .sheet-actions button { min-height: 50px; }
+
+    .result-list,
+    .report-grid { display: grid; gap: 6px; margin-top: 10px; }
+    .result-row {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 8px;
+      align-items: start;
+      border-radius: 8px;
+      padding: 8px;
+      background: #202e39;
+      color: #d9dfe2;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+    .result-row.ok .mark { color: var(--green); }
+    .result-row.warn .mark { color: var(--gold); }
+    .result-row.bad .mark { color: var(--red); }
+
+    .critique-options { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
+    .critique-options button { min-height: 48px; }
+
+    #toast {
+      position: fixed;
+      z-index: 30;
+      left: 50%;
+      bottom: calc(74px + env(safe-area-inset-bottom));
+      width: min(calc(100% - 30px), 480px);
+      transform: translate(-50%, 14px);
+      border: 1px solid #7e6540;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #2b271f;
+      color: #f8e8c2;
+      font-size: 11px;
+      line-height: 1.3;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .16s ease, transform .16s ease;
+    }
+    #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    .status-line { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .status-pill { border: 1px solid #485864; border-radius: 999px; padding: 5px 8px; color: #bdc7cd; font-size: 9px; }
+
+    @media (orientation: landscape) and (max-height: 520px) {
+      :root { --board: min(52vh, 42vw, 292px); }
+      #app {
+        grid-template-columns: minmax(250px, 1fr) minmax(290px, 1fr);
+        grid-template-rows: auto auto auto 1fr auto auto;
+      }
+      header, .hud, .brief { grid-column: 1; }
+      .workbench { grid-column: 2; grid-row: 1 / 7; }
+      .tools, .actions, .progress { grid-column: 1; }
+      .stress-shelf { width: min(42vw, 352px); }
+    }
+
+    @media (max-height: 700px) and (orientation: portrait) {
+      :root { --board: min(78vw, 35dvh, 286px); }
+      #app { gap: 4px; }
+      .brief { min-height: 50px; }
+      #briefText { font-size: 10px; margin-bottom: 4px; }
+      .check { font-size: 8px; min-height: 18px; }
+      .stress-shelf { min-height: 48px; }
+      .stress-canvases canvas, #benchmarkCanvas { width: 34px; height: 34px; }
+    }
+
+    @media (max-width: 350px) {
+      .tools { grid-template-columns: 1fr; }
+      .tool-actions { width: 100%; }
+      .tool-actions button { flex: 1; }
+      .swatch { min-width: 38px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main id="app" aria-label="PIXEL FORGE 16 by 16 training game">
+    <header>
+      <div class="brand">
+        <strong>PIXEL//FORGE</strong>
+        <small>16×16 APPRENTICESHIP</small>
+      </div>
+      <div class="header-actions">
+        <button id="soundBtn" class="icon-btn" type="button" aria-label="Toggle sound">♪</button>
+        <button id="menuBtn" class="icon-btn" type="button" aria-label="Open field manual">?</button>
+      </div>
+    </header>
+
+    <section class="hud" aria-live="polite">
+      <div>
+        <span id="stageLabel" class="hud-label">SHIFT 1 / 5</span>
+        <strong id="lessonName">CUT THE SHADOW</strong>
+      </div>
+      <div>
+        <span id="budgetLabel" class="hud-label">EDITS</span>
+        <strong id="budgetValue">0 / 12</strong>
+      </div>
+    </section>
+
+    <section class="brief">
+      <p id="briefText">Carve air around the neck and between the legs. At 16×16, empty pixels do real work.</p>
+      <div id="checks" class="checks" aria-label="Live lesson checks"></div>
+    </section>
+
+    <section class="workbench">
+      <div class="board-wrap">
+        <span id="boardBadge" class="board-badge">ERASE</span>
+        <canvas id="gridCanvas" aria-label="Editable 16 by 16 pixel grid"></canvas>
+      </div>
+      <div class="stress-shelf" aria-label="Sprite stress views">
+        <div class="native-box">
+          <canvas id="nativeCanvas" width="16" height="16" aria-label="Actual size preview"></canvas>
+          <span class="tiny-label"><b>1×</b><br>truth</span>
+        </div>
+        <div class="stress-canvases">
+          <canvas id="lightCanvas" width="16" height="16" aria-label="Light background preview"></canvas>
+          <canvas id="darkCanvas" width="16" height="16" aria-label="Dark background preview"></canvas>
+          <canvas id="silhouetteCanvas" width="16" height="16" aria-label="Silhouette preview"></canvas>
+        </div>
+        <div id="benchmarkWrap">
+          <span class="tiny-label"><b>BEST</b><br>carry</span>
+          <canvas id="benchmarkCanvas" width="16" height="16" aria-label="Current carry pose benchmark"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="tools" aria-label="Pixel tools">
+      <div id="palette" class="palette"></div>
+      <div class="tool-actions">
+        <button id="eraseBtn" type="button" aria-label="Eraser">ERASE</button>
+        <button id="undoBtn" type="button" aria-label="Undo last stroke">UNDO</button>
+        <button id="resetBtn" class="danger" type="button" aria-label="Reset lesson">RESET</button>
+      </div>
+    </section>
+
+    <section class="actions">
+      <button id="viewBtn" type="button">BONES: OFF</button>
+      <button id="submitBtn" class="primary" type="button">STRIKE TEST</button>
+    </section>
+
+    <div id="progress" class="progress" aria-label="Apprenticeship progress"></div>
+  </main>
+
+  <div id="introOverlay" class="overlay">
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+      <span class="kicker">CLOCK IN. BUILD SOMETHING.</span>
+      <h1 id="introTitle">Every pixel is a decision.</h1>
+      <p>Four repair shifts teach why tiny sprites read—or fail. The fifth shift is yours: build a carrier stronger than our current benchmark.</p>
+      <p>No tracing. No mystery score. You will carve silhouettes, clean clusters, anchor limbs, test contrast, and critique your own work.</p>
+      <div class="sheet-actions">
+        <button id="startBtn" class="primary" type="button">CLOCK IN</button>
+        <button id="freshBtn" class="danger" type="button" hidden>ERASE SAVED RUN</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="resultOverlay" class="overlay" hidden>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <span id="resultKicker" class="kicker">CLEAN STRIKE</span>
+      <h2 id="resultTitle">The silhouette reads.</h2>
+      <p id="resultText"></p>
+      <div id="resultList" class="result-list"></div>
+      <div class="sheet-actions two">
+        <button id="replayBtn" type="button">REWORK</button>
+        <button id="nextBtn" class="primary" type="button">NEXT SHIFT</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="critiqueOverlay" class="overlay" hidden>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="critiqueTitle">
+      <span class="kicker">FORGE REPORT</span>
+      <h2 id="critiqueTitle">The machine can inspect. You must judge.</h2>
+      <p>These checks expose structure; they do not decide whether your art is good. Read the sprite at 1×, then choose what you would improve next.</p>
+      <div id="reportGrid" class="report-grid"></div>
+      <div id="critiqueOptions" class="critique-options">
+        <button type="button" data-critique="silhouette">SILHOUETTE</button>
+        <button type="button" data-critique="skeleton">SKELETON</button>
+        <button type="button" data-critique="clusters">CLUSTERS</button>
+        <button type="button" data-critique="contrast">CONTRAST</button>
+      </div>
+      <div class="sheet-actions two">
+        <button id="backToForgeBtn" type="button">KEEP WORKING</button>
+        <button id="finishBtn" class="primary" type="button" disabled>STAMP IT</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="completeOverlay" class="overlay" hidden>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="completeTitle">
+      <span class="kicker">FIRST SHIFT COMPLETE</span>
+      <h2 id="completeTitle">You made the decisions.</h2>
+      <p id="completeText"></p>
+      <div class="sheet-actions two">
+        <button id="refineBtn" type="button">REFINE SPRITE</button>
+        <button id="exportBtn" class="primary" type="button">EXPORT PNG</button>
+      </div>
+      <div class="sheet-actions">
+        <button id="restartBtn" class="danger" type="button">RESTART APPRENTICESHIP</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="menuOverlay" class="overlay" hidden>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+      <span class="kicker">FIELD MANUAL</span>
+      <h2 id="menuTitle">Read the sprite, not the zoom.</h2>
+      <p><b>Silhouette:</b> the outer shape and negative space must carry the action before detail arrives.</p>
+      <p><b>Clusters:</b> pixels work in deliberate groups. Dust and accidental single pixels weaken form.</p>
+      <p><b>Skeleton:</b> exaggeration still needs believable shoulders, hips, and weight. Arms do not grow from the head.</p>
+      <p><b>Contrast:</b> an outline only exists if it separates from the background where it will be seen.</p>
+      <p><b>1× truth:</b> the large grid is for editing. The tiny preview is where readability is judged.</p>
+      <div class="status-line">
+        <span id="saveStatus" class="status-pill">SAVE: READY</span>
+        <span id="audioStatus" class="status-pill">AUDIO: LOCKED</span>
+        <span id="lifeStatus" class="status-pill">APP: ACTIVE</span>
+      </div>
+      <div class="sheet-actions">
+        <button id="closeMenuBtn" class="primary" type="button">BACK TO BENCH</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    const SIZE = 16;
+    const CELL_COUNT = SIZE * SIZE;
+    const STORAGE_KEY = 'pixel-forge-apprentice.v1';
+    const SCHEMA_VERSION = 1;
+    const DEBUG = new URLSearchParams(location.search).has('debug');
+
+    const COLORS = [
+      { name: 'INK', hex: '#202b38' },
+      { name: 'GOLD', hex: '#d6a24e' },
+      { name: 'GREEN', hex: '#4f785d' },
+      { name: 'SKIN', hex: '#efc79f' },
+      { name: 'LEATHER', hex: '#9f6345' },
+      { name: 'LIGHT', hex: '#f2e4af' }
+    ];
+
+    const BACKGROUNDS = {
+      neutral: '#d9d2c5',
+      light: '#eee8db',
+      dark: '#293746',
+      silhouette: '#c8c1b5'
+    };
+
+    const $ = id => document.getElementById(id);
+    const idx = (x, y) => y * SIZE + x;
+    const inside = (x, y) => x >= 0 && y >= 0 && x < SIZE && y < SIZE;
+    const countFilled = grid => grid.reduce((n, value) => n + (value >= 0 ? 1 : 0), 0);
+
+    function parseRows(rows) {
+      if (!Array.isArray(rows) || rows.length !== SIZE) throw new Error('A sprite seed must have 16 rows.');
+      const grid = [];
+      rows.forEach((row, y) => {
+        if (row.length !== SIZE) throw new Error(`Seed row ${y} has ${row.length} cells instead of 16.`);
+        [...row].forEach(char => {
+          if (char === '.') grid.push(-1);
+          else {
+            const value = Number(char);
+            if (!Number.isInteger(value) || value < 0 || value >= COLORS.length) throw new Error(`Invalid palette index ${char}.`);
+            grid.push(value);
+          }
+        });
+      });
+      return grid;
+    }
+
+    function withPixels(base, points) {
+      const grid = base.slice();
+      points.forEach(([x, y, color = 0]) => { grid[idx(x, y)] = color; });
+      return grid;
+    }
+
+    const BODY_SEED = parseRows([
+      '................',
+      '......0000......',
+      '.....033330.....',
+      '.....033330.....',
+      '......00........',
+      '....000000......',
+      '...00222200.....',
+      '...00222200.....',
+      '....022220......',
+      '....022220......',
+      '....000000......',
+      '....00..00......',
+      '...00....00.....',
+      '..000....000....',
+      '................',
+      '................'
+    ]);
+
+    const SILHOUETTE_SEED = parseRows([
+      '................',
+      '................',
+      '......0000......',
+      '......0000......',
+      '......0000......',
+      '.....000000.....',
+      '....00000000....',
+      '....00000000....',
+      '.....000000.....',
+      '.....000000.....',
+      '.....000000.....',
+      '.....000000.....',
+      '.....000000.....',
+      '.....000000.....',
+      '....00000000....',
+      '................'
+    ]);
+
+    const CLUSTER_SEED = withPixels(BODY_SEED, [
+      [13, 5, 0], [14, 5, 0], [14, 6, 0], [14, 7, 0], [13, 7, 0],
+      [1, 3, 1], [12, 10, 1], [2, 12, 2], [14, 13, 3]
+    ]);
+
+    const SKELETON_SEED = withPixels(parseRows([
+      '................',
+      '................',
+      '......0000......',
+      '.....033330.....',
+      '.....033330.....',
+      '.......00.......',
+      '.....002200.....',
+      '.....022220.....',
+      '.....022220.....',
+      '.....000000.....',
+      '......0..0......',
+      '.....00..00.....',
+      '....00....00....',
+      '...00......00...',
+      '................',
+      '................'
+    ]), [
+      [4, 3, 0], [3, 2, 0], [2, 1, 0],
+      [11, 3, 0], [12, 2, 0], [13, 1, 0]
+    ]);
+
+    const CONTRAST_SEED = BODY_SEED.slice();
+
+    const BENCHMARK = parseRows([
+      '.........00000..',
+      '.........04440..',
+      '.........04440..',
+      '.....00..00000..',
+      '....0330..00....',
+      '....0330.00.....',
+      '...0111100......',
+      '..01122110......',
+      '..01122110......',
+      '...111110.......',
+      '..0011110.......',
+      '.00.01100.......',
+      '00..0110........',
+      '....0110........',
+      '....00.00.......',
+      '...00...00......'
+    ]);
+
+    const badArmPoints = [[4, 3], [3, 2], [2, 1], [11, 3], [12, 2], [13, 1]];
+    const boneAnchors = [[5, 6], [10, 6], [6, 10], [9, 10]];
+
+    function connectedComponents(grid) {
+      const seen = new Uint8Array(CELL_COUNT);
+      const components = [];
+      for (let start = 0; start < CELL_COUNT; start++) {
+        if (seen[start] || grid[start] < 0) continue;
+        const cells = [];
+        const queue = [start];
+        seen[start] = 1;
+        while (queue.length) {
+          const current = queue.shift();
+          cells.push(current);
+          const x = current % SIZE;
+          const y = Math.floor(current / SIZE);
+          [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].forEach(([nx, ny]) => {
+            if (!inside(nx, ny)) return;
+            const ni = idx(nx, ny);
+            if (!seen[ni] && grid[ni] >= 0) {
+              seen[ni] = 1;
+              queue.push(ni);
+            }
+          });
+        }
+        components.push(cells);
+      }
+      return components.sort((a, b) => b.length - a.length);
+    }
+
+    function boundaryCells(grid) {
+      const result = [];
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const value = grid[idx(x, y)];
+          if (value !== 0 && value !== 5) continue;
+          const exposed = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]
+            .some(([nx, ny]) => !inside(nx, ny) || grid[idx(nx, ny)] < 0);
+          if (exposed) result.push({ x, y, value });
+        }
+      }
+      return result;
+    }
+
+    function luminance(hex) {
+      const rgb = [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16) / 255)
+        .map(value => value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+    }
+
+    function contrastRatio(a, b) {
+      const la = luminance(a);
+      const lb = luminance(b);
+      return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+
+    function contrastStats(grid) {
+      const edges = boundaryCells(grid);
+      const sides = { left: [], right: [] };
+      edges.forEach(cell => {
+        const bg = cell.x < 8 ? BACKGROUNDS.light : BACKGROUNDS.dark;
+        sides[cell.x < 8 ? 'left' : 'right'].push(contrastRatio(COLORS[cell.value].hex, bg));
+      });
+      const passRate = values => values.length ? values.filter(value => value >= 2.35).length / values.length : 0;
+      return {
+        left: passRate(sides.left),
+        right: passRate(sides.right),
+        edgeCount: edges.length,
+        tones: new Set(edges.map(cell => cell.value)).size
+      };
+    }
+
+    function filledIn(grid, points) {
+      return points.filter(([x, y]) => grid[idx(x, y)] >= 0).length;
+    }
+
+    function hasPath(grid, starts, target) {
+      const seen = new Uint8Array(CELL_COUNT);
+      const queue = [];
+      starts.forEach(([x, y]) => {
+        if (inside(x, y) && grid[idx(x, y)] >= 0) {
+          seen[idx(x, y)] = 1;
+          queue.push([x, y]);
+        }
+      });
+      while (queue.length) {
+        const [x, y] = queue.shift();
+        if (target(x, y)) return true;
+        [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].forEach(([nx, ny]) => {
+          if (!inside(nx, ny)) return;
+          const ni = idx(nx, ny);
+          if (!seen[ni] && grid[ni] >= 0) {
+            seen[ni] = 1;
+            queue.push([nx, ny]);
+          }
+        });
+      }
+      return false;
+    }
+
+    function boundingBox(grid) {
+      const xs = [];
+      const ys = [];
+      grid.forEach((value, i) => {
+        if (value >= 0) {
+          xs.push(i % SIZE);
+          ys.push(Math.floor(i / SIZE));
+        }
+      });
+      if (!xs.length) return null;
+      return {
+        minX: Math.min(...xs), maxX: Math.max(...xs),
+        minY: Math.min(...ys), maxY: Math.max(...ys),
+        width: Math.max(...xs) - Math.min(...xs) + 1,
+        height: Math.max(...ys) - Math.min(...ys) + 1
+      };
+    }
+
+    function silhouetteEvaluation(grid) {
+      const neckPoints = [[5, 5], [6, 5], [9, 5], [10, 5]];
+      const legPoints = [];
+      for (let y = 12; y <= 14; y++) for (let x = 7; x <= 8; x++) legPoints.push([x, y]);
+      const components = connectedComponents(grid);
+      const checks = [
+        { label: 'neck air', ok: filledIn(grid, neckPoints) <= 1, hint: 'Leave only a narrow neck; erase the pixels crowding both sides below the head.' },
+        { label: 'leg gap', ok: filledIn(grid, legPoints) <= 1, hint: 'Cut a vertical seam of empty pixels between the legs and through the feet.' },
+        { label: 'one body', ok: components.length === 1 && (components[0]?.length || 0) >= 45, hint: 'Keep the main mass connected. Negative space separates forms without chopping the body apart.' }
+      ];
+      return { pass: checks.every(check => check.ok), checks };
+    }
+
+    function clusterEvaluation(grid) {
+      const components = connectedComponents(grid);
+      const tiny = components.filter(component => component.length < 3);
+      const substantial = components.filter(component => component.length >= 3);
+      const hammer = substantial.some(component => component.some(i => i % SIZE >= 13 && Math.floor(i / SIZE) >= 4 && Math.floor(i / SIZE) <= 8));
+      const checks = [
+        { label: 'no pixel dust', ok: tiny.length === 0, hint: `${tiny.length} tiny orphan cluster${tiny.length === 1 ? '' : 's'} remain. Erase one, or deliberately connect it.` },
+        { label: 'two clear masses', ok: substantial.length === 2, hint: 'The worker and hammer should be the only two deliberate masses.' },
+        { label: 'hammer survives', ok: hammer, hint: 'Do not clean away the hammer. Preserve the small but deliberate cluster at the right.' }
+      ];
+      return { pass: checks.every(check => check.ok), checks };
+    }
+
+    function skeletonEvaluation(grid) {
+      const badCount = filledIn(grid, badArmPoints);
+      const shoulderRoot = grid[idx(11, 6)] >= 0;
+      const path = hasPath(grid, [[10, 6]], (x, y) => x >= 13 && y >= 3 && y <= 7);
+      const neckClear = grid[idx(6, 5)] < 0 && grid[idx(9, 5)] < 0;
+      const bodyHeld = filledIn(grid, [[6, 2], [7, 2], [8, 2], [9, 2], [6, 10], [9, 10], [5, 11], [10, 11]]) >= 7;
+      const checks = [
+        { label: 'head is one head', ok: badCount === 0, hint: `${badCount} antenna-like arm pixel${badCount === 1 ? '' : 's'} still touch the head.` },
+        { label: 'arm starts at shoulder', ok: shoulderRoot && path, hint: 'Start at the right yellow shoulder, then build a connected arm toward the upper-right.' },
+        { label: 'neck + weight hold', ok: neckClear && bodyHeld, hint: 'Keep air beside the neck and preserve the hips/feet carrying the pose.' }
+      ];
+      return { pass: checks.every(check => check.ok), checks };
+    }
+
+    function contrastEvaluation(grid) {
+      const stats = contrastStats(grid);
+      const checks = [
+        { label: 'light-side edge', ok: stats.left >= 0.8, hint: 'On the light half, keep most exposed edge pixels dark.' },
+        { label: 'dark-side edge', ok: stats.right >= 0.72, hint: 'On the dark half, repaint exposed outline pixels with LIGHT.' },
+        { label: 'selective outline', ok: stats.tones >= 2, hint: 'Use both dark and light outline tones. One outline value cannot serve every background.' }
+      ];
+      return { pass: checks.every(check => check.ok), checks, stats };
+    }
+
+    function finalMassEvaluation(grid) {
+      const count = countFilled(grid);
+      const box = boundingBox(grid);
+      const components = connectedComponents(grid);
+      const dominant = count ? (components[0]?.length || 0) / count : 0;
+      const headZone = [];
+      const bodyZone = [];
+      const crateZone = [];
+      const footZone = [];
+      for (let y = 2; y <= 5; y++) for (let x = 3; x <= 9; x++) headZone.push([x, y]);
+      for (let y = 6; y <= 11; y++) for (let x = 2; x <= 10; x++) bodyZone.push([x, y]);
+      for (let y = 1; y <= 7; y++) for (let x = 9; x <= 15; x++) crateZone.push([x, y]);
+      for (let y = 12; y <= 15; y++) for (let x = 1; x <= 11; x++) footZone.push([x, y]);
+      const checks = [
+        { label: 'enough mass', ok: count >= 35 && count <= 96, hint: `Use 35–96 pixels for the first silhouette. Current mass: ${count}.` },
+        { label: 'action fills frame', ok: !!box && box.width >= 9 && box.height >= 11, hint: 'Push the carrier across at least 9 columns and 11 rows. Exaggeration buys readability.' },
+        { label: 'carrier structure', ok: filledIn(grid, headZone) >= 4 && filledIn(grid, bodyZone) >= 12 && filledIn(grid, crateZone) >= 8 && filledIn(grid, footZone) >= 4, hint: 'The guide expects a head, load, torso/arms, and grounded feet in their broad zones.' },
+        { label: 'deliberate masses', ok: dominant >= 0.72 && !components.some(component => component.length === 1), hint: 'Join or erase pixel dust. Most of the carrier should read as one deliberate mass.' }
+      ];
+      return { pass: checks.every(check => check.ok), checks };
+    }
+
+    function finalReport(grid) {
+      const count = countFilled(grid);
+      const components = connectedComponents(grid);
+      const box = boundingBox(grid);
+      const usedColors = new Set(grid.filter(value => value >= 0));
+      const dust = components.filter(component => component.length === 1).length;
+      const bottomGap = (() => {
+        if (!box) return false;
+        const center = Math.round((box.minX + box.maxX) / 2);
+        let empty = 0;
+        for (let y = Math.max(10, box.maxY - 3); y <= box.maxY; y++) {
+          if (grid[idx(Math.max(0, Math.min(15, center)), y)] < 0) empty++;
+        }
+        return empty >= 2;
+      })();
+      const edgeOnLight = boundaryCells(grid).filter(cell => contrastRatio(COLORS[cell.value].hex, BACKGROUNDS.light) >= 2.35).length;
+      const edges = boundaryCells(grid).length;
+      return [
+        { label: 'Silhouette', level: box && box.width >= 9 && box.height >= 11 && bottomGap ? 'ok' : 'warn', text: box ? `${box.width}×${box.height} occupied; ${bottomGap ? 'leg negative space survives' : 'leg separation deserves another look'}.` : 'No silhouette yet.' },
+        { label: 'Skeleton', level: filledIn(grid, [[5, 6], [6, 6], [9, 6], [10, 6]]) >= 2 ? 'ok' : 'warn', text: 'Compare the arm roots to the shoulder guide, then judge the weight at 1×.' },
+        { label: 'Clusters', level: dust === 0 ? 'ok' : 'warn', text: `${components.length} connected mass${components.length === 1 ? '' : 'es'}; ${dust} single-pixel dust cluster${dust === 1 ? '' : 's'}.` },
+        { label: 'Palette', level: usedColors.size >= 2 && usedColors.size <= 5 ? 'ok' : 'warn', text: `${usedColors.size} color${usedColors.size === 1 ? '' : 's'} used. Let each color describe a form, not merely fill space.` },
+        { label: 'Contrast', level: edges && edgeOnLight / edges >= 0.65 ? 'ok' : 'warn', text: edges ? `${Math.round(edgeOnLight / edges * 100)}% of dark/light outline edges survive the light stress field.` : 'No exposed outline pixels found.' },
+        { label: 'Pixel budget', level: count >= 35 && count <= 96 ? 'ok' : 'warn', text: `${count}/96 filled pixels. Every extra pixel must earn its keep.` }
+      ];
+    }
+
+    const LEVELS = [
+      {
+        id: 'silhouette', name: 'CUT THE SHADOW', brief: 'Carve air around the neck and between the legs. At 16×16, empty pixels do real work.',
+        seed: SILHOUETTE_SEED, allowed: [0], startTool: 'erase', budget: 12, par: 8, evaluate: silhouetteEvaluation,
+        resultTitle: 'The body stopped being a blob.',
+        resultText: 'You did not add detail. You made the head, torso, and legs readable by deciding where pixels should not exist.'
+      },
+      {
+        id: 'clusters', name: 'KILL THE DUST', brief: 'Keep the worker and hammer. Erase stray pixels—or connect them only when they strengthen a deliberate mass.',
+        seed: CLUSTER_SEED, allowed: [0, 1, 2, 3], startTool: 'erase', budget: 8, par: 4, evaluate: clusterEvaluation,
+        resultTitle: 'The clusters now look intentional.',
+        resultText: 'A tiny sprite is read as groups of pixels. The hammer may be detached; the dust may not pretend it belongs.'
+      },
+      {
+        id: 'skeleton', name: 'MOVE THE SHOULDERS', brief: 'This reach grew from the head. Remove the antenna limbs, then rebuild one arm from the right shoulder marker.',
+        seed: SKELETON_SEED, allowed: [0], startTool: 'erase', budget: 14, par: 11, evaluate: skeletonEvaluation, guide: true,
+        resultTitle: 'One head. One anchored reach.',
+        resultText: 'Exaggeration survived because the limb still obeys a believable skeleton. The shoulder, not the skull, now owns the arm.'
+      },
+      {
+        id: 'contrast', name: 'EDGE UNDER PRESSURE', brief: 'The canvas is split: light on the left, dark on the right. Repaint exposed right-side outline pixels with LIGHT.',
+        seed: CONTRAST_SEED, allowed: [0, 5], startTool: 'paint', startColor: 5, budget: 24, par: 18, evaluate: contrastEvaluation, splitBackground: true,
+        resultTitle: 'The edge survives its background.',
+        resultText: 'The outline is not a sacred black border. Its job is separation, so its value changes when the background changes.'
+      },
+      {
+        id: 'final', name: 'OUTBUILD THE BENCHMARK', brief: 'Forge a worker carrying a crate. Start in INK, lock the mass at 1×, then use color to describe form.',
+        seed: new Array(CELL_COUNT).fill(-1), allowed: [0, 1, 2, 3, 4, 5], startTool: 'paint', startColor: 0, pixelLimit: 96, evaluate: finalMassEvaluation, guide: true, final: true
+      }
+    ];
+
+    function defaultDurable() {
+      return {
+        version: SCHEMA_VERSION,
+        currentLevel: 0,
+        completed: [false, false, false, false, false],
+        rivets: [0, 0, 0, 0],
+        levelPixels: LEVELS[0].seed.slice(),
+        editsUsed: 0,
+        finalPhase: 'mass',
+        finalCritique: '',
+        sound: true
+      };
+    }
+
+    function validGrid(value) {
+      return Array.isArray(value) && value.length === CELL_COUNT && value.every(pixel => Number.isInteger(pixel) && pixel >= -1 && pixel < COLORS.length);
+    }
+
+    function validateDurable(value) {
+      if (!value || value.version !== SCHEMA_VERSION) return null;
+      if (!Number.isInteger(value.currentLevel) || value.currentLevel < 0 || value.currentLevel >= LEVELS.length) return null;
+      if (!validGrid(value.levelPixels)) return null;
+      const clean = defaultDurable();
+      clean.currentLevel = value.currentLevel;
+      clean.completed = Array.isArray(value.completed) && value.completed.length === 5 ? value.completed.map(Boolean) : clean.completed;
+      clean.rivets = Array.isArray(value.rivets) && value.rivets.length === 4 ? value.rivets.map(v => Math.max(0, Math.min(3, Number(v) || 0))) : clean.rivets;
+      clean.levelPixels = value.levelPixels.slice();
+      clean.editsUsed = Math.max(0, Number(value.editsUsed) || 0);
+      clean.finalPhase = value.finalPhase === 'color' ? 'color' : 'mass';
+      clean.finalCritique = ['silhouette', 'skeleton', 'clusters', 'contrast'].includes(value.finalCritique) ? value.finalCritique : '';
+      clean.sound = value.sound !== false;
+      return clean;
+    }
+
+    const StorageOwner = {
+      status: 'ready',
+      dirty: false,
+      load() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return null;
+          const parsed = validateDurable(JSON.parse(raw));
+          if (!parsed) {
+            this.status = 'recovered';
+            return null;
+          }
+          return parsed;
+        } catch (error) {
+          this.status = 'failed';
+          return null;
+        }
+      },
+      mark() { this.dirty = true; },
+      flush() {
+        if (!this.dirty) return;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state.durable));
+          this.dirty = false;
+          this.status = 'ready';
+        } catch (error) {
+          this.status = 'failed';
+        }
+      },
+      clear() {
+        try { localStorage.removeItem(STORAGE_KEY); this.status = 'ready'; }
+        catch (error) { this.status = 'failed'; }
+      }
+    };
+
+    const loaded = StorageOwner.load();
+    const state = {
+      durable: loaded || defaultDurable(),
+      ui: {
+        scene: 'intro',
+        tool: 'paint',
+        color: 0,
+        guide: false,
+        pointerId: null,
+        lastCell: null,
+        stroke: null,
+        history: [],
+        toast: '',
+        toastUntil: 0,
+        resetArmedUntil: 0,
+        result: null,
+        report: [],
+        menuOpen: false,
+        renderDirty: true
+      },
+      runtime: {
+        inputQueue: [],
+        lifecycle: document.hidden ? 'hidden' : 'active',
+        frameDiscontinuous: false,
+        lastFrame: performance.now(),
+        revision: 0,
+        timedVisualActive: false
+      }
+    };
+
+    class AudioOwner {
+      constructor() {
+        this.context = null;
+        this.master = null;
+        this.queue = [];
+        this.status = 'locked';
+      }
+      async unlock() {
+        if (!state.durable.sound) return;
+        try {
+          if (!this.context) {
+            const Context = window.AudioContext || window.webkitAudioContext;
+            if (!Context) {
+              this.status = 'failed';
+              enqueue({ type: 'audioStatus' });
+              return;
+            }
+            this.context = new Context();
+            this.master = this.context.createGain();
+            this.master.gain.value = 0.18;
+            this.master.connect(this.context.destination);
+          }
+          if (this.context.state !== 'running') await this.context.resume();
+          this.status = this.context.state === 'running' ? 'ready' : 'suspended';
+          enqueue({ type: 'audioStatus' });
+        } catch (error) {
+          this.status = 'failed';
+          enqueue({ type: 'audioStatus' });
+        }
+      }
+      request(name) {
+        if (state.durable.sound) this.queue.push(name);
+        if (this.queue.length > 12) this.queue.splice(0, this.queue.length - 12);
+      }
+      process() {
+        if (!this.queue.length || this.status !== 'ready' || !this.context || !this.master) return;
+        const requests = this.queue.splice(0, this.queue.length);
+        requests.forEach(name => this.play(name));
+      }
+      play(name) {
+        const patterns = {
+          tick: [[480, .025, 'square', 0]],
+          edit: [[210, .035, 'triangle', 0]],
+          invalid: [[120, .09, 'sawtooth', 0]],
+          pass: [[420, .06, 'square', 0], [630, .08, 'triangle', .07], [840, .11, 'triangle', .15]],
+          fail: [[180, .08, 'square', 0], [125, .12, 'square', .08]],
+          stamp: [[260, .045, 'square', 0], [520, .12, 'triangle', .055]]
+        };
+        const now = this.context.currentTime;
+        (patterns[name] || patterns.tick).forEach(([frequency, duration, type, delay]) => {
+          const oscillator = this.context.createOscillator();
+          const gain = this.context.createGain();
+          oscillator.type = type;
+          oscillator.frequency.setValueAtTime(frequency, now + delay);
+          gain.gain.setValueAtTime(.0001, now + delay);
+          gain.gain.exponentialRampToValueAtTime(.65, now + delay + .006);
+          gain.gain.exponentialRampToValueAtTime(.0001, now + delay + duration);
+          oscillator.connect(gain);
+          gain.connect(this.master);
+          oscillator.start(now + delay);
+          oscillator.stop(now + delay + duration + .01);
+        });
+      }
+      noteHidden(hidden) {
+        if (hidden && this.context?.state === 'running') this.status = 'suspended';
+        else if (!hidden && this.context) this.status = this.context.state === 'running' ? 'ready' : 'suspended';
+      }
+    }
+
+    const audio = new AudioOwner();
+
+    function currentLevel() { return LEVELS[state.durable.currentLevel]; }
+
+    function markChanged() {
+      state.runtime.revision++;
+      state.ui.renderDirty = true;
+      StorageOwner.mark();
+    }
+
+    function enqueue(event) {
+      const queue = state.runtime.inputQueue;
+      if (event.type === 'pointerMove') {
+        for (let i = queue.length - 1; i >= 0; i--) {
+          if (queue[i].type === 'pointerMove' && queue[i].pointerId === event.pointerId) {
+            queue[i] = event;
+            return;
+          }
+          if (queue[i].type === 'pointerStart' || queue[i].type === 'pointerEnd') break;
+        }
+      }
+      queue.push(event);
+      if (queue.length > 96) {
+        const motion = queue.findIndex(item => item.type === 'pointerMove');
+        if (motion >= 0) queue.splice(motion, 1);
+        else queue.shift();
+        if (!queue.some(item => item.type === 'overload')) queue.push({ type: 'overload' });
+      }
+    }
+
+    function showToast(message, duration = 1700) {
+      state.ui.toast = message;
+      state.ui.toastUntil = performance.now() + duration;
+      state.ui.renderDirty = true;
+    }
+
+    function cellFromPointer(event) {
+      const rect = $('gridCanvas').getBoundingClientRect();
+      const x = Math.floor((event.clientX - rect.left) / rect.width * SIZE);
+      const y = Math.floor((event.clientY - rect.top) / rect.height * SIZE);
+      return inside(x, y) ? { x, y } : null;
+    }
+
+    function lineCells(from, to) {
+      const cells = [];
+      let x0 = from.x;
+      let y0 = from.y;
+      const x1 = to.x;
+      const y1 = to.y;
+      const dx = Math.abs(x1 - x0);
+      const sx = x0 < x1 ? 1 : -1;
+      const dy = -Math.abs(y1 - y0);
+      const sy = y0 < y1 ? 1 : -1;
+      let error = dx + dy;
+      while (true) {
+        cells.push({ x: x0, y: y0 });
+        if (x0 === x1 && y0 === y1) break;
+        const twice = 2 * error;
+        if (twice >= dy) { error += dy; x0 += sx; }
+        if (twice <= dx) { error += dx; y0 += sy; }
+      }
+      return cells;
+    }
+
+    function strokeEffectiveChanges(stroke = state.ui.stroke) {
+      if (!stroke) return [];
+      const result = [];
+      stroke.original.forEach((oldValue, cellIndex) => {
+        const newValue = state.durable.levelPixels[cellIndex];
+        if (newValue !== oldValue) result.push({ index: cellIndex, oldValue, newValue });
+      });
+      return result;
+    }
+
+    function beginStroke(pointerId, cell) {
+      if (state.ui.pointerId !== null) return;
+      state.ui.pointerId = pointerId;
+      state.ui.lastCell = cell;
+      state.ui.stroke = { original: new Map() };
+      applyCell(cell.x, cell.y);
+    }
+
+    function applyCell(x, y) {
+      const level = currentLevel();
+      const cellIndex = idx(x, y);
+      const oldValue = state.durable.levelPixels[cellIndex];
+      const newValue = state.ui.tool === 'erase' ? -1 : state.ui.color;
+      if (oldValue === newValue) return;
+
+      if (level.final && state.durable.finalPhase === 'mass' && newValue > 0) {
+        showToast('MASS FIRST — INK is the only material until the silhouette locks.');
+        audio.request('invalid');
+        return;
+      }
+
+      if (level.final && oldValue < 0 && newValue >= 0 && countFilled(state.durable.levelPixels) >= level.pixelLimit) {
+        showToast('96 PIXELS — trade one out before adding another.');
+        audio.request('invalid');
+        return;
+      }
+
+      const stroke = state.ui.stroke;
+      if (!stroke.original.has(cellIndex)) stroke.original.set(cellIndex, oldValue);
+      state.durable.levelPixels[cellIndex] = newValue;
+
+      if (!level.final) {
+        const projected = state.durable.editsUsed + strokeEffectiveChanges(stroke).length;
+        if (projected > level.budget) {
+          state.durable.levelPixels[cellIndex] = oldValue;
+          if (stroke.original.get(cellIndex) === oldValue) stroke.original.delete(cellIndex);
+          showToast('EDIT BUDGET SPENT — undo or reset, then make a sharper choice.');
+          audio.request('invalid');
+          return;
+        }
+      }
+      state.ui.renderDirty = true;
+    }
+
+    function moveStroke(pointerId, cell) {
+      if (state.ui.pointerId !== pointerId || !state.ui.lastCell) return;
+      if (cell.x === state.ui.lastCell.x && cell.y === state.ui.lastCell.y) return;
+      lineCells(state.ui.lastCell, cell).slice(1).forEach(point => applyCell(point.x, point.y));
+      state.ui.lastCell = cell;
+    }
+
+    function endStroke(pointerId, cancelled = false) {
+      if (state.ui.pointerId !== pointerId) return;
+      const changes = strokeEffectiveChanges();
+      if (changes.length) {
+        state.ui.history.push(changes);
+        if (state.ui.history.length > 40) state.ui.history.shift();
+        if (!currentLevel().final) state.durable.editsUsed += changes.length;
+        markChanged();
+        audio.request(cancelled ? 'invalid' : 'edit');
+      }
+      state.ui.pointerId = null;
+      state.ui.lastCell = null;
+      state.ui.stroke = null;
+    }
+
+    function undo() {
+      if (state.ui.pointerId !== null) endStroke(state.ui.pointerId, true);
+      const changes = state.ui.history.pop();
+      if (!changes) { showToast('NOTHING TO UNDO.'); return; }
+      changes.forEach(change => { state.durable.levelPixels[change.index] = change.oldValue; });
+      if (!currentLevel().final) state.durable.editsUsed = Math.max(0, state.durable.editsUsed - changes.length);
+      markChanged();
+      audio.request('tick');
+    }
+
+    function resetLevel(force = false) {
+      const now = performance.now();
+      if (!force && now > state.ui.resetArmedUntil) {
+        state.ui.resetArmedUntil = now + 1800;
+        showToast('TAP RESET AGAIN TO SCRAP THIS VERSION.');
+        state.ui.renderDirty = true;
+        return;
+      }
+      const level = currentLevel();
+      state.durable.levelPixels = level.seed.slice();
+      state.durable.editsUsed = 0;
+      if (level.final) {
+        state.durable.finalPhase = 'mass';
+        state.durable.finalCritique = '';
+      }
+      state.ui.history = [];
+      state.ui.resetArmedUntil = 0;
+      state.ui.tool = level.startTool || 'paint';
+      state.ui.color = level.startColor ?? level.allowed[0];
+      state.ui.guide = !!level.guide;
+      markChanged();
+      audio.request('tick');
+    }
+
+    function loadLevel(levelIndex, useSaved = false) {
+      const level = LEVELS[levelIndex];
+      state.durable.currentLevel = levelIndex;
+      if (!useSaved || !validGrid(state.durable.levelPixels)) {
+        state.durable.levelPixels = level.seed.slice();
+        state.durable.editsUsed = 0;
+      }
+      if (level.final && !['mass', 'color'].includes(state.durable.finalPhase)) state.durable.finalPhase = 'mass';
+      state.ui.tool = level.startTool || 'paint';
+      state.ui.color = level.startColor ?? level.allowed[0];
+      state.ui.guide = !!level.guide;
+      state.ui.history = [];
+      state.ui.result = null;
+      state.ui.scene = 'play';
+      markChanged();
+    }
+
+    function rivetsFor(level) {
+      if (state.durable.editsUsed <= level.par) return 3;
+      if (state.durable.editsUsed <= level.par + 2) return 2;
+      return 1;
+    }
+
+    function submitLevel() {
+      if (state.ui.pointerId !== null) endStroke(state.ui.pointerId);
+      const level = currentLevel();
+      if (level.final) {
+        if (state.durable.finalPhase === 'mass') {
+          const result = level.evaluate(state.durable.levelPixels);
+          if (!result.pass) {
+            const first = result.checks.find(check => !check.ok);
+            showToast(first?.hint || 'The silhouette is not holding yet.', 2600);
+            audio.request('fail');
+            state.ui.renderDirty = true;
+            return;
+          }
+          state.durable.finalPhase = 'color';
+          state.ui.color = 2;
+          state.ui.tool = 'paint';
+          markChanged();
+          showToast('MASS LOCKED — now make color describe the forms.', 2500);
+          audio.request('pass');
+          return;
+        }
+        state.ui.report = finalReport(state.durable.levelPixels);
+        state.ui.scene = 'critique';
+        state.ui.renderDirty = true;
+        audio.request('stamp');
+        return;
+      }
+
+      const result = level.evaluate(state.durable.levelPixels);
+      if (!result.pass) {
+        const failed = result.checks.filter(check => !check.ok);
+        showToast(failed[0]?.hint || 'The test found a structural weakness.', 2700);
+        audio.request('fail');
+        state.ui.renderDirty = true;
+        return;
+      }
+      const rivets = rivetsFor(level);
+      state.durable.completed[state.durable.currentLevel] = true;
+      state.durable.rivets[state.durable.currentLevel] = Math.max(state.durable.rivets[state.durable.currentLevel], rivets);
+      state.ui.result = { ...result, rivets };
+      state.ui.scene = 'result';
+      markChanged();
+      audio.request('pass');
+    }
+
+    function advanceLevel() {
+      const next = Math.min(LEVELS.length - 1, state.durable.currentLevel + 1);
+      state.durable.levelPixels = LEVELS[next].seed.slice();
+      state.durable.editsUsed = 0;
+      if (LEVELS[next].final) {
+        state.durable.finalPhase = 'mass';
+        state.durable.finalCritique = '';
+      }
+      loadLevel(next, true);
+    }
+
+    function chooseCritique(name) {
+      state.durable.finalCritique = name;
+      markChanged();
+      audio.request('tick');
+    }
+
+    function finishRun() {
+      if (!state.durable.finalCritique) {
+        showToast('NAME THE WEAKNESS YOU WOULD ATTACK NEXT.');
+        return;
+      }
+      state.durable.completed[4] = true;
+      state.ui.scene = 'complete';
+      markChanged();
+      audio.request('pass');
+    }
+
+    function exportPng() {
+      const source = document.createElement('canvas');
+      source.width = SIZE;
+      source.height = SIZE;
+      const context = source.getContext('2d');
+      context.imageSmoothingEnabled = false;
+      state.durable.levelPixels.forEach((value, i) => {
+        if (value < 0) return;
+        context.fillStyle = COLORS[value].hex;
+        context.fillRect(i % SIZE, Math.floor(i / SIZE), 1, 1);
+      });
+      const revision = state.runtime.revision;
+      source.toBlob(blob => enqueue({ type: blob ? 'exportReady' : 'exportFailed', blob, revision }), 'image/png');
+    }
+
+    function completeExport(blob, revision) {
+      if (revision !== state.runtime.revision) {
+        showToast('SPRITE CHANGED DURING EXPORT — tap export again.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'pixel-forge-carrier-16x16.png';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast('TRUE 16×16 PNG EXPORTED.');
+    }
+
+    function selectTool(tool, color = state.ui.color) {
+      const level = currentLevel();
+      if (tool === 'paint' && !level.allowed.includes(color)) return;
+      if (level.final && state.durable.finalPhase === 'mass' && color !== 0) {
+        showToast('LOCK THE SILHOUETTE BEFORE ADDING COLOR.');
+        audio.request('invalid');
+        return;
+      }
+      state.ui.tool = tool;
+      state.ui.color = color;
+      state.ui.renderDirty = true;
+      audio.request('tick');
+    }
+
+    function handleAction(action, value) {
+      const scene = state.ui.scene;
+      if (action === 'start' || action === 'fresh') {
+        if (scene !== 'intro') return;
+      } else if (['undo', 'reset', 'submit', 'guide', 'color', 'erase'].includes(action)) {
+        if (scene !== 'play') return;
+      } else if (action === 'menu') {
+        if (scene !== 'play') return;
+      } else if (action === 'closeMenu') {
+        if (scene !== 'menu') return;
+      } else if (action === 'next' || action === 'replay') {
+        if (scene !== 'result') return;
+      } else if (['critique', 'backToForge', 'finish'].includes(action)) {
+        if (scene !== 'critique') return;
+      } else if (['refine', 'export', 'restart'].includes(action)) {
+        if (scene !== 'complete') return;
+      }
+      switch (action) {
+        case 'start':
+          loadLevel(state.durable.currentLevel, true);
+          audio.request('stamp');
+          break;
+        case 'fresh':
+          StorageOwner.clear();
+          state.durable = defaultDurable();
+          loadLevel(0, true);
+          break;
+        case 'undo': undo(); break;
+        case 'reset': resetLevel(false); break;
+        case 'submit': submitLevel(); break;
+        case 'next': advanceLevel(); break;
+        case 'replay':
+          state.ui.scene = 'play';
+          resetLevel(true);
+          break;
+        case 'guide':
+          state.ui.guide = !state.ui.guide;
+          state.ui.renderDirty = true;
+          audio.request('tick');
+          break;
+        case 'menu': state.ui.scene = 'menu'; state.ui.renderDirty = true; break;
+        case 'closeMenu': state.ui.scene = 'play'; state.ui.renderDirty = true; break;
+        case 'sound':
+          state.durable.sound = !state.durable.sound;
+          if (state.durable.sound) audio.unlock();
+          else audio.queue.length = 0;
+          markChanged();
+          break;
+        case 'critique': chooseCritique(value); break;
+        case 'backToForge': state.ui.scene = 'play'; state.ui.renderDirty = true; break;
+        case 'finish': finishRun(); break;
+        case 'refine': state.ui.scene = 'play'; state.ui.renderDirty = true; break;
+        case 'export': exportPng(); break;
+        case 'restart':
+          if (performance.now() > state.ui.resetArmedUntil) {
+            state.ui.resetArmedUntil = performance.now() + 2000;
+            showToast('TAP RESTART AGAIN TO ERASE THE WHOLE APPRENTICESHIP.');
+          } else {
+            StorageOwner.clear();
+            state.durable = defaultDurable();
+            loadLevel(0, true);
+          }
+          break;
+        case 'color': selectTool('paint', Number(value)); break;
+        case 'erase': selectTool('erase'); break;
+      }
+    }
+
+    function processInputs() {
+      const queue = state.runtime.inputQueue.splice(0, state.runtime.inputQueue.length);
+      queue.forEach(event => {
+        if (event.type === 'pointerStart') beginStroke(event.pointerId, event.cell);
+        else if (event.type === 'pointerMove') moveStroke(event.pointerId, event.cell);
+        else if (event.type === 'pointerEnd') endStroke(event.pointerId, false);
+        else if (event.type === 'pointerCancel') endStroke(event.pointerId, true);
+        else if (event.type === 'action') handleAction(event.action, event.value);
+        else if (event.type === 'hide') {
+          if (state.ui.pointerId !== null) endStroke(state.ui.pointerId, true);
+          state.runtime.lifecycle = 'hidden';
+          state.runtime.frameDiscontinuous = true;
+          StorageOwner.mark();
+          audio.noteHidden(true);
+          state.ui.renderDirty = true;
+        } else if (event.type === 'restore') {
+          state.runtime.lifecycle = 'active';
+          state.runtime.frameDiscontinuous = true;
+          state.runtime.lastFrame = performance.now();
+          audio.noteHidden(false);
+          state.ui.renderDirty = true;
+        } else if (event.type === 'resize') {
+          state.runtime.frameDiscontinuous = true;
+          state.ui.renderDirty = true;
+        } else if (event.type === 'audioStatus') {
+          state.ui.renderDirty = true;
+        } else if (event.type === 'overload') {
+          showToast('INPUT LOAD HIGH — motion was coalesced.');
+        } else if (event.type === 'exportReady') {
+          completeExport(event.blob, event.revision);
+        } else if (event.type === 'exportFailed') {
+          showToast('PNG EXPORT FAILED.');
+        }
+      });
+    }
+
+    function drawPixelGrid(canvas, grid, options = {}) {
+      const context = canvas.getContext('2d');
+      const rect = canvas.getBoundingClientRect();
+      const displayWidth = Math.max(1, Math.round(rect.width || canvas.width));
+      const displayHeight = Math.max(1, Math.round(rect.height || canvas.height));
+      const ratio = Math.min(3, window.devicePixelRatio || 1);
+      const wantedWidth = Math.round(displayWidth * ratio);
+      const wantedHeight = Math.round(displayHeight * ratio);
+      if (canvas.width !== wantedWidth || canvas.height !== wantedHeight) {
+        canvas.width = wantedWidth;
+        canvas.height = wantedHeight;
+      }
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      context.imageSmoothingEnabled = false;
+      const cellWidth = displayWidth / SIZE;
+      const cellHeight = displayHeight / SIZE;
+
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          let bg = options.background || BACKGROUNDS.neutral;
+          if (options.split) bg = x < 8 ? BACKGROUNDS.light : BACKGROUNDS.dark;
+          context.fillStyle = bg;
+          context.fillRect(x * cellWidth, y * cellHeight, cellWidth + .5, cellHeight + .5);
+          const value = grid[idx(x, y)];
+          if (value >= 0) {
+            context.fillStyle = options.silhouette ? COLORS[0].hex : COLORS[value].hex;
+            context.fillRect(x * cellWidth, y * cellHeight, cellWidth + .5, cellHeight + .5);
+          }
+        }
+      }
+
+      if (options.grid) {
+        context.strokeStyle = options.split ? 'rgba(255,255,255,.16)' : 'rgba(42,52,58,.18)';
+        context.lineWidth = 1;
+        context.beginPath();
+        for (let i = 1; i < SIZE; i++) {
+          const x = Math.round(i * cellWidth) + .5;
+          const y = Math.round(i * cellHeight) + .5;
+          context.moveTo(x, 0); context.lineTo(x, displayHeight);
+          context.moveTo(0, y); context.lineTo(displayWidth, y);
+        }
+        context.stroke();
+      }
+
+      if (options.guide) drawGuide(context, cellWidth, cellHeight, options.final);
+    }
+
+    function drawGuide(context, cellWidth, cellHeight, finalGuide) {
+      const points = finalGuide
+        ? [[6, 4], [5, 7], [9, 7], [6, 10], [9, 10], [4, 14], [9, 14], [12, 4]]
+        : boneAnchors;
+      context.save();
+      context.strokeStyle = 'rgba(244, 197, 80, .72)';
+      context.fillStyle = 'rgba(255, 225, 112, .86)';
+      context.lineWidth = Math.max(1.5, cellWidth * .09);
+      if (finalGuide) {
+        const path = [[6, 4], [7, 7], [7, 10], [4, 14], [7, 10], [9, 14]];
+        context.beginPath();
+        path.forEach(([x, y], i) => {
+          const px = (x + .5) * cellWidth;
+          const py = (y + .5) * cellHeight;
+          if (i === 0 || i === 3 || i === 5) context.moveTo(px, py);
+          else context.lineTo(px, py);
+        });
+        context.moveTo(5.5 * cellWidth, 7.5 * cellHeight);
+        context.lineTo(9.5 * cellWidth, 7.5 * cellHeight);
+        context.lineTo(12.5 * cellWidth, 4.5 * cellHeight);
+        context.stroke();
+        context.setLineDash([cellWidth * .22, cellWidth * .18]);
+        context.strokeRect(9 * cellWidth, 1 * cellHeight, 6 * cellWidth, 6 * cellHeight);
+        context.setLineDash([]);
+      }
+      points.forEach(([x, y]) => {
+        context.beginPath();
+        context.arc((x + .5) * cellWidth, (y + .5) * cellHeight, Math.max(2, cellWidth * .16), 0, Math.PI * 2);
+        context.fill();
+      });
+      context.restore();
+    }
+
+    function drawTiny(canvas, grid, background, silhouette = false) {
+      const context = canvas.getContext('2d');
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      context.imageSmoothingEnabled = false;
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          context.fillStyle = background;
+          context.fillRect(x, y, 1, 1);
+          const value = grid[idx(x, y)];
+          if (value >= 0) {
+            context.fillStyle = silhouette ? COLORS[0].hex : COLORS[value].hex;
+            context.fillRect(x, y, 1, 1);
+          }
+        }
+      }
+    }
+
+    function renderPalette(level) {
+      const palette = $('palette');
+      const desired = level.allowed.join(',');
+      if (palette.dataset.allowed !== desired) {
+        palette.dataset.allowed = desired;
+        palette.replaceChildren();
+        level.allowed.forEach(colorIndex => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'swatch';
+          button.style.setProperty('--swatch', COLORS[colorIndex].hex);
+          button.dataset.color = String(colorIndex);
+          button.setAttribute('aria-label', COLORS[colorIndex].name);
+          button.addEventListener('click', () => enqueue({ type: 'action', action: 'color', value: colorIndex }));
+          palette.append(button);
+        });
+      }
+      palette.querySelectorAll('.swatch').forEach(button => {
+        const colorIndex = Number(button.dataset.color);
+        const locked = level.final && state.durable.finalPhase === 'mass' && colorIndex !== 0;
+        button.classList.toggle('active', state.ui.tool === 'paint' && state.ui.color === colorIndex);
+        button.classList.toggle('locked', locked);
+        button.disabled = locked;
+      });
+    }
+
+    function renderChecks(level) {
+      const evaluation = level.evaluate(state.durable.levelPixels);
+      const container = $('checks');
+      const signature = evaluation.checks.map(check => `${check.label}:${check.ok ? 1 : 0}`).join('|');
+      if (container.dataset.signature === signature) return;
+      container.dataset.signature = signature;
+      container.replaceChildren();
+      evaluation.checks.forEach(check => {
+        const chip = document.createElement('span');
+        chip.className = `check${check.ok ? ' ok' : ''}`;
+        chip.textContent = check.label;
+        container.append(chip);
+      });
+    }
+
+    function renderResult() {
+      const level = currentLevel();
+      const result = state.ui.result;
+      if (!result) return;
+      $('resultTitle').textContent = level.resultTitle;
+      $('resultText').textContent = `${level.resultText} ${result.rivets}/3 rivets: ${state.durable.editsUsed} edits against a ${level.par}-edit clean target.`;
+      $('resultList').replaceChildren();
+      result.checks.forEach(check => {
+        const row = document.createElement('div');
+        row.className = 'result-row ok';
+        row.innerHTML = `<span class="mark">◆</span><span><b>${check.label.toUpperCase()}</b><br>${check.hint}</span>`;
+        $('resultList').append(row);
+      });
+    }
+
+    function renderCritique() {
+      const grid = $('reportGrid');
+      grid.replaceChildren();
+      state.ui.report.forEach(item => {
+        const row = document.createElement('div');
+        row.className = `result-row ${item.level}`;
+        row.innerHTML = `<span class="mark">${item.level === 'ok' ? '◆' : '!'}</span><span><b>${item.label.toUpperCase()}</b><br>${item.text}</span>`;
+        grid.append(row);
+      });
+      document.querySelectorAll('[data-critique]').forEach(button => {
+        button.classList.toggle('active', button.dataset.critique === state.durable.finalCritique);
+        button.setAttribute('aria-pressed', button.dataset.critique === state.durable.finalCritique ? 'true' : 'false');
+      });
+      $('finishBtn').disabled = !state.durable.finalCritique;
+    }
+
+    function renderOverlays() {
+      $('introOverlay').hidden = state.ui.scene !== 'intro';
+      $('resultOverlay').hidden = state.ui.scene !== 'result';
+      $('critiqueOverlay').hidden = state.ui.scene !== 'critique';
+      $('completeOverlay').hidden = state.ui.scene !== 'complete';
+      $('menuOverlay').hidden = state.ui.scene !== 'menu';
+      if (state.ui.scene === 'result') renderResult();
+      if (state.ui.scene === 'critique') renderCritique();
+      if (state.ui.scene === 'complete') {
+        const focus = state.durable.finalCritique || 'structure';
+        $('completeText').textContent = `Your carrier is saved on this device. You named ${focus.toUpperCase()} as the next weakness to attack—that self-critique is part of the sprite, not an afterthought.`;
+      }
+    }
+
+    function render() {
+      const level = currentLevel();
+      const grid = state.durable.levelPixels;
+      $('stageLabel').textContent = `SHIFT ${state.durable.currentLevel + 1} / ${LEVELS.length}`;
+      $('lessonName').textContent = level.name;
+      $('briefText').textContent = level.brief;
+      $('budgetLabel').textContent = level.final ? (state.durable.finalPhase === 'mass' ? 'PIXELS' : 'PHASE') : 'EDITS';
+      $('budgetValue').textContent = level.final
+        ? (state.durable.finalPhase === 'mass' ? `${countFilled(grid)} / ${level.pixelLimit}` : 'COLOR')
+        : `${state.durable.editsUsed + strokeEffectiveChanges().length} / ${level.budget}`;
+
+      renderChecks(level);
+      renderPalette(level);
+      drawPixelGrid($('gridCanvas'), grid, { grid: true, split: !!level.splitBackground, guide: state.ui.guide, final: !!level.final });
+      drawTiny($('nativeCanvas'), grid, BACKGROUNDS.neutral, false);
+      drawTiny($('lightCanvas'), grid, BACKGROUNDS.light, false);
+      drawTiny($('darkCanvas'), grid, BACKGROUNDS.dark, false);
+      drawTiny($('silhouetteCanvas'), grid, BACKGROUNDS.silhouette, true);
+      drawTiny($('benchmarkCanvas'), BENCHMARK, BACKGROUNDS.neutral, false);
+
+      $('benchmarkWrap').classList.toggle('show', !!level.final);
+      $('boardBadge').textContent = state.ui.tool === 'erase' ? 'ERASE' : COLORS[state.ui.color].name;
+      $('eraseBtn').classList.toggle('active', state.ui.tool === 'erase');
+      $('eraseBtn').setAttribute('aria-pressed', state.ui.tool === 'erase' ? 'true' : 'false');
+      $('undoBtn').disabled = state.ui.history.length === 0;
+      $('resetBtn').textContent = performance.now() <= state.ui.resetArmedUntil ? 'RESET?' : 'RESET';
+
+      const guideAvailable = !!level.guide;
+      $('viewBtn').disabled = !guideAvailable;
+      $('viewBtn').textContent = guideAvailable ? `BONES: ${state.ui.guide ? 'ON' : 'OFF'}` : 'BONES: N/A';
+      $('viewBtn').classList.toggle('active', guideAvailable && state.ui.guide);
+      $('submitBtn').textContent = level.final
+        ? (state.durable.finalPhase === 'mass' ? 'LOCK SILHOUETTE' : 'OPEN CRITIQUE')
+        : 'STRIKE TEST';
+
+      const progress = $('progress');
+      progress.replaceChildren();
+      LEVELS.forEach((unused, index) => {
+        const dot = document.createElement('span');
+        dot.className = 'progress-dot';
+        if (state.durable.completed[index]) dot.classList.add('done');
+        else if (index === state.durable.currentLevel) dot.classList.add('current');
+        progress.append(dot);
+      });
+
+      $('soundBtn').textContent = state.durable.sound ? '♪' : '×';
+      $('soundBtn').classList.toggle('active', state.durable.sound);
+      $('freshBtn').hidden = !loaded;
+      $('startBtn').textContent = loaded ? 'RESUME SHIFT' : 'CLOCK IN';
+      $('saveStatus').textContent = `SAVE: ${StorageOwner.status.toUpperCase()}`;
+      $('audioStatus').textContent = `AUDIO: ${audio.status.toUpperCase()}`;
+      $('lifeStatus').textContent = `APP: ${state.runtime.lifecycle.toUpperCase()}`;
+      renderOverlays();
+
+      const toast = $('toast');
+      const toastVisible = state.ui.toast && performance.now() < state.ui.toastUntil;
+      toast.textContent = state.ui.toast;
+      toast.classList.toggle('show', !!toastVisible);
+    }
+
+    function bindAction(id, action) {
+      $(id).addEventListener('click', event => {
+        event.preventDefault();
+        enqueue({ type: 'action', action });
+      });
+    }
+
+    bindAction('startBtn', 'start');
+    bindAction('freshBtn', 'fresh');
+    bindAction('undoBtn', 'undo');
+    bindAction('resetBtn', 'reset');
+    bindAction('eraseBtn', 'erase');
+    bindAction('viewBtn', 'guide');
+    bindAction('submitBtn', 'submit');
+    bindAction('nextBtn', 'next');
+    bindAction('replayBtn', 'replay');
+    bindAction('menuBtn', 'menu');
+    bindAction('closeMenuBtn', 'closeMenu');
+    bindAction('soundBtn', 'sound');
+    bindAction('backToForgeBtn', 'backToForge');
+    bindAction('finishBtn', 'finish');
+    bindAction('refineBtn', 'refine');
+    bindAction('exportBtn', 'export');
+    bindAction('restartBtn', 'restart');
+
+    document.querySelectorAll('[data-critique]').forEach(button => {
+      button.addEventListener('click', () => enqueue({ type: 'action', action: 'critique', value: button.dataset.critique }));
+    });
+
+    const gridCanvas = $('gridCanvas');
+    gridCanvas.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      const cell = cellFromPointer(event);
+      if (!cell || state.ui.scene !== 'play') return;
+      try { gridCanvas.setPointerCapture(event.pointerId); } catch (error) { /* capture can fail after interruption */ }
+      enqueue({ type: 'pointerStart', pointerId: event.pointerId, cell });
+    });
+    gridCanvas.addEventListener('pointermove', event => {
+      event.preventDefault();
+      const cell = cellFromPointer(event);
+      if (cell) enqueue({ type: 'pointerMove', pointerId: event.pointerId, cell });
+    });
+    gridCanvas.addEventListener('pointerup', event => {
+      event.preventDefault();
+      enqueue({ type: 'pointerEnd', pointerId: event.pointerId });
+    });
+    gridCanvas.addEventListener('pointercancel', event => {
+      enqueue({ type: 'pointerCancel', pointerId: event.pointerId });
+    });
+    gridCanvas.addEventListener('lostpointercapture', event => {
+      enqueue({ type: 'pointerCancel', pointerId: event.pointerId });
+    });
+
+    document.addEventListener('pointerdown', () => audio.unlock(), { passive: true });
+    document.addEventListener('contextmenu', event => {
+      if (event.target.closest('button, canvas, .interactive')) event.preventDefault();
+    });
+    document.addEventListener('dragstart', event => {
+      if (event.target.closest('button, canvas, .interactive')) event.preventDefault();
+    });
+    document.addEventListener('visibilitychange', () => {
+      enqueue({ type: document.hidden ? 'hide' : 'restore' });
+    });
+    window.addEventListener('resize', () => enqueue({ type: 'resize' }), { passive: true });
+    window.addEventListener('pagehide', () => {
+      enqueue({ type: 'hide' });
+      processInputs();
+      StorageOwner.flush();
+    });
+
+    function frame(now) {
+      if (state.runtime.frameDiscontinuous) {
+        state.runtime.lastFrame = now;
+        state.runtime.frameDiscontinuous = false;
+      }
+      state.runtime.lastFrame = now;
+      processInputs();
+      audio.process();
+      StorageOwner.flush();
+      const timedActive = now < state.ui.toastUntil || now <= state.ui.resetArmedUntil;
+      const timedCleanup = state.runtime.timedVisualActive && !timedActive;
+      if (state.ui.renderDirty || timedActive || timedCleanup) {
+        state.ui.renderDirty = false;
+        render();
+      }
+      state.runtime.timedVisualActive = timedActive;
+      requestAnimationFrame(frame);
+    }
+
+    if (DEBUG) {
+      window.PIXEL_FORGE_TEST = {
+        getState: () => JSON.parse(JSON.stringify(state.durable)),
+        evaluate: () => currentLevel().evaluate(state.durable.levelPixels),
+        dispatch: (action, value) => enqueue({ type: 'action', action, value }),
+        setGrid: grid => {
+          if (!validGrid(grid)) throw new Error('Debug grid must contain exactly 256 valid pixels.');
+          state.durable.levelPixels = grid.slice();
+          markChanged();
+        },
+        levels: LEVELS.map(level => ({ id: level.id, budget: level.budget || null, pixelLimit: level.pixelLimit || null }))
+      };
+    }
+
+    loadLevel(state.durable.currentLevel, true);
+    state.ui.scene = 'intro';
+    state.ui.renderDirty = true;
+    requestAnimationFrame(frame);
+  })();
+  </script>
+</body>
+</html>
