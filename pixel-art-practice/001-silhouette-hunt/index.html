@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Silhouette Hunt 001</title>
+<style>
+:root{color-scheme:dark;--bg:#0c1017;--panel:#151c28;--ink:#f4f6fb;--muted:#9aa8bc;--accent:#7ee3a3;--bad:#ff7888;--gold:#ffd166}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overscroll-behavior:none}body{min-height:100dvh;padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}main{max-width:680px;margin:auto;display:grid;gap:10px}.top{display:flex;gap:8px;align-items:center}.top a{color:var(--muted);text-decoration:none}.grow{flex:1}.tag{font-size:11px;color:var(--muted)}.card{border:1px solid #2b3546;background:var(--panel);border-radius:16px;padding:12px}.target{text-align:center}.target strong{display:block;font-size:28px;letter-spacing:.08em;margin:4px 0}.target p{margin:3px 0;color:var(--muted);font-size:12px}.arena{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.choice{position:relative;min-height:190px;border:1px solid #2b3546;background:#0a0e15;border-radius:18px;display:grid;place-items:center;padding:8px;touch-action:manipulation}.choice:active{transform:scale(.985)}canvas{width:128px;height:128px;image-rendering:pixelated}.choice .name{position:absolute;bottom:8px;font-size:11px;color:#65748a;opacity:0}.choice.reveal .name{opacity:1;color:var(--ink)}.choice.good{outline:2px solid var(--accent)}.choice.bad{outline:2px solid var(--bad)}.hud{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}.hud b{display:block;font-size:20px}.hud span{font-size:10px;color:var(--muted)}button{border:1px solid #334158;background:#1b2534;color:var(--ink);min-height:48px;border-radius:14px;font:inherit;font-weight:900}.footer{font-size:11px;line-height:1.5;color:var(--muted)}@media(min-width:620px){.arena{grid-template-columns:repeat(4,1fr)}.choice{min-height:230px}canvas{width:144px;height:144px}}
+</style></head>
+<body><main>
+<div class="top"><a href="../">← PRACTICE DIRECTORY</a><div class="grow"></div><span class="tag">RUN 001</span></div>
+<section class="card target"><div class="tag">SILHOUETTE TEST</div><strong id="target">KNIGHT</strong><p>Tap the class from shape alone. Color appears only after your choice.</p></section>
+<section id="arena" class="arena"></section>
+<section class="card hud"><div><b id="score">0</b><span>SCORE</span></div><div><b id="streak">0</b><span>STREAK</span></div><div><b id="round">1/12</b><span>ROUND</span></div></section>
+<button id="again" hidden>PLAY AGAIN</button>
+<section class="card footer"><b>Practice target:</b> exaggerated external shapes, negative space, and one class-defining prop. Knight = shield + angled sword. Mage = tall hat + staff. Archer = bow arc with open negative space. Brute = broad shoulders + club.</section>
+</main><script>
+(()=>{'use strict';
+const S=16, classes=['Knight','Mage','Archer','Brute'];
+const sprites={
+Knight:{c:['#10141c','#b9c4d6','#6f7f98','#d94e5d','#e5b95a'],p:[
+'................','.....000........','....0110........','....0110....0...','....0000...00...','...022220.000...','..022222000.....','..02232220......','...2222220......','...2200220......','...20..020......','..440..044......','..440..044......','...0....0.......','..00....00......','................']},
+Mage:{c:['#10141c','#6657d9','#9a88ff','#e7c28a','#52b7d9'],p:[
+'......0.........','.....000........','....01110.......','...0111110......','..000000000.....','....03330.......','....03330....0..','...022220...00..','..0222220..040..','..0222220..040..','...222220..040..','...20.020..040..','..220.022..000..','..20...020......','..00...000......','................']},
+Archer:{c:['#10141c','#4e9b5c','#8fd06b','#d8ad78','#8b5a2b'],p:[
+'.....000........','....01110.......','....03330.......','....03330....0..','...022220...00..','...022220..0.0..','..0222220..0..0.','..0221220..0..0.','...221220..0..0.','...220220..0..0.','...20.020...00..','..220.022...0...','..20...020......','..00...000......','................','................']},
+Brute:{c:['#10141c','#8a5a37','#c88949','#d8ad78','#758447'],p:[
+'.....000........','....01110.......','....03330.......','....03330.......','...0000000......','..044444440..00.','.0444444440000..','.0444224440.00..','..444224440.00..','..444444440.00..','...4400440..00..','...40..040..00..','..440..044..00..','..40....040.00..','..00....000.00..','................']}}
+};
+const arena=document.getElementById('arena'),targetEl=document.getElementById('target'),scoreEl=document.getElementById('score'),streakEl=document.getElementById('streak'),roundEl=document.getElementById('round'),again=document.getElementById('again');let score=0,streak=0,round=1,target='',locked=false;
+function draw(canvas,silhouette){const d=canvas.getContext('2d');d.imageSmoothingEnabled=false;d.clearRect(0,0,128,128);const n=8,name=canvas.dataset.name,s=sprites[name];for(let y=0;y<S;y++)for(let x=0;x<S;x++){const k=s.p[y][x];if(k!=='.'){d.fillStyle=silhouette?'#080a0f':s.c[+k];d.fillRect(x*n,y*n,n,n)}}}
+function shuffled(){return [...classes].sort(()=>Math.random()-.5)}
+function setup(){locked=false;arena.innerHTML='';target=classes[Math.floor(Math.random()*classes.length)];targetEl.textContent=target.toUpperCase();for(const name of shuffled()){const b=document.createElement('button');b.className='choice';b.type='button';b.dataset.name=name;const c=document.createElement('canvas');c.width=c.height=128;c.dataset.name=name;const n=document.createElement('span');n.className='name';n.textContent=name.toUpperCase();b.append(c,n);b.onclick=()=>pick(b);arena.appendChild(b);draw(c,true)}roundEl.textContent=`${round}/12`}
+function pick(btn){if(locked)return;locked=true;const ok=btn.dataset.name===target;streak=ok?streak+1:0;score+=ok?10+Math.min(20,streak*2):-2;for(const b of arena.children){b.classList.add('reveal');draw(b.querySelector('canvas'),false);if(b.dataset.name===target)b.classList.add('good')}if(!ok)btn.classList.add('bad');scoreEl.textContent=score;streakEl.textContent=streak;if(round>=12){targetEl.textContent=score>=120?'SILHOUETTES HELD':'READABILITY NEEDS WORK';again.hidden=false;return}setTimeout(()=>{round++;setup()},850)}
+again.onclick=()=>{score=0;streak=0;round=1;scoreEl.textContent=0;streakEl.textContent=0;again.hidden=true;setup()};document.addEventListener('contextmenu',e=>e.preventDefault());setup();
+})();
+</script></body></html>
