@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="theme-color" content="#090909" />
+<title>FORGE // RIFF</title>
+<style>
+  :root { color-scheme: dark; font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; min-height:100%; background:#090909; color:#f3f3f3; overscroll-behavior:none; }
+  body { min-height:100dvh; display:grid; place-items:center; padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom)); user-select:none; -webkit-user-select:none; }
+  main { width:min(100%, 520px); display:grid; gap:18px; }
+  .plate { border:1px solid #292929; border-radius:24px; padding:22px; background:linear-gradient(180deg,#151515,#0d0d0d); box-shadow:0 18px 60px #0009; }
+  .eyebrow { font:700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.16em; color:#9f9f9f; }
+  h1 { margin:8px 0 4px; font-size:clamp(36px,10vw,62px); line-height:.9; letter-spacing:-.055em; }
+  .sub { color:#b8b8b8; margin:10px 0 0; line-height:1.45; }
+  .meter { height:10px; border-radius:999px; background:#232323; overflow:hidden; margin:22px 0 8px; }
+  .meter > i { display:block; width:0%; height:100%; background:linear-gradient(90deg,#777,#fff); transition:width .05s linear; }
+  .status { display:flex; justify-content:space-between; gap:12px; font:700 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:#aaa; }
+  .buttons { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:20px; }
+  button { min-height:64px; border-radius:18px; border:1px solid #333; background:#171717; color:#fff; font:800 17px/1 system-ui,sans-serif; touch-action:manipulation; }
+  button.primary { background:#f2f2f2; color:#080808; border-color:#fff; }
+  button:active { transform:translateY(1px) scale(.995); }
+  button:disabled { opacity:.42; }
+  .legend { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:18px; }
+  .step { height:42px; border:1px solid #292929; border-radius:10px; display:grid; place-items:center; color:#6e6e6e; font:700 11px ui-monospace,SFMono-Regular,Menlo,monospace; background:#111; }
+  .step.on { color:#fff; border-color:#777; background:#222; }
+  .note { color:#777; font-size:12px; line-height:1.45; margin:14px 2px 0; }
+</style>
+</head>
+<body>
+<main>
+  <section class="plate">
+    <div class="eyebrow">FORGE // AUDIO SPECIMEN 01</div>
+    <h1>BLACK<br>ANVIL</h1>
+    <p class="sub">A four-bar, drop-D flavored riff synthesized live in your browser. No samples. No backing track. Just strings getting electronically mistreated.</p>
+
+    <div class="meter" aria-hidden="true"><i id="meterFill"></i></div>
+    <div class="status"><span id="audioState">AUDIO: LOCKED</span><span>138 BPM · D MINOR</span></div>
+
+    <div class="buttons">
+      <button id="play" class="primary">▶ PLAY RIFF</button>
+      <button id="stop" disabled>■ STOP</button>
+    </div>
+
+    <div class="legend" id="steps" aria-label="riff progress"></div>
+    <p class="note">Headphones help. First tap unlocks audio on mobile. If iOS suspends the audio context after app switching, the next tap explicitly resumes it.</p>
+  </section>
+</main>
+<script>
+(() => {
+  'use strict';
+
+  const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+  const playBtn = document.querySelector('#play');
+  const stopBtn = document.querySelector('#stop');
+  const stateEl = document.querySelector('#audioState');
+  const meterFill = document.querySelector('#meterFill');
+  const stepsEl = document.querySelector('#steps');
+
+  const BPM = 138;
+  const BEAT = 60 / BPM;
+  const SIXTEENTH = BEAT / 4;
+  const TOTAL_STEPS = 64;
+
+  for (let i = 0; i < 16; i++) {
+    const el = document.createElement('div');
+    el.className = 'step';
+    el.textContent = String(i + 1).padStart(2, '0');
+    stepsEl.appendChild(el);
+  }
+  const stepEls = [...stepsEl.children];
+
+  const midiToHz = m => 440 * Math.pow(2, (m - 69) / 12);
+
+  // Drop-D flavored register. MIDI 38 = D2.
+  const M = {
+    D2: 38, Eb2: 39, F2: 41, G2: 43, Ab2: 44, A2: 45, Bb2: 46, C3: 48, D3: 50,
+    F3: 53, G3: 55, A3: 57, Bb3: 58, C4: 60, D4: 62
+  };
+
+  // Each event: [sixteenth step, midi note or array, duration in steps, velocity, mute amount]
+  // Low D gallops + chord punches + chromatic climb + descending turnaround.
+  const RIFF = [
+    [0,[M.D2,M.A2],2,1.00,.80], [3,M.D2,1,.82,.94], [4,M.D2,1,.84,.94], [6,[M.F2,M.C3],2,.96,.44],
+    [8,M.D2,1,.86,.94], [9,M.D2,1,.80,.95], [11,M.D2,1,.86,.94], [12,[M.G2,M.D3],3,1.00,.38],
+    [15,M.D2,1,.82,.92],
+
+    [16,[M.D2,M.A2],2,1.00,.78], [19,M.D2,1,.82,.94], [20,M.D2,1,.84,.94], [22,[M.Bb2,M.F3],2,1.00,.35],
+    [24,M.A2,1,.85,.83], [25,M.Bb2,1,.88,.78], [26,M.C3,1,.92,.70], [27,[M.D3,M.A3],3,1.00,.25],
+    [31,M.D2,1,.90,.95],
+
+    [32,[M.D2,M.A2],2,1.00,.80], [35,M.D2,1,.82,.94], [36,M.D2,1,.84,.94], [38,[M.F2,M.C3],2,.96,.44],
+    [40,M.D2,1,.86,.94], [41,M.D2,1,.80,.95], [43,M.D2,1,.86,.94], [44,[M.Ab2,M.Eb2],2,.94,.50],
+    [46,[M.A2,M.Eb2],2,.98,.43], [48,[M.Bb2,M.F3],4,1.00,.28],
+
+    [52,[M.D3,M.A3],2,1.00,.22], [54,[M.C3,M.G3],2,.97,.32], [56,[M.Bb2,M.F3],2,.96,.36], [58,[M.G2,M.D3],2,.94,.44],
+    [60,[M.F2,M.C3],2,.96,.42], [62,[M.Eb2,M.Bb2],1,.95,.50], [63,[M.D2,M.A2,M.D3],4,1.00,.15]
+  ];
+
+  class AudioEngine {
+    constructor() {
+      this.ctx = null;
+      this.master = null;
+      this.music = null;
+      this.drive = null;
+      this.cab = null;
+      this.compressor = null;
+      this.state = 'locked';
+      this.queue = [];
+      this.sources = new Set();
+      this.playToken = 0;
+    }
+
+    setState(next) {
+      this.state = next;
+      stateEl.textContent = `AUDIO: ${next.toUpperCase()}`;
+    }
+
+    async ensureReady() {
+      if (!AudioContextCtor) {
+        this.setState('failed');
+        throw new Error('Web Audio unavailable');
+      }
+      if (!this.ctx) this.buildGraph();
+      if (this.ctx.state !== 'running') {
+        this.setState('suspended');
+        await this.ctx.resume();
+      }
+      this.setState(this.ctx.state === 'running' ? 'ready' : 'suspended');
+      return this.ctx.state === 'running';
+    }
+
+    buildGraph() {
+      this.ctx = new AudioContextCtor({ latencyHint: 'interactive' });
+      this.master = new GainNode(this.ctx, { gain: 0.72 });
+      this.music = new GainNode(this.ctx, { gain: 0.62 });
+      this.drive = new WaveShaperNode(this.ctx, { curve: this.makeDriveCurve(240), oversample: '4x' });
+      this.cab = new BiquadFilterNode(this.ctx, { type: 'lowpass', frequency: 5200, Q: 0.72 });
+      this.compressor = new DynamicsCompressorNode(this.ctx, {
+        threshold: -19, knee: 14, ratio: 7, attack: 0.004, release: 0.11
+      });
+      this.music.connect(this.drive).connect(this.cab).connect(this.compressor).connect(this.master).connect(this.ctx.destination);
+      this.ctx.onstatechange = () => {
+        if (this.ctx.state === 'running') this.setState('ready');
+        else if (this.ctx.state === 'suspended') this.setState('suspended');
+        else if (this.ctx.state === 'interrupted') this.setState('interrupted');
+      };
+    }
+
+    makeDriveCurve(amount) {
+      const n = 32768;
+      const curve = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = (i * 2 / n) - 1;
+        curve[i] = ((3 + amount) * x * 20 * Math.PI / 180) / (Math.PI + amount * Math.abs(x));
+      }
+      return curve;
+    }
+
+    makePluckBuffer(freq, seconds, mute, seed = Math.random()) {
+      const sr = this.ctx.sampleRate;
+      const length = Math.max(1, Math.floor(seconds * sr));
+      const delay = Math.max(2, Math.round(sr / freq));
+      const data = new Float32Array(length);
+      const ring = new Float32Array(delay);
+      let s = (seed * 0x7fffffff) | 0;
+      const rand = () => {
+        s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+        return ((s >>> 0) / 4294967295) * 2 - 1;
+      };
+      for (let i = 0; i < delay; i++) ring[i] = rand() * 0.9;
+      const feedback = 0.9960 - mute * 0.0105;
+      let idx = 0;
+      let prev = 0;
+      for (let i = 0; i < length; i++) {
+        const cur = ring[idx];
+        const nextIdx = (idx + 1) % delay;
+        const filtered = (cur + ring[nextIdx] + prev * 0.45) / 2.45;
+        ring[idx] = filtered * feedback;
+        prev = cur;
+        data[i] = cur * Math.exp(-i / (sr * (0.40 + (1 - mute) * 1.4)));
+        idx = nextIdx;
+      }
+      const buffer = new AudioBuffer({ length, sampleRate: sr, numberOfChannels: 1 });
+      buffer.copyToChannel(data, 0);
+      return buffer;
+    }
+
+    scheduleNote(midi, when, durSteps, velocity, mute, seed) {
+      const freq = midiToHz(midi);
+      const sustain = Math.max(0.10, durSteps * SIXTEENTH * (mute > .8 ? .82 : 1.35));
+      const src = new AudioBufferSourceNode(this.ctx, { buffer: this.makePluckBuffer(freq, sustain + .22, mute, seed) });
+      const pick = new BiquadFilterNode(this.ctx, { type: 'highpass', frequency: 48, Q: .4 });
+      const tone = new BiquadFilterNode(this.ctx, { type: 'lowpass', frequency: 2500 + (1 - mute) * 2200, Q: .85 });
+      const gain = new GainNode(this.ctx, { gain: 0.0001 });
+      gain.gain.setValueAtTime(0.0001, when);
+      gain.gain.exponentialRampToValueAtTime(Math.max(.001, velocity * .52), when + .004);
+      gain.gain.exponentialRampToValueAtTime(.0001, when + sustain);
+      src.connect(pick).connect(tone).connect(gain).connect(this.music);
+      src.start(when);
+      src.stop(when + sustain + .05);
+      this.sources.add(src);
+      src.onended = () => this.sources.delete(src);
+    }
+
+    stopAll() {
+      this.playToken++;
+      for (const src of this.sources) {
+        try { src.stop(); } catch (_) {}
+      }
+      this.sources.clear();
+      this.queue.length = 0;
+    }
+
+    async playRiff() {
+      this.queue.push({ type: 'riff' });
+      try {
+        if (!await this.ensureReady()) return false;
+        this.stopAll();
+        const token = ++this.playToken;
+        const start = this.ctx.currentTime + .055;
+
+        RIFF.forEach((event, eventIndex) => {
+          const [step, notes, dur, vel, mute] = event;
+          const list = Array.isArray(notes) ? notes : [notes];
+          list.forEach((midi, voiceIndex) => this.scheduleNote(
+            midi,
+            start + step * SIXTEENTH + voiceIndex * 0.0015,
+            dur,
+            vel / Math.sqrt(list.length),
+            mute,
+            (eventIndex + 1) * 0.173 + voiceIndex * .071
+          ));
+        });
+
+        this.animate(token, start);
+        this.queue.shift();
+        return true;
+      } catch (err) {
+        console.error(err);
+        this.setState('failed');
+        this.queue.shift();
+        return false;
+      }
+    }
+
+    animate(token, start) {
+      playBtn.disabled = true;
+      stopBtn.disabled = false;
+      const total = TOTAL_STEPS * SIXTEENTH;
+      const tick = () => {
+        if (token !== this.playToken || !this.ctx) return this.resetUI();
+        const elapsed = this.ctx.currentTime - start;
+        const p = Math.max(0, Math.min(1, elapsed / total));
+        meterFill.style.width = `${p * 100}%`;
+        const beat16 = Math.min(15, Math.floor(Math.max(0, elapsed) / (total / 16)));
+        stepEls.forEach((el, i) => el.classList.toggle('on', i === beat16 && p < 1));
+        if (p >= 1) return this.resetUI();
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+
+    resetUI() {
+      meterFill.style.width = '0%';
+      stepEls.forEach(el => el.classList.remove('on'));
+      playBtn.disabled = false;
+      stopBtn.disabled = true;
+    }
+  }
+
+  const audio = new AudioEngine();
+
+  playBtn.addEventListener('pointerup', async () => { await audio.playRiff(); });
+  stopBtn.addEventListener('pointerup', () => { audio.stopAll(); audio.resetUI(); });
+
+  document.addEventListener('visibilitychange', () => {
+    if (!audio.ctx) return;
+    if (document.visibilityState === 'visible') {
+      if (audio.ctx.state !== 'running') audio.setState(audio.ctx.state === 'interrupted' ? 'interrupted' : 'suspended');
+    }
+  });
+
+  window.addEventListener('pageshow', () => {
+    if (audio.ctx && audio.ctx.state !== 'running') audio.setState('suspended');
+  });
+})();
+</script>
+</body>
+</html>
