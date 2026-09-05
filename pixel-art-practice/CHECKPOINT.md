@@ -1,6 +1,6 @@
 # Pixel Art Practice Checkpoint
 
-Latest completed experiment: **031 — Turntable Crew**
+Latest completed experiment: **033 — Recovery Window**
 
 ## Retained progression
 - 004 Pose Relay: Carry had the strongest skeleton; Catch attached arms too near the head.
@@ -29,34 +29,41 @@ Latest completed experiment: **031 — Turntable Crew**
 - 028 Ground Shift: grounding is relational. Keep the support foot fixed and organize body mass over it.
 - 029 Phase Pack: mechanical phase discipline can organize quadruped motion, but timing cannot rescue weak species construction.
 - 030 Core Beasts: remove easy appendage identifiers temporarily; strengthen torso/head/neck ratios if the creature stops reading.
-- 031 Turntable Crew: **viewpoint changes must preserve a mass contract**. Hand-redraw the new view, but hold ground anchor, overall scale, and diagnostic proportion relationships stable enough that the sprite remains the same character.
+- 031 Turntable Crew: viewpoint changes must preserve a mass contract across redrawn views.
+- 032 Edge Tempo: contour rhythm matters at tiny scale; repeated stair-step ratios and gradual curve changes avoid accidental dents, but edge cleanup cannot replace a strong base silhouette.
+- 033 Recovery Window: **recovery is state information**. A recovery key pose must remain distinct from both impact and neutral: preserve residual momentum in torso/weapon relationship, then restore compact balance only at READY.
 
-## Run 031 research lesson
-Multi-direction sprite guidance consistently treats each facing as a redraw rather than an arbitrary rotation. The useful transferable rule is to preserve invariant scale and anchors while translating the same design relationships into a new silhouette. Pixeldex specifically recommends fixed foot/ground anchors, same scale across directions, silhouette checks, and warns that diagonals should not simply be rotated cardinals. A skeletal-animation tutorial for pixel art independently notes that raw rotation produces jagged artifacts and uses enlarged transforms plus cleanup rather than trusting low-resolution rotation directly.
+## Run 033 research lesson
+Rivals Workshop separates attack animation into anticipation, action, and recovery because each phase has mechanical meaning. It explicitly prioritizes readable, exaggerated, distinct silhouettes and warns that overly smooth transitions can make the current gameplay state ambiguous. Adobe's key-pose guidance independently reinforces that key poses carry the logic of motion and help preserve structural consistency.
 
 Sources:
-- https://pixeldex.dev/sprites/builder/
-- https://itch.io/devlog/214252/tutorial-basic-skeletal-animation.amp
+- https://www.rivalslib.com/workshop_guide/art/anticipation_action_recovery.html
+- https://www.adobe.com/creativecloud/animation/discover/animation-key-poses.html
 
 ## Experiment
-**Turntable Crew** is a four-round matching game. A 16×16 front-facing worker is shown as the reference. Three clean side-view silhouettes are offered; exactly one belongs to the same worker. The wrong answers are not malformed decoys. They are valid side sprites whose body-width, depth, head/body, or grounded-height relationships belong to another worker. INK is the default so color cannot solve the match.
+**Recovery Window** is a 12-encounter timing game. Four original 16×16 fighters — Cutter, Lancer, Maul, and Cleaver — cycle through READY, STRIKE, RECOVERY, then READY. The player taps COUNTER only during RECOVERY. No color cue identifies the opening; the body and weapon silhouette must carry the state.
 
-Assets: four original front views plus four original side views for Hauler, Scout, Guard, and Miner.
+Assets: twelve original 16×16 state silhouettes: ready, strike, and recovery for each of four fighters.
 
 ## Assumption challenge
-The dangerous shortcut was to use obvious distortions as wrong answers. That would test error spotting rather than viewpoint consistency. The experiment therefore swaps complete, plausible side-view proportion systems between workers.
+The dangerous shortcut was treating recovery as the attack pose translated backward. That would preserve motion chronology but not communicate a distinct gameplay state. Each recovery was instead redrawn around a different mass relationship: the torso remains displaced after impact while the weapon trails or drops, and only the subsequent ready pose recenters the body.
 
-A second risk was confusing side-view facing cues with the already-practiced 012 lesson. 031 does not ask which direction a sprite faces. It asks whether a front and side silhouette preserve one character identity across projection.
+This run does not repeat 023's anticipation-lane lesson. The player never predicts attack direction. It isolates the post-action vulnerability state.
+
+## Test notes
+- JavaScript syntax check passed with `node --check`.
+- All 92 sprite rectangles were programmatically checked to remain inside the 16×16 canvas.
+- The directory preserves independent localStorage keys and adds `pixelArtPracticeRating033`.
 
 ## Self-critique
-Hauler and Guard have the strongest contracts because their width/depth differences survive a turn clearly. Scout and Miner are more fragile: at 16×16, one pixel of width can swing their identity too far. The game is also stricter than a single turnaround showcase because every distractor is a legitimate sprite. If choices feel arbitrary, the mass contracts are not separated enough.
+Maul has the strongest recovery because the large hammer mass creates a clear trailing relationship after impact. Lancer is readable when the spear drops behind the torso, but thin one-pixel shaft cues remain fragile. Cutter is weakest: the forward torso plus diagonal sword trail can still be mistaken for a continuing attack. Cleaver sits between those extremes.
 
-Hard-fail condition: matching requires color; the correct side view is not distinguishable from another worker by broad shape; side sprites float relative to the front reference; or one character becomes a visibly different scale when turned.
+Hard-fail condition: the player must rely on timing memorization rather than silhouette; recovery reads as frozen impact; recovery reads as idle; or any fighter gains extra apparent limbs/heads while posed.
 
 ## Next-run guardrail
-Do not immediately repeat front-to-side worker matching, generic multi-direction turnaround, core-only quadruped proportion tests, quadruped phase offsets, lower-body weight transfer, tool follow-through, shoulder-lock detection, mechanical arc correction, squash/stretch volume, attack-lane anticipation, modular machinery cleanup, tool foreshortening, four-frame locomotion tracking, contact-seam A/B testing, diagnostic-landmark subtraction, fur/feather clumps, big-medium-small prop hierarchy, action-verb staging, exaggerated humanoid proportions, interior value blocking, facing asymmetry, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, or asymmetrical loadout integration as isolated lessons.
+Do not immediately repeat recovery-window timing, attack/recovery/idle classification, contour-rhythm A/B testing, front-to-side worker matching, core-only quadruped proportion tests, quadruped phase offsets, lower-body weight transfer, tool follow-through, shoulder-lock detection, mechanical arc correction, squash/stretch volume, attack-lane anticipation, modular machinery cleanup, tool foreshortening, four-frame locomotion tracking, contact-seam A/B testing, diagnostic-landmark subtraction, fur/feather clumps, big-medium-small prop hierarchy, action-verb staging, exaggerated humanoid proportions, interior value blocking, facing asymmetry, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, or asymmetrical loadout integration as isolated lessons.
 
-Promising next pressures: recovery-state readability after an action; maintaining one character identity across front/back rather than front/side; silhouette hierarchy when multiple actors overlap in a small encounter; or a deliberately non-humanoid mechanical-to-organic transfer that has not been isolated before.
+Promising next pressures: front/back identity preservation; overlap hierarchy with multiple actors; readable damage/hurt poses that do not create anatomical ambiguity; or silhouette-based size/scale contrast between one hero and several enemy classes.
 
 ## Feedback limitation
 Stephen's 1–5 ratings are stored with `localStorage` on his device. They are not visible to automated future runs unless a shared feedback backend is added.
