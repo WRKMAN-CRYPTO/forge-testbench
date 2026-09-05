@@ -9,6 +9,49 @@
     js: { name: 'app.js' }
   };
   const MODES = new Set(['code', 'preview', 'console', 'tools']);
+  const HISTORY_LIMIT = 80;
+
+  const DECK_KEYS = {
+    html: [
+      { label: '<>', action: 'pair', open: '<', close: '>' },
+      { label: '""', action: 'pair', open: '"', close: '"' },
+      { label: '=', action: 'insert', value: '=' },
+      { label: '/', action: 'insert', value: '/' },
+      { label: '<!-- -->', action: 'pair', open: '<!-- ', close: ' -->', wide: true },
+      { label: '&', action: 'insert', value: '&' }
+    ],
+    css: [
+      { label: '{}', action: 'pair', open: '{', close: '}' },
+      { label: ':', action: 'insert', value: ':' },
+      { label: ';', action: 'insert', value: ';' },
+      { label: '()', action: 'pair', open: '(', close: ')' },
+      { label: '#', action: 'insert', value: '#' },
+      { label: '.', action: 'insert', value: '.' },
+      { label: '-', action: 'insert', value: '-' },
+      { label: 'px', action: 'insert', value: 'px' }
+    ],
+    js: [
+      { label: '()', action: 'pair', open: '(', close: ')' },
+      { label: '{}', action: 'pair', open: '{', close: '}' },
+      { label: '[]', action: 'pair', open: '[', close: ']' },
+      { label: "''", action: 'pair', open: "'", close: "'" },
+      { label: '""', action: 'pair', open: '"', close: '"' },
+      { label: '``', action: 'pair', open: '`', close: '`' },
+      { label: '=>', action: 'insert', value: '=>', wide: true },
+      { label: ';', action: 'insert', value: ';' },
+      { label: '=', action: 'insert', value: '=' },
+      { label: '.', action: 'insert', value: '.' }
+    ]
+  };
+
+  const COMMON_DECK_KEYS = [
+    { label: 'TAB', action: 'indent', control: true, wide: true },
+    { label: '⇤', action: 'outdent', control: true },
+    { label: '←', action: 'left', control: true },
+    { label: '→', action: 'right', control: true },
+    { label: '↶', action: 'undo', control: true },
+    { label: '↷', action: 'redo', control: true }
+  ];
 
   const starter = () => ({
     version: SCHEMA_VERSION,
@@ -21,6 +64,8 @@
     }
   });
 
+  const emptyHistory = () => ({ html: [], css: [], js: [] });
+
   const state = {
     durable: starter(),
     ui: {
@@ -32,7 +77,11 @@
       previewDocument: '',
       previewRunId: 0,
       toast: '',
-      toastToken: 0
+      toastToken: 0,
+      undo: emptyHistory(),
+      redo: emptyHistory(),
+      selectionToken: 0,
+      selectionRequest: null
     },
     queue: [],
     processing: false,
@@ -41,11 +90,14 @@
   };
 
   let renderedPreviewRunId = -1;
+  let renderedDeckFile = '';
+  let appliedSelectionToken = -1;
 
   const els = {
     app: document.querySelector('#app'),
     editor: document.querySelector('#editor'),
     editorPane: document.querySelector('#editorPane'),
+    codeDeck: document.querySelector('#codeDeck'),
     fileName: document.querySelector('#fileName'),
     lineCount: document.querySelector('#lineCount'),
     saveStatus: document.querySelector('#saveStatus'),
@@ -88,15 +140,12 @@
 
   function applyEvent(event) {
     switch (event.type) {
-      case 'EDIT': {
-        const key = state.durable.activeFile;
-        if (state.durable.files[key] !== event.payload.value) {
-          state.durable.files[key] = event.payload.value;
-          state.durable.revision += 1;
-          scheduleSave();
-        }
+      case 'EDIT':
+        commitNativeEdit(event.payload.value);
         break;
-      }
+      case 'DECK_ACTION':
+        applyDeckAction(event.payload);
+        break;
       case 'SELECT_FILE':
         if (FILE_META[event.payload.file]) {
           state.durable.activeFile = event.payload.file;
@@ -122,6 +171,8 @@
         state.ui.logs = [];
         state.ui.errorCount = 0;
         state.ui.mode = 'code';
+        state.ui.undo = emptyHistory();
+        state.ui.redo = emptyHistory();
         persistCurrentState();
         prepareRun(false);
         setToast('Starter project restored');
@@ -142,6 +193,141 @@
       case 'QUEUE_OVERLOAD':
         appendLog('error', 'Input queue trimmed after overload.');
         break;
+    }
+  }
+
+  function pushHistory(stack, value) {
+    if (stack[stack.length - 1] === value) return;
+    stack.push(value);
+    if (stack.length > HISTORY_LIMIT) stack.shift();
+  }
+
+  function commitNativeEdit(next) {
+    const key = state.durable.activeFile;
+    const current = state.durable.files[key];
+    if (current === next) return;
+    pushHistory(state.ui.undo[key], current);
+    state.ui.redo[key] = [];
+    state.durable.files[key] = next;
+    state.durable.revision += 1;
+    scheduleSave();
+  }
+
+  function commitDeckEdit(next, start, end, recordHistory = true) {
+    const key = state.durable.activeFile;
+    const current = state.durable.files[key];
+    if (current !== next) {
+      if (recordHistory) pushHistory(state.ui.undo[key], current);
+      if (recordHistory) state.ui.redo[key] = [];
+      state.durable.files[key] = next;
+      state.durable.revision += 1;
+      scheduleSave();
+    }
+    requestSelection(start, end, true);
+  }
+
+  function requestSelection(start, end, focus) {
+    state.ui.selectionToken += 1;
+    state.ui.selectionRequest = { token: state.ui.selectionToken, start, end, focus };
+  }
+
+  function clampSelection(source, start, end) {
+    const safeStart = Math.max(0, Math.min(source.length, Number.isInteger(start) ? start : source.length));
+    const safeEnd = Math.max(safeStart, Math.min(source.length, Number.isInteger(end) ? end : safeStart));
+    return [safeStart, safeEnd];
+  }
+
+  function applyDeckAction(payload) {
+    const key = state.durable.activeFile;
+    const source = state.durable.files[key];
+    const [start, end] = clampSelection(source, payload.start, payload.end);
+    const selected = source.slice(start, end);
+
+    if (payload.action === 'insert') {
+      const value = payload.value || '';
+      const next = source.slice(0, start) + value + source.slice(end);
+      const caret = start + value.length;
+      commitDeckEdit(next, caret, caret);
+      return;
+    }
+
+    if (payload.action === 'pair') {
+      const open = payload.open || '';
+      const close = payload.close || '';
+      const next = source.slice(0, start) + open + selected + close + source.slice(end);
+      const innerStart = start + open.length;
+      const innerEnd = innerStart + selected.length;
+      commitDeckEdit(next, innerStart, innerEnd);
+      return;
+    }
+
+    if (payload.action === 'left' || payload.action === 'right') {
+      let caret;
+      if (start !== end) caret = payload.action === 'left' ? start : end;
+      else caret = payload.action === 'left' ? Math.max(0, start - 1) : Math.min(source.length, end + 1);
+      requestSelection(caret, caret, true);
+      return;
+    }
+
+    if (payload.action === 'indent') {
+      const lineStart = source.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+      const lineEndIndex = source.indexOf('\n', end);
+      const lineEnd = lineEndIndex === -1 ? source.length : lineEndIndex;
+      const block = source.slice(lineStart, lineEnd);
+      const lines = block.split('\n');
+      const replacement = lines.map(line => '  ' + line).join('\n');
+      const next = source.slice(0, lineStart) + replacement + source.slice(lineEnd);
+      const newStart = start + 2;
+      const newEnd = end + (2 * lines.length);
+      commitDeckEdit(next, newStart, newEnd);
+      return;
+    }
+
+    if (payload.action === 'outdent') {
+      const lineStart = source.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+      const lineEndIndex = source.indexOf('\n', end);
+      const lineEnd = lineEndIndex === -1 ? source.length : lineEndIndex;
+      const block = source.slice(lineStart, lineEnd);
+      const lines = block.split('\n');
+      let removedBeforeStart = 0;
+      let removedTotal = 0;
+      let offset = lineStart;
+      const replacement = lines.map(line => {
+        const match = line.match(/^ {1,2}/);
+        const removed = match ? match[0].length : 0;
+        if (offset <= start) removedBeforeStart += removed;
+        removedTotal += removed;
+        offset += line.length + 1;
+        return line.slice(removed);
+      }).join('\n');
+      const next = source.slice(0, lineStart) + replacement + source.slice(lineEnd);
+      commitDeckEdit(next, Math.max(lineStart, start - removedBeforeStart), Math.max(lineStart, end - removedTotal));
+      return;
+    }
+
+    if (payload.action === 'undo') {
+      const undo = state.ui.undo[key];
+      if (!undo.length) return;
+      const previous = undo.pop();
+      pushHistory(state.ui.redo[key], source);
+      state.durable.files[key] = previous;
+      state.durable.revision += 1;
+      scheduleSave();
+      const caret = Math.min(start, previous.length);
+      requestSelection(caret, caret, true);
+      return;
+    }
+
+    if (payload.action === 'redo') {
+      const redo = state.ui.redo[key];
+      if (!redo.length) return;
+      const next = redo.pop();
+      pushHistory(state.ui.undo[key], source);
+      state.durable.files[key] = next;
+      state.durable.revision += 1;
+      scheduleSave();
+      const caret = Math.min(start, next.length);
+      requestSelection(caret, caret, true);
     }
   }
 
@@ -244,6 +430,25 @@
     element.setAttribute('aria-hidden', String(!active));
   }
 
+  function renderDeck(file) {
+    if (renderedDeckFile === file) return;
+    renderedDeckFile = file;
+    const keys = [...DECK_KEYS[file], ...COMMON_DECK_KEYS];
+    els.codeDeck.replaceChildren(...keys.map(key => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `deck-key${key.control ? ' control' : ''}${key.wide ? ' wide' : ''}`;
+      button.textContent = key.label;
+      button.dataset.action = key.action;
+      if (key.value !== undefined) button.dataset.value = key.value;
+      if (key.open !== undefined) button.dataset.open = key.open;
+      if (key.close !== undefined) button.dataset.close = key.close;
+      button.setAttribute('aria-label', `Code key ${key.label}`);
+      return button;
+    }));
+    els.codeDeck.scrollLeft = 0;
+  }
+
   function render() {
     const active = state.durable.activeFile;
     const source = state.durable.files[active];
@@ -255,6 +460,7 @@
     els.fileTabs.forEach(tab => tab.classList.toggle('active', state.ui.mode === 'code' && tab.dataset.file === active));
     els.toolsBtn.classList.toggle('active', state.ui.mode === 'tools');
 
+    renderDeck(active);
     setPaneState(els.editorPane, state.ui.mode === 'code');
     setPaneState(els.previewPane, state.ui.mode === 'preview');
     setPaneState(els.consolePane, state.ui.mode === 'console');
@@ -265,7 +471,6 @@
     els.consoleBtn.classList.toggle('active', state.ui.mode === 'console');
     els.errorBadge.hidden = state.ui.errorCount === 0;
     els.errorBadge.textContent = String(state.ui.errorCount);
-
     els.app.classList.toggle('editor-focused', state.ui.editorFocused);
 
     els.consoleOutput.replaceChildren(...state.ui.logs.map(log => {
@@ -281,6 +486,14 @@
       els.preview.srcdoc = state.ui.previewDocument;
     }
 
+    const selection = state.ui.selectionRequest;
+    if (selection && selection.token !== appliedSelectionToken) {
+      appliedSelectionToken = selection.token;
+      els.editor.value = source;
+      if (selection.focus) els.editor.focus({ preventScroll: true });
+      els.editor.setSelectionRange(selection.start, selection.end);
+    }
+
     els.toast.textContent = state.ui.toast;
     els.toast.classList.toggle('show', Boolean(state.ui.toast));
   }
@@ -292,15 +505,29 @@
     els.editor.addEventListener('keydown', event => {
       if (event.key === 'Tab') {
         event.preventDefault();
-        const start = els.editor.selectionStart;
-        const end = els.editor.selectionEnd;
-        const next = els.editor.value.slice(0, start) + '  ' + els.editor.value.slice(end);
-        els.editor.value = next;
-        els.editor.selectionStart = els.editor.selectionEnd = start + 2;
-        enqueue('EDIT', { value: next });
+        enqueue('DECK_ACTION', {
+          action: event.shiftKey ? 'outdent' : 'indent',
+          start: els.editor.selectionStart,
+          end: els.editor.selectionEnd
+        });
       }
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') enqueue('RUN');
     });
+
+    els.codeDeck.addEventListener('pointerdown', event => {
+      const button = event.target.closest('.deck-key');
+      if (!button) return;
+      event.preventDefault();
+      enqueue('DECK_ACTION', {
+        action: button.dataset.action,
+        value: button.dataset.value,
+        open: button.dataset.open,
+        close: button.dataset.close,
+        start: els.editor.selectionStart,
+        end: els.editor.selectionEnd
+      });
+    });
+
     els.fileTabs.forEach(tab => tab.addEventListener('click', () => enqueue('SELECT_FILE', { file: tab.dataset.file })));
     els.runBtn.addEventListener('click', () => enqueue('RUN'));
     els.codeBtn.addEventListener('click', () => enqueue('SET_MODE', { mode: 'code' }));
