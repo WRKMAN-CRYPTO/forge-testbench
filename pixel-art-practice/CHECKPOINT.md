@@ -1,48 +1,62 @@
 # Pixel Art Practice Checkpoint
 
-Latest completed experiment: **023 — Windup Lane**
+Latest completed experiment: **031 — Turntable Crew**
 
 ## Retained progression
 - 004 Pose Relay: Carry had the strongest skeleton; Catch attached arms too near the head.
 - 006 Skeleton Lock: readable pose can still fail if contour branches create extra-head/extra-limb ambiguity.
 - 007 Hidden Limb: occlude rear limbs instead of granting every anatomical part its own silhouette branch.
-- 008 Crew Call: current best humanoid baseline. Compact head/torso/leg mass hierarchy improved readability.
-- 009 Loadout Read: give one dominant equipment mass ownership of the outer contour while keeping the humanoid body compact.
-- 010 Armory Grammar: weapon identity can be designed before shading through distinct mass distribution along the main axis.
-- 011 Gap Beasts: negative space is an active design element. A few deliberate empty-pixel channels can clarify anatomy better than adding contour branches.
-- 012 Facing Signal: side-facing humanoids can communicate direction with a few agreeing one-sided contour cues while the opposite side remains visually quiet.
-- 013 Value Crew: preserve the compact outer silhouette and move profession/equipment information inward into broad connected value regions.
-- 014 Action Read: synthesize retained rules around one dominant direction of force. The pose should communicate a verb before profession, color, or interior detail.
-- 015 Mass Signal: proportional distortion works when several connected masses participate in one coherent semantic exaggeration.
-- 016 Shape Stack: big-medium-small hierarchy is strongest when each size tier has a different structural job.
-- 017 Tuft Signal: material texture should ride existing masses rather than manufacture a second contour language.
+- 008 Crew Call: compact head/torso/leg mass hierarchy improved humanoid readability.
+- 009 Loadout Read: one dominant equipment mass can own the outer contour while the body remains compact.
+- 010 Armory Grammar: weapon identity can be designed before shading through mass distribution along the main axis.
+- 011 Gap Beasts: deliberate empty-pixel channels can clarify anatomy better than extra contour branches.
+- 012 Facing Signal: direction can read from a few agreeing one-sided contour cues while the opposite side stays quiet.
+- 013 Value Crew: compact human silhouettes remained readable even without explicit arms; broad interior values can carry secondary information.
+- 014 Action Read: pose readability is not action readability. Push was visually strongest but read too much like jumping.
+- 015 Mass Signal: **current humanoid design benchmark**. Stephen explicitly judged the sprites themselves well designed: clean head/limb count, good symmetry, clear construction, and readable labels.
+- 016 Shape Stack: anvil was clearly strongest; big-medium-small organization cannot replace a category-defining contour.
+- 017 Tuft Signal: Wolf strongest, Boar second. Solid believable animal mass outranked decorative texture.
 - 018 Anchor Drop: a contour landmark earns pixels when removing it changes category recognition.
 - 019 Contact Read: negative space can clarify ownership of good masses but cannot rescue confused mass organization.
 - 020 Motion Lock: decide which identity masses are not allowed to drift before spending silhouette pixels on locomotion.
-- 021 Depth Cheat: at 16×16, projection may be intentionally dishonest when literal foreshortening destroys semantic truth.
-- 022 Machine Phase: modular movement is only a scaffold; hand-correct grid artifacts that damage thickness, pivots, joints, and diagnostic masses.
-- 023 Windup Lane: anticipation is successful only when the silhouette predicts the *future hit*, not merely that effort is happening. Whole-body lean, reach, and balance should agree on attack direction before the active frame.
+- 021 Depth Cheat: projection may be intentionally dishonest when literal foreshortening destroys semantic truth.
+- 022 Machine Phase: mechanical animation is currently a stronger area. Modular movement is only a scaffold; hand-correct thickness, pivots, joints, and diagnostic masses.
+- 023 Windup Lane: anticipation should predict the future hit, not merely effort.
+- 024 Volume Bounce: squash/stretch may distort geometry but should preserve apparent volume and diagnostic masses.
+- 025 Arc Yard: mechanical in-betweens must preserve pivots and linkage length; the path between key poses is part of construction.
+- 026 Joint Lock: important anatomical attachment points can be treated as construction invariants during organic animation.
+- 027 Heavy Hand: post-contact follow-through communicates tool weight; terminal tool masses need to remain distinct.
+- 028 Ground Shift: grounding is relational. Keep the support foot fixed and organize body mass over it.
+- 029 Phase Pack: mechanical phase discipline can organize quadruped motion, but timing cannot rescue weak species construction.
+- 030 Core Beasts: remove easy appendage identifiers temporarily; strengthen torso/head/neck ratios if the creature stops reading.
+- 031 Turntable Crew: **viewpoint changes must preserve a mass contract**. Hand-redraw the new view, but hold ground anchor, overall scale, and diagnostic proportion relationships stable enough that the sprite remains the same character.
 
-## Run 023 research lesson
-The Rivals Workshop Community Library separates attack animation into anticipation, active action, and recovery, and argues that anticipation must be a distinct silhouette that tells the opponent both that an attack is coming and where it will hit. It also favors fast transitions between readable poses over mushy in-betweens. imonk's sword-slash tutorial independently uses anticipation, slash, and recovery key poses, with the body leaning and balancing around the windup before a fast strike.
+## Run 031 research lesson
+Multi-direction sprite guidance consistently treats each facing as a redraw rather than an arbitrary rotation. The useful transferable rule is to preserve invariant scale and anchors while translating the same design relationships into a new silhouette. Pixeldex specifically recommends fixed foot/ground anchors, same scale across directions, silhouette checks, and warns that diagonals should not simply be rotated cardinals. A skeletal-animation tutorial for pixel art independently notes that raw rotation produces jagged artifacts and uses enlarged transforms plus cleanup rather than trusting low-resolution rotation directly.
 
 Sources:
-- https://www.rivalslib.com/workshop_guide/art/anticipation_action_recovery.html
-- https://itch.io/t/2489691/pixel-tutorial-sword-slash-animation
+- https://pixeldex.dev/sprites/builder/
+- https://itch.io/devlog/214252/tutorial-basic-skeletal-animation.amp
 
 ## Experiment
-**Windup Lane** is a short three-lane dodge game. A 16×16 boss randomly threatens left, center, or right. In CLEAR WINDUP, each startup pose redistributes the boss's whole silhouette toward the future hit. In MUDDY WINDUP, every startup collapses toward one generic crouch. The player has to move out of the threatened lane before the strike lands. COLOR/INK removes palette dependence.
+**Turntable Crew** is a four-round matching game. A 16×16 front-facing worker is shown as the reference. Three clean side-view silhouettes are offered; exactly one belongs to the same worker. The wrong answers are not malformed decoys. They are valid side sprites whose body-width, depth, head/body, or grounded-height relationships belong to another worker. INK is the default so color cannot solve the match.
+
+Assets: four original front views plus four original side views for Hauler, Scout, Guard, and Miner.
+
+## Assumption challenge
+The dangerous shortcut was to use obvious distortions as wrong answers. That would test error spotting rather than viewpoint consistency. The experiment therefore swaps complete, plausible side-view proportion systems between workers.
+
+A second risk was confusing side-view facing cues with the already-practiced 012 lesson. 031 does not ask which direction a sprite faces. It asks whether a front and side silhouette preserve one character identity across projection.
 
 ## Self-critique
-The left and right windups are strongest because torso lean, arm reach, and counterbalance all point in one direction. The center attack is weaker because a vertical threat naturally offers fewer asymmetric contour clues and risks reading as a generic crouch. That weakness is useful: an anticipation pose cannot rely on intensity alone. It must encode destination or hit region. The game is also a better pressure test than another identification card because the silhouette now affects survival before the active frame appears.
+Hauler and Guard have the strongest contracts because their width/depth differences survive a turn clearly. Scout and Miner are more fragile: at 16×16, one pixel of width can swing their identity too far. The game is also stricter than a single turnaround showcase because every distractor is a legitimate sprite. If choices feel arbitrary, the mass contracts are not separated enough.
 
-Hard-fail condition: CLEAR and MUDDY produce similar dodge success; the player cannot infer the threatened lane before impact; INK mode destroys the directional read; or the attack is readable only because of the lane highlight at strike time.
-
-## Plateau note
-Stephen observed that competent runs without headway should not be mistaken for breakthroughs. 023 adds temporal prediction: the artwork must communicate future gameplay state before the event occurs. This is a stronger synthesis pressure than simply recognizing a finished pose.
+Hard-fail condition: matching requires color; the correct side view is not distinguishable from another worker by broad shape; side sprites float relative to the front reference; or one character becomes a visibly different scale when turned.
 
 ## Next-run guardrail
-Do not immediately repeat attack-lane anticipation, modular machinery cleanup, tool foreshortening, four-frame locomotion tracking, contact-seam A/B testing, diagnostic-landmark subtraction, fur/feather clumps, big-medium-small prop hierarchy, action-verb staging, exaggerated humanoid proportions, interior value blocking, facing asymmetry, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, or asymmetrical loadout integration as isolated lessons. Prefer rotation consistency across viewpoints, silhouette hierarchy in a small boss encounter with multiple actors, recovery-state readability, or another synthesis pressure that changes the spatial problem.
+Do not immediately repeat front-to-side worker matching, generic multi-direction turnaround, core-only quadruped proportion tests, quadruped phase offsets, lower-body weight transfer, tool follow-through, shoulder-lock detection, mechanical arc correction, squash/stretch volume, attack-lane anticipation, modular machinery cleanup, tool foreshortening, four-frame locomotion tracking, contact-seam A/B testing, diagnostic-landmark subtraction, fur/feather clumps, big-medium-small prop hierarchy, action-verb staging, exaggerated humanoid proportions, interior value blocking, facing asymmetry, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, or asymmetrical loadout integration as isolated lessons.
+
+Promising next pressures: recovery-state readability after an action; maintaining one character identity across front/back rather than front/side; silhouette hierarchy when multiple actors overlap in a small encounter; or a deliberately non-humanoid mechanical-to-organic transfer that has not been isolated before.
 
 ## Feedback limitation
 Stephen's 1–5 ratings are stored with `localStorage` on his device. They are not visible to automated future runs unless a shared feedback backend is added.
