@@ -8,6 +8,7 @@
     css: { name: 'styles.css' },
     js: { name: 'app.js' }
   };
+  const MODES = new Set(['code', 'preview', 'console', 'tools']);
 
   const starter = () => ({
     version: SCHEMA_VERSION,
@@ -23,9 +24,8 @@
   const state = {
     durable: starter(),
     ui: {
-      previewOpen: false,
-      consoleOpen: false,
-      toolsOpen: false,
+      mode: 'code',
+      editorFocused: false,
       saveStatus: 'READY',
       logs: [],
       errorCount: 0,
@@ -43,7 +43,9 @@
   let renderedPreviewRunId = -1;
 
   const els = {
+    app: document.querySelector('#app'),
     editor: document.querySelector('#editor'),
+    editorPane: document.querySelector('#editorPane'),
     fileName: document.querySelector('#fileName'),
     lineCount: document.querySelector('#lineCount'),
     saveStatus: document.querySelector('#saveStatus'),
@@ -51,19 +53,17 @@
     preview: document.querySelector('#preview'),
     previewPane: document.querySelector('#previewPane'),
     consolePane: document.querySelector('#consolePane'),
+    toolsPane: document.querySelector('#toolsPane'),
     consoleOutput: document.querySelector('#consoleOutput'),
+    codeBtn: document.querySelector('#codeBtn'),
     previewBtn: document.querySelector('#previewBtn'),
     consoleBtn: document.querySelector('#consoleBtn'),
     errorBadge: document.querySelector('#errorBadge'),
     clearConsole: document.querySelector('#clearConsole'),
     toolsBtn: document.querySelector('#toolsBtn'),
-    toolsSheet: document.querySelector('#toolsSheet'),
-    closeTools: document.querySelector('#closeTools'),
     resetProject: document.querySelector('#resetProject'),
-    scrim: document.querySelector('#scrim'),
     toast: document.querySelector('#toast'),
-    fileTabs: [...document.querySelectorAll('[data-file]')],
-    closeButtons: [...document.querySelectorAll('[data-close]')]
+    fileTabs: [...document.querySelectorAll('[data-file]')]
   };
 
   function enqueue(type, payload = {}) {
@@ -98,25 +98,20 @@
         break;
       }
       case 'SELECT_FILE':
-        if (FILE_META[event.payload.file]) state.durable.activeFile = event.payload.file;
+        if (FILE_META[event.payload.file]) {
+          state.durable.activeFile = event.payload.file;
+          state.ui.mode = 'code';
+        }
         break;
-      case 'TOGGLE_PREVIEW':
-        state.ui.previewOpen = !state.ui.previewOpen;
-        if (state.ui.previewOpen) state.ui.consoleOpen = false;
+      case 'SET_MODE':
+        if (MODES.has(event.payload.mode)) state.ui.mode = event.payload.mode;
         break;
-      case 'TOGGLE_CONSOLE':
-        state.ui.consoleOpen = !state.ui.consoleOpen;
-        if (state.ui.consoleOpen) state.ui.previewOpen = false;
+      case 'EDITOR_FOCUS':
+        state.ui.editorFocused = true;
+        state.ui.mode = 'code';
         break;
-      case 'CLOSE_PANEL':
-        if (event.payload.panel === 'preview') state.ui.previewOpen = false;
-        if (event.payload.panel === 'console') state.ui.consoleOpen = false;
-        break;
-      case 'OPEN_TOOLS':
-        state.ui.toolsOpen = true;
-        break;
-      case 'CLOSE_TOOLS':
-        state.ui.toolsOpen = false;
+      case 'EDITOR_BLUR':
+        state.ui.editorFocused = false;
         break;
       case 'CLEAR_CONSOLE':
         state.ui.logs = [];
@@ -126,13 +121,13 @@
         state.durable = starter();
         state.ui.logs = [];
         state.ui.errorCount = 0;
-        state.ui.toolsOpen = false;
+        state.ui.mode = 'code';
         persistCurrentState();
-        prepareRun();
+        prepareRun(false);
         setToast('Starter project restored');
         break;
       case 'RUN':
-        prepareRun();
+        prepareRun(true);
         setToast('Build executed');
         break;
       case 'SAVE':
@@ -213,13 +208,16 @@
     <\/script><script>${safeJs}<\/script></body></html>`;
   }
 
-  function prepareRun() {
+  function prepareRun(showPreview) {
     state.ui.logs = [{ level: 'info', message: `Run revision ${state.durable.revision}`, time: Date.now() }];
     state.ui.errorCount = 0;
     state.ui.previewDocument = buildPreviewDocument();
     state.ui.previewRunId += 1;
-    state.ui.previewOpen = true;
-    state.ui.consoleOpen = false;
+    if (showPreview) {
+      state.ui.editorFocused = false;
+      state.ui.mode = 'preview';
+      els.editor.blur();
+    }
   }
 
   function handlePreviewMessage(data) {
@@ -241,6 +239,11 @@
     state.toastTimer = setTimeout(() => enqueue('TOAST_EXPIRE', { token }), 1300);
   }
 
+  function setPaneState(element, active) {
+    element.classList.toggle('active-pane', active);
+    element.setAttribute('aria-hidden', String(!active));
+  }
+
   function render() {
     const active = state.durable.activeFile;
     const source = state.durable.files[active];
@@ -249,14 +252,22 @@
     const lines = source.split('\n').length;
     els.lineCount.textContent = `${lines} ${lines === 1 ? 'LINE' : 'LINES'}`;
     els.saveStatus.textContent = state.ui.saveStatus;
-    els.fileTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.file === active));
-    els.previewPane.classList.toggle('collapsed', !state.ui.previewOpen);
-    els.consolePane.classList.toggle('collapsed', !state.ui.consoleOpen);
-    els.toolsSheet.classList.toggle('open', state.ui.toolsOpen);
-    els.toolsSheet.setAttribute('aria-hidden', String(!state.ui.toolsOpen));
-    els.scrim.hidden = !state.ui.toolsOpen;
+    els.fileTabs.forEach(tab => tab.classList.toggle('active', state.ui.mode === 'code' && tab.dataset.file === active));
+    els.toolsBtn.classList.toggle('active', state.ui.mode === 'tools');
+
+    setPaneState(els.editorPane, state.ui.mode === 'code');
+    setPaneState(els.previewPane, state.ui.mode === 'preview');
+    setPaneState(els.consolePane, state.ui.mode === 'console');
+    setPaneState(els.toolsPane, state.ui.mode === 'tools');
+
+    els.codeBtn.classList.toggle('active', state.ui.mode === 'code');
+    els.previewBtn.classList.toggle('active', state.ui.mode === 'preview');
+    els.consoleBtn.classList.toggle('active', state.ui.mode === 'console');
     els.errorBadge.hidden = state.ui.errorCount === 0;
     els.errorBadge.textContent = String(state.ui.errorCount);
+
+    els.app.classList.toggle('editor-focused', state.ui.editorFocused);
+
     els.consoleOutput.replaceChildren(...state.ui.logs.map(log => {
       const row = document.createElement('div');
       row.className = `log ${log.level}`;
@@ -276,6 +287,8 @@
 
   function bindInputs() {
     els.editor.addEventListener('input', event => enqueue('EDIT', { value: event.target.value }));
+    els.editor.addEventListener('focus', () => enqueue('EDITOR_FOCUS'));
+    els.editor.addEventListener('blur', () => enqueue('EDITOR_BLUR'));
     els.editor.addEventListener('keydown', event => {
       if (event.key === 'Tab') {
         event.preventDefault();
@@ -290,18 +303,16 @@
     });
     els.fileTabs.forEach(tab => tab.addEventListener('click', () => enqueue('SELECT_FILE', { file: tab.dataset.file })));
     els.runBtn.addEventListener('click', () => enqueue('RUN'));
-    els.previewBtn.addEventListener('click', () => enqueue('TOGGLE_PREVIEW'));
-    els.consoleBtn.addEventListener('click', () => enqueue('TOGGLE_CONSOLE'));
-    els.closeButtons.forEach(button => button.addEventListener('click', () => enqueue('CLOSE_PANEL', { panel: button.dataset.close })));
+    els.codeBtn.addEventListener('click', () => enqueue('SET_MODE', { mode: 'code' }));
+    els.previewBtn.addEventListener('click', () => enqueue('SET_MODE', { mode: 'preview' }));
+    els.consoleBtn.addEventListener('click', () => enqueue('SET_MODE', { mode: 'console' }));
     els.clearConsole.addEventListener('click', () => enqueue('CLEAR_CONSOLE'));
-    els.toolsBtn.addEventListener('click', () => enqueue('OPEN_TOOLS'));
-    els.closeTools.addEventListener('click', () => enqueue('CLOSE_TOOLS'));
-    els.scrim.addEventListener('click', () => enqueue('CLOSE_TOOLS'));
+    els.toolsBtn.addEventListener('click', () => enqueue('SET_MODE', { mode: 'tools' }));
     els.resetProject.addEventListener('click', () => {
       if (confirm('Reset all three files to the WRKMAN starter project?')) enqueue('RESET');
     });
     window.addEventListener('message', event => enqueue('PREVIEW_MESSAGE', { data: event.data }));
-    document.querySelectorAll('.chrome, .bottombar, .tools-sheet').forEach(surface => {
+    document.querySelectorAll('.chrome, .bottombar').forEach(surface => {
       surface.addEventListener('contextmenu', event => event.preventDefault());
     });
   }
@@ -309,5 +320,6 @@
   loadPersisted();
   bindInputs();
   els.editor.value = state.durable.files[state.durable.activeFile];
-  enqueue('RUN');
+  prepareRun(false);
+  render();
 })();
