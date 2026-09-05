@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>023 Windup Lane</title>
+<style>:root{color-scheme:dark;--bg:#0b0f15;--panel:#151c27;--line:#2a3547;--ink:#f2f5fa;--muted:#9ba8bb;--accent:#79e6a5;--bad:#ff8f8f;--gold:#ffd166}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}body{min-height:100vh;padding:max(12px,env(safe-area-inset-top)) 12px max(16px,env(safe-area-inset-bottom));user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}main{max-width:720px;margin:auto;display:grid;gap:10px}.top{display:flex;justify-content:space-between;align-items:center}.back{color:#a8c9ff;text-decoration:none;font-weight:900}h1{font-size:22px;margin:0}.sub{margin:4px 0 0;color:var(--muted);font-size:11px;line-height:1.45}.panel{border:1px solid var(--line);background:var(--panel);border-radius:18px;padding:11px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:7px}.controls button,.move button,.reset{min-height:48px;border:1px solid #3a4a61;border-radius:12px;background:#101722;color:var(--ink);font:inherit;font-size:10px;font-weight:900}.controls button.on{border-color:#56836a;background:#183425;color:#d0f8db}.hud{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted)}.hud strong{color:var(--gold)}#arena{width:100%;aspect-ratio:3/2;border:1px solid var(--line);border-radius:18px;background:#d6cfbf;image-rendering:pixelated}.move{display:grid;grid-template-columns:1fr 1fr;gap:8px}.move button{font-size:14px;touch-action:manipulation}.note{font-size:11px;line-height:1.5;color:#c8d1de}.note strong{color:var(--accent)}#msg{min-height:17px;font-size:11px;font-weight:900}.good{color:var(--accent)}.bad{color:var(--bad)}</style></head><body><main>
+<div class="top"><a class="back" href="../">← DIRECTORY</a><span>EXPERIMENT 023</span></div>
+<section><h1>WINDUP LANE</h1><p class="sub">Read the boss silhouette before the strike. Move out of the threatened lane before impact.</p></section>
+<section class="panel controls"><button id="clarity" class="on">CLEAR WINDUP</button><button id="ink">COLOR</button></section>
+<section class="panel hud"><span>ATTACK <strong id="round">1</strong>/10</span><span>HP <strong id="hp">3</strong></span><span>SCORE <strong id="score">0</strong></span></section>
+<canvas id="arena" width="240" height="160"></canvas>
+<div class="move"><button id="left">◀ MOVE LEFT</button><button id="right">MOVE RIGHT ▶</button></div><div id="msg"></div>
+<section class="panel note"><strong>Training pressure:</strong> the boss has three attack lanes. CLEAR WINDUP gives each startup a distinct whole-body silhouette that points toward the future hit. MUDDY WINDUP compresses all three startups toward the same generic crouch. The strike itself is intentionally fast. If you only understand the attack after impact, the anticipation failed.</section>
+<button class="reset" id="reset">NEW 10-ATTACK ROUND</button>
+<script>(()=>{'use strict';
+const cv=document.getElementById('arena'),x=cv.getContext('2d');x.imageSmoothingEnabled=false;
+const boss={idle:[[6,2,4,3],[5,5,6,6],[3,6,2,4],[11,6,2,4],[5,11,2,3],[9,11,2,3]],
+left:[[8,2,4,3],[7,5,6,5],[4,6,4,2],[2,7,3,2],[8,10,2,4],[11,10,2,4],[11,4,3,2]],
+center:[[6,3,4,3],[4,6,8,5],[3,7,2,3],[11,7,2,3],[5,11,2,3],[9,11,2,3],[7,1,2,2]],
+right:[[4,2,4,3],[3,5,6,5],[8,6,4,2],[11,7,3,2],[3,10,2,4],[6,10,2,4],[2,4,3,2]],
+muddy:[[6,3,4,3],[5,6,6,5],[4,7,2,3],[10,7,2,3],[5,11,2,3],[9,11,2,3]],
+strikeL:[[2,5,10,3],[10,3,4,2],[5,8,5,5],[4,12,2,2],[9,12,2,2]],strikeC:[[6,1,4,4],[5,5,6,7],[4,7,2,3],[10,7,2,3],[5,12,2,2],[9,12,2,2]],strikeR:[[4,5,10,3],[2,3,4,2],[6,8,5,5],[5,12,2,2],[10,12,2,2]],recover:[[5,3,5,3],[4,6,7,6],[3,9,2,3],[10,8,3,2],[5,12,2,2],[9,12,2,2]]};
+let player=1,attack=1,phase='anticipation',round=1,hp=3,score=0,clear=true,ink=false,locked=false,timer=null;
+function px(parts,ox,oy,s,c){x.fillStyle=c;for(const [a,b,w,h] of parts)x.fillRect(ox+a*s,oy+b*s,w*s,h*s)}
+function draw(){x.fillStyle='#d6cfbf';x.fillRect(0,0,240,160);x.strokeStyle='#aaa18f';x.lineWidth=1;for(let i=1;i<3;i++){x.beginPath();x.moveTo(i*80,0);x.lineTo(i*80,160);x.stroke()}
+const key=phase==='anticipation'?(clear?['left','center','right'][attack]:'muddy'):phase==='strike'?['strikeL','strikeC','strikeR'][attack]:phase==='recover'?'recover':'idle';
+px(boss[key],88,15,4,ink?'#252b34':'#853f43');
+// 16x16 player: compact miner-like silhouette
+const p=[[6,2,5,2],[5,4,6,3],[6,7,5,5],[4,8,2,2],[11,8,2,2],[6,12,2,2],[9,12,2,2]];px(p,player*80+16,96,3,ink?'#252b34':'#3f6f91');
+if(phase==='strike'){x.fillStyle='rgba(120,35,35,.18)';x.fillRect(attack*80,0,80,160)} }
+function start(){clearTimeout(timer);attack=Math.floor(Math.random()*3);phase='anticipation';locked=false;draw();timer=setTimeout(strike,clear?850:850)}
+function strike(){phase='strike';locked=true;draw();if(player===attack){hp--;msg('HIT — windup not escaped','bad')}else{score++;msg('SAFE','good')}sync();timer=setTimeout(()=>{phase='recover';draw();timer=setTimeout(next,420)},220)}
+function next(){if(hp<=0||round>=10){phase='idle';draw();document.getElementById('msg').textContent=hp<=0?`DOWN • ${score}/10 reads`:`SHIFT CLEAR • ${score}/10 reads`;return}round++;sync();start()}
+function move(d){if(locked)return;player=Math.max(0,Math.min(2,player+d));draw()}
+function msg(t,c){const m=document.getElementById('msg');m.textContent=t;m.className=c}function sync(){roundEl.textContent=round;hpEl.textContent=hp;scoreEl.textContent=score}
+const roundEl=document.getElementById('round'),hpEl=document.getElementById('hp'),scoreEl=document.getElementById('score');
+document.getElementById('left').onclick=()=>move(-1);document.getElementById('right').onclick=()=>move(1);
+document.getElementById('clarity').onclick=e=>{clear=!clear;e.currentTarget.textContent=clear?'CLEAR WINDUP':'MUDDY WINDUP';e.currentTarget.classList.toggle('on',clear);if(phase==='anticipation')draw()};
+document.getElementById('ink').onclick=e=>{ink=!ink;e.currentTarget.textContent=ink?'INK':'COLOR';e.currentTarget.classList.toggle('on',ink);draw()};
+document.getElementById('reset').onclick=()=>{round=1;hp=3;score=0;player=1;sync();msg('','');start()};
+sync();start();
+})();</script></main></body></html>
