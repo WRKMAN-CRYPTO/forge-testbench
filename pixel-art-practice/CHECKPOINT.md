@@ -1,6 +1,6 @@
 # Pixel Art Practice Checkpoint
 
-Latest completed experiment: **013 — Value Crew**
+Latest completed experiment: **014 — Action Read**
 
 ## Retained progression
 - 004 Pose Relay: Carry had the strongest skeleton; Catch attached arms too near the head.
@@ -9,27 +9,29 @@ Latest completed experiment: **013 — Value Crew**
 - 008 Crew Call: current best humanoid baseline. Compact head/torso/leg mass hierarchy improved readability. Stephen explicitly judged these the best characters so far.
 - 009 Loadout Read: give one dominant equipment mass ownership of the outer contour while keeping the humanoid body compact.
 - 010 Armory Grammar: weapon identity can be designed before shading through distinct mass distribution along the main axis.
-- 011 Gap Beasts: negative space is an active design element. A few deliberate empty-pixel channels between legs, tail/body, or neck/body can clarify anatomy better than adding contour branches.
-- 012 Facing Signal: side-facing humanoids can communicate direction with only a few one-sided contour cues. Profile, brim/hood, body lean, and toe direction should agree while the opposite side remains visually quiet.
-- 013 Value Crew: preserve the compact outer silhouette and move profession/equipment information inward. A few broad connected value regions can create role identity without buying that identity with extra contour branches.
+- 011 Gap Beasts: negative space is an active design element. A few deliberate empty-pixel channels can clarify anatomy better than adding contour branches.
+- 012 Facing Signal: side-facing humanoids can communicate direction with a few agreeing one-sided contour cues while the opposite side remains visually quiet.
+- 013 Value Crew: preserve the compact outer silhouette and move profession/equipment information inward into a few broad connected value regions.
+- 014 Action Read: synthesize the retained rules around one dominant direction of force. At 16×16, the pose should communicate a verb before profession, color, or interior detail does.
 
-## Run 013 research lesson
-Pedro Medeiros notes that at very low resolution he avoids excessive outlines while retaining an outside border for contrast and silhouette. Wayline's game-ready-sprite lesson recommends building silhouette first, then adding the biggest interior shapes before small details. Run 013 combines those ideas into one constraint: the outer human contour stays quiet while visor, chest block, bib, and diagonal cloth are expressed as large interior value masses.
+## Run 014 research lesson
+Pixel Canvas Hub's motion-first character lesson recommends readable action silhouettes, separated major masses, and black-out testing. Its silhouette-to-soul lesson frames gesture as a single dominant line of action that prevents stiffness. Wayline reinforces testing the silhouette at actual game scale before adding smaller interior shapes. Run 014 combines those ideas into a synthesis constraint: one worker is redrawn as four distinct verbs, and each verb must survive an all-ink view while preserving the compact Crew Call body hierarchy.
 
 Sources:
-- https://www.patreon.com/saint11/posts/outlines-14106192
+- https://pixelcanvashub.com/post/dynamic-poses-strong-characters-a-motion-first-guide-to-character-design
+- https://pixelcanvashub.com/post/from-silhouette-to-soul-a-stepbystep-character-design-workout-for-any-skill-level
 - https://www.wayline.io/learn/pixel-art/4
 
 ## Self-critique
-This is a deliberate plateau-breaker rather than another contour specialty. Hauler currently has the strongest interior hierarchy because the bib reads as one broad connected mass. Welder's visor is clean but does much of the role work from the head. Medic is clear in value mode but risks leaning on familiar cross-like visual shorthand. Scout's diagonal cloth mass gives motion and identity without changing the body edge, but remains somewhat abstract. The main improvement is structural: all four can carry more information without sprouting extra limb-like projections.
+Sprint currently has the clearest directional force because head, torso, and leg placement agree on a forward diagonal. Lift has the clearest task because the overhead mass and centered support body create an unmistakable vertical relationship. Push is structurally useful but its forward arm/body mass risks merging into one blunt horizontal block. Swing is the most ambitious and the weakest in refinement: the raised tool direction creates useful energy, but the upper contour can still regress into the old branch/antenna problem if the tool is described too thinly. This is a more meaningful test than adding another isolated silhouette trick because several retained rules are now required to coexist in the same 16×16 figure.
 
-Hard-fail condition: interior value regions fragment into confetti, require black internal linework to make sense, or push outward until the silhouette regains the old branch/antenna ambiguity.
+Hard-fail condition: COLOR appears readable but INK loses the verb; the line of action is contradicted by limb placement; or exaggeration reintroduces false heads, false limbs, antenna-like projections, or disconnected pixel confetti.
 
 ## Plateau note
-Stephen observed that the last few runs were not bad but had made no real headway. Treat 008 Crew Call as the stable humanoid baseline and avoid mistaking small technique additions for a breakthrough. Future runs should increasingly test synthesis: multiple retained rules must coexist in one readable design. If repeated synthesis runs remain merely tidy, the bottleneck should be treated as composition/taste rather than another isolated pixel-art rule.
+Stephen observed that the recent runs were not bad but had made no real headway. Treat 008 Crew Call as the stable humanoid baseline and do not mistake cleanliness for breakthrough. Run 014 begins deliberate synthesis. Future runs should continue asking whether multiple learned principles can coexist naturally enough that the result begins to develop a distinctive but comprehensible visual grammar.
 
 ## Next-run guardrail
-Do not repeat large interior value blocking, side-facing direction cues, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, basic proportions, or asymmetrical loadout integration. Prefer a synthesis challenge or a genuinely new transferable pressure such as readable cloth/hair mass, material differentiation with minimal clusters, or expressive non-humanoid functional props. Require the new lesson to preserve Crew Call-level body mass hierarchy rather than replacing it.
+Do not repeat action-verb staging immediately. Also avoid repeating large interior value blocking, side-facing direction cues, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, basic proportions, or asymmetrical loadout integration as isolated lessons. Prefer another synthesis pressure that changes the design problem, such as readable cloth/hair mass under motion, material identity with minimal clusters, or a functional non-humanoid prop/creature whose silhouette must communicate both identity and purpose.
 
 ## Feedback limitation
 Stephen's 1–5 ratings are stored with `localStorage` on his device. They are not visible to automated future runs unless a shared feedback backend is added.
