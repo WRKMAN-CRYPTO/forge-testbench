@@ -5,15 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Shed Vector Generator</title>
 <style>
-:root{color-scheme:dark;--bg:#111411;--panel:#191e19;--panel2:#202620;--line:#354035;--text:#f1f5ef;--muted:#aab6a8;--accent:#9fe870;--accent2:#d6ffbb;--danger:#ffb36b;--shadow:0 12px 30px #0007}
+:root{color-scheme:dark;--bg:#111411;--panel:#191e19;--panel2:#202620;--line:#354035;--text:#f1f5ef;--muted:#aab6a8;--accent:#9fe870;--accent2:#d6ffbb;--shadow:0 12px 30px #0007}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overscroll-behavior:none}
 body{-webkit-user-select:none;user-select:none}
-button,input,select{font:inherit}
+button,input{font:inherit}
 button{min-height:46px;border:1px solid var(--line);border-radius:14px;background:var(--panel2);color:var(--text);font-weight:800;padding:0 14px;touch-action:manipulation}
 button:active{transform:translateY(1px)}
 button.primary{background:var(--accent);color:#10200a;border-color:transparent}
-button.ghost{background:transparent}
 button:focus-visible,input:focus-visible{outline:3px solid var(--accent2);outline-offset:2px}
 .app{max-width:980px;margin:auto;padding:12px 12px 28px;display:grid;gap:12px}
 .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between;min-width:0}
@@ -21,164 +20,65 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--accent2);outlin
 .actions{display:flex;gap:8px;flex-shrink:0}.actions button{padding:0 12px}
 .viewer{position:relative;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:linear-gradient(#1b241d,#111611);box-shadow:var(--shadow)}
 canvas{display:block;width:100%;height:auto;aspect-ratio:1.1/1;touch-action:pan-y;background:transparent}
-.hud{position:absolute;left:10px;right:10px;top:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
-.chip{background:#111a11d9;border:1px solid #ffffff1f;border-radius:999px;padding:7px 10px;font-size:12px;color:#e7efe3;backdrop-filter:blur(8px)}
-.viewerBottom{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:8px;justify-content:center}
-.viewerBottom button{background:#111a11d9;backdrop-filter:blur(8px);min-width:52px;border-color:#ffffff26}
-.panel{border:1px solid var(--line);border-radius:18px;background:var(--panel);overflow:hidden}
-.panelHead{width:100%;display:flex;justify-content:space-between;align-items:center;background:transparent;border:0;border-radius:0;padding:12px 14px;min-height:48px;text-align:left}
-.panelHead span:last-child{color:var(--muted);font-size:12px}
-.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 14px 14px}
-.control{min-width:0}.control label{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:750;margin-bottom:7px}.value{color:var(--accent2);font-variant-numeric:tabular-nums}
-input[type=range]{width:100%;height:34px;margin:0;accent-color:var(--accent);touch-action:pan-y}
-.full{grid-column:1/-1}.toggles{display:grid;grid-template-columns:1fr 1fr;gap:8px}.toggle{display:flex;align-items:center;gap:9px;min-height:46px;padding:0 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2);font-size:13px;font-weight:750}.toggle input{width:20px;height:20px;accent-color:var(--accent)}
-.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 14px 14px}.metric{background:var(--panel2);border-radius:13px;padding:10px;min-width:0}.metric b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metric span{display:block;color:var(--muted);font-size:11px;margin-top:3px}
-.notice{font-size:11px;color:var(--muted);line-height:1.4;padding:0 14px 14px}
+.hud{position:absolute;left:10px;right:10px;top:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}.chip{background:#111a11d9;border:1px solid #ffffff1f;border-radius:999px;padding:7px 10px;font-size:12px;color:#e7efe3;backdrop-filter:blur(8px)}
+.viewerBottom{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:8px;justify-content:center}.viewerBottom button{background:#111a11d9;backdrop-filter:blur(8px);min-width:52px;border-color:#ffffff26}
+.panel{border:1px solid var(--line);border-radius:18px;background:var(--panel);overflow:hidden}.panelHead{width:100%;display:flex;justify-content:space-between;align-items:center;background:transparent;border:0;border-radius:0;padding:12px 14px;min-height:48px;text-align:left}.panelHead span:last-child{color:var(--muted);font-size:12px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 14px 14px}.control{min-width:0}.control label{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:750;margin-bottom:7px}.value{color:var(--accent2);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;height:34px;margin:0;accent-color:var(--accent);touch-action:pan-y}.full{grid-column:1/-1}.toggles{display:grid;grid-template-columns:1fr 1fr;gap:8px}.toggle{display:flex;align-items:center;gap:9px;min-height:46px;padding:0 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2);font-size:13px;font-weight:750}.toggle input{width:20px;height:20px;accent-color:var(--accent)}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 14px 14px}.metric{background:var(--panel2);border-radius:13px;padding:10px;min-width:0}.metric b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metric span{display:block;color:var(--muted);font-size:11px;margin-top:3px}.notice{font-size:11px;color:var(--muted);line-height:1.4;padding:0 14px 14px}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(14px);opacity:0;pointer-events:none;background:#efffe6;color:#10200a;border-radius:999px;padding:10px 14px;font-size:13px;font-weight:800;transition:.18s ease;z-index:20;box-shadow:var(--shadow)}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-@media(min-width:760px){.app{grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);align-items:start}.topbar{grid-column:1/-1}.viewer{position:sticky;top:12px}.controls{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:420px){.actions .label{display:none}.actions button{width:48px;padding:0}.controls{grid-template-columns:1fr}.full{grid-column:auto}.metrics{grid-template-columns:1fr 1fr 1fr}.metric{padding:9px 7px}.metric b{font-size:12px}}
-@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+@media(min-width:760px){.app{grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);align-items:start}.topbar{grid-column:1/-1}.viewer{position:sticky;top:12px}.controls{grid-template-columns:1fr 1fr}}
+@media(max-width:420px){.actions .label{display:none}.actions button{width:48px;padding:0}.controls{grid-template-columns:1fr}.full{grid-column:auto}.metric{padding:9px 7px}.metric b{font-size:12px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <main class="app" id="app">
-  <header class="topbar">
-    <div class="brand"><h1>Shed Vector Generator</h1><p>Dimensions → vectors → projected faces → PNG</p></div>
-    <div class="actions">
-      <button id="randomBtn" type="button" aria-label="Generate a random shed">⟳ <span class="label">Generate</span></button>
-      <button id="exportBtn" class="primary" type="button" aria-label="Export current shed as PNG">⇩ <span class="label">PNG</span></button>
-    </div>
-  </header>
-
-  <section class="viewer" aria-label="Shed preview">
-    <canvas id="canvas" width="900" height="800"></canvas>
-    <div class="hud"><div class="chip" id="dimsChip">10′ × 12′</div><div class="chip" id="pitchChip">6:12 roof</div></div>
-    <div class="viewerBottom" aria-label="View controls">
-      <button id="leftBtn" type="button" aria-label="Rotate left">↶</button>
-      <button id="frontBtn" type="button" aria-label="Reset view">Front</button>
-      <button id="rightBtn" type="button" aria-label="Rotate right">↷</button>
-    </div>
-  </section>
-
-  <section class="panel">
-    <button class="panelHead" id="panelHead" type="button" aria-expanded="true" aria-controls="controls"><span>Build dimensions</span><span id="panelHint">tap to close</span></button>
-    <div id="controls">
-      <div class="controls">
-        <div class="control"><label for="width">Width <span class="value" id="widthVal"></span></label><input id="width" type="range" min="6" max="20" step="1" value="10"></div>
-        <div class="control"><label for="depth">Depth <span class="value" id="depthVal"></span></label><input id="depth" type="range" min="6" max="24" step="1" value="12"></div>
-        <div class="control"><label for="height">Wall height <span class="value" id="heightVal"></span></label><input id="height" type="range" min="6" max="12" step="0.5" value="8"></div>
-        <div class="control"><label for="pitch">Roof slope <span class="value" id="pitchVal"></span></label><input id="pitch" type="range" min="2" max="12" step="1" value="6"></div>
-        <div class="control full"><label for="overhang">Roof overhang <span class="value" id="overhangVal"></span></label><input id="overhang" type="range" min="0" max="2" step="0.25" value="1"></div>
-        <div class="full toggles">
-          <label class="toggle"><input id="door" type="checkbox" checked> Front door</label>
-          <label class="toggle"><input id="windows" type="checkbox" checked> Side windows</label>
-        </div>
-      </div>
-      <div class="metrics">
-        <div class="metric"><b id="ridgeMetric">11′ 0″</b><span>ridge height</span></div>
-        <div class="metric"><b id="rafterMetric">7′ 10″</b><span>rafter line</span></div>
-        <div class="metric"><b id="floorMetric">120 ft²</b><span>floor area</span></div>
-      </div>
-      <div class="notice">Exterior-envelope visualizer only. It does not size framing, foundations, fasteners, loads, or certify code compliance.</div>
-    </div>
-  </section>
-</main>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<header class="topbar"><div class="brand"><h1>Shed Vector Generator</h1><p>Dimensions → vectors → projection → PNG</p></div><div class="actions"><button id="randomBtn" type="button" aria-label="Generate a random shed">⟳ <span class="label">Generate</span></button><button id="exportBtn" class="primary" type="button" aria-label="Export current shed as PNG">⇩ <span class="label">PNG</span></button></div></header>
+<section class="viewer" aria-label="Shed preview"><canvas id="canvas" width="900" height="818"></canvas><div class="hud"><div class="chip" id="dimsChip">10′ × 12′</div><div class="chip" id="pitchChip">6:12 roof</div></div><div class="viewerBottom" aria-label="View controls"><button id="leftBtn" type="button" aria-label="Rotate left">↶</button><button id="frontBtn" type="button" aria-label="Reset view">Front</button><button id="rightBtn" type="button" aria-label="Rotate right">↷</button></div></section>
+<section class="panel"><button class="panelHead" id="panelHead" type="button" aria-expanded="true" aria-controls="controls"><span>Build dimensions</span><span id="panelHint">tap to close</span></button><div id="controls"><div class="controls">
+<div class="control"><label for="width">Width <span class="value" id="widthVal"></span></label><input id="width" type="range" min="6" max="20" step="1" value="10"></div>
+<div class="control"><label for="depth">Depth <span class="value" id="depthVal"></span></label><input id="depth" type="range" min="6" max="24" step="1" value="12"></div>
+<div class="control"><label for="height">Wall height <span class="value" id="heightVal"></span></label><input id="height" type="range" min="6" max="12" step="0.5" value="8"></div>
+<div class="control"><label for="pitch">Roof slope <span class="value" id="pitchVal"></span></label><input id="pitch" type="range" min="2" max="12" step="1" value="6"></div>
+<div class="control full"><label for="overhang">Roof overhang <span class="value" id="overhangVal"></span></label><input id="overhang" type="range" min="0" max="2" step="0.25" value="1"></div>
+<div class="full toggles"><label class="toggle"><input id="door" type="checkbox" checked> Front door</label><label class="toggle"><input id="windows" type="checkbox" checked> Side windows</label></div>
+</div><div class="metrics"><div class="metric"><b id="ridgeMetric"></b><span>ridge height</span></div><div class="metric"><b id="rafterMetric"></b><span>roof edge line</span></div><div class="metric"><b id="floorMetric"></b><span>floor area</span></div></div><div class="notice">Exterior-envelope visualizer only. It does not size framing, foundations, fasteners, loads, or certify code compliance.</div></div></section>
+</main><div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
-(()=>{
-'use strict';
-const root=document.getElementById('app');
-if(root.dataset.ready)return;root.dataset.ready='1';
-const $=id=>document.getElementById(id);
-const canvas=$('canvas'),ctx=canvas.getContext('2d');
+(()=>{'use strict';
+const root=document.getElementById('app');if(root.dataset.ready)return;root.dataset.ready='1';
+const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d');
 const ui={width:$('width'),depth:$('depth'),height:$('height'),pitch:$('pitch'),overhang:$('overhang'),door:$('door'),windows:$('windows')};
 const state={width:10,depth:12,height:8,pitch:6,overhang:1,door:true,windows:true,yaw:-34};
-
-class V3{constructor(x=0,y=0,z=0){this.x=x;this.y=y;this.z=z} add(v){return new V3(this.x+v.x,this.y+v.y,this.z+v.z)} sub(v){return new V3(this.x-v.x,this.y-v.y,this.z-v.z)} scale(s){return new V3(this.x*s,this.y*s,this.z*s)}}
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+class V3{constructor(x=0,y=0,z=0){this.x=x;this.y=y;this.z=z}add(v){return new V3(this.x+v.x,this.y+v.y,this.z+v.z)}scale(s){return new V3(this.x*s,this.y*s,this.z*s)}}
+const C={front:'#9c7650',side:'#805f40',roofL:'#566656',roofR:'#445244',edge:'#20251f',trim:'#d9cfb7',door:'#5f4633',glass:'#6295a0'};
 const ft=v=>{let f=Math.floor(v+1e-6),inch=Math.round((v-f)*12);if(inch===12){f++;inch=0}return inch?`${f}′ ${inch}″`:`${f}′`};
-const color={ground:'#101510',front:'#9c7650',side:'#805f40',gable:'#aa8056',roofL:'#566656',roofR:'#445244',edge:'#20251f',trim:'#d9cfb7',door:'#5f4633',window:'#a9d4d8',glass:'#6295a0',shadow:'#00000035'};
-
-function syncFromUI(){for(const k of ['width','depth','height','pitch','overhang'])state[k]=Number(ui[k].value);state.door=ui.door.checked;state.windows=ui.windows.checked;render();}
-function syncToUI(){for(const k of ['width','depth','height','pitch','overhang'])ui[k].value=state[k];ui.door.checked=state.door;ui.windows.checked=state.windows;render();}
 function geometry(){
- const w=state.width,d=state.depth,h=state.height,o=state.overhang, rise=(w/2)*(state.pitch/12), ridge=h+rise;
- const x0=-w/2,x1=w/2,z0=-d/2,z1=d/2;
- const pts={
-  fbl:new V3(x0,0,z0),fbr:new V3(x1,0,z0),ftl:new V3(x0,h,z0),ftr:new V3(x1,h,z0),fr:new V3(0,ridge,z0),
-  bbl:new V3(x0,0,z1),bbr:new V3(x1,0,z1),btl:new V3(x0,h,z1),btr:new V3(x1,h,z1),br:new V3(0,ridge,z1),
-  rfl:new V3(x0-o,h,z0-o),rfr:new V3(x1+o,h,z0-o),rrl:new V3(x0-o,h,z1+o),rrr:new V3(x1+o,h,z1+o),
-  rfront:new V3(0,ridge+(o*state.pitch/12),z0-o),rback:new V3(0,ridge+(o*state.pitch/12),z1+o)
- };
- const faces=[
-  {id:'leftWall',p:[pts.fbl,pts.ftl,pts.btl,pts.bbl],fill:color.side},
-  {id:'rightWall',p:[pts.fbr,pts.bbr,pts.btr,pts.ftr],fill:color.side},
-  {id:'backWall',p:[pts.bbl,pts.bbr,pts.btr,pts.br,pts.btl],fill:color.front},
-  {id:'frontWall',p:[pts.fbl,pts.fbr,pts.ftr,pts.fr,pts.ftl],fill:color.front},
-  {id:'roofLeft',p:[pts.rfl,pts.rfront,pts.rback,pts.rrl],fill:color.roofL},
-  {id:'roofRight',p:[pts.rfront,pts.rfr,pts.rrr,pts.rback],fill:color.roofR}
- ];
- return {w,d,h,o,rise,ridge,pts,faces};
+ const w=state.width,d=state.depth,h=state.height,o=state.overhang,s=state.pitch/12,rise=(w/2)*s,ridge=h+rise,eaveY=h-o*s,x0=-w/2,x1=w/2,z0=-d/2,z1=d/2;
+ const p={fbl:new V3(x0,0,z0),fbr:new V3(x1,0,z0),ftl:new V3(x0,h,z0),ftr:new V3(x1,h,z0),fr:new V3(0,ridge,z0),bbl:new V3(x0,0,z1),bbr:new V3(x1,0,z1),btl:new V3(x0,h,z1),btr:new V3(x1,h,z1),br:new V3(0,ridge,z1),rfl:new V3(x0-o,eaveY,z0-o),rfr:new V3(x1+o,eaveY,z0-o),rrl:new V3(x0-o,eaveY,z1+o),rrr:new V3(x1+o,eaveY,z1+o),rfront:new V3(0,ridge,z0-o),rback:new V3(0,ridge,z1+o)};
+ const faces=[{id:'leftWall',p:[p.fbl,p.ftl,p.btl,p.bbl],fill:C.side},{id:'rightWall',p:[p.fbr,p.bbr,p.btr,p.ftr],fill:C.side},{id:'backWall',p:[p.bbl,p.bbr,p.btr,p.br,p.btl],fill:C.front},{id:'frontWall',p:[p.fbl,p.fbr,p.ftr,p.fr,p.ftl],fill:C.front},{id:'roofLeft',p:[p.rfl,p.rfront,p.rback,p.rrl],fill:C.roofL},{id:'roofRight',p:[p.rfront,p.rfr,p.rrr,p.rback],fill:C.roofR}];
+ return{w,d,h,o,s,rise,ridge,eaveY,p,faces};
 }
-function rotateY(p,rad){const c=Math.cos(rad),s=Math.sin(rad);return new V3(p.x*c-p.z*s,p.y,p.x*s+p.z*c)}
-function cameraPoint(p,yaw){const q=rotateY(p,yaw);return {x:q.x,y:q.y,z:q.z};}
-function projectRaw(p,yaw){const q=cameraPoint(p,yaw);return {x:q.x,y:-q.y+q.z*.42,z:q.z};}
-function polygonCenter(face,yaw){let z=0;for(const p of face.p)z+=cameraPoint(p,yaw).z;return z/face.p.length}
-function makeTransform(g,W,H,padding=48){
- const yaw=state.yaw*Math.PI/180;const points=Object.values(g.pts).map(p=>projectRaw(p,yaw));
- let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(const p of points){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y)}
- const spanX=Math.max(.1,maxX-minX),spanY=Math.max(.1,maxY-minY);const scale=Math.min((W-padding*2)/spanX,(H-padding*2)/spanY);const ox=(W-(minX+maxX)*scale)/2,oy=(H-(minY+maxY)*scale)/2+H*.025;
- return {yaw,scale,ox,oy,p:p=>{const q=projectRaw(p,yaw);return{x:q.x*scale+ox,y:q.y*scale+oy,z:q.z}}};
-}
+function rotateY(p,a){const c=Math.cos(a),s=Math.sin(a);return new V3(p.x*c-p.z*s,p.y,p.x*s+p.z*c)}
+function camera(p,a){return rotateY(p,a)}
+function raw(p,a){const q=camera(p,a);return{x:q.x,y:-q.y+q.z*.42,z:q.z}}
+function depth(face,a){return face.p.reduce((n,p)=>n+camera(p,a).z,0)/face.p.length}
+function transform(g,W,H,pad){const yaw=state.yaw*Math.PI/180,pts=Object.values(g.p).map(p=>raw(p,yaw));let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;for(const q of pts){minX=Math.min(minX,q.x);maxX=Math.max(maxX,q.x);minY=Math.min(minY,q.y);maxY=Math.max(maxY,q.y)}const scale=Math.min((W-pad*2)/Math.max(.1,maxX-minX),(H-pad*2)/Math.max(.1,maxY-minY)),ox=(W-(minX+maxX)*scale)/2,oy=(H-(minY+maxY)*scale)/2+H*.03;return{yaw,scale,p:p=>{const q=raw(p,yaw);return{x:q.x*scale+ox,y:q.y*scale+oy}}}}
 function path(c,pts,T){c.beginPath();pts.forEach((p,i)=>{const q=T.p(p);i?c.lineTo(q.x,q.y):c.moveTo(q.x,q.y)});c.closePath()}
-function strokeLine(c,a,b,T,width=2,stroke=color.edge){const A=T.p(a),B=T.p(b);c.beginPath();c.moveTo(A.x,A.y);c.lineTo(B.x,B.y);c.lineWidth=width;c.strokeStyle=stroke;c.stroke()}
-function quadOnFace(origin,u,v,uw,vh){return [origin,origin.add(u.scale(uw)),origin.add(u.scale(uw)).add(v.scale(vh)),origin.add(v.scale(vh))]}
-function drawFacade(c,g,T){
- const yaw=T.yaw;
- // Door on front face, centered; dimensions clamp to shed size.
- if(state.door){const dw=Math.min(4,g.w*.42),dh=Math.min(7,g.h*.88);const origin=new V3(-dw/2,.03,-g.d/2-.006);const poly=quadOnFace(origin,new V3(1,0,0),new V3(0,1,0),dw,dh);path(c,poly,T);c.fillStyle=color.door;c.fill();c.strokeStyle=color.trim;c.lineWidth=Math.max(2,T.scale*.035);c.stroke();const knob=T.p(new V3(dw*.32,dh*.53,-g.d/2-.012));c.beginPath();c.arc(knob.x,knob.y,Math.max(2,T.scale*.04),0,Math.PI*2);c.fillStyle=color.trim;c.fill()}
- if(state.windows){
-  const ww=Math.min(3,g.d*.28),wh=Math.min(3,g.h*.36),y=Math.min(g.h*.55,4.4);
-  const sideX=-g.w/2-.008;const z=-ww/2;const poly=quadOnFace(new V3(sideX,y,z),new V3(0,0,1),new V3(0,1,0),ww,wh);path(c,poly,T);c.fillStyle=color.glass;c.fill();c.strokeStyle=color.trim;c.lineWidth=Math.max(2,T.scale*.035);c.stroke();strokeLine(c,new V3(sideX-.006,y+wh/2,z),new V3(sideX-.006,y+wh/2,z+ww),T,Math.max(1,T.scale*.018),color.trim);strokeLine(c,new V3(sideX-.006,y,z+ww/2),new V3(sideX-.006,y+wh,z+ww/2),T,Math.max(1,T.scale*.018),color.trim);
-  const rx=g.w/2+.008;const rpoly=quadOnFace(new V3(rx,y,z),new V3(0,0,1),new V3(0,1,0),ww,wh);path(c,rpoly,T);c.fillStyle=color.glass;c.fill();c.strokeStyle=color.trim;c.lineWidth=Math.max(2,T.scale*.035);c.stroke();strokeLine(c,new V3(rx+.006,y+wh/2,z),new V3(rx+.006,y+wh/2,z+ww),T,Math.max(1,T.scale*.018),color.trim);strokeLine(c,new V3(rx+.006,y,z+ww/2),new V3(rx+.006,y+wh,z+ww/2),T,Math.max(1,T.scale*.018),color.trim);
- }
-}
-function renderScene(c,W,H,forExport=false){
- const g=geometry(),T=makeTransform(g,W,H,forExport?90:52);
- c.clearRect(0,0,W,H);
- const grad=c.createLinearGradient(0,0,0,H);grad.addColorStop(0,forExport?'#eef3e9':'#1b241d');grad.addColorStop(1,forExport?'#dce4d5':'#101510');c.fillStyle=grad;c.fillRect(0,0,W,H);
- const base=[new V3(-g.w*.9,0,-g.d*.85),new V3(g.w*.9,0,-g.d*.85),new V3(g.w*.9,0,g.d*.85),new V3(-g.w*.9,0,g.d*.85)];path(c,base,T);c.fillStyle=forExport?'#c3ceb9':'#263126';c.fill();
- const faces=[...g.faces].sort((a,b)=>polygonCenter(b,T.yaw)-polygonCenter(a,T.yaw));
- for(const f of faces){path(c,f.p,T);c.fillStyle=f.fill;c.fill();c.strokeStyle=color.edge;c.lineWidth=Math.max(1.5,T.scale*.022);c.lineJoin='round';c.stroke()}
- drawFacade(c,g,T);
- strokeLine(c,g.pts.rfront,g.pts.rback,T,Math.max(2,T.scale*.03),'#283128');
- // Dimension floor footprint, faint but geometry-derived.
- const footprint=[g.pts.fbl,g.pts.fbr,g.pts.bbr,g.pts.bbl];c.save();c.setLineDash([Math.max(3,T.scale*.06),Math.max(3,T.scale*.06)]);path(c,footprint,T);c.strokeStyle=forExport?'#566254':'#cbe3bf55';c.lineWidth=Math.max(1,T.scale*.016);c.stroke();c.restore();
- if(forExport){c.fillStyle='#293027';c.font=`700 ${Math.max(18,W*.022)}px system-ui`;c.textAlign='left';c.fillText(`${state.width}′ × ${state.depth}′  •  ${state.pitch}:12 roof`,36,H-40)}
- return g;
-}
-function render(){
- const ratio=Math.min(2,window.devicePixelRatio||1),rect=canvas.getBoundingClientRect(),W=Math.max(320,Math.round(rect.width*ratio)),H=Math.max(310,Math.round(rect.width/.99*ratio));if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H}
- const g=renderScene(ctx,W,H,false);
- $('widthVal').textContent=ft(state.width);$('depthVal').textContent=ft(state.depth);$('heightVal').textContent=ft(state.height);$('pitchVal').textContent=`${state.pitch}:12`;$('overhangVal').textContent=ft(state.overhang);
- $('dimsChip').textContent=`${state.width}′ × ${state.depth}′ × ${ft(state.height)}`;$('pitchChip').textContent=`${state.pitch}:12 roof`;
- $('ridgeMetric').textContent=ft(g.ridge);$('rafterMetric').textContent=ft(Math.hypot(g.w/2+g.o,g.rise+g.o*state.pitch/12));$('floorMetric').textContent=`${Math.round(g.w*g.d)} ft²`;
-}
+function line(c,a,b,T,width,stroke){const A=T.p(a),B=T.p(b);c.beginPath();c.moveTo(A.x,A.y);c.lineTo(B.x,B.y);c.lineWidth=width;c.strokeStyle=stroke;c.stroke()}
+function quad(o,u,v,uw,vh){return[o,o.add(u.scale(uw)),o.add(u.scale(uw)).add(v.scale(vh)),o.add(v.scale(vh))]}
+function windowOn(c,g,T,x){const ww=Math.min(3,g.d*.28),wh=Math.min(3,g.h*.36),y=Math.min(g.h*.52,4.2),z=-ww/2,eps=x<0?-.008:.008,px=x+eps;const q=quad(new V3(px,y,z),new V3(0,0,1),new V3(0,1,0),ww,wh);path(c,q,T);c.fillStyle=C.glass;c.fill();c.strokeStyle=C.trim;c.lineWidth=Math.max(2,T.scale*.035);c.stroke();line(c,new V3(px,y+wh/2,z),new V3(px,y+wh/2,z+ww),T,Math.max(1,T.scale*.018),C.trim);line(c,new V3(px,y,z+ww/2),new V3(px,y+wh,z+ww/2),T,Math.max(1,T.scale*.018),C.trim)}
+function decorate(c,id,g,T){if(id==='frontWall'&&state.door){const dw=Math.min(4,g.w*.42),dh=Math.min(7,g.h*.88),z=-g.d/2-.008,q=quad(new V3(-dw/2,.02,z),new V3(1,0,0),new V3(0,1,0),dw,dh);path(c,q,T);c.fillStyle=C.door;c.fill();c.strokeStyle=C.trim;c.lineWidth=Math.max(2,T.scale*.035);c.stroke();const k=T.p(new V3(dw*.32,dh*.53,z-.004));c.beginPath();c.arc(k.x,k.y,Math.max(2,T.scale*.04),0,Math.PI*2);c.fillStyle=C.trim;c.fill()}if(state.windows&&id==='leftWall')windowOn(c,g,T,-g.w/2);if(state.windows&&id==='rightWall')windowOn(c,g,T,g.w/2)}
+function renderScene(c,W,H,exporting){const g=geometry(),T=transform(g,W,H,exporting?90:52);c.clearRect(0,0,W,H);const grad=c.createLinearGradient(0,0,0,H);grad.addColorStop(0,exporting?'#eef3e9':'#1b241d');grad.addColorStop(1,exporting?'#dce4d5':'#101510');c.fillStyle=grad;c.fillRect(0,0,W,H);const ground=[new V3(-g.w*.9,0,-g.d*.85),new V3(g.w*.9,0,-g.d*.85),new V3(g.w*.9,0,g.d*.85),new V3(-g.w*.9,0,g.d*.85)];path(c,ground,T);c.fillStyle=exporting?'#c3ceb9':'#263126';c.fill();const faces=[...g.faces].sort((a,b)=>depth(b,T.yaw)-depth(a,T.yaw));for(const f of faces){path(c,f.p,T);c.fillStyle=f.fill;c.fill();c.strokeStyle=C.edge;c.lineWidth=Math.max(1.5,T.scale*.022);c.lineJoin='round';c.stroke();decorate(c,f.id,g,T)}line(c,g.p.rfront,g.p.rback,T,Math.max(2,T.scale*.03),'#283128');if(exporting){c.fillStyle='#293027';c.font=`700 ${Math.max(18,W*.022)}px system-ui`;c.textAlign='left';c.fillText(`${state.width}′ × ${state.depth}′ • ${state.pitch}:12 roof`,36,H-40)}return g}
+function render(){const ratio=Math.min(2,window.devicePixelRatio||1),rect=canvas.getBoundingClientRect(),W=Math.max(320,Math.round(rect.width*ratio)),H=Math.max(290,Math.round(W/1.1));if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H}const g=renderScene(ctx,W,H,false);$('widthVal').textContent=ft(state.width);$('depthVal').textContent=ft(state.depth);$('heightVal').textContent=ft(state.height);$('pitchVal').textContent=`${state.pitch}:12`;$('overhangVal').textContent=ft(state.overhang);$('dimsChip').textContent=`${state.width}′ × ${state.depth}′ × ${ft(state.height)}`;$('pitchChip').textContent=`${state.pitch}:12 roof`;$('ridgeMetric').textContent=ft(g.ridge);$('rafterMetric').textContent=ft(Math.hypot(g.w/2+g.o,g.ridge-g.eaveY));$('floorMetric').textContent=`${Math.round(g.w*g.d)} ft²`}
+function fromUI(){for(const k of ['width','depth','height','pitch','overhang'])state[k]=Number(ui[k].value);state.door=ui.door.checked;state.windows=ui.windows.checked;render()}
+function toUI(){for(const k of ['width','depth','height','pitch','overhang'])ui[k].value=state[k];ui.door.checked=state.door;ui.windows.checked=state.windows;render()}
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),1500)}
-function randomize(){state.width=Math.round(7+Math.random()*11);state.depth=Math.round(8+Math.random()*15);state.height=Math.round((7+Math.random()*3.5)*2)/2;state.pitch=3+Math.floor(Math.random()*7);state.overhang=Math.round((.5+Math.random()*1.25)*4)/4;state.door=true;state.windows=Math.random()>.18;state.yaw=-24-Math.random()*30;syncToUI();toast('New shed generated')}
-function exportPNG(){
- const out=document.createElement('canvas');out.width=1800;out.height=1500;const c=out.getContext('2d');renderScene(c,out.width,out.height,true);
- const name=`shed-${state.width}x${state.depth}-${state.pitch}in12.png`;
- if(out.toBlob){out.toBlob(blob=>{if(!blob){toast('PNG export failed');return}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('PNG exported')},'image/png');}
- else{const a=document.createElement('a');a.href=out.toDataURL('image/png');a.download=name;a.click();toast('PNG exported')}
-}
-Object.values(ui).forEach(el=>el.addEventListener(el.type==='range'?'input':'change',syncFromUI));
-$('randomBtn').addEventListener('click',randomize);$('exportBtn').addEventListener('click',exportPNG);
-$('leftBtn').addEventListener('click',()=>{state.yaw-=12;render()});$('rightBtn').addEventListener('click',()=>{state.yaw+=12;render()});$('frontBtn').addEventListener('click',()=>{state.yaw=-34;render()});
-$('panelHead').addEventListener('click',()=>{const box=$('controls'),open=box.hidden;box.hidden=!open;$('panelHead').setAttribute('aria-expanded',String(open));$('panelHint').textContent=open?'tap to close':'tap to open'});
-let drag=null;canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw:state.yaw,id:e.pointerId};canvas.setPointerCapture?.(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const dx=e.clientX-drag.x;if(Math.abs(dx)>3){state.yaw=drag.yaw+dx*.35;render()}});canvas.addEventListener('pointerup',e=>{if(drag&&e.pointerId===drag.id)drag=null});canvas.addEventListener('pointercancel',()=>drag=null);
-let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(render,80)});
-syncToUI();
+function randomize(){state.width=Math.round(7+Math.random()*11);state.depth=Math.round(8+Math.random()*15);state.height=Math.round((7+Math.random()*3.5)*2)/2;state.pitch=3+Math.floor(Math.random()*7);state.overhang=Math.round((.5+Math.random()*1.25)*4)/4;state.door=true;state.windows=Math.random()>.18;state.yaw=-24-Math.random()*30;toUI();toast('New shed generated')}
+function exportPNG(){const out=document.createElement('canvas');out.width=1800;out.height=1500;renderScene(out.getContext('2d'),out.width,out.height,true);const name=`shed-${state.width}x${state.depth}-${state.pitch}in12.png`;out.toBlob(blob=>{if(!blob){toast('PNG export failed');return}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200);toast('PNG exported')},'image/png')}
+Object.values(ui).forEach(el=>el.addEventListener(el.type==='range'?'input':'change',fromUI));$('randomBtn').addEventListener('click',randomize);$('exportBtn').addEventListener('click',exportPNG);$('leftBtn').addEventListener('click',()=>{state.yaw-=12;render()});$('rightBtn').addEventListener('click',()=>{state.yaw+=12;render()});$('frontBtn').addEventListener('click',()=>{state.yaw=-34;render()});$('panelHead').addEventListener('click',()=>{const box=$('controls'),open=box.hidden;box.hidden=!open;$('panelHead').setAttribute('aria-expanded',String(open));$('panelHint').textContent=open?'tap to close':'tap to open'});
+let drag=null;canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,yaw:state.yaw,id:e.pointerId};canvas.setPointerCapture?.(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const dx=e.clientX-drag.x;if(Math.abs(dx)>3){state.yaw=drag.yaw+dx*.35;render()}});canvas.addEventListener('pointerup',e=>{if(drag&&e.pointerId===drag.id)drag=null});canvas.addEventListener('pointercancel',()=>drag=null);let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(render,80)});toUI();
 })();
 </script>
 </body>
