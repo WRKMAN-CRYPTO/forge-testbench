@@ -11,45 +11,48 @@
   <main id="app" class="app-shell">
     <header class="topbar chrome">
       <div class="brand"><span class="mark">W</span><div><strong>WRKMAN IDE</strong><small id="saveStatus">READY</small></div></div>
-      <button id="runBtn" class="run-btn" type="button">▶ RUN</button>
+      <button id="runBtn" class="run-btn touch-target" type="button">▶ RUN</button>
     </header>
 
     <section class="workspace">
       <nav class="file-tabs chrome" aria-label="Project files">
-        <button class="file-tab active" data-file="html" type="button">HTML</button>
-        <button class="file-tab" data-file="css" type="button">CSS</button>
-        <button class="file-tab" data-file="js" type="button">JS</button>
-        <button id="toolsBtn" class="file-tab tools-tab" type="button">TOOLS</button>
+        <button class="file-tab touch-target active" data-file="html" type="button">HTML</button>
+        <button class="file-tab touch-target" data-file="css" type="button">CSS</button>
+        <button class="file-tab touch-target" data-file="js" type="button">JS</button>
+        <button id="toolsBtn" class="file-tab touch-target tools-tab" type="button">TOOLS</button>
       </nav>
 
-      <section class="editor-pane" aria-label="Code editor">
+      <section id="editorPane" class="mode-pane editor-pane active-pane" aria-label="Code editor">
         <div class="editor-head chrome"><span id="fileName">index.html</span><span id="lineCount">1 LINE</span></div>
         <textarea id="editor" aria-label="Source editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
       </section>
 
-      <section id="previewPane" class="preview-pane collapsed" aria-label="Preview">
-        <div class="panel-head chrome"><strong>PREVIEW</strong><button data-close="preview" type="button">×</button></div>
+      <section id="previewPane" class="mode-pane preview-pane" aria-label="Preview" aria-hidden="true">
+        <div class="panel-head chrome"><strong>PREVIEW</strong><span>RUN OUTPUT</span></div>
         <iframe id="preview" title="App preview" sandbox="allow-scripts"></iframe>
       </section>
 
-      <section id="consolePane" class="console-pane collapsed" aria-label="Console">
-        <div class="panel-head chrome"><strong>CONSOLE</strong><div><button id="clearConsole" type="button">CLEAR</button><button data-close="console" type="button">×</button></div></div>
+      <section id="consolePane" class="mode-pane console-pane" aria-label="Console" aria-hidden="true">
+        <div class="panel-head chrome"><strong>CONSOLE</strong><button id="clearConsole" class="panel-action touch-target" type="button">CLEAR</button></div>
         <div id="consoleOutput" class="console-output" role="log" aria-live="polite"></div>
+      </section>
+
+      <section id="toolsPane" class="mode-pane tools-pane" aria-label="Project tools" aria-hidden="true">
+        <div class="panel-head chrome"><strong>PROJECT TOOLS</strong><span>LOCAL PROJECT</span></div>
+        <div class="tools-content">
+          <button id="resetProject" class="danger-soft touch-target" type="button">RESET STARTER PROJECT</button>
+          <p>Source autosaves on this device. Run executes the current HTML, CSS, and JavaScript inside an isolated preview.</p>
+          <p class="hint">Tap HTML, CSS, or JS above to return to code.</p>
+        </div>
       </section>
     </section>
 
     <footer class="bottombar chrome">
-      <button id="previewBtn" type="button">▣ PREVIEW</button>
-      <button id="consoleBtn" type="button">⌁ CONSOLE <span id="errorBadge" hidden>0</span></button>
+      <button id="codeBtn" class="touch-target mode-button active" type="button">⌨ CODE</button>
+      <button id="previewBtn" class="touch-target mode-button" type="button">▣ PREVIEW</button>
+      <button id="consoleBtn" class="touch-target mode-button" type="button">⌁ CONSOLE <span id="errorBadge" hidden>0</span></button>
     </footer>
 
-    <aside id="toolsSheet" class="tools-sheet" aria-hidden="true">
-      <div class="sheet-grip"></div>
-      <div class="sheet-head"><strong>PROJECT TOOLS</strong><button id="closeTools" type="button">×</button></div>
-      <button id="resetProject" class="danger-soft" type="button">RESET STARTER PROJECT</button>
-      <p>Source autosaves on this device. Run executes the current HTML, CSS, and JavaScript inside an isolated preview.</p>
-    </aside>
-    <div id="scrim" class="scrim" hidden></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </main>
   <script src="app.js"></script>
