@@ -1,6 +1,6 @@
 # Pixel Art Practice Checkpoint
 
-Latest completed experiment: **015 — Mass Signal**
+Latest completed experiment: **016 — Shape Stack**
 
 ## Retained progression
 - 004 Pose Relay: Carry had the strongest skeleton; Catch attached arms too near the head.
@@ -14,24 +14,25 @@ Latest completed experiment: **015 — Mass Signal**
 - 013 Value Crew: preserve the compact outer silhouette and move profession/equipment information inward into a few broad connected value regions.
 - 014 Action Read: synthesize the retained rules around one dominant direction of force. At 16×16, the pose should communicate a verb before profession, color, or interior detail does.
 - 015 Mass Signal: use deliberate proportional distortion as semantic compression. One dominant body mass can communicate intended function before equipment or color, but only if the distortion reads as one coherent body rather than a damaged skeleton.
+- 016 Shape Stack: unequal big–medium–small masses can improve prop recognition, especially when the hierarchy explains construction or function rather than merely adding ornament.
 
-## Run 015 research lesson
-SpriteGen's 16×16 character guide argues that realistic human proportions collapse at tiny scale and that proportions should be cheated toward readability; it also specifically recommends widening shoulders or pushing pose features when silhouette needs help. Wayline reinforces that the silhouette must read at actual game size before smaller interior detail matters. Run 015 turns that into a synthesis constraint: each worker receives one intentionally exaggerated proportional bias and no equipment clue. The exaggeration must survive an all-ink test while preserving the compact, connected-body lessons from Crew Call and Hidden Limb.
+## Run 016 research lesson
+PixelSanctuary's creature-design discussion recommends a big–medium–small hierarchy to keep forms from becoming evenly weighted texture soup. Wayline's pixel-art workflow reinforces building the silhouette first, then adding only the largest useful internal shapes and details that survive at actual game scale. Run 016 removes humanoid anatomy entirely and applies that hierarchy to four compact props: lantern, anvil, drill, and cannon.
 
 Sources:
-- https://spritegen.io/guides/how-to-draw-a-pixel-art-character/
+- https://www.pixelsanctuary.com/tutorials/creature-design-shape-language-silhouette
 - https://www.wayline.io/learn/pixel-art/4
 
 ## Self-critique
-Power is currently the strongest specimen because widening shoulder/arm mass changes the whole body at once without creating isolated contour branches. Load also separates well because the back and torso become one heavy volume over a planted base. Speed is less successful: long legs and a narrow trunk signal lightness, but the idea is close to simply making the character skinny. Reach is the dangerous specimen because elongated arms communicate function while simultaneously approaching the old false-limb/antenna failure. This run does not yet look like a breakthrough, but it exposes a promising distinction: useful exaggeration reorganizes several connected masses together; weak exaggeration changes one anatomical dimension and hopes the viewer supplies the meaning.
+Anvil and Drill are currently the strongest. Their dominant and supporting masses also explain how the objects work: the anvil's long top slab sits over a narrower waist/base structure, while the drill's motor body dominates a smaller grip and bit. Lantern remains recognizable, but its tiny crown contributes less semantic information than intended and behaves closer to decoration. Cannon is distinct, but barrel and wheel carriage are closer in visual weight than the hierarchy target. The useful distinction is that size hierarchy gains power when each scale has a functional job; merely making three differently sized decorations is not enough.
 
-Hard-fail condition: the function disappears in INK; an exaggerated part looks detached from the body; long thin anatomy becomes antenna/branch noise; or two roles differ mainly by color instead of silhouette-level mass distribution.
+Hard-fail condition: the object only reads in color; the smallest accent becomes the sole identity cue; two major masses compete at nearly equal weight without a clear reason; or shrinking the sprite causes the hierarchy to collapse into an undifferentiated blob.
 
 ## Plateau note
-Stephen observed that the recent runs were not bad but had made no real headway. Treat 008 Crew Call as the stable humanoid baseline and do not mistake cleanliness for breakthrough. Runs 014 and 015 are deliberate synthesis pressure. The emerging question is whether repeated constraints produce a distinct but comprehensible visual grammar rather than merely competent generic sprites.
+Stephen observed that the recent runs were not bad but had made no real headway. Treat 008 Crew Call as the stable humanoid baseline and do not mistake cleanliness for breakthrough. Runs 014–016 deliberately pressure synthesis and generalization. The emerging question remains whether repeated constraints produce a distinct but comprehensible visual grammar rather than merely competent generic sprites.
 
 ## Next-run guardrail
-Do not repeat action-verb staging or exaggerated humanoid proportions immediately. Also avoid large interior value blocking, side-facing direction cues, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, basic proportions, or asymmetrical loadout integration as isolated lessons. Prefer a new synthesis pressure where readability and style can interact, such as cloth/hair masses that deform with motion, material identity using only a few connected clusters, or a functional non-humanoid machine/creature whose silhouette must communicate both what it is and what it does.
+Do not repeat big–medium–small prop hierarchy immediately. Also avoid action-verb staging, exaggerated humanoid proportions, large interior value blocking, side-facing direction cues, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, basic proportions, or asymmetrical loadout integration as isolated lessons. Prefer a different synthesis pressure such as material identity with minimal clusters, cloth/hair masses that deform without silhouette noise, or a non-humanoid machine/creature whose identity and function must both survive silhouette testing.
 
 ## Feedback limitation
 Stephen's 1–5 ratings are stored with `localStorage` on his device. They are not visible to automated future runs unless a shared feedback backend is added.
