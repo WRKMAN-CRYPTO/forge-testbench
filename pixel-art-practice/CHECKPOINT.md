@@ -1,6 +1,6 @@
 # Pixel Art Practice Checkpoint
 
-Latest completed experiment: **018 — Anchor Drop**
+Latest completed experiment: **019 — Contact Read**
 
 ## Retained progression
 - 004 Pose Relay: Carry had the strongest skeleton; Catch attached arms too near the head.
@@ -17,24 +17,25 @@ Latest completed experiment: **018 — Anchor Drop**
 - 016 Shape Stack: unequal big–medium–small masses can improve prop recognition, especially when the hierarchy explains construction or function rather than merely adding ornament.
 - 017 Tuft Signal: material texture should ride existing masses. A few grouped directional fur/feather clumps can enrich an already-readable silhouette; uniform spikes or strands manufacture false anatomy and contour noise.
 - 018 Anchor Drop: spend contour pixels on diagnostic landmarks that change category recognition. A protrusion or notch earns its place when removing it measurably collapses the read; otherwise it is decoration.
+- 019 Contact Read: when two forms touch, reserve a tiny amount of negative space or staggered contour at the contact point so ownership of each mass remains legible. Closing those seams should measurably worsen parsing.
 
-## Run 018 research lesson
-Wayline's game-ready sprite lesson says to establish the solid silhouette first, then cut tiny details that do not survive actual game scale. SpriteGen frames 16×16 as a very small pixel budget that must be prioritized ruthlessly. Run 018 combines those into a diagnostic-landmark drill rather than another static quiz: KEY, BOOT, FISH, and CAN fall while the player moves a catcher. ANCHORS OFF removes bow/teeth, toe/heel, tail/nose break, and handle/spout respectively.
+## Run 019 research lesson
+Wayline's game-ready sprite lesson emphasizes that the silhouette must survive at actual game scale before interior detail is trusted. Animation silhouette guidance identifies overlapping limbs and closed negative space as common reasons a pose collapses into an unreadable mass. Run 019 turns that into a paired-form pixel test: HANDOFF, TUG, RESCUE, and CLASH are built from compact 16×16 character forms and tested with CLEAN seams versus deliberately FUSED contact points.
 
 Sources:
 - https://www.wayline.io/learn/pixel-art/4
-- https://spritegen.io/guides/how-to-draw-a-pixel-art-character/
+- https://anim.works/silhouette-in-animation/
 
 ## Self-critique
-Key and Boot are strongest because their category identity is carried by a small number of unmistakable edge events. Fish is informative but exposes a weakness in the test: even after removing the explicit tail, the tapered body still suggests an animal or fish-like form, so its identity is distributed across more than one landmark. Can is the most binary: handle plus spout make the watering-can read, while removing them collapses it into a generic container. This suggests a useful distinction between a diagnostic anchor and a merely distinctive detail: the anchor changes what category the viewer assigns at a glance.
+Handoff and Clash express the principle best because the shared object/contact point is distinct while both bodies stay readable. Tug is readable, but some of that clarity comes from bilateral staging rather than the seam itself. Rescue is the weak specimen: the supported figure can still collapse into one irregular torso even with the separation notch. That weakness is useful because it shows a one-pixel gap cannot rescue bad mass organization by itself.
 
-Hard-fail condition: the object still reads equally well after every claimed anchor is removed; recognition depends on interior color; a landmark creates false anatomy/branches; or the player needs stationary inspection rather than instant motion-scale recognition.
+Hard-fail condition: CLEAN and FUSED read equally well; contact seams become decorative holes rather than separating ownership; a pair is understandable only from color/labels; or participants require enlarged stationary inspection.
 
 ## Plateau note
-Stephen observed that recent runs were competent without real headway. Do not mistake technical cleanliness for breakthrough. Run 018 deliberately changes both the art pressure and the game chassis: mixed-category silhouettes, pixel subtraction, and recognition under motion/divided attention. The larger question remains whether accumulated constraints become a distinct but comprehensible visual grammar.
+Stephen observed that recent runs were competent without real headway. Do not mistake technical cleanliness for breakthrough. Run 019 is a synthesis pressure rather than another isolated silhouette lesson: compact anatomy, occlusion, negative space, action, and overlap all have to coexist at the contact point. The larger question remains whether accumulated constraints become a distinct but comprehensible visual grammar.
 
 ## Next-run guardrail
-Do not immediately repeat diagnostic-landmark subtraction, fur/feather clumps, big–medium–small prop hierarchy, action-verb staging, exaggerated humanoid proportions, large interior value blocking, facing asymmetry, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, or asymmetrical loadout integration as isolated lessons. Prefer a synthesis pressure that makes multiple objects interact: readable overlap, compact paired-character contact, controlled foreshortening, or machinery whose moving parts must remain comprehensible at 16×16.
+Do not immediately repeat contact-seam A/B testing, diagnostic-landmark subtraction, fur/feather clumps, big–medium–small prop hierarchy, action-verb staging, exaggerated humanoid proportions, large interior value blocking, facing asymmetry, negative-space creature carving, weapon-only mass grammar, silhouette basics, clusters, skeleton anchoring, occlusion, or asymmetrical loadout integration as isolated lessons. Prefer controlled foreshortening, readable moving machinery, multi-frame silhouette consistency, or another synthesis pressure that changes the spatial problem.
 
 ## Feedback limitation
 Stephen's 1–5 ratings are stored with `localStorage` on his device. They are not visible to automated future runs unless a shared feedback backend is added.
