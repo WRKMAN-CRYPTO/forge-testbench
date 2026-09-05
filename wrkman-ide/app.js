@@ -28,13 +28,19 @@
       toolsOpen: false,
       saveStatus: 'READY',
       logs: [],
-      errorCount: 0
+      errorCount: 0,
+      previewDocument: '',
+      previewRunId: 0,
+      toast: '',
+      toastToken: 0
     },
     queue: [],
     processing: false,
     saveTimer: null,
     toastTimer: null
   };
+
+  let renderedPreviewRunId = -1;
 
   const els = {
     editor: document.querySelector('#editor'),
@@ -64,7 +70,7 @@
     state.queue.push({ type, payload });
     if (state.queue.length > 250) {
       state.queue.splice(0, state.queue.length - 250);
-      appendLog('error', 'Input queue trimmed after overload.');
+      state.queue.push({ type: 'QUEUE_OVERLOAD', payload: {} });
     }
     processQueue();
   }
@@ -87,7 +93,7 @@
         if (state.durable.files[key] !== event.payload.value) {
           state.durable.files[key] = event.payload.value;
           state.durable.revision += 1;
-          markDirty();
+          scheduleSave();
         }
         break;
       }
@@ -121,32 +127,37 @@
         state.ui.logs = [];
         state.ui.errorCount = 0;
         state.ui.toolsOpen = false;
-        persistNow();
-        runPreview();
-        showToast('Starter project restored');
+        persistCurrentState();
+        prepareRun();
+        setToast('Starter project restored');
         break;
       case 'RUN':
-        runPreview();
+        prepareRun();
+        setToast('Build executed');
+        break;
+      case 'SAVE':
+        if (event.payload.revision === state.durable.revision) persistCurrentState();
         break;
       case 'PREVIEW_MESSAGE':
         handlePreviewMessage(event.payload.data);
         break;
+      case 'TOAST_EXPIRE':
+        if (event.payload.token === state.ui.toastToken) state.ui.toast = '';
+        break;
+      case 'QUEUE_OVERLOAD':
+        appendLog('error', 'Input queue trimmed after overload.');
+        break;
     }
   }
 
-  function markDirty() {
+  function scheduleSave() {
     state.ui.saveStatus = 'UNSAVED';
     clearTimeout(state.saveTimer);
     const revision = state.durable.revision;
-    state.saveTimer = setTimeout(() => persistRevision(revision), 260);
+    state.saveTimer = setTimeout(() => enqueue('SAVE', { revision }), 260);
   }
 
-  function persistRevision(revision) {
-    if (revision !== state.durable.revision) return;
-    persistNow();
-  }
-
-  function persistNow() {
+  function persistCurrentState() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.durable));
       state.ui.saveStatus = 'SAVED';
@@ -154,7 +165,6 @@
       state.ui.saveStatus = 'SAVE FAILED';
       appendLog('error', `Save failed: ${error.message}`);
     }
-    render();
   }
 
   function loadPersisted() {
@@ -203,13 +213,13 @@
     <\/script><script>${safeJs}<\/script></body></html>`;
   }
 
-  function runPreview() {
+  function prepareRun() {
     state.ui.logs = [{ level: 'info', message: `Run revision ${state.durable.revision}`, time: Date.now() }];
     state.ui.errorCount = 0;
-    els.preview.srcdoc = buildPreviewDocument();
+    state.ui.previewDocument = buildPreviewDocument();
+    state.ui.previewRunId += 1;
     state.ui.previewOpen = true;
     state.ui.consoleOpen = false;
-    showToast('Build executed');
   }
 
   function handlePreviewMessage(data) {
@@ -221,6 +231,14 @@
     state.ui.logs.push({ level, message: String(message), time: Date.now() });
     if (state.ui.logs.length > 120) state.ui.logs.splice(0, state.ui.logs.length - 120);
     if (level === 'error') state.ui.errorCount += 1;
+  }
+
+  function setToast(message) {
+    state.ui.toast = message;
+    state.ui.toastToken += 1;
+    const token = state.ui.toastToken;
+    clearTimeout(state.toastTimer);
+    state.toastTimer = setTimeout(() => enqueue('TOAST_EXPIRE', { token }), 1300);
   }
 
   function render() {
@@ -246,13 +264,14 @@
       return row;
     }));
     els.consoleOutput.scrollTop = els.consoleOutput.scrollHeight;
-  }
 
-  function showToast(message) {
-    els.toast.textContent = message;
-    els.toast.classList.add('show');
-    clearTimeout(state.toastTimer);
-    state.toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1300);
+    if (renderedPreviewRunId !== state.ui.previewRunId) {
+      renderedPreviewRunId = state.ui.previewRunId;
+      els.preview.srcdoc = state.ui.previewDocument;
+    }
+
+    els.toast.textContent = state.ui.toast;
+    els.toast.classList.toggle('show', Boolean(state.ui.toast));
   }
 
   function bindInputs() {
@@ -290,7 +309,5 @@
   loadPersisted();
   bindInputs();
   els.editor.value = state.durable.files[state.durable.activeFile];
-  render();
-  runPreview();
-  render();
+  enqueue('RUN');
 })();
