@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#17140f">
+<title>Woodworking Layout Bench</title>
+<style>
+:root{color-scheme:dark;--bg:#11100d;--panel:#1b1813;--panel2:#242018;--ink:#f4ecd9;--muted:#bfb39a;--accent:#e0b45b;--line:#665a46;--danger:#d36f5d;--ok:#82b47b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+button,input{font:inherit}button{touch-action:manipulation}
+#app{height:100dvh;display:grid;grid-template-rows:auto 1fr auto;overflow:hidden;background:radial-gradient(circle at 50% -20%,#2a2419 0,#15120e 42%,#0f0e0b 100%)}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:max(8px,env(safe-area-inset-top)) 10px 8px;border-bottom:1px solid #40392d;background:#15130fee;z-index:5}
+.brand{font-weight:900;letter-spacing:.08em}.brand b{color:var(--accent)}.sub{font-size:10px;color:var(--muted);margin-top:2px}.pill{font-size:10px;color:#d9ceb8;border:1px solid #514936;border-radius:99px;padding:6px 8px;background:#1d1a14}
+#stageWrap{position:relative;min-height:0;overflow:hidden;touch-action:none}.grid{position:absolute;inset:0;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px),linear-gradient(#ffffff04 1px,transparent 1px),linear-gradient(90deg,#ffffff04 1px,transparent 1px);background-size:48px 48px,48px 48px,12px 12px,12px 12px;pointer-events:none}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}.hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:10px;color:#d4c7ac;background:#17140fdc;border:1px solid #494131;border-radius:8px;padding:6px 9px;pointer-events:none;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}.status{position:absolute;left:10px;bottom:10px;right:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}.status>div{font-size:10px;background:#17140fe8;border:1px solid #494131;border-radius:8px;padding:7px 9px;color:#cfc2a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.status b{color:#fff0c9}
+.toolbar{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px 8px max(8px,env(safe-area-inset-bottom));border-top:1px solid #40392d;background:#15130ff2}.tool{min-height:54px;border:1px solid #5a503c;background:#211d16;color:var(--ink);border-radius:10px;font-weight:900;font-size:11px;padding:5px}.tool small{display:block;font-size:8px;color:var(--muted);font-weight:600;margin-top:2px}.tool.active{border-color:var(--accent);background:#3a3020;box-shadow:inset 0 0 0 1px #d5a84755}.tool:disabled{opacity:.36}.tool.danger{color:#ffd1c9}
+.sheet{position:fixed;inset:0;z-index:20;background:#0008;display:none;align-items:flex-end}.sheet.open{display:flex}.panel{width:100%;background:#1b1813;border-top:1px solid #675b45;border-radius:16px 16px 0 0;padding:14px 14px max(14px,env(safe-area-inset-bottom));box-shadow:0 -20px 60px #0008}.panel h2{font-size:16px;margin:0 0 4px}.panel p{margin:0 0 12px;color:var(--muted);font-size:11px;line-height:1.4}.fields{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.field label{display:block;color:var(--muted);font-size:9px;margin:0 0 4px}.field input{width:100%;min-width:0;border:1px solid #5a503c;background:#100f0c;color:var(--ink);border-radius:8px;padding:12px 8px;font-size:16px;-webkit-user-select:text;user-select:text}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.actions button{min-height:46px;border-radius:9px;border:1px solid #625641;background:#262119;color:var(--ink);font-weight:900}.actions .primary{background:#5e4927;border-color:#b48a45}.actions .danger{border-color:#8c4a3d;color:#ffd5cf}
+#toast{position:fixed;left:50%;top:18%;translate:-50% -50%;z-index:40;background:#17140ff2;border:1px solid #776749;border-radius:9px;padding:9px 12px;color:#f5ead1;font-size:11px;opacity:0;pointer-events:none;transition:opacity .16s;max-width:85%;text-align:center}#toast.show{opacity:1}
+@media(min-width:760px){#app{max-width:1100px;margin:auto;border-left:1px solid #332d22;border-right:1px solid #332d22}.toolbar{grid-template-columns:repeat(10,1fr)}.panel{max-width:560px;margin:auto;border-radius:16px 16px 0 0}.tool{min-height:58px}}
+</style>
+</head>
+<body>
+<div id="app">
+<header><div><div class="brand"><b>WOOD</b> BENCH // 01</div><div class="sub">STOCK → CUT → JOIN → MEASURE → EXPORT</div></div><div class="pill" id="scalePill">12 px / in</div></header>
+<div id="stageWrap"><div class="grid"></div><canvas id="bench"></canvas><div class="hint" id="hint">Add a board to start.</div><div class="status"><div id="selStatus">NO SELECTION</div><div id="modeStatus">MODE <b>MOVE</b></div></div></div>
+<div class="toolbar">
+<button class="tool" id="addBtn">＋ STOCK<small>new board</small></button>
+<button class="tool active" data-mode="move">MOVE<small>drag pieces</small></button>
+<button class="tool" id="rotateBtn" disabled>↻ ROTATE<small>90°</small></button>
+<button class="tool" id="cutBtn" disabled>CUT<small>exact length</small></button>
+<button class="tool" data-mode="join">JOIN<small>snap edges</small></button>
+<button class="tool" data-mode="measure">MEASURE<small>tap 2 points</small></button>
+<button class="tool" id="dupBtn" disabled>DUP<small>copy piece</small></button>
+<button class="tool danger" id="delBtn" disabled>DELETE<small>remove piece</small></button>
+<button class="tool" id="fitBtn">FIT<small>center work</small></button>
+<button class="tool" id="exportBtn">EXPORT<small>PNG</small></button>
+</div>
+</div>
+<div class="sheet" id="stockSheet"><div class="panel"><h2>Add stock</h2><p>Actual dimensions in inches. Length runs with the grain.</p><div class="fields"><div class="field"><label>LENGTH</label><input id="stockL" inputmode="decimal" value="48"></div><div class="field"><label>WIDTH</label><input id="stockW" inputmode="decimal" value="8"></div><div class="field"><label>THICK</label><input id="stockT" inputmode="decimal" value="0.75"></div></div><div class="actions"><button data-close="stockSheet">CANCEL</button><button class="primary" id="addStockConfirm">ADD BOARD</button></div></div></div>
+<div class="sheet" id="cutSheet"><div class="panel"><h2>Cut selected board</h2><p id="cutDesc">Measure from the left end of the board. Kerf is removed from the offcut side.</p><div class="fields" style="grid-template-columns:1fr 1fr"><div class="field"><label>CUT AT</label><input id="cutAt" inputmode="decimal" value="24"></div><div class="field"><label>KERF</label><input id="kerf" inputmode="decimal" value="0.125"></div></div><div class="actions"><button data-close="cutSheet">CANCEL</button><button class="primary" id="cutConfirm">MAKE CUT</button></div></div></div>
+<div id="toast"></div>
+<script>
+(()=>{'use strict';
+const $=s=>document.querySelector(s), stage=$('#stageWrap'), canvas=$('#bench'), ctx=canvas.getContext('2d');
+let W=0,H=0,dpr=1, scale=12, offsetX=0,offsetY=0, boards=[], selected=null, mode='move', drag=null, measurePts=[], toastTimer=0, idSeq=1;
+const fmt=n=>{const v=Math.round(n*1000)/1000;return Number.isInteger(v)?String(v):String(v).replace(/0+$/,'').replace(/\.$/,'')};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),1500)}
+function resize(){const r=stage.getBoundingClientRect();dpr=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);if(!offsetX&&!offsetY){offsetX=W/2;offsetY=H/2}draw()} addEventListener('resize',resize);
+function boardDims(b){return b.rot%2?{w:b.width,h:b.length}:{w:b.length,h:b.width}}
+function worldToScreen(x,y){return{x:offsetX+x*scale,y:offsetY+y*scale}}
+function screenToWorld(x,y){return{x:(x-offsetX)/scale,y:(y-offsetY)/scale}}
+function rectFor(b){const d=boardDims(b),p=worldToScreen(b.x,b.y);return{x:p.x,y:p.y,w:d.w*scale,h:d.h*scale}}
+function hitBoard(sx,sy){for(let i=boards.length-1;i>=0;i--){const r=rectFor(boards[i]);if(sx>=r.x&&sx<=r.x+r.w&&sy>=r.y&&sy<=r.y+r.h)return boards[i]}return null}
+function grainLines(b,r){ctx.save();ctx.beginPath();ctx.rect(r.x,r.y,r.w,r.h);ctx.clip();ctx.strokeStyle='#704f2b66';ctx.lineWidth=1;const horizontal=b.rot%2===0;if(horizontal){for(let y=r.y+7;y<r.y+r.h;y+=9){ctx.beginPath();ctx.moveTo(r.x,y);ctx.bezierCurveTo(r.x+r.w*.3,y+3,r.x+r.w*.65,y-3,r.x+r.w,y+1);ctx.stroke()}}else{for(let x=r.x+7;x<r.x+r.w;x+=9){ctx.beginPath();ctx.moveTo(x,r.y);ctx.bezierCurveTo(x+3,r.y+r.h*.3,x-3,r.y+r.h*.65,x+1,r.y+r.h);ctx.stroke()}}ctx.restore()}
+function drawBoard(b){const r=rectFor(b);ctx.fillStyle=b.id===selected?'#c9934e':'#aa7439';ctx.strokeStyle=b.id===selected?'#ffe3a1':'#e0b26a';ctx.lineWidth=b.id===selected?3:1.4;ctx.fillRect(r.x,r.y,r.w,r.h);grainLines(b,r);ctx.strokeRect(r.x+.5,r.y+.5,r.w-1,r.h-1);if(r.w>55&&r.h>22){ctx.fillStyle='#fff4dc';ctx.font='700 10px ui-monospace,monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(`${fmt(b.length)} × ${fmt(b.width)} × ${fmt(b.thick)}`,r.x+r.w/2,r.y+r.h/2)}}
+function drawMeasure(){if(!measurePts.length)return;ctx.save();ctx.strokeStyle='#8fd0e7';ctx.fillStyle='#8fd0e7';ctx.lineWidth=2;for(const p of measurePts){const s=worldToScreen(p.x,p.y);ctx.beginPath();ctx.arc(s.x,s.y,5,0,Math.PI*2);ctx.fill()}if(measurePts.length===2){const a=worldToScreen(measurePts[0].x,measurePts[0].y),b=worldToScreen(measurePts[1].x,measurePts[1].y),dist=Math.hypot(measurePts[1].x-measurePts[0].x,measurePts[1].y-measurePts[0].y);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.font='800 12px ui-monospace,monospace';ctx.textAlign='center';ctx.textBaseline='bottom';const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;ctx.fillStyle='#111';ctx.fillRect(mx-34,my-24,68,18);ctx.fillStyle='#c7efff';ctx.fillText(fmt(dist)+' in',mx,my-10)}ctx.restore()}
+function draw(){ctx.clearRect(0,0,W,H);for(const b of boards)drawBoard(b);drawMeasure();hud()}
+function hud(){const b=boards.find(x=>x.id===selected);$('#selStatus').innerHTML=b?`SELECTED <b>${fmt(b.length)} × ${fmt(b.width)} × ${fmt(b.thick)}</b>`:'NO SELECTION';$('#modeStatus').innerHTML=`MODE <b>${mode.toUpperCase()}</b>`;['rotateBtn','cutBtn','dupBtn','delBtn'].forEach(id=>$('#'+id).disabled=!b);$('#hint').textContent=mode==='measure'?(measurePts.length?'Tap the second point.':'Tap any two points to measure.'):(mode==='join'?'Drag a piece near another edge to snap it.':boards.length?'Tap a board to select it. Drag to move.':'Add a board to start.');}
+function addBoard(length,width,thick,x=0,y=0,rot=0){const b={id:idSeq++,length,width,thick,x,y,rot};boards.push(b);selected=b.id;draw();return b}
+function setMode(m){mode=m;measurePts=[];document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));draw()}
+function snapBoard(b){const r=boardDims(b),threshold=1.0;let best=null;for(const o of boards){if(o.id===b.id)continue;const q=boardDims(o);const pairs=[{axis:'x',delta:o.x+q.w-b.x},{axis:'x',delta:o.x-(b.x+r.w)},{axis:'y',delta:o.y+q.h-b.y},{axis:'y',delta:o.y-(b.y+r.h)}];for(const p of pairs){const d=Math.abs(p.delta);if(d<=threshold&&(!best||d<best.d))best={...p,d}}}if(best){if(best.axis==='x')b.x+=best.delta;else b.y+=best.delta;toast('EDGE SNAPPED');}}
+function pointerXY(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);const p=pointerXY(e);if(mode==='measure'){const w=screenToWorld(p.x,p.y);if(measurePts.length>=2)measurePts=[];measurePts.push(w);draw();return}const b=hitBoard(p.x,p.y);selected=b?.id??null;if(b){const w=screenToWorld(p.x,p.y);drag={id:b.id,dx:w.x-b.x,dy:w.y-b.y,moved:false}}else drag=null;draw()});
+canvas.addEventListener('pointermove',e=>{if(!drag)return;const b=boards.find(x=>x.id===drag.id);if(!b)return;const p=pointerXY(e),w=screenToWorld(p.x,p.y);b.x=w.x-drag.dx;b.y=w.y-drag.dy;drag.moved=true;draw()});
+canvas.addEventListener('pointerup',e=>{if(drag&&mode==='join'){const b=boards.find(x=>x.id===drag.id);if(b)snapBoard(b)}drag=null;draw()});
+$('#addBtn').onclick=()=>$('#stockSheet').classList.add('open');
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$('#'+b.dataset.close).classList.remove('open'));
+$('#addStockConfirm').onclick=()=>{const l=+$('#stockL').value,w=+$('#stockW').value,t=+$('#stockT').value;if(!(l>0&&w>0&&t>0)){toast('Enter valid dimensions.');return}const d={w:l,h:w};addBoard(l,w,t,-d.w/2,-d.h/2);$('#stockSheet').classList.remove('open');fitAll();toast('STOCK ADDED')};
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+$('#rotateBtn').onclick=()=>{const b=boards.find(x=>x.id===selected);if(!b)return;const old=boardDims(b),cx=b.x+old.w/2,cy=b.y+old.h/2;b.rot=(b.rot+1)%2;const d=boardDims(b);b.x=cx-d.w/2;b.y=cy-d.h/2;draw()};
+$('#dupBtn').onclick=()=>{const b=boards.find(x=>x.id===selected);if(!b)return;addBoard(b.length,b.width,b.thick,b.x+1,b.y+1,b.rot);toast('PIECE COPIED')};
+$('#delBtn').onclick=()=>{const i=boards.findIndex(x=>x.id===selected);if(i<0)return;boards.splice(i,1);selected=null;draw();toast('PIECE DELETED')};
+$('#cutBtn').onclick=()=>{const b=boards.find(x=>x.id===selected);if(!b)return;$('#cutAt').value=fmt(b.length/2);$('#cutDesc').textContent=`Selected length: ${fmt(b.length)} in. Measure from the grain-start end.`;$('#cutSheet').classList.add('open')};
+$('#cutConfirm').onclick=()=>{const b=boards.find(x=>x.id===selected);if(!b)return;const at=+$('#cutAt').value,kerf=Math.max(0,+$('#kerf').value||0);if(!(at>0&&at<b.length-kerf)){toast('Cut must fall inside the board.');return}const off=b.length-at-kerf;if(off<=0){toast('Kerf leaves no offcut.');return}const originalLength=b.length;b.length=at;const d=boardDims(b);let nx=b.x,ny=b.y;if(b.rot%2===0)nx=b.x+(at+kerf);else ny=b.y+(at+kerf);const offcut=addBoard(off,b.width,b.thick,nx,ny,b.rot);if(b.rot%2===0)offcut.y=b.y;else offcut.x=b.x;selected=b.id;$('#cutSheet').classList.remove('open');draw();toast(`${fmt(originalLength)} → ${fmt(at)} + KERF + ${fmt(off)}`)};
+function fitAll(){if(!boards.length){offsetX=W/2;offsetY=H/2;scale=12;draw();return}let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const b of boards){const d=boardDims(b);minX=Math.min(minX,b.x);minY=Math.min(minY,b.y);maxX=Math.max(maxX,b.x+d.w);maxY=Math.max(maxY,b.y+d.h)}const bw=Math.max(1,maxX-minX),bh=Math.max(1,maxY-minY),pad=34;scale=clamp(Math.min((W-pad*2)/bw,(H-pad*2)/bh),3,20);offsetX=W/2-(minX+bw/2)*scale;offsetY=H/2-(minY+bh/2)*scale;$('#scalePill').textContent=fmt(scale)+' px / in';draw()}
+$('#fitBtn').onclick=fitAll;
+function exportPNG(){if(!boards.length){toast('Nothing to export.');return}const oldSel=selected;selected=null;draw();const out=document.createElement('canvas'),od=2;out.width=Math.round(W*od);out.height=Math.round(H*od);const c=out.getContext('2d');c.scale(od,od);c.fillStyle='#f2ead8';c.fillRect(0,0,W,H);c.drawImage(canvas,0,0,W,H);c.fillStyle='#2b241a';c.font='700 12px ui-monospace,monospace';c.fillText('WOOD BENCH // layout export',12,18);const a=document.createElement('a');a.href=out.toDataURL('image/png');a.download='wood-bench-layout.png';document.body.appendChild(a);a.click();a.remove();selected=oldSel;draw();toast('PNG EXPORTED')}
+$('#exportBtn').onclick=exportPNG;
+addBoard(48,8,.75,-24,-4);resize();fitAll();
+})();
+</script>
+</body>
+</html>
