@@ -71,7 +71,7 @@ function spawnEnemy(){
   const y=42+Math.random()*(H-84);
   S.enemies.push({type,x:W+r+20,y,r,hp,maxHp:hp,speed:speed+S.difficulty*5,shieldCost,score,phase:Math.random()*6.28,hit:0,dead:false,state:type==='lancer'?'approach':'normal',timer:type==='lancer'?1.15:0,chargeY:y,frontArmor:type==='ramguard'?4:0});
 }
-function fire(){const p=S.player;S.shots.push({x:p.x+24,y:p.y,vx:520,vy:0,r:3,t:1.6});p.fire=.16;burst(p.x+20,p.y,3,'muzzle')}
+function fire(){const p=S.player;S.shots.push({x:p.x+24,y:p.y,vx:520,vy:0,r:3,t:1.6});p.fire=.40;burst(p.x+20,p.y,3,'muzzle')}
 function burst(x,y,n,type){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,sp=30+Math.random()*130;S.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:.18+Math.random()*.4,r:1+Math.random()*3,type})}}
 function kill(e,ram=false){if(e.dead)return;e.dead=true;S.score+=e.score+(ram?8:0);S.shake=Math.max(S.shake,ram?8:4);burst(e.x,e.y,e.type==='brute'?22:12,ram?'ram':'kill');if(S.score>S.best){S.best=S.score;ui.best.textContent=S.best;try{localStorage.setItem('excaliburPhoenix',JSON.stringify({best:S.best}))}catch(_){}}}
 function hurtPlayer(amount){const p=S.player;if(p.inv>0)return;p.hull=Math.max(0,p.hull-amount);p.inv=.55;S.shake=9;S.flash=.12;burst(p.x,p.y,12,'hurt');if(p.hull<=0)die()}
