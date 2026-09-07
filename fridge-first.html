@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#151515">
+<title>Fridge First</title>
+<style>
+:root{
+  --bg:#11110f; --panel:#1a1a17; --panel2:#23231f; --text:#f3f0e7; --muted:#aaa698;
+  --line:#34342e; --hot:#ff765f; --warn:#f2c14e; --good:#8ccf7e; --cold:#7fb7ff;
+  --r:18px; --shadow:0 12px 35px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:ui-rounded,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{min-height:100vh;padding:max(14px,env(safe-area-inset-top)) 14px max(92px,env(safe-area-inset-bottom))}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.wrap{max-width:720px;margin:auto}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 2px 18px}
+.brand h1{font-size:29px;margin:0;letter-spacing:-.7px}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.pill{border:1px solid var(--line);background:var(--panel);padding:8px 11px;border-radius:999px;color:var(--muted);font-size:12px}
+.hero{background:linear-gradient(145deg,#24231d,#171713);border:1px solid var(--line);border-radius:24px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px}
+.heroTitle{display:flex;justify-content:space-between;align-items:end;gap:10px}
+.hero h2{font-size:20px;margin:0}
+.hero .count{font-size:42px;line-height:1;font-weight:800;letter-spacing:-2px}
+.hero small{color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.stat{background:rgba(255,255,255,.035);border:1px solid var(--line);padding:10px;border-radius:14px;text-align:center}
+.stat b{display:block;font-size:19px}
+.stat span{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.actions{display:grid;grid-template-columns:1.2fr 1fr;gap:9px;margin-bottom:14px}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:15px;min-height:49px;padding:10px 14px;font-weight:700}
+.btn.primary{background:var(--text);color:#111;border-color:transparent}
+.btn.rescue{background:#2c2a1b;color:#f8da77;border-color:#4f4928}
+.btn.shop{background:#17221c;color:#a9e0b0;border-color:#2e4937}
+.sectionTitle{display:flex;justify-content:space-between;align-items:center;margin:18px 3px 9px}
+.sectionTitle h3{margin:0;font-size:16px}
+.sectionTitle span{font-size:12px;color:var(--muted)}
+.list{display:flex;flex-direction:column;gap:9px}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:17px;padding:13px;display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:center}
+.dot{width:13px;height:13px;border-radius:50%;background:var(--good);box-shadow:0 0 0 5px rgba(255,255,255,.03)}
+.card.hot .dot{background:var(--hot)}
+.card.warn .dot{background:var(--warn)}
+.itemName{font-weight:800}
+.meta{font-size:12px;color:var(--muted);margin-top:3px}
+.days{font-weight:800;font-size:13px;padding:7px 9px;border-radius:11px;background:var(--panel2)}
+.empty{border:1px dashed var(--line);border-radius:18px;padding:28px 18px;text-align:center;color:var(--muted)}
+.empty .big{font-size:36px;margin-bottom:8px}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.56);display:none;align-items:end;z-index:20}
+.sheet.open{display:flex}
+.sheetBox{width:100%;max-width:720px;margin:0 auto;background:#171714;border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:18px 16px max(24px,env(safe-area-inset-bottom));max-height:88vh;overflow:auto;box-shadow:0 -20px 60px rgba(0,0,0,.5)}
+.grabber{width:42px;height:5px;border-radius:9px;background:#4d4d44;margin:0 auto 16px}
+.sheet h2{margin:0 0 14px;font-size:21px}
+label{display:block;color:var(--muted);font-size:12px;margin:12px 2px 6px}
+input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:13px;padding:13px;outline:none}
+input:focus,select:focus{border-color:#727265}
+.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:7px}
+.quick button{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:11px 6px;border-radius:12px}
+.quick button.on{border-color:#f1d77d;background:#332f1f;color:#ffe795}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.sheetActions{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:17px}
+.mini{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px;border-radius:12px}
+.itemActions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.itemActions button{padding:11px 6px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text)}
+.idea{padding:13px;border-radius:15px;background:var(--panel2);border:1px solid var(--line);margin:8px 0}
+.idea b{display:block;margin-bottom:4px}
+.idea span{color:var(--muted);font-size:13px}
+.shopList{margin:8px 0 0;padding:0;list-style:none}
+.shopList li{padding:11px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
+.shopList li:last-child{border-bottom:0}
+.danger{color:#ff9e8d}
+.footer{margin:24px 4px 0;text-align:center;color:#6e6b62;font-size:11px;line-height:1.4}
+.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translate(-50%,30px);opacity:0;pointer-events:none;background:#f1eee4;color:#111;padding:10px 14px;border-radius:999px;font-weight:700;font-size:13px;transition:.22s;z-index:40;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.topBtns{display:flex;gap:7px}
+.iconBtn{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
+@media(min-width:600px){.sheet{align-items:center}.sheetBox{border-bottom:1px solid var(--line);border-radius:24px;margin:20px}.actions{grid-template-columns:1.4fr 1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <h1>Fridge First</h1>
+      <p>Track only the food you're afraid of losing.</p>
+    </div>
+    <div class="topBtns">
+      <button class="iconBtn" id="dataBtn" aria-label="Data tools">↕</button>
+    </div>
+  </div>
+
+  <section class="hero">
+    <div class="heroTitle">
+      <div>
+        <h2>Use-first queue</h2>
+        <small id="headline">Nothing is on fire. Lovely.</small>
+      </div>
+      <div class="count" id="riskCount">0</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="rescued">0</b><span>rescued</span></div>
+      <div class="stat"><b id="frozen">0</b><span>frozen</span></div>
+      <div class="stat"><b id="wasted">0</b><span>wasted</span></div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn primary" id="addBtn">＋ Add at-risk food</button>
+    <button class="btn rescue" id="rescueBtn">🍳 Rescue mode</button>
+    <button class="btn shop" id="shopBtn">🛒 Before I shop</button>
+  </div>
+
+  <div class="sectionTitle">
+    <h3>Eat these first</h3>
+    <span id="sortNote">soonest first</span>
+  </div>
+  <div id="list" class="list"></div>
+
+  <div class="footer">No account. No cloud. No pantry census. Everything stays in this browser unless you export it.</div>
+</div>
+
+<div class="sheet" id="addSheet">
+  <div class="sheetBox">
+    <div class="grabber"></div>
+    <h2>Add one thing that might die</h2>
+    <label for="name">What is it?</label>
+    <input id="name" autocomplete="off" placeholder="half a bag of spinach">
+    <label>How urgent?</label>
+    <div class="quick">
+      <button data-days="0">Today</button>
+      <button data-days="2" class="on">2 days</button>
+      <button data-days="6">This week</button>
+    </div>
+    <label for="date">Or pick a use-by date</label>
+    <input id="date" type="date">
+    <div class="row">
+      <div>
+        <label for="kind">Rough type</label>
+        <select id="kind">
+          <option value="other">Anything</option>
+          <option value="veg">Vegetable</option>
+          <option value="fruit">Fruit</option>
+          <option value="meat">Meat / fish</option>
+          <option value="dairy">Dairy</option>
+          <option value="leftover">Leftovers</option>
+          <option value="bread">Bread / grain</option>
+        </select>
+      </div>
+      <div>
+        <label for="amount">Amount (optional)</label>
+        <input id="amount" placeholder="½ bag">
+      </div>
+    </div>
+    <div class="sheetActions">
+      <button class="btn" data-close="addSheet">Cancel</button>
+      <button class="btn primary" id="saveBtn">Put it on deck</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="itemSheet">
+  <div class="sheetBox">
+    <div class="grabber"></div>
+    <h2 id="itemTitle">Food</h2>
+    <div id="itemDetail" class="meta"></div>
+    <div class="itemActions">
+      <button id="usedBtn">✓ Ate it</button>
+      <button id="freezeBtn">❄ Froze it</button>
+      <button id="wasteBtn" class="danger">× Lost it</button>
+    </div>
+    <button class="btn" style="width:100%;margin-top:10px" id="calendarBtn">Add rescue date to calendar (.ics)</button>
+    <button class="btn" style="width:100%;margin-top:8px" id="deleteBtn">Remove without counting</button>
+    <button class="btn" style="width:100%;margin-top:8px" data-close="itemSheet">Close</button>
+  </div>
+</div>
+
+<div class="sheet" id="rescueSheet">
+  <div class="sheetBox">
+    <div class="grabber"></div>
+    <h2>Rescue mode 🍳</h2>
+    <div id="rescueContent"></div>
+    <button class="btn primary" style="width:100%;margin-top:12px" data-close="rescueSheet">I know what I'm cooking</button>
+  </div>
+</div>
+
+<div class="sheet" id="shopSheet">
+  <div class="sheetBox">
+    <div class="grabber"></div>
+    <h2>Before new food enters the building</h2>
+    <div id="shopContent"></div>
+    <button class="btn primary" style="width:100%;margin-top:12px" data-close="shopSheet">Okay, now shop</button>
+  </div>
+</div>
+
+<div class="sheet" id="dataSheet">
+  <div class="sheetBox">
+    <div class="grabber"></div>
+    <h2>Your data</h2>
+    <p class="meta">Back it up or move it to another browser. Fridge First does not send it anywhere.</p>
+    <button class="btn" style="width:100%;margin-top:8px" id="exportBtn">Export backup</button>
+    <label for="importFile">Import backup</label>
+    <input type="file" id="importFile" accept="application/json">
+    <button class="btn" style="width:100%;margin-top:12px" data-close="dataSheet">Close</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const KEY = "fridge-first-v1";
+  let state = load();
+  let selectedId = null;
+  let quickDays = 2;
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+
+  function load(){
+    try{
+      return JSON.parse(localStorage.getItem(KEY)) || {items:[],stats:{rescued:0,frozen:0,wasted:0}};
+    }catch(e){
+      return {items:[],stats:{rescued:0,frozen:0,wasted:0}};
+    }
+  }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(state)); render(); }
+  function isoDay(d){
+    const x = new Date(d); x.setHours(12,0,0,0); return x.toISOString().slice(0,10);
+  }
+  function today(){ return isoDay(new Date()); }
+  function plusDays(n){
+    const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+n); return isoDay(d);
+  }
+  function daysLeft(date){
+    const a = new Date(today()+"T12:00:00"), b = new Date(date+"T12:00:00");
+    return Math.round((b-a)/86400000);
+  }
+  function dayLabel(n){
+    if(n<0) return `${Math.abs(n)}d overdue`;
+    if(n===0) return "today";
+    if(n===1) return "tomorrow";
+    return `${n} days`;
+  }
+  function riskClass(n){ return n<=1 ? "hot" : n<=3 ? "warn" : ""; }
+  function esc(s){ return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
+
+  function render(){
+    const items=[...state.items].sort((a,b)=>a.date.localeCompare(b.date)||a.created-b.created);
+    const urgent=items.filter(x=>daysLeft(x.date)<=2).length;
+    $("#riskCount").textContent=urgent;
+    $("#headline").textContent = urgent
+      ? (urgent===1 ? "One thing needs a tiny intervention." : `${urgent} things are plotting their escape.`)
+      : items.length ? "Nothing urgent. Keep rotating forward." : "Nothing is on fire. Lovely.";
+    $("#rescued").textContent=state.stats.rescued||0;
+    $("#frozen").textContent=state.stats.frozen||0;
+    $("#wasted").textContent=state.stats.wasted||0;
+    $("#list").innerHTML = items.length ? items.map(x=>{
+      const d=daysLeft(x.date);
+      return `<button class="card ${riskClass(d)}" data-id="${x.id}" style="text-align:left;color:inherit;width:100%">
+        <span class="dot"></span>
+        <span><span class="itemName">${esc(x.name)}</span><span class="meta">${esc(x.amount||kindLabel(x.kind))}</span></span>
+        <span class="days">${dayLabel(d)}</span>
+      </button>`;
+    }).join("") : `<div class="empty"><div class="big">🥬</div><b>No endangered groceries.</b><div style="margin-top:5px">Add only the stuff you suspect you'll forget.</div></div>`;
+    $$(".card[data-id]").forEach(b=>b.onclick=()=>openItem(b.dataset.id));
+  }
+
+  function kindLabel(k){
+    return ({veg:"vegetable",fruit:"fruit",meat:"meat / fish",dairy:"dairy",leftover:"leftovers",bread:"bread / grain",other:"at-risk food"})[k]||"at-risk food";
+  }
+  function openSheet(id){ $("#"+id).classList.add("open"); }
+  function closeSheet(id){ $("#"+id).classList.remove("open"); }
+  $$('[data-close]').forEach(b=>b.onclick=()=>closeSheet(b.dataset.close));
+  $$(".sheet").forEach(s=>s.addEventListener("click",e=>{ if(e.target===s) closeSheet(s.id); }));
+
+  $("#addBtn").onclick=()=>{
+    $("#name").value=""; $("#amount").value=""; $("#kind").value="other";
+    quickDays=2; $("#date").value=plusDays(2);
+    $$(".quick button").forEach(b=>b.classList.toggle("on",+b.dataset.days===2));
+    openSheet("addSheet"); setTimeout(()=>$("#name").focus(),120);
+  };
+  $$(".quick button").forEach(b=>b.onclick=()=>{
+    quickDays=+b.dataset.days; $("#date").value=plusDays(quickDays);
+    $$(".quick button").forEach(x=>x.classList.toggle("on",x===b));
+  });
+  $("#date").addEventListener("change",()=>$$('.quick button').forEach(b=>b.classList.remove("on")));
+  $("#saveBtn").onclick=()=>{
+    const name=$("#name").value.trim();
+    if(!name){ toast("Name the poor thing first."); $("#name").focus(); return; }
+    const date=$("#date").value||plusDays(quickDays);
+    state.items.push({id:crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random(),name,date,kind:$("#kind").value,amount:$("#amount").value.trim(),created:Date.now()});
+    save(); closeSheet("addSheet"); toast("Added to the rescue queue.");
+  };
+
+  function openItem(id){
+    const x=state.items.find(i=>i.id===id); if(!x) return;
+    selectedId=id;
+    $("#itemTitle").textContent=x.name;
+    $("#itemDetail").textContent=`${kindLabel(x.kind)} · rescue ${dayLabel(daysLeft(x.date))} · ${new Date(x.date+"T12:00:00").toLocaleDateString()}`;
+    openSheet("itemSheet");
+  }
+  function resolve(kind){
+    if(!selectedId)return;
+    state.items=state.items.filter(x=>x.id!==selectedId);
+    state.stats[kind]=(state.stats[kind]||0)+1;
+    save(); closeSheet("itemSheet");
+    toast(kind==="rescued"?"Rescued. Nice.":kind==="frozen"?"Future-you has snacks.":"Logged. No shame, just signal.");
+  }
+  $("#usedBtn").onclick=()=>resolve("rescued");
+  $("#freezeBtn").onclick=()=>resolve("frozen");
+  $("#wasteBtn").onclick=()=>resolve("wasted");
+  $("#deleteBtn").onclick=()=>{
+    state.items=state.items.filter(x=>x.id!==selectedId); save(); closeSheet("itemSheet"); toast("Removed.");
+  };
+
+  $("#calendarBtn").onclick=()=>{
+    const x=state.items.find(i=>i.id===selectedId); if(!x)return;
+    const d=x.date.replaceAll("-","");
+    const safe=x.name.replace(/\n/g," ");
+    const ics=`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Fridge First//EN\r\nBEGIN:VEVENT\r\nUID:${x.id}@fridge-first\r\nDTSTART;VALUE=DATE:${d}\r\nDTEND;VALUE=DATE:${d}\r\nSUMMARY:Rescue ${safe}\r\nDESCRIPTION:Use, freeze, or intentionally discard this before buying more.\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+    download(`rescue-${safe.replace(/[^a-z0-9]+/gi,"-").toLowerCase()}.ics`,ics,"text/calendar");
+  };
+
+  function rescueIdeas(items){
+    const kinds=new Set(items.map(x=>x.kind));
+    const names=items.map(x=>x.name).join(", ");
+    const ideas=[];
+    if(kinds.has("veg")) ideas.push(["Sheet-pan rescue","Roast the vegetables hard, add oil + salt + any seasoning. Put over rice, pasta, eggs, or toast."]);
+    if(kinds.has("fruit")) ideas.push(["Freeze-the-future","Slice soft fruit and freeze it now. Smoothies, oatmeal, pancakes, or quick compote later."]);
+    if(kinds.has("bread")) ideas.push(["Crisp it","Toast, crouton, breadcrumb, French-toast, or freeze the bread before mold gets a vote."]);
+    if(kinds.has("dairy")) ideas.push(["Use the dairy as an ingredient","Turn milk/yogurt/cheese into sauce, pudding, oats, eggs, baking, or a creamy soup."]);
+    if(kinds.has("meat")) ideas.push(["Cook once, repurpose twice","Cook the meat now. Eat some tonight and freeze or repurpose the rest into tacos, rice, soup, or sandwiches."]);
+    if(kinds.has("leftover")) ideas.push(["Leftover remix","Make fried rice, quesadillas, omelet/frittata, soup, loaded toast, or a grain bowl."]);
+    ideas.push(["The catch-all meal","Combine what makes sense into soup, fried rice, tacos/quesadillas, pasta, eggs, or a sheet-pan dinner. Perfection is not invited."]);
+    return {names,ideas:ideas.slice(0,4)};
+  }
+
+  $("#rescueBtn").onclick=()=>{
+    const items=[...state.items].sort((a,b)=>a.date.localeCompare(b.date)).slice(0,4);
+    if(!items.length){ $("#rescueContent").innerHTML=`<div class="empty">Nothing needs rescuing yet. Your refrigerator has achieved temporary peace.</div>`; }
+    else{
+      const r=rescueIdeas(items);
+      $("#rescueContent").innerHTML=`<div class="idea"><b>Your rescue pile</b><span>${esc(r.names)}</span></div>`+
+        r.ideas.map(([a,b])=>`<div class="idea"><b>${esc(a)}</b><span>${esc(b)}</span></div>`).join("");
+    }
+    openSheet("rescueSheet");
+  };
+
+  $("#shopBtn").onclick=()=>{
+    const items=[...state.items].sort((a,b)=>a.date.localeCompare(b.date));
+    $("#shopContent").innerHTML = items.length ? `
+      <p class="meta">Before buying replacements, glance at what is already volunteering as tribute:</p>
+      <ul class="shopList">${items.slice(0,8).map(x=>`<li><b>${esc(x.name)}</b><span>${dayLabel(daysLeft(x.date))}</span></li>`).join("")}</ul>
+      <div class="idea"><b>Three-question gate</b><span>Can I eat one of these first? Can I freeze one? Am I buying a duplicate because I forgot I owned it?</span></div>`
+      : `<div class="empty">Your rescue queue is empty. Shop without refrigerator guilt.</div>`;
+    openSheet("shopSheet");
+  };
+
+  $("#dataBtn").onclick=()=>openSheet("dataSheet");
+  $("#exportBtn").onclick=()=>download("fridge-first-backup.json",JSON.stringify(state,null,2),"application/json");
+  $("#importFile").onchange=async e=>{
+    const f=e.target.files[0]; if(!f)return;
+    try{
+      const data=JSON.parse(await f.text());
+      if(!data.items||!data.stats) throw new Error();
+      state=data; save(); closeSheet("dataSheet"); toast("Backup imported.");
+    }catch(err){ toast("That backup does not look right."); }
+    e.target.value="";
+  };
+
+  function download(name,text,type){
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name;
+    document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+  }
+  function toast(msg){
+    const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+    clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("show"),1800);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
