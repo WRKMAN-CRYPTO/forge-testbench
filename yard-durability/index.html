@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#102217" />
+<title>Yard Durability</title>
+<style>
+  :root{--bg:#0e1711;--panel:#16251b;--panel2:#1c3022;--text:#f3f7ef;--muted:#a8b8aa;--line:#2d4432;--good:#8de26f;--warn:#ffd166;--bad:#ff786f;--accent:#b8f28c;--shadow:0 12px 35px rgba(0,0,0,.28)}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:ui-rounded,system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Rounded","Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
+  body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;min-height:100dvh}
+  button,input,select{font:inherit}
+  button{color:inherit}
+  .app{max-width:760px;margin:0 auto;padding:env(safe-area-inset-top) 14px calc(92px + env(safe-area-inset-bottom))}
+  header{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 82%,transparent);padding:14px 2px 18px;display:flex;align-items:end;justify-content:space-between;gap:10px}
+  h1{margin:0;font-size:30px;letter-spacing:-.04em}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .iconBtn{border:1px solid var(--line);background:var(--panel);min-width:48px;height:48px;border-radius:16px;font-size:22px;box-shadow:var(--shadow)}
+  .hero{border:1px solid var(--line);background:linear-gradient(145deg,#18311f,#111b15);border-radius:24px;padding:18px;margin:2px 0 16px;box-shadow:var(--shadow)}
+  .heroTop{display:flex;justify-content:space-between;gap:14px;align-items:center}
+  .heroLabel{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:800}
+  .heroTask{font-size:24px;font-weight:900;margin-top:4px;letter-spacing:-.02em}
+  .heroArea{font-size:13px;color:var(--muted);margin-top:3px}
+  .heroPct{font-size:38px;font-weight:950;letter-spacing:-.05em}
+  .hero button{width:100%;min-height:54px;margin-top:14px;border:0;border-radius:17px;background:var(--accent);color:#102217;font-weight:950;font-size:18px}
+  .area{background:var(--panel);border:1px solid var(--line);border-radius:24px;margin:14px 0;overflow:hidden;box-shadow:var(--shadow)}
+  .areaHead{padding:16px 16px 12px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+  .areaName{font-size:22px;font-weight:950;letter-spacing:-.03em}
+  .areaMeta{color:var(--muted);font-size:12px;margin-top:2px}
+  .ring{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--c) calc(var(--p)*1%),#26382a 0);position:relative}
+  .ring:after{content:"";position:absolute;inset:7px;border-radius:50%;background:var(--panel)}
+  .ring strong{position:relative;z-index:1;font-size:16px}
+  .tasks{padding:0 10px 10px}
+  .task{position:relative;width:100%;min-height:68px;border:0;border-top:1px solid var(--line);background:transparent;display:grid;grid-template-columns:1fr auto;gap:12px;text-align:left;align-items:center;padding:11px 7px;touch-action:manipulation}
+  .task:first-child{border-top:0}
+  .taskName{font-weight:900;font-size:17px}
+  .taskMeta{font-size:12px;color:var(--muted);margin-top:3px}
+  .pct{font-size:24px;font-weight:950;min-width:64px;text-align:right}
+  .bar{height:5px;background:#29382c;border-radius:999px;overflow:hidden;margin-top:8px}.fill{height:100%;width:var(--p);background:var(--c);border-radius:inherit;transition:width .25s ease}
+  .fab{position:fixed;right:max(18px,calc((100vw - 760px)/2 + 18px));bottom:calc(18px + env(safe-area-inset-bottom));z-index:8;border:0;background:var(--accent);color:#102217;border-radius:20px;height:58px;padding:0 20px;font-weight:950;font-size:17px;box-shadow:0 10px 28px rgba(0,0,0,.38)}
+  .empty{padding:28px;text-align:center;color:var(--muted)}
+  .sheetWrap{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.48);display:none;align-items:end}
+  .sheetWrap.open{display:flex}
+  .sheet{width:min(760px,100%);margin:0 auto;background:#17241b;border:1px solid var(--line);border-bottom:0;border-radius:26px 26px 0 0;max-height:88dvh;overflow:auto;padding:16px 14px calc(22px + env(safe-area-inset-bottom))}
+  .grab{width:48px;height:5px;background:#607565;border-radius:10px;margin:0 auto 14px}
+  .sheet h2{margin:0 0 12px;font-size:24px}
+  label{display:block;color:var(--muted);font-size:12px;font-weight:800;margin:12px 2px 6px}
+  input,select{width:100%;min-height:50px;border:1px solid var(--line);border-radius:14px;background:#0f1812;color:var(--text);padding:10px 12px;-webkit-user-select:text;user-select:text}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sheetActions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+  .sheetActions button,.manageItem button{min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);font-weight:900}
+  .primary{background:var(--accent)!important;color:#102217!important;border:0!important}
+  .danger{color:#ff948d}
+  .manageItem{border:1px solid var(--line);border-radius:16px;padding:12px;margin:9px 0;background:#111a14}
+  .manageTop{display:flex;justify-content:space-between;gap:10px;align-items:center}.manageTitle{font-weight:900}.manageButtons{display:flex;gap:8px}.manageButtons button{min-height:40px;padding:0 12px}
+  .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(18px);bottom:calc(84px + env(safe-area-inset-bottom));z-index:40;background:#eef8e9;color:#152118;border-radius:16px;padding:11px 12px 11px 16px;display:flex;align-items:center;gap:14px;opacity:0;pointer-events:none;transition:.2s;box-shadow:var(--shadow);max-width:calc(100vw - 28px);font-weight:800}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}.toast button{border:0;background:#cdecbf;color:#152118;border-radius:10px;padding:8px 11px;font-weight:950}
+  .spark{position:fixed;pointer-events:none;z-index:50;font-size:22px;animation:pop .65s ease-out forwards}@keyframes pop{to{transform:translateY(-42px) scale(.7) rotate(12deg);opacity:0}}
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.spark{display:none}.fill,.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div><h1>Yard Durability</h1><div class="sub">Tap a job when you finish it. The yard remembers the rest.</div></div>
+    <button class="iconBtn" id="manageBtn" aria-label="Manage yard">⚙︎</button>
+  </header>
+  <section class="hero" id="hero"></section>
+  <main id="areas"></main>
+</div>
+<button class="fab" id="addBtn">＋ Add</button>
+<div class="sheetWrap" id="sheetWrap"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"><span id="toastText"></span><button id="undoBtn">Undo</button></div>
+<script>
+(() => {
+  const KEY='yardDurability.v1';
+  const HOUR=3600000;
+  const seed={version:1,areas:[
+    {id:uid(),name:'Front Yard',tasks:[
+      {id:uid(),name:'Mow lawn',intervalHours:120,lastDone:Date.now()-84*HOUR,importance:1},
+      {id:uid(),name:'Weed eat',intervalHours:168,lastDone:Date.now()-98*HOUR,importance:1},
+      {id:uid(),name:'Edge',intervalHours:240,lastDone:Date.now()-156*HOUR,importance:1}
+    ]},
+    {id:uid(),name:'Back Yard',tasks:[
+      {id:uid(),name:'Mow lawn',intervalHours:120,lastDone:Date.now()-48*HOUR,importance:1},
+      {id:uid(),name:'Weed eat',intervalHours:168,lastDone:Date.now()-132*HOUR,importance:1}
+    ]}
+  ]};
+  let state=load();
+  let undo=null,toastTimer=null;
+  const areasEl=document.querySelector('#areas'),heroEl=document.querySelector('#hero'),sheetWrap=document.querySelector('#sheetWrap'),sheet=document.querySelector('#sheet');
+
+  function uid(){return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4)}
+  function load(){try{const x=JSON.parse(localStorage.getItem(KEY));if(x&&Array.isArray(x.areas))return x}catch(e){} return seed}
+  function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+  function durability(t,now=Date.now()){const elapsed=Math.max(0,now-t.lastDone)/HOUR;return Math.max(0,Math.min(100,100-(elapsed/t.intervalHours)*100))}
+  function areaScore(a){if(!a.tasks.length)return 100;const vals=a.tasks.map(t=>durability(t));const weighted=vals.reduce((s,v,i)=>s+v*(a.tasks[i].importance||1),0)/a.tasks.reduce((s,t)=>s+(t.importance||1),0);const worst=Math.min(...vals);return weighted*.72+worst*.28}
+  function color(v){return v>=67?'var(--good)':v>=34?'var(--warn)':'var(--bad)'}
+  function status(v){return v>=82?'topped off':v>=67?'healthy':v>=34?'coming due':'needs attention'}
+  function ageText(t){const h=Math.max(0,(Date.now()-t.lastDone)/HOUR);if(h<1)return 'just topped off';if(h<48)return `${Math.floor(h)}h since done`;return `${Math.floor(h/24)}d since done`}
+  function intervalText(h){if(h%168===0)return `${h/168} wk${h===168?'':'s'}`;if(h%24===0)return `${h/24} day${h===24?'':'s'}`;return `${h} hr`}
+  function allTasks(){return state.areas.flatMap(a=>a.tasks.map(t=>({a,t,v:durability(t)})))}
+  function render(){
+    const all=allTasks().sort((x,y)=>x.v-y.v);
+    if(all.length){const n=all[0];heroEl.innerHTML=`<div class="heroTop"><div><div class="heroLabel">Next thing poking up</div><div class="heroTask">${esc(n.t.name)}</div><div class="heroArea">${esc(n.a.name)} · ${status(n.v)}</div></div><div class="heroPct" style="color:${color(n.v)}">${Math.round(n.v)}%</div></div><button data-top="${n.t.id}" data-area="${n.a.id}">TOP OFF</button>`}
+    else heroEl.innerHTML='<div class="empty">Add your first yard task.</div>';
+    areasEl.innerHTML=state.areas.length?state.areas.map(a=>{
+      const s=areaScore(a),tasks=[...a.tasks].sort((x,y)=>durability(x)-durability(y));
+      return `<section class="area"><div class="areaHead"><div><div class="areaName">${esc(a.name)}</div><div class="areaMeta">${status(s)} · ${a.tasks.length} job${a.tasks.length===1?'':'s'}</div></div><div class="ring" style="--p:${s};--c:${color(s)}"><strong>${Math.round(s)}%</strong></div></div><div class="tasks">${tasks.map(t=>{const v=durability(t);return `<button class="task" data-top="${t.id}" data-area="${a.id}"><div><div class="taskName">${esc(t.name)}</div><div class="taskMeta">${ageText(t)} · fades over ${intervalText(t.intervalHours)}</div><div class="bar"><div class="fill" style="--p:${v}%;--c:${color(v)}"></div></div></div><div class="pct" style="color:${color(v)}">${Math.round(v)}%</div></button>`}).join('')||'<div class="empty">No jobs here yet.</div>'}</div></section>`
+    }).join(''):'<div class="empty">Your property is empty. Add an area to begin.</div>';
+  }
+  function topOff(areaId,taskId,source){const a=state.areas.find(x=>x.id===areaId),t=a&&a.tasks.find(x=>x.id===taskId);if(!t)return;undo={areaId,taskId,lastDone:t.lastDone};t.lastDone=Date.now();save();render();burst(source);showToast(`${t.name} topped off`)}
+  function burst(el){if(!el)return;const r=el.getBoundingClientRect();for(let i=0;i<4;i++){const s=document.createElement('div');s.className='spark';s.textContent=['✦','·','✧','❋'][i];s.style.left=(r.left+r.width*(.3+.14*i))+'px';s.style.top=(r.top+r.height*.35)+'px';document.body.appendChild(s);setTimeout(()=>s.remove(),700)}}
+  function showToast(msg){clearTimeout(toastTimer);document.querySelector('#toastText').textContent=msg;document.querySelector('#toast').classList.add('show');toastTimer=setTimeout(()=>document.querySelector('#toast').classList.remove('show'),4200)}
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-top]');if(b)topOff(b.dataset.area,b.dataset.top,b)});
+  document.querySelector('#undoBtn').onclick=()=>{if(!undo)return;const a=state.areas.find(x=>x.id===undo.areaId),t=a&&a.tasks.find(x=>x.id===undo.taskId);if(t){t.lastDone=undo.lastDone;save();render()}undo=null;document.querySelector('#toast').classList.remove('show')};
+
+  function openSheet(html){sheet.innerHTML='<div class="grab"></div>'+html;sheetWrap.classList.add('open')}
+  function closeSheet(){sheetWrap.classList.remove('open')}
+  sheetWrap.addEventListener('click',e=>{if(e.target===sheetWrap)closeSheet()});
+  document.querySelector('#addBtn').onclick=()=>openAdd();
+  document.querySelector('#manageBtn').onclick=()=>openManage();
+
+  function openAdd(){openSheet(`<h2>Add to the yard</h2><label>What are you adding?</label><select id="kind"><option value="task">A task</option><option value="area">An area</option></select><div id="addFields"></div><div class="sheetActions"><button id="cancel">Cancel</button><button class="primary" id="saveAdd">Add</button></div>`);const kind=sheet.querySelector('#kind');const draw=()=>{sheet.querySelector('#addFields').innerHTML=kind.value==='area'?`<label>Area name</label><input id="newArea" placeholder="Side Yard">`:`<label>Area</label><select id="areaPick">${state.areas.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select><label>Task name</label><input id="taskName" placeholder="Trim shrubs"><div class="row"><div><label>Fresh for</label><input id="intervalNum" inputmode="decimal" type="number" min="1" value="7"></div><div><label>Unit</label><select id="intervalUnit"><option value="24">days</option><option value="168">weeks</option><option value="1">hours</option></select></div></div>`};draw();kind.onchange=draw;sheet.querySelector('#cancel').onclick=closeSheet;sheet.querySelector('#saveAdd').onclick=()=>{if(kind.value==='area'){const name=(sheet.querySelector('#newArea').value||'').trim();if(!name)return;state.areas.push({id:uid(),name,tasks:[]})}else{if(!state.areas.length)return;const a=state.areas.find(x=>x.id===sheet.querySelector('#areaPick').value);const name=(sheet.querySelector('#taskName').value||'').trim();const n=Number(sheet.querySelector('#intervalNum').value),unit=Number(sheet.querySelector('#intervalUnit').value);if(!a||!name||!n)return;a.tasks.push({id:uid(),name,intervalHours:n*unit,lastDone:Date.now(),importance:1})}save();render();closeSheet()}}
+
+  function openManage(){openSheet(`<h2>Manage yard</h2><div class="sub">Tune how long each job stays fresh. Changes recalculate immediately.</div>${state.areas.map(a=>`<div class="manageItem"><div class="manageTop"><div><div class="manageTitle">${esc(a.name)}</div><div class="sub">${a.tasks.length} jobs</div></div><div class="manageButtons"><button data-edit-area="${a.id}">Rename</button><button class="danger" data-del-area="${a.id}">Delete</button></div></div>${a.tasks.map(t=>`<div class="manageTop" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><div><div class="manageTitle">${esc(t.name)}</div><div class="sub">${intervalText(t.intervalHours)}</div></div><div class="manageButtons"><button data-edit-task="${t.id}" data-a="${a.id}">Tune</button><button class="danger" data-del-task="${t.id}" data-a="${a.id}">×</button></div></div>`).join('')}</div>`).join('')||'<div class="empty">Nothing to manage yet.</div>'}<div class="sheetActions"><button class="primary" id="doneManage">Done</button><button id="resetDemo">Reset demo</button></div>`);sheet.querySelector('#doneManage').onclick=closeSheet;sheet.querySelector('#resetDemo').onclick=()=>{if(confirm('Replace your current yard with the starter example?')){state=JSON.parse(JSON.stringify(seed));save();render();closeSheet()}};sheet.querySelectorAll('[data-edit-task]').forEach(b=>b.onclick=()=>openEditTask(b.dataset.a,b.dataset.editTask));sheet.querySelectorAll('[data-edit-area]').forEach(b=>b.onclick=()=>{const a=state.areas.find(x=>x.id===b.dataset.editArea);const n=prompt('Area name',a.name);if(n&&n.trim()){a.name=n.trim();save();render();openManage()}});sheet.querySelectorAll('[data-del-task]').forEach(b=>b.onclick=()=>{const a=state.areas.find(x=>x.id===b.dataset.a),t=a.tasks.find(x=>x.id===b.dataset.delTask);if(confirm(`Delete ${t.name}?`)){a.tasks=a.tasks.filter(x=>x.id!==t.id);save();render();openManage()}});sheet.querySelectorAll('[data-del-area]').forEach(b=>b.onclick=()=>{const a=state.areas.find(x=>x.id===b.dataset.delArea);if(confirm(`Delete ${a.name} and its tasks?`)){state.areas=state.areas.filter(x=>x.id!==a.id);save();render();openManage()}})}
+
+  function openEditTask(aid,tid){const a=state.areas.find(x=>x.id===aid),t=a.tasks.find(x=>x.id===tid);let n=t.intervalHours,unit=1;if(n%168===0){unit=168;n/=168}else if(n%24===0){unit=24;n/=24}openSheet(`<h2>Tune task</h2><label>Name</label><input id="editName" value="${escAttr(t.name)}"><div class="row"><div><label>Fresh for</label><input id="editNum" type="number" min="1" inputmode="decimal" value="${n}"></div><div><label>Unit</label><select id="editUnit"><option value="24" ${unit===24?'selected':''}>days</option><option value="168" ${unit===168?'selected':''}>weeks</option><option value="1" ${unit===1?'selected':''}>hours</option></select></div></div><label>Importance</label><select id="importance"><option value="0.7" ${(t.importance||1)===.7?'selected':''}>Light</option><option value="1" ${(t.importance||1)===1?'selected':''}>Normal</option><option value="1.5" ${(t.importance||1)===1.5?'selected':''}>Important</option></select><div class="sheetActions"><button id="cancelEdit">Cancel</button><button class="primary" id="saveEdit">Save</button></div>`);sheet.querySelector('#cancelEdit').onclick=openManage;sheet.querySelector('#saveEdit').onclick=()=>{const name=sheet.querySelector('#editName').value.trim(),num=Number(sheet.querySelector('#editNum').value),u=Number(sheet.querySelector('#editUnit').value);if(!name||!num)return;t.name=name;t.intervalHours=num*u;t.importance=Number(sheet.querySelector('#importance').value);save();render();openManage()}}
+
+  function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+  function escAttr(s){return esc(s)}
+  render();
+  setInterval(render,60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
+})();
+</script>
+</body>
+</html>
