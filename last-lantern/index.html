@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#090b10">
+<title>Last Lantern</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#090b10;--panel:#11151d;--line:#29303d;--text:#eef2f7;--muted:#98a2b3;--warm:#ffd36b;--danger:#d86b72;--shade:#414958;--fast:#5b526f;--heavy:#332f3a;--fuel:#8fb9a8}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);overscroll-behavior:none}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);touch-action:pan-y}
+button{font:inherit;color:inherit}
+.app{width:min(100%,720px);margin:0 auto;padding:12px;display:grid;gap:10px}
+.hud{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.stats{font-weight:800;font-size:15px}.msg{margin-top:3px;color:var(--muted);font-size:13px;min-height:1.2em}.actions{display:flex;gap:8px}.btn{min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.arena{position:relative;height:min(68svh,520px);min-height:390px;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:radial-gradient(circle at 50% 50%,#151923 0 21%,#0b0d13 52%,#030406 100%);touch-action:none;overscroll-behavior:contain;user-select:none;-webkit-user-select:none;isolation:isolate}
+.dark{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 0 20%,rgba(0,0,0,.22) 43%,rgba(0,0,0,.76) 78%,rgba(0,0,0,.94) 100%)}
+.light{position:absolute;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(255,211,107,.28) 0,rgba(255,211,107,.13) 45%,transparent 72%);transform:translate(-50%,-50%);left:50%;top:50%;transition:width .08s linear,height .08s linear}
+.entities{position:absolute;inset:0;pointer-events:none}.entity{position:absolute;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);pointer-events:auto;touch-action:none}
+.shade{width:34px;height:34px;border-radius:47% 53% 45% 55%;background:var(--shade)}.shade::after{content:"··";letter-spacing:3px;font-weight:900}.shade.fast{width:28px;height:28px;border-radius:50% 35% 50% 35%;background:var(--fast)}.shade.heavy{width:42px;height:42px;border-radius:42%;background:var(--heavy)}
+.drop{width:40px;height:40px;border-radius:50%;background:var(--fuel);color:#0d1713;font-weight:1000;font-size:22px}
+.lantern{position:absolute;left:50%;top:50%;z-index:5;width:72px;height:72px;transform:translate(-50%,-50%);border:2px solid #705f32;border-radius:50%;background:#1a1820;font-size:30px;touch-action:none}.lantern:active{transform:translate(-50%,-50%) scale(.92)}
+.corner{position:absolute;bottom:10px;z-index:6;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(17,21,29,.88);font-size:12px;pointer-events:none}.corner.left{left:10px}.corner.right{right:10px}
+.burst{position:absolute;left:50%;top:50%;z-index:4;width:40px;height:40px;border:2px solid var(--warm);border-radius:50%;transform:translate(-50%,-50%);animation:burst .42s ease-out forwards;pointer-events:none}.pop{position:absolute;z-index:10;font-size:12px;font-weight:900;pointer-events:none;animation:pop .5s ease-out forwards}
+.footer{color:var(--muted);font-size:12px;line-height:1.35}.gameover{position:absolute;inset:0;z-index:20;display:none;place-items:center;background:rgba(4,5,8,.78);padding:24px;text-align:center}.gameover.show{display:grid}.gameover-card{max-width:300px;padding:20px;border:1px solid var(--line);border-radius:16px;background:#10141c}.gameover h2{margin:0 0 8px}.gameover p{color:var(--muted)}
+@keyframes burst{to{width:360px;height:360px;opacity:0}}@keyframes pop{to{transform:translateY(-28px);opacity:0}}
+@media (max-height:700px){.arena{height:430px;min-height:360px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="hud">
+    <div>
+      <div class="stats">Night <span id="night">1</span> · Flame <span id="flame">100</span>% · Combo <span id="combo">0</span></div>
+      <div class="msg" id="msg" aria-live="polite">Keep the light alive.</div>
+    </div>
+    <div class="actions"><button class="btn" id="pause" type="button">Pause</button><button class="btn" id="restart" type="button">Restart</button></div>
+  </header>
+
+  <section class="arena" id="arena" aria-label="Last Lantern game area">
+    <div class="dark"></div>
+    <div class="light" id="light"></div>
+    <div class="entities" id="entities"></div>
+    <button class="lantern" id="lantern" type="button" aria-label="Spend one fuel to blast shadows back">✦</button>
+    <div class="corner left">Fuel <b id="fuel">3</b></div>
+    <div class="corner right">Broken <b id="score">0</b></div>
+    <div class="gameover" id="gameover"><div class="gameover-card"><h2>The light went out.</h2><p id="result"></p><button class="btn" id="again" type="button">Light it again</button></div></div>
+  </section>
+
+  <div class="footer">Tap shadows to break them. Heavy shadows take two hits. Grab fuel when it appears. Tap the lantern to burn one fuel and blast everything backward. The playfield captures touch so the page should stay put while you fight.</div>
+</main>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const arena=$('arena'),entities=$('entities'),lantern=$('lantern'),light=$('light'),msg=$('msg');
+const nightEl=$('night'),flameEl=$('flame'),comboEl=$('combo'),fuelEl=$('fuel'),scoreEl=$('score'),pauseBtn=$('pause'),restartBtn=$('restart'),againBtn=$('again'),gameover=$('gameover'),result=$('result');
+const S={flame:100,fuel:3,night:1,score:0,combo:0,comboTimer:0,alive:true,paused:false,spawn:0,nightClock:0,fuelClock:0,last:performance.now(),raf:0,shades:[],drops:[]};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function render(){nightEl.textContent=S.night;flameEl.textContent=Math.max(0,Math.round(S.flame));comboEl.textContent=S.combo;fuelEl.textContent=S.fuel;scoreEl.textContent=S.score;const glow=clamp(78+S.flame*1.25,78,205);light.style.width=glow+'px';light.style.height=glow+'px'}
+function pop(cx,cy,text){const r=arena.getBoundingClientRect(),el=document.createElement('div');el.className='pop';el.textContent=text;el.style.left=(cx-r.left)+'px';el.style.top=(cy-r.top)+'px';arena.appendChild(el);setTimeout(()=>el.remove(),520)}
+function place(el,x,y,off){el.style.left=`calc(${x*100}% - ${off}px)`;el.style.top=`calc(${y*100}% - ${off}px)`}
+function spawnShade(){const roll=Math.random();const type=S.night>=4&&roll<.18?'heavy':S.night>=2&&roll<.45?'fast':'normal';const a=Math.random()*Math.PI*2,r=.49,x=.5+Math.cos(a)*r,y=.5+Math.sin(a)*r;const el=document.createElement('button');el.type='button';el.className='entity shade '+(type==='normal'?'':type);el.setAttribute('aria-label',type+' shadow');entities.appendChild(el);const off=type==='heavy'?21:type==='fast'?14:17;place(el,x,y,off);const s={el,x,y,type,off,hp:type==='heavy'?2:1,speed:(type==='fast'?.078:type==='heavy'?.032:.048)+S.night*.0034,dead:false};S.shades.push(s);el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();hitShade(s,e)})}
+function hitShade(s,e){if(!S.alive||S.paused||s.dead)return;s.hp--;if(s.hp>0){pop(e.clientX,e.clientY,'hit');s.el.style.transform='scale(.82)';setTimeout(()=>{if(!s.dead)s.el.style.transform=''},90);return}s.dead=true;S.score++;S.combo++;S.comboTimer=1.35;S.flame=Math.min(100,S.flame+.7*Math.min(4,1+Math.floor(S.combo/6)));pop(e.clientX,e.clientY,'+'+Math.min(4,1+Math.floor(S.combo/6)));s.el.style.opacity='0';s.el.style.transform='scale(.2)';setTimeout(()=>s.el.remove(),110);if(S.combo===10)msg.textContent='Ten in a row. The dark noticed.';if(S.combo===20)msg.textContent='Twenty. It is getting angry.';render()}
+function spawnFuel(){if(S.drops.length)return;const a=Math.random()*Math.PI*2,r=.24+Math.random()*.15,x=.5+Math.cos(a)*r,y=.5+Math.sin(a)*r;const el=document.createElement('button');el.type='button';el.className='entity drop';el.textContent='+';el.setAttribute('aria-label','fuel canister');entities.appendChild(el);place(el,x,y,20);const d={el,life:6,dead:false};S.drops.push(d);el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(!S.alive||S.paused||d.dead)return;d.dead=true;S.fuel++;S.flame=Math.min(100,S.flame+8);pop(e.clientX,e.clientY,'FUEL');el.remove();msg.textContent='Fuel secured.';render()});msg.textContent='Fuel in the dark.'}
+function blast(){if(!S.alive||S.paused)return;if(S.fuel<=0){msg.textContent='No fuel.';return}S.fuel--;S.flame=Math.min(100,S.flame+24);S.combo=0;S.comboTimer=0;const b=document.createElement('div');b.className='burst';arena.appendChild(b);setTimeout(()=>b.remove(),450);for(const s of S.shades){if(s.dead)continue;const dx=s.x-.5,dy=s.y-.5,d=Math.hypot(dx,dy)||1,nd=Math.min(.49,d+.22);s.x=.5+dx/d*nd;s.y=.5+dy/d*nd}msg.textContent=S.fuel?'The lantern kicks the dark backward.':'Last fuel burned.';render()}
+function end(){S.alive=false;cancelAnimationFrame(S.raf);result.textContent=`Night ${S.night}. ${S.score} shadows broken.`;gameover.classList.add('show');pauseBtn.disabled=true}
+function frame(t){if(!S.alive)return;const dt=Math.min(.05,(t-S.last)/1000);S.last=t;if(S.paused){S.raf=requestAnimationFrame(frame);return}S.spawn+=dt;S.nightClock+=dt;S.fuelClock+=dt;S.flame-=dt*(1.8+S.night*.17);if(S.comboTimer>0){S.comboTimer-=dt;if(S.comboTimer<=0)S.combo=0}const spawnEvery=Math.max(.42,1.18-S.night*.065);if(S.spawn>=spawnEvery){S.spawn=0;spawnShade()}if(S.nightClock>=15){S.nightClock=0;S.night++;msg.textContent=`Night ${S.night}. They're faster now.`}if(S.fuelClock>=11){S.fuelClock=0;if(Math.random()<.82)spawnFuel()}for(const s of S.shades){if(s.dead)continue;const dx=.5-s.x,dy=.5-s.y,d=Math.hypot(dx,dy)||1;s.x+=dx/d*s.speed*dt;s.y+=dy/d*s.speed*dt;place(s.el,s.x,s.y,s.off);if(d<.078){s.dead=true;s.el.remove();S.flame-=s.type==='heavy'?19:s.type==='fast'?10:13;S.combo=0;S.comboTimer=0;msg.textContent=s.type==='heavy'?'A heavy one crushed into the light.':'Something touched the flame.'}}S.shades=S.shades.filter(s=>!s.dead);for(const d of S.drops){if(d.dead)continue;d.life-=dt;if(d.life<=0){d.dead=true;d.el.remove()}}S.drops=S.drops.filter(d=>!d.dead);render();if(S.flame<=0){S.flame=0;render();end();return}S.raf=requestAnimationFrame(frame)}
+function start(){cancelAnimationFrame(S.raf);entities.innerHTML='';Object.assign(S,{flame:100,fuel:3,night:1,score:0,combo:0,comboTimer:0,alive:true,paused:false,spawn:0,nightClock:0,fuelClock:0,last:performance.now(),shades:[],drops:[]});gameover.classList.remove('show');pauseBtn.disabled=false;pauseBtn.textContent='Pause';msg.textContent='Keep the light alive.';render();S.raf=requestAnimationFrame(frame)}
+function togglePause(){if(!S.alive)return;S.paused=!S.paused;pauseBtn.textContent=S.paused?'Resume':'Pause';msg.textContent=S.paused?'The night holds still.':'The dark moves again.'}
+function lockTouch(e){if(e.pointerType==='touch')e.preventDefault()}
+arena.addEventListener('pointermove',lockTouch,{passive:false});arena.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});arena.addEventListener('contextmenu',e=>e.preventDefault());lantern.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();blast()});pauseBtn.addEventListener('click',togglePause);restartBtn.addEventListener('click',start);againBtn.addEventListener('click',start);document.addEventListener('visibilitychange',()=>{if(document.hidden&&S.alive&&!S.paused)togglePause()});start();
+})();
+</script>
+</body>
+</html>
