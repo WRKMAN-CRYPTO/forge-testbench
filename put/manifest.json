@@ -1,0 +1,10 @@
+{
+  "name": "PUT — Memory for Physical Things",
+  "short_name": "PUT",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#11130f",
+  "theme_color": "#11130f",
+  "description": "Snap it, say where, forget it. PUT remembers where physical things are.",
+  "icons": []
+}
