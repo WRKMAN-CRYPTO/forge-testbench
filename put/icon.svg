@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PUT app icon">
+  <rect width="512" height="512" rx="116" fill="#11130f"/>
+  <rect x="42" y="42" width="428" height="428" rx="98" fill="#151811" stroke="#d6f36a" stroke-width="24"/>
+  <path d="M190 154h88c70 0 112 36 112 98 0 64-45 102-119 102h-25v72h-56V154Zm56 52v96h28c39 0 59-16 59-49 0-32-20-47-59-47h-28Z" fill="#d6f36a"/>
+</svg>
