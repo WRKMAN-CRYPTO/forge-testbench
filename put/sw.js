@@ -1,5 +1,18 @@
-const CACHE='put-shell-v2';
+const CACHE='put-shell-v3';
 const ASSETS=['./manifest.json'];
+const APP_STYLE='<style id="put-app-hardening">html,body,body *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}img{-webkit-user-drag:none;user-drag:none}</style>';
+
+function hardenHtml(response){
+  if(!response||!response.ok)return response;
+  const type=response.headers.get('content-type')||'';
+  if(!type.includes('text/html'))return response;
+  return response.text().then(html=>{
+    if(!html.includes('put-app-hardening'))html=html.replace('</head>',APP_STYLE+'</head>');
+    const headers=new Headers(response.headers);
+    headers.delete('content-length');
+    return new Response(html,{status:response.status,statusText:response.statusText,headers});
+  });
+}
 
 self.addEventListener('install',event=>{
   event.waitUntil(
@@ -25,12 +38,16 @@ self.addEventListener('fetch',event=>{
   if(isNavigation){
     event.respondWith(
       fetch(event.request)
-        .then(response=>{
-          const copy=response.clone();
+        .then(async response=>{
+          const hardened=await hardenHtml(response);
+          const copy=hardened.clone();
           caches.open(CACHE).then(cache=>cache.put('./index.html',copy));
-          return response;
+          return hardened;
         })
-        .catch(()=>caches.match('./index.html'))
+        .catch(async()=>{
+          const cached=await caches.match('./index.html');
+          return hardenHtml(cached);
+        })
     );
     return;
   }
