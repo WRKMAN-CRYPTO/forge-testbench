@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#11130f">
+<title>PAYDAY — Plan the Check, Not the Month</title>
+<style>
+:root{--bg:#11130f;--panel:#191c16;--panel2:#22261e;--ink:#f4f1df;--muted:#aeb29f;--line:#343a2f;--accent:#d7ff59;--accent2:#8da53d;--danger:#ff7d69;--ok:#99dc7a;--shadow:0 18px 60px rgba(0,0,0,.28)}
+*{box-sizing:border-box}html{background:var(--bg);color:var(--ink);font-family:ui-rounded,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}body{margin:0;min-height:100dvh;background:radial-gradient(circle at 80% -10%,rgba(215,255,89,.10),transparent 34rem),var(--bg)}button,input,select{font:inherit}button{cursor:pointer}.app{max-width:720px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}.brand{font-weight:950;letter-spacing:.06em;font-size:1.08rem}.tag{color:var(--muted);font-size:.78rem;margin-top:4px}.icon-btn{width:44px;height:44px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:14px;font-size:1.25rem}
+.hero{background:linear-gradient(145deg,#20251b,#161914);border:1px solid #39402f;border-radius:26px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}.hero:after{content:"";position:absolute;right:-44px;top:-55px;width:150px;height:150px;border:22px solid rgba(215,255,89,.08);border-radius:50%}.eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.14em;color:#c2c8ad;font-weight:800}.safe{font-size:clamp(2.7rem,13vw,4.5rem);font-weight:950;letter-spacing:-.065em;line-height:.95;margin:10px 0 7px}.safe.negative{color:var(--danger)}.hero-note{color:var(--muted);font-size:.92rem}.pace{display:flex;gap:8px;flex-wrap:wrap;margin-top:17px}.pill{border:1px solid var(--line);background:#11140f;border-radius:999px;padding:8px 10px;font-size:.78rem;color:#d9ddca}.pill strong{color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:12px 0 24px}.stat{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px 12px}.stat span{display:block;color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em}.stat b{display:block;margin-top:5px;font-size:1rem;overflow:hidden;text-overflow:ellipsis}
+.section{margin-top:26px}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px}.section h2{font-size:1rem;margin:0;letter-spacing:.01em}.section-sub{color:var(--muted);font-size:.76rem;margin-top:3px}.text-btn{border:0;background:transparent;color:var(--accent);font-weight:800;padding:8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}.field.full{grid-column:1/-1}.field label{display:block;color:var(--muted);font-size:.72rem;font-weight:700;margin:0 0 6px}.field input,.field select{width:100%;min-height:48px;border:1px solid #3d4436;background:#11140f;color:var(--ink);border-radius:13px;padding:0 12px;outline:none}.field input:focus,.field select:focus{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(215,255,89,.08)}
+.list{display:grid;gap:9px}.item{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:13px 12px}.item-main{min-width:0}.item-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.item-meta{font-size:.72rem;color:var(--muted);margin-top:3px}.amount{font-weight:900}.delete{border:0;background:transparent;color:#7d8375;font-size:1.15rem;padding:8px}.delete:hover,.delete:focus{color:var(--danger)}.empty{border:1px dashed var(--line);border-radius:17px;color:var(--muted);padding:20px;text-align:center;font-size:.86rem}
+.addbox{display:grid;grid-template-columns:1fr 116px;gap:9px;margin-top:10px}.addbox input,.addbox select{min-height:48px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:14px;padding:0 12px}.addbox .wide{grid-column:1/-1}.primary{grid-column:1/-1;min-height:49px;border:0;border-radius:14px;background:var(--accent);color:#1b210b;font-weight:950}.primary:active{transform:translateY(1px)}
+.spendbox{display:grid;grid-template-columns:1fr 120px auto;gap:8px}.spendbox input{min-width:0;min-height:50px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:14px;padding:0 12px}.spendbox button{border:0;border-radius:14px;background:var(--accent);font-weight:950;padding:0 16px}.spent-total{font-size:.78rem;color:var(--muted);margin:10px 2px 0}.spent-total strong{color:var(--ink)}
+.drawer{position:fixed;inset:0;z-index:20;display:none;background:rgba(0,0,0,.56);align-items:flex-end}.drawer.open{display:flex}.sheet{width:100%;max-width:720px;margin:0 auto;background:#171a14;border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -24px 70px rgba(0,0,0,.45)}.sheet h3{margin:2px 0 14px}.sheet button,.file-label{display:flex;width:100%;min-height:50px;align-items:center;justify-content:center;border-radius:14px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-weight:800;margin-top:9px;text-align:center}.sheet .danger{color:var(--danger)}.file-label input{display:none}.fine{font-size:.72rem;color:var(--muted);line-height:1.45;margin-top:12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:#efffc2;color:#1d2409;border-radius:999px;padding:10px 14px;font-size:.78rem;font-weight:850;opacity:0;pointer-events:none;transition:.2s;z-index:40}.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:430px){.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.spendbox{grid-template-columns:1fr 105px}.spendbox button{grid-column:1/-1;min-height:48px}.safe{font-size:3.35rem}.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:1/-1}.addbox{grid-template-columns:1fr 108px}}
+</style>
+</head>
+<body>
+<main class="app">
+<header><div><div class="brand">PAYDAY</div><div class="tag">Plan the check, not the month.</div></div><button class="icon-btn" id="menuBtn" aria-label="Data and settings">•••</button></header>
+
+<section class="hero" aria-live="polite">
+  <div class="eyebrow">Safe to spend</div>
+  <div class="safe" id="safeAmount">$0.00</div>
+  <div class="hero-note" id="safeNote">Tell this paycheck what it needs to survive.</div>
+  <div class="pace"><div class="pill"><strong id="dailyPace">$0</strong> / day pace</div><div class="pill"><strong id="daysLeft">0</strong> days to payday</div></div>
+</section>
+<div class="stats"><div class="stat"><span>Paycheck</span><b id="incomeStat">$0</b></div><div class="stat"><span>Reserved</span><b id="reservedStat">$0</b></div><div class="stat"><span>Spent</span><b id="spentStat">$0</b></div></div>
+
+<section class="section">
+  <div class="section-head"><div><h2>This pay period</h2><div class="section-sub">The frame everything else hangs on.</div></div></div>
+  <div class="card"><div class="form-grid">
+    <div class="field"><label for="income">Take-home paycheck</label><input id="income" type="number" min="0" step="0.01" inputmode="decimal" placeholder="1200"></div>
+    <div class="field"><label for="nextPayday">Next payday</label><input id="nextPayday" type="date"></div>
+    <div class="field full"><label for="buffer">Hands-off buffer</label><input id="buffer" type="number" min="0" step="0.01" inputmode="decimal" placeholder="100"></div>
+  </div></div>
+</section>
+
+<section class="section">
+  <div class="section-head"><div><h2>Must cover</h2><div class="section-sub">Bills, essentials, and goals this check is responsible for.</div></div><button class="text-btn" id="clearItems" type="button">Clear</button></div>
+  <div class="list" id="itemList"></div>
+  <form class="addbox" id="itemForm">
+    <input class="wide" id="itemName" maxlength="50" autocomplete="off" placeholder="Rent, groceries, gas…" aria-label="Item name" required>
+    <select id="itemKind" aria-label="Item type"><option value="Bill">Bill</option><option value="Essential">Essential</option><option value="Goal">Goal</option></select>
+    <input id="itemAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="$ amount" aria-label="Item amount" required>
+    <button class="primary" type="submit">Reserve it</button>
+  </form>
+</section>
+
+<section class="section">
+  <div class="section-head"><div><h2>Spending</h2><div class="section-sub">Log money that actually left your flex pile.</div></div><button class="text-btn" id="undoSpend" type="button">Undo</button></div>
+  <form class="spendbox" id="spendForm"><input id="spendName" maxlength="50" autocomplete="off" placeholder="What was it?" aria-label="Spending note"><input id="spendAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="$ amount" aria-label="Spending amount" required><button type="submit">Log spend</button></form>
+  <div class="spent-total" id="recentSpend"></div>
+</section>
+</main>
+
+<div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dataTitle"><div class="sheet"><h3 id="dataTitle">Your data</h3><button id="exportBtn" type="button">Export backup</button><label class="file-label">Import backup<input id="importFile" type="file" accept="application/json"></label><button id="resetBtn" class="danger" type="button">Reset PAYDAY</button><button id="closeDrawer" type="button">Close</button><div class="fine">PAYDAY keeps this plan in this browser. No account, no bank connection, no remote financial profile. Export a backup if the plan matters to you.</div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const KEY='payday.v1';
+  const blank=()=>({version:1,income:0,nextPayday:'',buffer:0,items:[],spends:[]});
+  let state=load();
+  const $=id=>document.getElementById(id);
+  const money=n=>new Intl.NumberFormat(undefined,{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:2}).format(Number(n)||0);
+  const num=v=>Math.max(0,Number(v)||0);
+  const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+  function load(){
+    try{
+      const raw=localStorage.getItem(KEY); if(!raw) return blank();
+      const x=JSON.parse(raw); if(!x||x.version!==1) return blank();
+      return {version:1,income:num(x.income),nextPayday:typeof x.nextPayday==='string'?x.nextPayday:'',buffer:num(x.buffer),items:Array.isArray(x.items)?x.items.filter(validItem):[],spends:Array.isArray(x.spends)?x.spends.filter(validSpend):[]};
+    }catch(e){ return blank(); }
+  }
+  function validItem(x){return x&&typeof x.name==='string'&&Number.isFinite(Number(x.amount));}
+  function validSpend(x){return x&&typeof x.name==='string'&&Number.isFinite(Number(x.amount));}
+  function save(){localStorage.setItem(KEY,JSON.stringify(state));}
+  function commit(){save();render();}
+
+  function daysToPayday(){
+    if(!state.nextPayday) return 0;
+    const end=new Date(state.nextPayday+'T12:00:00'); const now=new Date(); now.setHours(12,0,0,0);
+    return Math.max(0,Math.ceil((end-now)/86400000));
+  }
+  function totals(){
+    const reserved=state.items.reduce((s,x)=>s+num(x.amount),0)+num(state.buffer);
+    const spent=state.spends.reduce((s,x)=>s+num(x.amount),0);
+    const safe=num(state.income)-reserved-spent;
+    return {reserved,spent,safe};
+  }
+  function render(){
+    $('income').value=state.income||''; $('nextPayday').value=state.nextPayday||''; $('buffer').value=state.buffer||'';
+    const t=totals(),days=daysToPayday(),safe=$('safeAmount');
+    safe.textContent=money(t.safe); safe.classList.toggle('negative',t.safe<0);
+    $('incomeStat').textContent=money(state.income); $('reservedStat').textContent=money(t.reserved); $('spentStat').textContent=money(t.spent);
+    $('daysLeft').textContent=days;
+    $('dailyPace').textContent=money(days>0?Math.max(0,t.safe)/days:Math.max(0,t.safe));
+    if(!state.income) $('safeNote').textContent='Tell this paycheck what it needs to survive.';
+    else if(t.safe<0) $('safeNote').textContent='This check is overcommitted by '+money(Math.abs(t.safe))+'. Trim a reserve or plan the gap.';
+    else if(days===0&&!state.nextPayday) $('safeNote').textContent='Add your next payday to turn this into a daily pace.';
+    else $('safeNote').textContent=money(t.reserved)+' protected before flexible spending.';
+    renderItems(); renderRecent();
+  }
+  function renderItems(){
+    const box=$('itemList'); box.innerHTML='';
+    if(!state.items.length){box.innerHTML='<div class="empty">Nothing reserved yet. Add what this paycheck must carry.</div>';return;}
+    state.items.forEach(x=>{
+      const row=document.createElement('div'); row.className='item';
+      const main=document.createElement('div');main.className='item-main';
+      const name=document.createElement('div');name.className='item-name';name.textContent=x.name;
+      const meta=document.createElement('div');meta.className='item-meta';meta.textContent=x.kind||'Reserve';
+      main.append(name,meta);
+      const amt=document.createElement('div');amt.className='amount';amt.textContent=money(x.amount);
+      const del=document.createElement('button');del.className='delete';del.type='button';del.setAttribute('aria-label','Delete '+x.name);del.textContent='×';del.addEventListener('click',()=>{state.items=state.items.filter(i=>i.id!==x.id);commit();});
+      row.append(main,amt,del);box.append(row);
+    });
+  }
+  function renderRecent(){
+    const box=$('recentSpend');
+    if(!state.spends.length){box.textContent='No flex spending logged yet.';return;}
+    const x=state.spends[state.spends.length-1]; box.innerHTML='Latest: <strong></strong> · '+money(x.amount); box.querySelector('strong').textContent=x.name||'Spend';
+  }
+  function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),1700);}
+
+  ['income','buffer'].forEach(id=>$(id).addEventListener('input',e=>{state[id]=num(e.target.value);save();render();}));
+  $('nextPayday').addEventListener('change',e=>{state.nextPayday=e.target.value;commit();});
+  $('itemForm').addEventListener('submit',e=>{e.preventDefault();const name=$('itemName').value.trim(),amount=num($('itemAmount').value);if(!name||!amount)return;state.items.push({id:uid(),name,kind:$('itemKind').value,amount});$('itemName').value='';$('itemAmount').value='';commit();$('itemName').focus();});
+  $('spendForm').addEventListener('submit',e=>{e.preventDefault();const amount=num($('spendAmount').value);if(!amount)return;state.spends.push({id:uid(),name:$('spendName').value.trim()||'Spend',amount,at:new Date().toISOString()});$('spendName').value='';$('spendAmount').value='';commit();toast('Spend logged');});
+  $('undoSpend').addEventListener('click',()=>{if(!state.spends.length)return;state.spends.pop();commit();toast('Last spend removed');});
+  $('clearItems').addEventListener('click',()=>{if(!state.items.length)return;if(confirm('Clear every reserved item?')){state.items=[];commit();}});
+
+  const drawer=$('drawer');
+  $('menuBtn').addEventListener('click',()=>drawer.classList.add('open')); $('closeDrawer').addEventListener('click',()=>drawer.classList.remove('open')); drawer.addEventListener('click',e=>{if(e.target===drawer)drawer.classList.remove('open');});
+  $('exportBtn').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='payday-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('Backup exported');});
+  $('importFile').addEventListener('change',async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;try{const x=JSON.parse(await file.text());if(!x||x.version!==1||!Array.isArray(x.items)||!Array.isArray(x.spends))throw new Error('bad');state={version:1,income:num(x.income),nextPayday:typeof x.nextPayday==='string'?x.nextPayday:'',buffer:num(x.buffer),items:x.items.filter(validItem).map(i=>({id:i.id||uid(),name:i.name,kind:i.kind||'Reserve',amount:num(i.amount)})),spends:x.spends.filter(validSpend).map(s=>({id:s.id||uid(),name:s.name,amount:num(s.amount),at:s.at||''}))};commit();drawer.classList.remove('open');toast('Backup restored');}catch(err){alert('That file does not look like a PAYDAY backup.');}finally{e.target.value='';}});
+  $('resetBtn').addEventListener('click',()=>{if(confirm('Reset PAYDAY? This erases the plan stored in this browser. Export first if you need it.')){state=blank();commit();drawer.classList.remove('open');toast('PAYDAY reset');}});
+
+  render();
+})();
+</script>
+</body>
+</html>
