@@ -1,10 +1,22 @@
 {
+  "id": "./",
   "name": "PUT — Memory for Physical Things",
   "short_name": "PUT",
+  "description": "Snap it, say where, forget it. PUT remembers where physical things are.",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#11130f",
   "theme_color": "#11130f",
-  "description": "Snap it, say where, forget it. PUT remembers where physical things are.",
-  "icons": []
+  "categories": ["utilities", "productivity"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
