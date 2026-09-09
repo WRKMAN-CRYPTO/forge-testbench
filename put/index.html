@@ -25,7 +25,7 @@ h1{font-size:20px;margin:0;letter-spacing:.08em}.sub{font-size:12px;color:var(--
 .photoBtn{position:relative;height:86px;border:1px dashed #667052;border-radius:18px;background:#151811;color:var(--accent);display:grid;place-items:center;font-size:30px;overflow:hidden}
 .photoBtn img{width:100%;height:100%;object-fit:cover;display:none}.photoBtn.has img{display:block}.photoBtn.has span{display:none}
 .fields{display:grid;gap:9px}
-.inputWrap{position:relative}.inputWrap input{width:100%;height:40px;border-radius:12px;border:1px solid var(--line);background:#11140f;color:var(--ink);padding:0 42px 0 12px;outline:none}.inputWrap input:focus{border-color:#829047}.mic{position:absolute;right:4px;top:4px;width:34px;height:32px;border:0;background:transparent;color:var(--muted);font-size:18px}
+.inputWrap{position:relative}.inputWrap input{width:100%;height:40px;border-radius:12px;border:1px solid var(--line);background:#11140f;color:var(--ink);padding:0 90px 0 12px;outline:none}.inputWrap input:focus{border-color:#829047}.mic{position:absolute;right:4px;top:4px;height:32px;min-width:80px;padding:0 9px;border:1px solid #404638;border-radius:9px;background:#1a1d17;color:var(--muted);font-size:12px;font-weight:850;display:flex;align-items:center;justify-content:center;gap:5px}.mic.listening{color:#171911;background:var(--accent);border-color:var(--accent)}
 .save{width:100%;height:50px;border-radius:15px;border:0;background:var(--accent);color:#181b12;font-weight:900;font-size:16px;margin-top:12px}
 .save:active{transform:translateY(1px)}
 .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.4}
@@ -49,8 +49,8 @@ dialog{border:1px solid var(--line);background:var(--panel);color:var(--ink);bor
 <div class="capture">
 <label class="photoBtn" id="photoBtn"><span>＋</span><img id="preview" alt="Selected object"><input id="photo" type="file" accept="image/*" capture="environment" hidden></label>
 <div class="fields">
-<div class="inputWrap"><input id="thing" autocomplete="off" placeholder="What is it?" aria-label="What is it"><button class="mic" data-target="thing" aria-label="Speak item name">◉</button></div>
-<div class="inputWrap"><input id="where" autocomplete="off" placeholder="Where are you putting it?" aria-label="Where are you putting it"><button class="mic" data-target="where" aria-label="Speak location">◉</button></div>
+<div class="inputWrap"><input id="thing" autocomplete="off" placeholder="What is it?" aria-label="What is it"><button class="mic" data-target="thing" aria-label="Speak item name"><span aria-hidden="true">🎙</span><span>Speak</span></button></div>
+<div class="inputWrap"><input id="where" autocomplete="off" placeholder="Where are you putting it?" aria-label="Where are you putting it"><button class="mic" data-target="where" aria-label="Speak location"><span aria-hidden="true">🎙</span><span>Speak</span></button></div>
 </div>
 </div>
 <div class="suggestions" id="suggestions"></div>
@@ -66,7 +66,7 @@ dialog{border:1px solid var(--line);background:var(--panel);color:var(--ink);bor
 <div class="toast" id="toast"></div>
 <script>
 const DB='put-memory-v1', STORE='items';
-let db, photoData=null, activeId=null, items=[];
+let db, photoData=null, activeId=null, items=[], activeRecognition=null, voiceTimer=null;
 const $=s=>document.querySelector(s);
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE,{keyPath:'id'});r.onsuccess=()=>{db=r.result;res(db)};r.onerror=()=>rej(r.error)})}
 function tx(mode='readonly'){return db.transaction(STORE,mode).objectStore(STORE)}
@@ -75,7 +75,7 @@ function put(v){return new Promise((res,rej)=>{const r=tx('readwrite').put(v);r.
 function del(id){return new Promise((res,rej)=>{const r=tx('readwrite').delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),1500)}
 function age(ts){const s=(Date.now()-ts)/1000;if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';const d=Math.floor(s/86400);return d===1?'yesterday':d+'d ago'}
-function esc(v=''){return v.replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function esc(v=''){return v.replace(/[&<>'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c]))}
 function normalize(s){return s.toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(where|are|is|my|the|did|i|put|find|show|me|a|an)\b/g,' ').replace(/\s+/g,' ').trim()}
 function score(item,query){if(!query)return 1;const q=normalize(query);if(!q)return 1;const hay=normalize(item.thing+' '+item.where);if(hay.includes(q))return 100;return q.split(' ').reduce((n,w)=>n+(hay.includes(w)?1:0),0)}
 function render(){const query=$('#q').value.trim();const ranked=items.map(x=>[x,score(x,query)]).filter(x=>query?x[1]>0:true).sort((a,b)=>query?b[1]-a[1]||b[0].ts-a[0].ts:b[0].ts-a[0].ts).map(x=>x[0]);$('#listTitle').textContent=query?'FOUND':'RECENT MEMORY';$('#count').textContent=ranked.length+(ranked.length===1?' thing':' things');const list=$('#list');if(!ranked.length){list.innerHTML='<div class="empty">'+(query?'Nothing remembered matches that yet.':'Nothing remembered yet.<br>Your first tiny memory goes here.')+'</div>';return}list.innerHTML=ranked.map(x=>`<article class="card" data-id="${x.id}">${x.photo?`<img class="thumb" src="${x.photo}" alt="">`:`<div class="thumb"></div>`}<div><div class="thing">${esc(x.thing)}</div><div class="where">↳ ${esc(x.where)}</div><div class="when">remembered ${age(x.ts)}</div></div><button class="more" aria-label="More">•••</button></article>`).join('');list.querySelectorAll('.card').forEach(c=>c.onclick=()=>showItem(c.dataset.id))}
@@ -87,8 +87,10 @@ $('#save').onclick=async()=>{const thing=$('#thing').value.trim(),where=$('#wher
 $('#q').oninput=render;$('#focusSearch').onclick=()=>{$('#q').focus();$('#q').scrollIntoView({behavior:'smooth',block:'start'})};
 function showItem(id){const x=items.find(v=>v.id===id);if(!x)return;activeId=id;$('#dlgThing').textContent=x.thing;$('#dlgWhere').textContent='↳ '+x.where;$('#dlgWhen').textContent='Remembered '+new Date(x.ts).toLocaleString();$('#itemDialog').showModal()}
 $('#closeDlg').onclick=()=>$('#itemDialog').close();$('#deleteItem').onclick=async()=>{if(!activeId)return;await del(activeId);$('#itemDialog').close();activeId=null;await refresh();toast('Forgotten')};
-function startVoice(target){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('Voice input is not available here');target.focus();return}const r=new SR();r.lang='en-US';r.interimResults=false;r.maxAlternatives=1;r.onresult=e=>{target.value=e.results[0][0].transcript.replace(/[.]$/,'');target.dispatchEvent(new Event('input'));};r.onerror=()=>toast('Did not catch that');r.start();toast('Listening…')}
-document.querySelectorAll('.mic').forEach(b=>b.onclick=()=>startVoice(document.getElementById(b.dataset.target)));
+function resetVoiceButton(button){button.classList.remove('listening');button.innerHTML='<span aria-hidden="true">🎙</span><span>Speak</span>';button.setAttribute('aria-pressed','false')}
+function stopVoice(){clearTimeout(voiceTimer);voiceTimer=null;if(activeRecognition){try{activeRecognition.stop()}catch{}activeRecognition=null}document.querySelectorAll('.mic.listening').forEach(resetVoiceButton)}
+function startVoice(target,button){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('Speech-to-text is not available here');target.focus();return}stopVoice();const r=new SR();activeRecognition=r;r.lang='en-US';r.continuous=false;r.interimResults=false;r.maxAlternatives=1;button.classList.add('listening');button.innerHTML='<span aria-hidden="true">🎙</span><span>Listening…</span>';button.setAttribute('aria-pressed','true');r.onresult=e=>{const result=e.results[e.results.length-1];if(result&&result.isFinal!==false){target.value=result[0].transcript.replace(/[.]$/,'');target.dispatchEvent(new Event('input'));try{r.stop()}catch{}}};r.onerror=e=>{if(e.error!=='aborted'&&e.error!=='no-speech')toast('Did not catch that');stopVoice()};r.onend=()=>{if(activeRecognition===r)activeRecognition=null;clearTimeout(voiceTimer);voiceTimer=null;resetVoiceButton(button)};try{r.start();toast('Listening…');voiceTimer=setTimeout(()=>{if(activeRecognition===r){try{r.stop()}catch{}toast('Stopped listening')}},8000)}catch{resetVoiceButton(button);activeRecognition=null;toast('Could not start speech-to-text')}}
+document.querySelectorAll('.mic').forEach(b=>b.onclick=()=>{if(b.classList.contains('listening')){stopVoice();return}startVoice(document.getElementById(b.dataset.target),b)});
 function validItem(x){return x&&typeof x.id==='string'&&typeof x.thing==='string'&&typeof x.where==='string'&&typeof x.ts==='number'&&(x.photo==null||typeof x.photo==='string')}
 function backupName(){return 'put-backup-'+new Date().toISOString().slice(0,10)+'.json'}
 $('#exportBtn').onclick=async()=>{try{const payload={app:'PUT',version:1,exportedAt:new Date().toISOString(),items:await getAll()},text=JSON.stringify(payload),file=new File([text],backupName(),{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share){try{await navigator.share({files:[file],title:'PUT backup'});toast('Backup ready ✓');return}catch(e){if(e&&e.name==='AbortError')return}}const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);toast('Backup exported ✓')}catch(e){console.error(e);toast('Could not export backup')}};
