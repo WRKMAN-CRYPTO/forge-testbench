@@ -4,13 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#11130f">
+<meta name="color-scheme" content="dark">
+<meta name="application-name" content="PUT">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PUT">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>PUT — remember where things are</title>
 <style>
 :root{color-scheme:dark;--bg:#11130f;--panel:#1a1d17;--panel2:#22261e;--ink:#f4f0df;--muted:#aaa997;--accent:#d6f36a;--danger:#ff8c79;--line:#34392d}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);overscroll-behavior:none}
+html{background:var(--bg)}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);overscroll-behavior:none;-webkit-touch-callout:none}
 button,input,textarea{font:inherit}
 button{cursor:pointer}
 .shell{max-width:620px;margin:auto;min-height:100dvh;padding:18px 16px 28px;display:flex;flex-direction:column;gap:16px}
