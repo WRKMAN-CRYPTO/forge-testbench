@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<title>Smart Tower</title>
+<style>
+  :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;background:#101214;color:#f4f4f4;min-height:100svh;display:flex;justify-content:center}
+  main{width:min(100%,720px);padding:12px 12px calc(18px + env(safe-area-inset-bottom));display:grid;gap:10px}
+  h1{font-size:20px;margin:0;letter-spacing:.02em}
+  .sub{font-size:13px;color:#b8bec6;margin-top:2px}
+  .panel{background:#171a1e;border:1px solid #343a42;border-radius:12px;padding:10px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+  .stat b{display:block;font-size:18px}.stat span{font-size:11px;color:#aeb5bd}
+  #fieldWrap{position:relative;background:#0c0e10;border:1px solid #343a42;border-radius:12px;overflow:hidden}
+  canvas{display:block;width:100%;height:auto;touch-action:manipulation}
+  .legend{font-size:12px;color:#c7ccd2;display:grid;gap:4px}
+  .memory{display:grid;gap:6px}
+  .memory strong{font-size:14px}
+  .rows{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .rowbox{border:1px solid #343a42;border-radius:9px;padding:8px;font-size:12px}
+  .rowbox b{display:block;font-size:13px;margin-bottom:2px}
+  .decision{padding:9px;border-radius:9px;background:#0f1215;border:1px solid #343a42;font-size:13px;line-height:1.35}
+  button{width:100%;min-height:48px;border:1px solid #6b7480;border-radius:11px;background:#20252a;color:#fff;font-size:16px;font-weight:700}
+  button:disabled{opacity:.45}
+  .hint{font-size:12px;color:#aeb5bd;text-align:center}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>SMART TOWER</h1>
+    <div class="sub">One enemy memory. Nothing hidden.</div>
+  </header>
+
+  <section class="panel stats">
+    <div class="stat"><b id="wave">0</b><span>WAVE</span></div>
+    <div class="stat"><b id="cash">60</b><span>CASH</span></div>
+    <div class="stat"><b id="base">12</b><span>BASE</span></div>
+    <div class="stat"><b id="alive">0</b><span>ENEMIES</span></div>
+  </section>
+
+  <section id="fieldWrap">
+    <canvas id="field" width="696" height="380" aria-label="Tower defense field"></canvas>
+  </section>
+
+  <section class="panel memory">
+    <strong>Enemy memory</strong>
+    <div class="rows">
+      <div class="rowbox"><b>TOP ROUTE</b><span id="topReport">No evidence yet.</span></div>
+      <div class="rowbox"><b>BOTTOM ROUTE</b><span id="bottomReport">No evidence yet.</span></div>
+    </div>
+    <div class="decision" id="decision">Wave 1 has no memory. Enemies will split evenly: 4 top, 4 bottom.</div>
+  </section>
+
+  <button id="start">START WAVE 1</button>
+  <div class="hint" id="hint">Between waves: tap an empty square to build a tower for 20.</div>
+
+  <section class="panel legend">
+    <div><b>Tower:</b> fires automatically at the nearest enemy in range.</div>
+    <div><b>Learning rule:</b> the route with the higher survival rate last wave gets 6 enemies next wave; the other gets 2. A tie stays 4 / 4.</div>
+    <div><b>Only memory:</b> the immediately previous wave. Nothing else is learned.</div>
+  </section>
+</main>
+<script>
+(() => {
+  const canvas = document.getElementById('field');
+  const ctx = canvas.getContext('2d');
+  const els = {
+    wave: document.getElementById('wave'), cash: document.getElementById('cash'), base: document.getElementById('base'), alive: document.getElementById('alive'),
+    topReport: document.getElementById('topReport'), bottomReport: document.getElementById('bottomReport'), decision: document.getElementById('decision'),
+    start: document.getElementById('start'), hint: document.getElementById('hint')
+  };
+
+  const state = {
+    wave: 0, cash: 60, base: 12, running: false, enemies: [], towers: [], shots: [],
+    nextPlan: {top:4,bottom:4,reason:'Wave 1 has no memory. Enemies will split evenly: 4 top, 4 bottom.'},
+    report: null, spawnQueue: [], spawnTimer: 0, lastTime: performance.now()
+  };
+
+  const lanes = { top: 132, bottom: 248 };
+  const padXs = [180, 348, 516];
+  const pads = [
+    ...padXs.map((x,i)=>({id:'t'+i,x,y:72,lane:'top'})),
+    ...padXs.map((x,i)=>({id:'b'+i,x,y:308,lane:'bottom'}))
+  ];
+
+  function sync(){
+    els.wave.textContent = state.wave;
+    els.cash.textContent = state.cash;
+    els.base.textContent = state.base;
+    els.alive.textContent = state.enemies.length + state.spawnQueue.length;
+    els.decision.textContent = state.nextPlan.reason;
+    els.start.disabled = state.running || state.base <= 0;
+    els.start.textContent = state.base <= 0 ? 'BASE LOST' : `START WAVE ${state.wave + 1}`;
+    els.hint.textContent = state.running ? 'Wave running. Watch which route survives better.' : 'Between waves: tap an empty square to build a tower for 20.';
+    if(!state.report){
+      els.topReport.textContent = 'No evidence yet.';
+      els.bottomReport.textContent = 'No evidence yet.';
+    } else {
+      const fmt = r => `${r.entered} entered · ${r.leaked} survived · ${Math.round(r.rate*100)}% survival`;
+      els.topReport.textContent = fmt(state.report.top);
+      els.bottomReport.textContent = fmt(state.report.bottom);
+    }
+  }
+
+  function buildAt(x,y){
+    if(state.running || state.cash < 20 || state.base <= 0) return;
+    let best=null, bestD=9999;
+    for(const p of pads){
+      if(state.towers.some(t=>t.padId===p.id)) continue;
+      const d=Math.hypot(x-p.x,y-p.y);
+      if(d<bestD){bestD=d;best=p;}
+    }
+    if(best && bestD<34){
+      state.towers.push({padId:best.id,x:best.x,y:best.y,cool:0});
+      state.cash -= 20;
+      sync();
+    }
+  }
+
+  function pointerPos(e){
+    const r=canvas.getBoundingClientRect();
+    return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height};
+  }
+  canvas.addEventListener('pointerup', e => { const p=pointerPos(e); buildAt(p.x,p.y); });
+
+  function startWave(){
+    if(state.running || state.base<=0) return;
+    state.wave++;
+    state.running=true;
+    const q=[];
+    for(let i=0;i<state.nextPlan.top;i++) q.push('top');
+    for(let i=0;i<state.nextPlan.bottom;i++) q.push('bottom');
+    // Alternate lanes as much as possible so spawn order itself does not imply intelligence.
+    const mixed=[];
+    let t=q.filter(x=>x==='top').length, b=q.filter(x=>x==='bottom').length;
+    while(t||b){
+      if(t){mixed.push('top');t--;}
+      if(b){mixed.push('bottom');b--;}
+    }
+    state.spawnQueue=mixed;
+    state.spawnTimer=0;
+    state.currentStats={top:{entered:0,leaked:0},bottom:{entered:0,leaked:0}};
+    sync();
+  }
+  els.start.addEventListener('click', startWave);
+
+  function spawn(lane){
+    state.currentStats[lane].entered++;
+    state.enemies.push({lane,x:24,y:lanes[lane],hp:100,maxHp:100,speed:42});
+  }
+
+  function finishWave(){
+    state.running=false;
+    const make = r => ({entered:r.entered, leaked:r.leaked, rate:r.entered ? r.leaked/r.entered : 0});
+    const top=make(state.currentStats.top), bottom=make(state.currentStats.bottom);
+    state.report={top,bottom};
+    if(top.rate > bottom.rate){
+      state.nextPlan={top:6,bottom:2,reason:`TOP survived better (${Math.round(top.rate*100)}% vs ${Math.round(bottom.rate*100)}%). Next wave: 6 top, 2 bottom.`};
+    } else if(bottom.rate > top.rate){
+      state.nextPlan={top:2,bottom:6,reason:`BOTTOM survived better (${Math.round(bottom.rate*100)}% vs ${Math.round(top.rate*100)}%). Next wave: 2 top, 6 bottom.`};
+    } else {
+      state.nextPlan={top:4,bottom:4,reason:`Both routes survived equally (${Math.round(top.rate*100)}%). Next wave stays even: 4 top, 4 bottom.`};
+    }
+    state.cash += 18;
+    sync();
+  }
+
+  function update(dt){
+    if(state.running){
+      state.spawnTimer -= dt;
+      if(state.spawnQueue.length && state.spawnTimer<=0){
+        spawn(state.spawnQueue.shift());
+        state.spawnTimer=0.55;
+      }
+    }
+
+    for(const t of state.towers){
+      t.cool-=dt;
+      if(t.cool<=0){
+        let target=null, best=9999;
+        for(const e of state.enemies){
+          const d=Math.hypot(e.x-t.x,e.y-t.y);
+          if(d<118 && d<best){best=d;target=e;}
+        }
+        if(target){
+          target.hp-=25;
+          t.cool=.62;
+          state.shots.push({x1:t.x,y1:t.y,x2:target.x,y2:target.y,life:.08});
+        }
+      }
+    }
+
+    for(const e of state.enemies) e.x += e.speed*dt;
+
+    for(let i=state.enemies.length-1;i>=0;i--){
+      const e=state.enemies[i];
+      if(e.hp<=0){state.enemies.splice(i,1);state.cash+=3;}
+      else if(e.x>canvas.width-28){
+        state.currentStats[e.lane].leaked++;
+        state.enemies.splice(i,1);
+        state.base=Math.max(0,state.base-1);
+      }
+    }
+
+    for(const s of state.shots) s.life-=dt;
+    state.shots=state.shots.filter(s=>s.life>0);
+
+    if(state.running && state.spawnQueue.length===0 && state.enemies.length===0) finishWave();
+    sync();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#0c0e10';ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // Routes
+    ctx.lineWidth=34;ctx.strokeStyle='#242a30';ctx.lineCap='round';
+    for(const y of [lanes.top,lanes.bottom]){ctx.beginPath();ctx.moveTo(22,y);ctx.lineTo(canvas.width-28,y);ctx.stroke();}
+    ctx.lineWidth=1;ctx.strokeStyle='#555e68';ctx.setLineDash([8,10]);
+    for(const y of [lanes.top,lanes.bottom]){ctx.beginPath();ctx.moveTo(22,y);ctx.lineTo(canvas.width-28,y);ctx.stroke();}
+    ctx.setLineDash([]);
+
+    ctx.fillStyle='#d7dde3';ctx.font='bold 12px system-ui';ctx.fillText('TOP',18,106);ctx.fillText('BOTTOM',18,222);
+    ctx.fillStyle='#8f98a3';ctx.fillText('BASE',canvas.width-62,190);
+    ctx.strokeStyle='#8f98a3';ctx.strokeRect(canvas.width-34,112,12,156);
+
+    // Pads
+    for(const p of pads){
+      const used=state.towers.some(t=>t.padId===p.id);
+      ctx.strokeStyle=used?'#606872':'#89929c';ctx.lineWidth=2;
+      ctx.strokeRect(p.x-20,p.y-20,40,40);
+      if(!used){ctx.fillStyle='#8f98a3';ctx.font='11px system-ui';ctx.textAlign='center';ctx.fillText('20',p.x,p.y+4);ctx.textAlign='left';}
+    }
+
+    // Towers and ranges only when idle, for clarity while placing.
+    for(const t of state.towers){
+      if(!state.running){ctx.strokeStyle='#303840';ctx.lineWidth=1;ctx.beginPath();ctx.arc(t.x,t.y,118,0,Math.PI*2);ctx.stroke();}
+      ctx.fillStyle='#e7ebef';ctx.fillRect(t.x-10,t.y-10,20,20);
+      ctx.fillStyle='#111';ctx.fillRect(t.x-3,t.y-3,6,6);
+    }
+
+    for(const e of state.enemies){
+      ctx.fillStyle='#d9dde1';ctx.beginPath();ctx.arc(e.x,e.y,10,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#343b42';ctx.fillRect(e.x-12,e.y-18,24,3);
+      ctx.fillStyle='#f0f0f0';ctx.fillRect(e.x-12,e.y-18,24*Math.max(0,e.hp/e.maxHp),3);
+    }
+
+    ctx.strokeStyle='#f0f0f0';ctx.lineWidth=2;
+    for(const s of state.shots){ctx.beginPath();ctx.moveTo(s.x1,s.y1);ctx.lineTo(s.x2,s.y2);ctx.stroke();}
+  }
+
+  function loop(now){
+    const dt=Math.min(.05,(now-state.lastTime)/1000);state.lastTime=now;
+    update(dt);draw();requestAnimationFrame(loop);
+  }
+  sync();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
