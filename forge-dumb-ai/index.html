@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>DUMB // FORGE</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1117;--panel:#151b23;--line:#2a3440;--text:#e7edf4;--muted:#8d9aaa;--good:#7ee787;--bad:#ff7b72;--hot:#f2cc60;--accent:#79c0ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;min-height:100vh;padding:max(16px,env(safe-area-inset-top)) 14px max(24px,env(safe-area-inset-bottom))}main{max-width:760px;margin:auto}.eyebrow{font-size:12px;letter-spacing:.15em;color:var(--muted)}h1{font-size:28px;margin:6px 0 4px}.sub{color:var(--muted);font-size:13px;line-height:1.45;margin-bottom:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin:12px 0}.label{font-size:11px;color:var(--muted);letter-spacing:.12em;margin-bottom:10px}.senses,.actions,.feedback,.tools{display:grid;gap:9px}.senses{grid-template-columns:repeat(3,1fr)}.actions{grid-template-columns:repeat(2,1fr)}.feedback{grid-template-columns:1fr 1fr}.tools{grid-template-columns:repeat(3,1fr)}button{appearance:none;border:1px solid var(--line);background:#10161d;color:var(--text);border-radius:12px;padding:13px 10px;font:inherit;font-weight:700;min-height:48px;touch-action:manipulation}button:active{transform:translateY(1px)}button.on{border-color:var(--accent);background:#132234;color:#bfe0ff}.action.chosen{outline:2px solid var(--hot);border-color:transparent}.good{border-color:#315d38;color:var(--good)}.bad{border-color:#673732;color:var(--bad)}.brainline{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.choice{font-size:24px;font-weight:900}.why{font-size:12px;color:var(--muted);line-height:1.45;text-align:right;max-width:48%}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}.stat{background:#0f141b;border-radius:10px;padding:9px;text-align:center}.stat b{display:block;font-size:16px}.stat span{font-size:10px;color:var(--muted)}table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:7px 4px;border-bottom:1px solid #26303a;text-align:right}th:first-child,td:first-child{text-align:left}.pos{color:var(--good)}.neg{color:var(--bad)}.log{font-size:11px;line-height:1.5;max-height:150px;overflow:auto;color:#bac5d1}.row{padding:4px 0;border-bottom:1px dotted #27303a}.tiny{font-size:10px;color:var(--muted);line-height:1.4;margin-top:9px}dialog{width:min(92vw,620px);border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--text);padding:14px}textarea{width:100%;min-height:230px;background:#0b1016;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font:11px ui-monospace,monospace}.dialogtools{display:flex;gap:8px;margin-top:8px}.dialogtools button{flex:1}@media(max-width:430px){.tools{grid-template-columns:1fr}.brainline{display:block}.why{text-align:left;max-width:none;margin-top:8px}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body><main>
+<div class="eyebrow">FORGE TEST SPECIMEN</div>
+<h1>DUMB // FORGE</h1>
+<div class="sub">Three senses. Four actions. One-bit feedback. No language model. You teach it by consequences.</div>
+
+<section class="card">
+  <div class="label">SITUATION</div>
+  <div class="senses">
+    <button id="hungry" class="sense">HUNGRY</button>
+    <button id="danger" class="sense">DANGER</button>
+    <button id="familiar" class="sense">FAMILIAR</button>
+  </div>
+  <div class="tiny">Tap senses to describe the moment. The AI only sees ON/OFF.</div>
+</section>
+
+<section class="card">
+  <div class="label">CURRENT THOUGHT</div>
+  <div class="brainline">
+    <div><div class="choice" id="choice">WAIT</div><div class="tiny" id="mode">untrained guess</div></div>
+    <div class="why" id="why">Every action begins equal. It has to earn preferences.</div>
+  </div>
+  <div class="actions" id="actions" style="margin-top:12px"></div>
+</section>
+
+<section class="card">
+  <div class="label">TEACH IT</div>
+  <div class="feedback">
+    <button class="good" id="worked">✓ WORKED</button>
+    <button class="bad" id="failed">✕ FAILED</button>
+  </div>
+  <div class="tiny">Feedback changes only the chosen action's weights for the current senses. Learning rate: <span id="rate"></span>.</div>
+</section>
+
+<section class="card">
+  <div class="label">VISIBLE BRAIN</div>
+  <table><thead><tr><th>action</th><th>bias</th><th>hungry</th><th>danger</th><th>familiar</th></tr></thead><tbody id="weights"></tbody></table>
+  <div class="stats">
+    <div class="stat"><b id="lessons">0</b><span>LESSONS</span></div>
+    <div class="stat"><b id="wins">0</b><span>WORKED</span></div>
+    <div class="stat"><b id="losses">0</b><span>FAILED</span></div>
+    <div class="stat"><b id="epsilon">18%</b><span>EXPLORE</span></div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="label">RECENT CONTEXT</div>
+  <div class="log" id="log"></div>
+</section>
+
+<section class="card">
+  <div class="label">CONTEXT TOOLS</div>
+  <div class="tools">
+    <button id="randomize">NEW SITUATION</button>
+    <button id="context">EXPORT / IMPORT</button>
+    <button id="reset">RESET BRAIN</button>
+  </div>
+  <div class="tiny">The context packet is the whole durable mind: weights, counts, and recent lessons. Copy it elsewhere and this tiny AI continues from the same learned state.</div>
+</section>
+</main>
+<dialog id="dialog">
+  <div class="label">FORGE-STYLE CONTEXT PACKET</div>
+  <textarea id="packet" spellcheck="false"></textarea>
+  <div class="dialogtools"><button id="load">IMPORT</button><button id="copy">COPY</button><button id="close">CLOSE</button></div>
+  <div class="tiny" id="packetStatus"></div>
+</dialog>
+<script>
+(() => {
+  'use strict';
+  const ACTIONS=['WAIT','SEEK','HIDE','TOUCH'];
+  const FEATURES=['bias','hungry','danger','familiar'];
+  const STORE='dumb-forge-v1';
+  const LR=.22, EPS=.18, LOG_MAX=24;
+  const blank=()=>({version:1,weights:Object.fromEntries(ACTIONS.map(a=>[a,[0,0,0,0]])),lessons:0,wins:0,losses:0,recent:[]});
+  let brain=load();
+  let senses={hungry:false,danger:false,familiar:false};
+  let chosen='WAIT', exploration=false;
+
+  const $=id=>document.getElementById(id);
+  const vec=()=>[1,senses.hungry?1:0,senses.danger?1:0,senses.familiar?1:0];
+  const score=a=>brain.weights[a].reduce((n,w,i)=>n+w*vec()[i],0);
+  const fmt=n=>Math.abs(n)<.005?'0.00':n.toFixed(2);
+  const cls=n=>n>.005?'pos':n<-.005?'neg':'';
+
+  function load(){
+    try{const p=JSON.parse(localStorage.getItem(STORE)); return valid(p)?p:blank()}catch{return blank()}
+  }
+  function valid(p){return p&&p.version===1&&p.weights&&ACTIONS.every(a=>Array.isArray(p.weights[a])&&p.weights[a].length===4)}
+  function save(){localStorage.setItem(STORE,JSON.stringify(brain))}
+
+  function choose(){
+    const scored=ACTIONS.map(a=>({a,s:score(a)}));
+    const max=Math.max(...scored.map(x=>x.s));
+    const best=scored.filter(x=>Math.abs(x.s-max)<1e-9);
+    exploration=Math.random()<EPS;
+    chosen=exploration?ACTIONS[Math.floor(Math.random()*ACTIONS.length)]:best[Math.floor(Math.random()*best.length)].a;
+    renderChoice(scored);
+  }
+
+  function renderChoice(scored){
+    $('choice').textContent=chosen;
+    $('mode').textContent=exploration?'exploration: trying something':'exploitation: best known action';
+    const ordered=[...scored].sort((a,b)=>b.s-a.s);
+    $('why').textContent=ordered.map(x=>`${x.a} ${fmt(x.s)}`).join('  ·  ');
+    document.querySelectorAll('.action').forEach(b=>b.classList.toggle('chosen',b.dataset.action===chosen));
+  }
+
+  function teach(reward){
+    const before=score(chosen), x=vec();
+    const error=reward-before;
+    brain.weights[chosen]=brain.weights[chosen].map((w,i)=>w+LR*error*x[i]);
+    brain.lessons++;
+    reward>0?brain.wins++:brain.losses++;
+    const active=Object.entries(senses).filter(([,v])=>v).map(([k])=>k).join('+')||'none';
+    brain.recent.unshift({n:brain.lessons,senses:active,action:chosen,reward,from:+before.toFixed(3),to:+score(chosen).toFixed(3)});
+    brain.recent=brain.recent.slice(0,LOG_MAX);
+    save(); render(); choose();
+  }
+
+  function toggle(name){senses[name]=!senses[name]; renderSenses(); choose()}
+  function renderSenses(){Object.keys(senses).forEach(k=>$(k).classList.toggle('on',senses[k]))}
+  function render(){
+    $('rate').textContent=LR;
+    $('lessons').textContent=brain.lessons;
+    $('wins').textContent=brain.wins;
+    $('losses').textContent=brain.losses;
+    $('epsilon').textContent=Math.round(EPS*100)+'%';
+    $('weights').innerHTML=ACTIONS.map(a=>`<tr><td>${a}</td>${brain.weights[a].map(n=>`<td class="${cls(n)}">${fmt(n)}</td>`).join('')}</tr>`).join('');
+    $('log').innerHTML=brain.recent.length?brain.recent.map(r=>`<div class="row">#${r.n} · ${r.senses} → <b>${r.action}</b> · ${r.reward>0?'WORKED':'FAILED'} · ${fmt(r.from)}→${fmt(r.to)}</div>`).join(''):'No lessons yet. It knows nothing.';
+    renderSenses();
+  }
+
+  function packet(){
+    return JSON.stringify({
+      forge_context:{purpose:'smallest durable state that enables the next learned decision',specimen:'forge-dumb-ai',schema:1},
+      learner:{type:'linear contextual bandit',features:FEATURES,actions:ACTIONS,learning_rate:LR,exploration:EPS},
+      state:brain
+    },null,2)
+  }
+
+  ACTIONS.forEach(a=>{const b=document.createElement('button');b.className='action';b.dataset.action=a;b.textContent=a;b.onclick=()=>{chosen=a;exploration=false;renderChoice(ACTIONS.map(x=>({a:x,s:score(x)})))};$('actions').appendChild(b)});
+  Object.keys(senses).forEach(k=>$(k).onclick=()=>toggle(k));
+  $('worked').onclick=()=>teach(1); $('failed').onclick=()=>teach(-1);
+  $('randomize').onclick=()=>{Object.keys(senses).forEach(k=>senses[k]=Math.random()>.5);renderSenses();choose()};
+  $('reset').onclick=()=>{if(confirm('Erase every learned weight and lesson?')){brain=blank();save();render();choose()}};
+  $('context').onclick=()=>{$('packet').value=packet();$('packetStatus').textContent='';$('dialog').showModal()};
+  $('close').onclick=()=>$('dialog').close();
+  $('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('packet').value);$('packetStatus').textContent='Copied.'}catch{$('packet').select();$('packetStatus').textContent='Select + copy manually.'}};
+  $('load').onclick=()=>{try{const p=JSON.parse($('packet').value);const candidate=p.state||p;if(!valid(candidate))throw new Error('bad schema');brain=candidate;save();render();choose();$('packetStatus').textContent='Imported. Brain replaced.'}catch{$('packetStatus').textContent='Could not import: packet is not a valid v1 brain.'}};
+
+  render(); choose();
+})();
+</script>
+</body>
+</html>
