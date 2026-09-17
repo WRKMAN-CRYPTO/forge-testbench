@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#0a0d0c" />
+<title>AGENT LANGUAGE // 001</title>
+<style>
+  :root{--bg:#0a0d0c;--panel:#111714;--panel2:#161e1a;--ink:#e8f1eb;--muted:#8fa197;--line:#26352d;--hot:#bafc73;--bad:#ff8a72;--cold:#70d8ff;--warn:#ffd36b}
+  *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  button{font:inherit;color:inherit;background:#18211d;border:1px solid #34473d;border-radius:12px;min-height:48px;padding:10px 14px;touch-action:manipulation}
+  button:active{transform:translateY(1px);background:#213029}.primary{border-color:#587f68;background:#1d3327}.danger{border-color:#69443d}.tiny{min-height:38px;padding:6px 10px;font-size:12px}
+  .app{max-width:860px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+  h1{font-size:19px;margin:0;letter-spacing:.08em}.sub{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}.badge{font-size:10px;padding:5px 7px;border:1px solid var(--line);border-radius:999px;color:var(--warn);white-space:nowrap}
+  .grid{display:grid;grid-template-columns:1fr;gap:10px}.panel{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:16px;padding:13px;box-shadow:0 8px 28px #0004}
+  .panel h2{font-size:11px;letter-spacing:.14em;color:var(--muted);margin:0 0 11px}.worldRow{display:flex;gap:10px;align-items:center;justify-content:space-between}.lamps{display:flex;gap:8px}
+  .lampWrap{text-align:center;font-size:10px;color:var(--muted)}.lamp{width:42px;height:42px;border-radius:50%;border:1px solid #3a4b42;background:#0c100e;display:grid;place-items:center;margin-bottom:4px}.lamp.on{background:#d9ffd0;color:#071007;box-shadow:0 0 18px #bafc7366}
+  .utterance{font-size:clamp(20px,5vw,35px);font-weight:800;letter-spacing:.02em;line-height:1.25;word-break:break-word}.arrow{color:#64766c}.outcome{font-size:12px;margin-top:8px;color:var(--muted)}.outcome.good{color:var(--hot)}.outcome.bad{color:var(--bad)}
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}.controls .wide{grid-column:1/-1}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:9px;text-align:center}.stat b{display:block;font-size:18px}.stat span{display:block;font-size:9px;color:var(--muted);margin-top:3px;letter-spacing:.08em}
+  .phrase{display:grid;grid-template-columns:1fr auto;gap:5px;padding:8px 0;border-top:1px solid #223028}.phrase:first-child{border-top:0}.phrase .p{font-size:13px;font-weight:700}.phrase .m{font-size:10px;color:var(--muted);margin-top:3px}.phrase .r{font-size:11px;text-align:right}
+  .agents{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.agent{border:1px solid var(--line);background:#0d120f;border-radius:12px;padding:9px;min-height:84px}.agent.term{border-color:#365364}.agent b{font-size:15px}.agent .meta{font-size:9px;color:var(--muted);line-height:1.5;margin-top:5px}.bar{height:4px;background:#1f2a24;border-radius:9px;overflow:hidden;margin-top:5px}.bar i{display:block;height:100%;background:currentColor}
+  details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summary{font-size:11px;color:var(--muted);cursor:pointer}.matrix{font-size:10px;overflow:auto;white-space:pre;line-height:1.5;color:#aec0b5;margin-top:8px}
+  .foot{font-size:10px;color:var(--muted);line-height:1.5;margin:12px 2px 2px}.locked{color:var(--warn)}
+  @media(min-width:720px){.grid{grid-template-columns:1.05fr .95fr}.span{grid-column:1/-1}.controls{grid-template-columns:repeat(4,1fr)}.controls .wide{grid-column:auto}.agents{grid-template-columns:repeat(9,1fr)}.agent{min-height:105px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div><h1>AGENT LANGUAGE // 001</h1><div class="sub">Agents are the symbols. Reward shapes the utterance.</div></div>
+    <div class="badge">VOCABULARY LOCKED</div>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>WORLD STIMULUS</h2>
+      <div class="worldRow">
+        <div class="lamps" id="lamps"></div>
+        <div style="text-align:right"><div style="font-size:10px;color:var(--muted)">PATTERN</div><div id="pattern" style="font-size:18px;font-weight:800">---</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>CURRENT UTTERANCE</h2>
+      <div class="utterance" id="utterance">A? <span class="arrow">→</span> A? <span class="arrow">→</span> A? <span class="arrow">→</span> A?</div>
+      <div class="outcome" id="outcome">No round yet.</div>
+    </section>
+
+    <section class="panel span">
+      <h2>RUN</h2>
+      <div class="controls">
+        <button class="primary" id="one">ONE ROUND</button>
+        <button id="hundred">TRAIN 100</button>
+        <button id="auto">AUTO</button>
+        <button id="pause">PAUSE</button>
+        <button class="wide" id="copy">COPY BRAIN</button>
+        <button class="wide" id="load">LOAD BRAIN</button>
+        <button class="danger wide" id="reset">RESET</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>PERFORMANCE</h2>
+      <div class="stats">
+        <div class="stat"><b id="rounds">0</b><span>ROUNDS</span></div>
+        <div class="stat"><b id="wins">0</b><span>WINS</span></div>
+        <div class="stat"><b id="rate">0%</b><span>ALL TIME</span></div>
+        <div class="stat"><b id="recent">0%</b><span>RECENT 120</span></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>RECENT PHRASES</h2>
+      <div id="phrases"><div class="sub">No language yet.</div></div>
+    </section>
+
+    <section class="panel span">
+      <h2>AGENTS</h2>
+      <div class="agents" id="agents"></div>
+      <details>
+        <summary>RAW BRAIN</summary>
+        <div class="matrix" id="matrix"></div>
+      </details>
+    </section>
+  </div>
+
+  <div class="foot">The learner never sees words like “danger,” “food,” or “correct action.” It receives only a three-bit stimulus, anonymous agent choices, and success/failure. <span class="locked">Build 001 cannot create new agents.</span></div>
+</div>
+<script>
+(() => {
+  'use strict';
+  const KEY = 'forge-agent-language-001';
+  const INTERNAL = 6;
+  const TERMINALS = 3;
+  const TEMP = 0.62;
+  const LR = 0.075;
+  const STATES = [1,5,2,3,4,6];
+  const LAW = {1:0,5:0,2:1,3:1,4:2,6:2};
+  let autoTimer = null;
+
+  const $ = id => document.getElementById(id);
+  const rnd = () => (Math.random() * 0.04) - 0.02;
+  const mat = (r,c) => Array.from({length:r}, () => Array.from({length:c}, rnd));
+  const clip = v => Math.max(-4, Math.min(4, v));
+  const pct = v => Number.isFinite(v) ? Math.round(v * 100) + '%' : '0%';
+
+  function fresh() {
+    return {
+      version: 1,
+      inW: mat(INTERNAL,4),
+      transW: mat(INTERNAL,INTERNAL),
+      outW: mat(INTERNAL,TERMINALS),
+      rounds: 0,
+      wins: 0,
+      recent: [],
+      utterances: [],
+      uses: Array(9).fill(0),
+      last: null
+    };
+  }
+
+  function validBrain(b) {
+    return b && b.version === 1 &&
+      Array.isArray(b.inW) && b.inW.length === INTERNAL &&
+      Array.isArray(b.transW) && b.transW.length === INTERNAL &&
+      Array.isArray(b.outW) && b.outW.length === INTERNAL;
+  }
+
+  let brain;
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY));
+    brain = validBrain(saved) ? saved : fresh();
+  } catch { brain = fresh(); }
+
+  function save() {
+    localStorage.setItem(KEY, JSON.stringify(brain));
+  }
+
+  function probs(scores) {
+    const m = Math.max(...scores);
+    const e = scores.map(s => Math.exp((s - m) / TEMP));
+    const z = e.reduce((a,b) => a+b, 0) || 1;
+    return e.map(v => v / z);
+  }
+
+  function sample(p) {
+    let r = Math.random();
+    for (let i=0;i<p.length;i++) {
+      r -= p[i];
+      if (r <= 0) return i;
+    }
+    return p.length - 1;
+  }
+
+  function features(state) {
+    return [0,1,2].map(i => ((state >> i) & 1) ? 1 : -1);
+  }
+
+  function startProb(x) {
+    return probs(brain.inW.map(w => w[0] + w[1]*x[0] + w[2]*x[1] + w[3]*x[2]));
+  }
+
+  function policyUpdate(row, p, chosen, reward, scale=1) {
+    for (let i=0;i<row.length;i++) {
+      const grad = (i === chosen ? 1 : 0) - p[i];
+      row[i] = clip(row[i] + LR * scale * reward * grad);
+    }
+  }
+
+  function round(renderAfter=true) {
+    const state = STATES[Math.floor(Math.random() * STATES.length)];
+    const x = features(state);
+
+    const p0 = startProb(x);
+    const a0 = sample(p0);
+    const p1 = probs(brain.transW[a0]);
+    const a1 = sample(p1);
+    const p2 = probs(brain.transW[a1]);
+    const a2 = sample(p2);
+    const po = probs(brain.outW[a2]);
+    const out = sample(po);
+    const terminal = INTERNAL + out;
+    const win = out === LAW[state];
+    const reward = win ? 1 : -1;
+
+    const f = [1, ...x];
+    for (let agent=0;agent<INTERNAL;agent++) {
+      const grad = (agent === a0 ? 1 : 0) - p0[agent];
+      for (let k=0;k<4;k++) brain.inW[agent][k] = clip(brain.inW[agent][k] + LR * reward * grad * f[k]);
+    }
+    policyUpdate(brain.transW[a0], p1, a1, reward);
+    policyUpdate(brain.transW[a1], p2, a2, reward);
+    policyUpdate(brain.outW[a2], po, out, reward);
+
+    const chain = [a0,a1,a2,terminal];
+    chain.forEach(i => brain.uses[i] = (brain.uses[i] || 0) + 1);
+    brain.rounds++;
+    if (win) brain.wins++;
+    brain.recent.push(win ? 1 : 0);
+    if (brain.recent.length > 120) brain.recent.shift();
+    brain.utterances.push({k:chain.join('-'), win:win?1:0, state, t:Date.now()});
+    if (brain.utterances.length > 360) brain.utterances.shift();
+    brain.last = {state, chain, win};
+    if (brain.rounds % 10 === 0) save();
+    if (renderAfter) render();
+  }
+
+  function train(n) {
+    for (let i=0;i<n;i++) round(false);
+    save(); render();
+  }
+
+  function patternText(state) {
+    return [0,1,2].map(i => ((state >> i) & 1) ? '1' : '0').join('');
+  }
+
+  function topPhrases() {
+    const map = new Map();
+    for (const u of brain.utterances) {
+      if (!map.has(u.k)) map.set(u.k,{count:0,wins:0,states:{}});
+      const v = map.get(u.k); v.count++; v.wins += u.win;
+      const s = patternText(u.state); v.states[s] = (v.states[s]||0)+1;
+    }
+    return [...map.entries()].sort((a,b) => b[1].count-a[1].count).slice(0,6);
+  }
+
+  function strongest(row) {
+    let idx=0; for(let i=1;i<row.length;i++) if(row[i]>row[idx]) idx=i;
+    const p = probs(row);
+    return {idx, p:p[idx]};
+  }
+
+  function render() {
+    const last = brain.last;
+    const state = last ? last.state : 0;
+    $('lamps').innerHTML = [0,1,2].map(i => {
+      const on = last && ((state >> i) & 1);
+      return `<div class="lampWrap"><div class="lamp ${on?'on':''}">${on?'1':'0'}</div>σ${i}</div>`;
+    }).join('');
+    $('pattern').textContent = last ? patternText(state) : '---';
+
+    if (last) {
+      $('utterance').innerHTML = last.chain.map((a,i) => `${i?'<span class="arrow">→</span> ':''}A${a}`).join(' ');
+      $('outcome').className = 'outcome ' + (last.win ? 'good' : 'bad');
+      $('outcome').textContent = `${last.win ? 'SUCCESS' : 'FAIL'} · terminal A${last.chain[3]} · stimulus ${patternText(last.state)}`;
+    }
+
+    $('rounds').textContent = brain.rounds.toLocaleString();
+    $('wins').textContent = brain.wins.toLocaleString();
+    $('rate').textContent = pct(brain.rounds ? brain.wins / brain.rounds : 0);
+    $('recent').textContent = pct(brain.recent.length ? brain.recent.reduce((a,b)=>a+b,0) / brain.recent.length : 0);
+
+    const ph = topPhrases();
+    $('phrases').innerHTML = ph.length ? ph.map(([k,v]) => {
+      const seq = k.split('-').map(x=>'A'+x).join(' → ');
+      const contexts = Object.entries(v.states).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([s,n])=>`${s}×${n}`).join(' · ');
+      return `<div class="phrase"><div><div class="p">${seq}</div><div class="m">${contexts}</div></div><div class="r">×${v.count}<br>${pct(v.wins/v.count)}</div></div>`;
+    }).join('') : '<div class="sub">No language yet.</div>';
+
+    const maxUse = Math.max(1,...brain.uses);
+    $('agents').innerHTML = Array.from({length:9},(_,i) => {
+      const usage = brain.uses[i] || 0;
+      let desc;
+      if (i < INTERNAL) {
+        const next = strongest(brain.transW[i]);
+        const out = strongest(brain.outW[i]);
+        desc = `next A${next.idx} ${pct(next.p)}<br>terminal A${INTERNAL+out.idx} ${pct(out.p)}`;
+      } else {
+        desc = `grounded output ${i-INTERNAL}<br>terminal agent`;
+      }
+      return `<div class="agent ${i>=INTERNAL?'term':''}"><b>A${i}</b><div class="meta">used ${usage}<br>${desc}</div><div class="bar"><i style="width:${Math.round(100*usage/maxUse)}%"></i></div></div>`;
+    }).join('');
+
+    const f = n => (Math.round(n*100)/100).toFixed(2).padStart(5,' ');
+    let raw = 'INPUT → FIRST AGENT\n';
+    brain.inW.forEach((r,i)=> raw += `A${i}  ${r.map(f).join(' ')}\n`);
+    raw += '\nAGENT → AGENT\n';
+    brain.transW.forEach((r,i)=> raw += `A${i}  ${r.map(f).join(' ')}\n`);
+    raw += '\nAGENT → TERMINAL (A6 A7 A8)\n';
+    brain.outW.forEach((r,i)=> raw += `A${i}  ${r.map(f).join(' ')}\n`);
+    $('matrix').textContent = raw;
+  }
+
+  $('one').onclick = () => round(true);
+  $('hundred').onclick = () => train(100);
+  $('auto').onclick = () => {
+    if (autoTimer) return;
+    autoTimer = setInterval(() => { for(let i=0;i<4;i++) round(false); render(); }, 120);
+  };
+  $('pause').onclick = () => { clearInterval(autoTimer); autoTimer = null; save(); };
+  $('copy').onclick = async () => {
+    save(); const text = JSON.stringify(brain);
+    try { await navigator.clipboard.writeText(text); $('outcome').textContent = 'Brain copied to clipboard.'; }
+    catch { prompt('Copy brain JSON:', text); }
+  };
+  $('load').onclick = () => {
+    const text = prompt('Paste brain JSON:'); if (!text) return;
+    try {
+      const next = JSON.parse(text);
+      if (!validBrain(next)) throw new Error('wrong brain shape');
+      brain = next; save(); render();
+      $('outcome').className='outcome'; $('outcome').textContent='Brain loaded.';
+    } catch(e) { alert('Could not load brain: ' + e.message); }
+  };
+  $('reset').onclick = () => {
+    if (!confirm('Erase this learned brain and start ignorant again?')) return;
+    clearInterval(autoTimer); autoTimer=null; brain=fresh(); save(); render();
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  window.addEventListener('pagehide', save);
+  render();
+})();
+</script>
+</body>
+</html>
