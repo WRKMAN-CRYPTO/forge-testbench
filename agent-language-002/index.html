@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#090d0b" />
+<title>AGENT LANGUAGE // 002</title>
+<style>
+:root{--bg:#090d0b;--panel:#131a15;--ink:#edf4ef;--muted:#91a198;--line:#2a3a31;--hot:#b9ff79;--bad:#ff8d78;--born:#d39cff;--warn:#ffd66f}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{max-width:860px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{font-size:20px;margin:0;letter-spacing:.08em}.sub{font-size:11px;color:var(--muted);line-height:1.45}.badge{font-size:10px;color:var(--born);border:1px solid #624979;border-radius:999px;padding:6px 8px;white-space:nowrap}.grid{display:grid;gap:10px;margin-top:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px}.panel h2{font-size:11px;color:var(--muted);letter-spacing:.14em;margin:0 0 11px}.world{display:flex;justify-content:space-between;align-items:center}.lamps{display:flex;gap:8px}.lampWrap{text-align:center;font-size:10px;color:var(--muted)}.lamp{width:42px;height:42px;border:1px solid #3b4e43;border-radius:50%;display:grid;place-items:center;margin-bottom:4px}.lamp.on{background:#d9ffd0;color:#071007;box-shadow:0 0 18px #b9ff7966}.utter{font-size:clamp(20px,5vw,35px);font-weight:800;line-height:1.35}.arrow{color:#66786e}.born{color:var(--born)}.outcome{font-size:12px;margin-top:8px;color:var(--muted)}.good{color:var(--hot)}.bad{color:var(--bad)}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{font:inherit;color:inherit;background:#18211c;border:1px solid #35483d;border-radius:12px;min-height:48px;padding:10px;touch-action:manipulation}.primary{background:#1c3426;border-color:#58836a}.danger{border-color:#70473f}.wide{grid-column:1/-1}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:9px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:9px;color:var(--muted)}.rows{display:grid;gap:7px}.row{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px}.row.new{border-color:#624979}.main{font-size:13px;font-weight:800}.meta{font-size:10px;color:var(--muted);line-height:1.45;margin-top:3px}.vocab{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.agent{background:#0d120f;border:1px solid var(--line);border-radius:12px;padding:9px;min-height:82px}.agent.new{border-color:#624979}.agent.out{border-color:#365666}.agent b{font-size:15px}.agent .meta{font-size:9px}.foot{font-size:10px;color:var(--muted);line-height:1.5;margin:12px 2px}.note{color:var(--warn)}details{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}summary{font-size:11px;color:var(--muted)}pre{font-size:9px;white-space:pre-wrap;overflow-wrap:anywhere;color:#aec0b5}
+@media(min-width:720px){.grid{grid-template-columns:1fr 1fr}.span{grid-column:1/-1}.controls{grid-template-columns:repeat(5,1fr)}.wide{grid-column:auto}.vocab{grid-template-columns:repeat(6,1fr)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top"><div><h1>AGENT LANGUAGE // 002</h1><div class="sub">Recurring fragments can become selectable agents.</div></div><div class="badge">VOCABULARY CAN GROW</div></div>
+  <div class="grid">
+    <section class="panel"><h2>WORLD STIMULUS</h2><div class="world"><div class="lamps" id="lamps"></div><div style="text-align:right"><div class="sub">PATTERN</div><div id="pattern" style="font-size:19px;font-weight:800">---</div></div></div></section>
+    <section class="panel"><h2>CURRENT UTTERANCE</h2><div id="utter" class="utter">A? → A? → A? → A?</div><div id="outcome" class="outcome">No round yet.</div><div id="expanded" class="sub"></div></section>
+    <section class="panel span"><h2>RUN</h2><div class="controls"><button class="primary" id="one">ONE ROUND</button><button id="hundred">TRAIN 100</button><button id="thousand">TRAIN 1K</button><button id="auto">AUTO</button><button id="pause">PAUSE</button><button class="wide" id="copy">COPY BRAIN</button><button class="wide" id="load">LOAD BRAIN</button><button class="danger wide" id="reset">RESET</button></div></section>
+    <section class="panel"><h2>PERFORMANCE</h2><div class="stats"><div class="stat"><b id="rounds">0</b><span>ROUNDS</span></div><div class="stat"><b id="wins">0</b><span>WINS</span></div><div class="stat"><b id="rate">0%</b><span>ALL TIME</span></div><div class="stat"><b id="recent">0%</b><span>RECENT 120</span></div></div></section>
+    <section class="panel"><h2>NEWBORN AGENTS</h2><div id="births" class="rows"><div class="sub">None yet.</div></div></section>
+    <section class="panel"><h2>RECURRENT UTTERANCES</h2><div id="phrases" class="rows"></div></section>
+    <section class="panel"><h2>FRAGMENTS UNDER PRESSURE</h2><div id="frags" class="rows"></div></section>
+    <section class="panel span"><h2>VOCABULARY</h2><div id="vocab" class="vocab"></div><details><summary>RAW BRAIN</summary><pre id="raw"></pre></details></section>
+  </div>
+  <div class="foot">A fragment must be a two-agent internal sequence, appear often, succeed at least 94%, and occur across at least two stimuli before it can become a newborn. <span class="note">Whole utterances never qualify.</span></div>
+</div>
+<script>
+(()=>{'use strict';
+const KEY='forge-agent-language-002';
+const PRIMS=6,OUTS=3,LEN=3,TEMP=.62,LR=.075,MAX_NEW=4;
+const STATES=[1,5,2,3,4,6],LAW={1:0,5:0,2:1,3:1,4:2,6:2};
+const BIRTH_MIN=70,BIRTH_RATE=.94,BIRTH_STATES=2;
+let autoTimer=null;
+const $=id=>document.getElementById(id);
+const rnd=()=>Math.random()*.04-.02;
+const clip=v=>Math.max(-4,Math.min(4,v));
+const pct=v=>Number.isFinite(v)?Math.round(v*100)+'%':'0%';
+const mat=(r,c)=>Array.from({length:r},()=>Array.from({length:c},rnd));
+function fresh(){return{version:2,rounds:0,wins:0,recent:[],history:[],births:[],uses:Array(32).fill(0),last:null,inW:mat(PRIMS,4),transW:mat(PRIMS,PRIMS),outW:mat(PRIMS,OUTS)}}
+function valid(b){return b&&b.version===2&&Array.isArray(b.births)&&Array.isArray(b.inW)&&Array.isArray(b.transW)&&Array.isArray(b.outW)}
+let brain;try{const s=JSON.parse(localStorage.getItem(KEY));brain=valid(s)?s:fresh()}catch{brain=fresh()}
+function ids(){return[0,1,2,3,4,5,...brain.births.map(b=>b.id)]}
+function exp(id){if(id<PRIMS)return[id];const b=brain.births.find(x=>x.id===id);return b?b.pair.slice():[0]}
+function ensure(id){while(brain.inW.length<=id)brain.inW.push([rnd(),rnd(),rnd(),rnd()]);while(brain.transW.length<=id)brain.transW.push([]);for(let r=0;r<brain.transW.length;r++){if(!brain.transW[r])brain.transW[r]=[];for(const t of ids())if(!Number.isFinite(brain.transW[r][t]))brain.transW[r][t]=rnd()}}
+function normalize(){for(const id of ids())ensure(id);while(brain.uses.length<32)brain.uses.push(0)}
+normalize();
+function save(){localStorage.setItem(KEY,JSON.stringify(brain))}
+function probs(scores){const m=Math.max(...scores),e=scores.map(s=>Math.exp((s-m)/TEMP)),z=e.reduce((a,b)=>a+b,0)||1;return e.map(v=>v/z)}
+function sample(p){let r=Math.random();for(let i=0;i<p.length;i++){r-=p[i];if(r<=0)return i}return p.length-1}
+function feat(state){return[0,1,2].map(i=>((state>>i)&1)?1:-1)}
+function candidates(rem){return ids().filter(id=>exp(id).length<=rem)}
+function chooseStart(x,rem){const list=candidates(rem),scores=list.map(id=>{ensure(id);const w=brain.inW[id];return w[0]+w[1]*x[0]+w[2]*x[1]+w[3]*x[2]}),p=probs(scores),ix=sample(p);return{list,p,ix,id:list[ix]}}
+function chooseNext(prev,rem){const list=candidates(rem);ensure(prev);const p=probs(list.map(id=>brain.transW[prev][id]||0)),ix=sample(p);return{list,p,ix,id:list[ix]}}
+function updateChoice(choice,reward,apply){for(let i=0;i<choice.list.length;i++){const g=(i===choice.ix?1:0)-choice.p[i];apply(choice.list[i],LR*reward*g)}}
+function pattern(state){return[0,1,2].map(i=>((state>>i)&1)?'1':'0').join('')}
+function utterance(state){const x=feat(state),tokens=[],expanded=[],steps=[];let rem=LEN,prev=null;while(rem>0){const c=prev===null?chooseStart(x,rem):chooseNext(prev,rem);tokens.push(c.id);steps.push({prev,choice:c,start:prev===null});expanded.push(...exp(c.id));rem-=exp(c.id).length;prev=c.id}const last=expanded[expanded.length-1],po=probs(brain.outW[last]),out=sample(po);return{x,tokens,expanded,steps,last,po,out,terminal:PRIMS+out}}
+function learn(u,reward){const f=[1,...u.x];for(const s of u.steps){if(s.start){updateChoice(s.choice,reward,(id,d)=>{for(let k=0;k<4;k++)brain.inW[id][k]=clip(brain.inW[id][k]+d*f[k])})}else{updateChoice(s.choice,reward,(id,d)=>{brain.transW[s.prev][id]=clip((brain.transW[s.prev][id]||0)+d)})}}for(let o=0;o<OUTS;o++){const g=(o===u.out?1:0)-u.po[o];brain.outW[u.last][o]=clip(brain.outW[u.last][o]+LR*reward*g)}}
+function fragmentStats(){const m=new Map();for(const h of brain.history){for(let i=0;i<h.expanded.length-1;i++){const a=h.expanded[i],b=h.expanded[i+1];if(a>=PRIMS||b>=PRIMS)continue;const k=a+'-'+b;if(!m.has(k))m.set(k,{pair:[a,b],count:0,wins:0,states:new Set()});const v=m.get(k);v.count++;v.wins+=h.win;v.states.add(h.state)}}return[...m.values()].sort((a,b)=>b.count-a.count)}
+function maybeBirth(){if(brain.births.length>=MAX_NEW)return;for(const v of fragmentStats()){const rate=v.count?v.wins/v.count:0,exists=brain.births.some(b=>b.pair[0]===v.pair[0]&&b.pair[1]===v.pair[1]);if(!exists&&v.count>=BIRTH_MIN&&rate>=BIRTH_RATE&&v.states.size>=BIRTH_STATES){const id=9+brain.births.length;brain.births.push({id,pair:v.pair.slice(),bornAt:brain.rounds,evidence:v.count,rate,states:[...v.states]});ensure(id);brain.inW[id]=brain.inW[v.pair[0]].map((x,k)=>(x+brain.inW[v.pair[1]][k])*.325);break}}}
+function round(draw=true){const state=STATES[Math.floor(Math.random()*STATES.length)],u=utterance(state),win=u.out===LAW[state];learn(u,win?1:-1);for(const id of [...u.tokens,u.terminal])brain.uses[id]=(brain.uses[id]||0)+1;brain.rounds++;if(win)brain.wins++;brain.recent.push(win?1:0);if(brain.recent.length>120)brain.recent.shift();brain.history.push({state,tokens:u.tokens.slice(),expanded:u.expanded.slice(),terminal:u.terminal,win:win?1:0});if(brain.history.length>900)brain.history.shift();brain.last={state,tokens:u.tokens,expanded:u.expanded,terminal:u.terminal,win};if(brain.rounds%10===0){maybeBirth();save()}if(draw)render()}
+function train(n){for(let i=0;i<n;i++)round(false);maybeBirth();save();render()}
+function topPhrases(){const m=new Map();for(const h of brain.history){const k=[...h.tokens,h.terminal].join('-');if(!m.has(k))m.set(k,{count:0,wins:0,states:{}});const v=m.get(k);v.count++;v.wins+=h.win;const s=pattern(h.state);v.states[s]=(v.states[s]||0)+1}return[...m.entries()].sort((a,b)=>b[1].count-a[1].count).slice(0,6)}
+function tokenHTML(id){return `<span class="${id>=9?'born':''}">A${id}</span>`}
+function strongest(id){ensure(id);const list=ids(),p=probs(list.map(t=>brain.transW[id][t]||0));let ix=0;for(let i=1;i<p.length;i++)if(p[i]>p[ix])ix=i;return{to:list[ix],p:p[ix]}}
+function render(){normalize();const l=brain.last,state=l?l.state:0;
+$('lamps').innerHTML=[0,1,2].map(i=>{const on=l&&((state>>i)&1);return `<div class="lampWrap"><div class="lamp ${on?'on':''}">${on?'1':'0'}</div>σ${i}</div>`}).join('');
+$('pattern').textContent=l?pattern(state):'---';
+if(l){$('utter').innerHTML=[...l.tokens,l.terminal].map((id,i)=>`${i?'<span class="arrow">→</span> ':''}${tokenHTML(id)}`).join(' ');$('outcome').className='outcome '+(l.win?'good':'bad');$('outcome').textContent=`${l.win?'SUCCESS':'FAIL'} · terminal A${l.terminal} · stimulus ${pattern(l.state)}`;$('expanded').textContent=l.tokens.some(id=>id>=9)?'expanded internal path: '+l.expanded.map(id=>'A'+id).join(' → '):'';}
+$('rounds').textContent=brain.rounds.toLocaleString();$('wins').textContent=brain.wins.toLocaleString();$('rate').textContent=pct(brain.rounds?brain.wins/brain.rounds:0);$('recent').textContent=pct(brain.recent.length?brain.recent.reduce((a,b)=>a+b,0)/brain.recent.length:0);
+$('births').innerHTML=brain.births.length?brain.births.slice().reverse().map(b=>`<div class="row new"><div class="main"><span class="born">A${b.id}</span> = A${b.pair[0]} → A${b.pair[1]}</div><div class="meta">born round ${b.bornAt.toLocaleString()} · evidence ${b.evidence} · ${pct(b.rate)} · ${b.states.length} stimuli</div></div>`).join(''):'<div class="sub">None yet.</div>';
+$('phrases').innerHTML=topPhrases().map(([k,v])=>`<div class="row"><div class="main">${k.split('-').map(x=>tokenHTML(+x)).join(' → ')}</div><div class="meta">×${v.count} · ${pct(v.wins/v.count)} · ${Object.entries(v.states).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([s,c])=>s+'×'+c).join(' · ')}</div></div>`).join('')||'<div class="sub">No language yet.</div>';
+$('frags').innerHTML=fragmentStats().slice(0,6).map(v=>{const b=brain.births.find(x=>x.pair[0]===v.pair[0]&&x.pair[1]===v.pair[1]);return `<div class="row ${b?'new':''}"><div class="main">A${v.pair[0]} → A${v.pair[1]} ${b?`<span class="born">= A${b.id}</span>`:''}</div><div class="meta">${v.count}/${BIRTH_MIN} uses · ${pct(v.wins/v.count)} · ${v.states.size} stimuli</div></div>`}).join('')||'<div class="sub">Waiting for repeated structure.</div>';
+const all=[...ids(),6,7,8];$('vocab').innerHTML=all.map(id=>{if(id>=6&&id<=8)return `<div class="agent out"><b>A${id}</b><div class="meta">grounded output ${id-6}<br>used ${(brain.uses[id]||0).toLocaleString()}</div></div>`;const b=brain.births.find(x=>x.id===id),s=strongest(id);return `<div class="agent ${b?'new':''}"><b class="${b?'born':''}">A${id}</b><div class="meta">${b?`newborn<br>A${b.pair[0]} → A${b.pair[1]}<br>`:'primitive<br>'}used ${(brain.uses[id]||0).toLocaleString()}<br>next A${s.to} ${pct(s.p)}</div></div>`}).join('');
+$('raw').textContent=JSON.stringify({births:brain.births,inW:brain.inW,transW:brain.transW,outW:brain.outW},null,2);
+}
+$('one').onclick=()=>round();$('hundred').onclick=()=>train(100);$('thousand').onclick=()=>train(1000);$('auto').onclick=()=>{if(!autoTimer)autoTimer=setInterval(()=>train(20),90)};$('pause').onclick=()=>{clearInterval(autoTimer);autoTimer=null;save()};$('copy').onclick=async()=>{save();const t=JSON.stringify(brain);try{await navigator.clipboard.writeText(t);$('copy').textContent='COPIED';setTimeout(()=>$('copy').textContent='COPY BRAIN',900)}catch{prompt('Copy brain:',t)}};$('load').onclick=()=>{const t=prompt('Paste Build 002 brain JSON:');if(!t)return;try{const b=JSON.parse(t);if(!valid(b))throw 0;brain=b;normalize();save();render()}catch{alert('Invalid Build 002 brain.')}};$('reset').onclick=()=>{if(confirm('Erase this Build 002 brain?')){clearInterval(autoTimer);autoTimer=null;brain=fresh();normalize();save();render()}};
+render();
+})();
+</script>
+</body>
+</html>
