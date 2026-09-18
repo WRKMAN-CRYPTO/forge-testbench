@@ -12,27 +12,11 @@ h1{margin:0 0 6px;font-size:clamp(26px,8vw,42px)}
 p{color:var(--muted);line-height:1.5}
 a{display:block;color:inherit;text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px}
 a:active{transform:translateY(1px)}
-.title{font-weight:900;color:var(--accent);font-size:18px}
-.desc{display:block;color:var(--muted);font-size:12px;line-height:1.45;margin-top:5px}
-.tag{display:inline-block;margin-top:10px;border:1px solid var(--line);border-radius:999px;padding:4px 8px;color:#d5d0b7;font-size:11px}
-</style>
-</head>
-<body><main>
-<h1>INTERESTING SYSTEMS</h1>
-<p>Small digital experiments built to expose transferable behavior. Each one should do something, not merely shimmer.</p>
-<a href="./load-shedding/">
-  <span class="title">LOAD SHEDDING LAB</span>
-  <span class="desc">Overload a finite-capacity service. Compare queuing every request against deliberately dropping low-value work to preserve critical throughput.</span>
-  <span class="tag">sacrifice completeness to preserve function</span>
-</a>
-<a href="./priority-inheritance/">
-  <span class="title">PRIORITY INHERITANCE LAB</span>
-  <span class="desc">Watch a low-priority lock holder stall urgent work while medium-priority work cuts the line. Toggle inheritance and see one local rule collapse the delay.</span>
-  <span class="tag">temporary authority transfer</span>
-</a>
-<a href="./stigmergy-task-router/">
-  <span class="title">STIGMERGY TASK ROUTER</span>
-  <span class="desc">Route CUT, WELD, and INSPECT jobs using decaying traces left by successful work. Jam a favored worker and see whether the system adapts or follows stale evidence.</span>
-  <span class="tag">shared environmental memory</span>
-</a>
+.title{font-weight:900;color:var(--accent);font-size:18px}.desc{display:block;color:var(--muted);font-size:12px;line-height:1.45;margin-top:5px}.tag{display:inline-block;margin-top:10px;border:1px solid var(--line);border-radius:999px;padding:4px 8px;color:#d5d0b7;font-size:11px}
+</style></head><body><main>
+<h1>INTERESTING SYSTEMS</h1><p>Small digital experiments built to expose transferable behavior. Each one should do something, not merely shimmer.</p>
+<a href="./tuned-mass-damper/"><span class="title">TUNED MASS DAMPER LAB</span><span class="desc">Tune a small secondary oscillator against a disturbance and see when it suppresses motion in the larger structure.</span><span class="tag">fight oscillation with oscillation</span></a>
+<a href="./load-shedding/"><span class="title">LOAD SHEDDING LAB</span><span class="desc">Overload a finite-capacity service. Compare queuing every request against deliberately dropping low-value work to preserve critical throughput.</span><span class="tag">sacrifice completeness to preserve function</span></a>
+<a href="./priority-inheritance/"><span class="title">PRIORITY INHERITANCE LAB</span><span class="desc">Watch a low-priority lock holder stall urgent work while medium-priority work cuts the line. Toggle inheritance and see one local rule collapse the delay.</span><span class="tag">temporary authority transfer</span></a>
+<a href="./stigmergy-task-router/"><span class="title">STIGMERGY TASK ROUTER</span><span class="desc">Route CUT, WELD, and INSPECT jobs using decaying traces left by successful work. Jam a favored worker and see whether the system adapts or follows stale evidence.</span><span class="tag">shared environmental memory</span></a>
 </main></body></html>
