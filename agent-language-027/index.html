@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0b"><title>AGENT LANGUAGE // 027</title><style>
+:root{--bg:#090d0b;--panel:#131a15;--ink:#edf4ef;--muted:#91a198;--line:#2a3a31;--hot:#b9ff79;--cyan:#77dfff;--warn:#ffd66f;--violet:#d39cff;--bad:#ff8d78}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{max-width:980px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{font-size:20px;margin:0;letter-spacing:.08em}.sub{font-size:11px;color:var(--muted);line-height:1.55}.badge{font-size:10px;color:var(--cyan);border:1px solid #476b77;border-radius:999px;padding:6px 8px;white-space:nowrap}
+.grid{display:grid;gap:10px;margin-top:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px}.panel h2{font-size:11px;color:var(--muted);letter-spacing:.14em;margin:0 0 11px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{font:inherit;color:inherit;background:#18211c;border:1px solid #35483d;border-radius:12px;min-height:48px;padding:10px;touch-action:manipulation}.primary{background:#1c3426;border-color:#58836a}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:9px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:9px;color:var(--muted)}.rows{display:grid;gap:7px}.row{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px}.row.hot{border-color:#596d37}.main{font-size:13px;font-weight:800}.meta{font-size:10px;color:var(--muted);line-height:1.55;margin-top:3px}.good{color:var(--hot)}.bad{color:var(--bad)}.cyan{color:var(--cyan)}.warn{color:var(--warn)}.violet{color:var(--violet)}
+.progress{height:7px;background:#0d120f;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:9px}.fill{height:100%;width:0;background:var(--cyan)}
+.roleGrid{display:grid;grid-template-columns:46px repeat(4,minmax(0,1fr));gap:5px;align-items:stretch}.cell,.head{border:1px solid var(--line);border-radius:9px;padding:7px;text-align:center;min-width:0}.head{font-size:9px;color:var(--muted);display:flex;align-items:center;justify-content:center}.cell{background:#0d120f}.cell.diag{border-color:#6d5e35;box-shadow:inset 0 0 0 1px #3a321d}.cell b{display:block;font-size:12px}.cell span{display:block;font-size:8px;color:var(--muted);margin-top:3px}
+.kernels{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:10px;border:1px solid var(--line);border-radius:999px;padding:5px 8px}.foot{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 2px}pre{font-size:9px;white-space:pre-wrap;overflow-wrap:anywhere;color:#aec0b5}details{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}summary{font-size:11px;color:var(--muted)}
+@media(min-width:760px){.grid{grid-template-columns:1fr 1fr}.span2{grid-column:1/-1}.controls{grid-template-columns:repeat(4,1fr)}.stats{grid-template-columns:repeat(4,1fr)}}
+</style></head><body><div class="app">
+<div class="top"><div><h1>AGENT LANGUAGE // 027</h1><div class="sub">Same operation, different role. Hold input and hidden transformation constant, then separate eligibility, position, and remaining budget.</div></div><div class="badge">ROLE MICROSCOPE</div></div>
+<div class="grid">
+<section class="panel span2"><h2>FROZEN SOURCE</h2><div class="stats"><div class="stat"><b id="status">—</b><span>SOURCE</span></div><div class="stat"><b id="rounds">0</b><span>TRAIN ROUNDS</span></div><div class="stat"><b id="familyN">0</b><span>[3] SYNONYMS</span></div><div class="stat"><b id="samples">0</b><span>INPUTS</span></div></div><div class="controls" style="margin-top:10px"><button class="primary" id="loadSaved">LOAD SAVED 023</button><button id="paste">PASTE 023 BRAIN</button><button id="scan">RUN MICROSCOPE</button><button id="copy">COPY REPORT</button></div><div class="progress"><div class="fill" id="fill"></div></div><div class="sub" id="progress" style="margin-top:6px">Idle. Frozen analysis only.</div></section>
+
+<section class="panel"><h2>THE CONTROL</h2><div class="sub">A3, A16, A21, A22, and A29 all execute kernel <span class="cyan">[3]</span>. Starting from the same input and hidden state, that means their hidden transformation is identical. Their learned selectors can still differ because span changes <b>position</b>, <b>remaining budget</b>, and which later words are eligible.</div><div class="kernels" id="familyChips" style="margin-top:10px"></div></section>
+
+<section class="panel"><h2>VERDICT</h2><div class="stats"><div class="stat"><b id="hiddenDelta">—</b><span>MAX HIDDEN Δ</span></div><div class="stat"><b id="eligTV">—</b><span>ELIGIBILITY TV</span></div><div class="stat"><b id="posTV">—</b><span>POSITION TV</span></div><div class="stat"><b id="remTV">—</b><span>BUDGET TV</span></div></div><div id="verdict" class="sub" style="margin-top:10px">Run the microscope.</div></section>
+
+<section class="panel span2"><h2>NATURAL SIBLING CONTEXTS</h2><div class="sub" style="margin-bottom:9px">Each sibling executes the same [3] transformation. FIT uses the real span≤remaining eligibility rule. FIXED-SHORT uses the same span&lt;8 candidate pool in every row, so differences that remain cannot be caused by eligibility changes.</div><div id="naturalRows" class="rows"><div class="sub">Run the microscope.</div></div></section>
+
+<section class="panel"><h2>POSITION ONLY</h2><div class="sub" style="margin-bottom:9px">Hidden state fixed after [3], remaining budget fixed at 5, and candidate pool fixed to words with span≤3. Only selector position changes.</div><div id="posRows" class="rows"><div class="sub">Run the microscope.</div></div></section>
+
+<section class="panel"><h2>BUDGET ONLY</h2><div class="sub" style="margin-bottom:9px">Hidden state fixed after [3], position fixed at 3, and candidate pool fixed to words with span≤3. Only the remaining-budget feature changes.</div><div id="remRows" class="rows"><div class="sub">Run the microscope.</div></div></section>
+
+<section class="panel span2"><h2>[3] SYNONYM ROLE GRID</h2><div class="sub" style="margin-bottom:9px">Counterfactual score probe. Candidate pool is always the full [3] family, including members that would not fit. This strips away eligibility completely and asks which synonym's selector row scores highest as only position and remaining-budget coordinates move. Gold cells are the four real post-prefix contexts.</div><div id="roleGrid" class="roleGrid"><div class="sub">Run the microscope.</div></div></section>
+
+<section class="panel span2"><h2>RAW REPORT</h2><details><summary>OPEN JSON</summary><pre id="raw"></pre></details></section>
+</div>
+<div class="foot"><span class="warn">Interpretation guardrail:</span> this is a selector microscope, not a claim of human-like syntax. The fixed-pool sweeps are deliberate counterfactuals used to isolate learned context dependence.</div>
+</div><script>
+(()=>{'use strict';
+const SOURCE_KEY='forge-agent-language-023',REPORT_KEY='forge-agent-language-027-results';
+const PRIMS=8,LEN=8,H=8,N=8192,BASES=[2,3,5,7,11,13],POS=[1,2,3,5],REM=[7,6,5,3];
+const $=id=>document.getElementById(id),vec=n=>Array(n).fill(0);
+let brain=null,report={version:27,source:null,family:null,hiddenCheck:null,natural:null,positionSweep:null,budgetSweep:null,roleGrid:null},busy=false;
+function valid(b){return b&&b.version===23&&Array.isArray(b.births)&&Array.isArray(b.selW)&&Array.isArray(b.Wh)&&Array.isArray(b.Wx)}
+function birth(id){return brain.births.find(b=>b.id===id)}
+function tokenIds(){return[...Array(PRIMS).keys(),...brain.births.map(b=>b.id)]}
+function kernel(id){if(id<PRIMS)return[id];const b=birth(id);return b&&Array.isArray(b.kernel)?b.kernel.slice():[]}
+function span(id){if(id<PRIMS)return 1;const b=birth(id);return b?b.span:0}
+function sameKernel(id,k){const a=kernel(id);return a.length===k.length&&a.every((v,i)=>v===k[i])}
+function family(){return tokenIds().filter(id=>sameKernel(id,[3])).sort((a,b)=>span(a)-span(b)||a-b)}
+function dot(a,b){let z=0;for(let i=0;i<a.length;i++)z+=a[i]*b[i];return z}
+function phi(x,h,pos,rem){return[1,...x,...h,pos/(LEN-1),rem/LEN]}
+function applyPrim(id,h,x){const h0=h.slice(),out=vec(H);for(let r=0;r<H;r++){let z=brain.bias[id][r];for(let c=0;c<H;c++)z+=brain.Wh[id][r][c]*h0[c];for(let c=0;c<6;c++)z+=brain.Wx[id][r][c]*x[c];out[r]=Math.tanh(z)}return out}
+function applySeq(seq,h,x){for(const id of seq)h=applyPrim(id,h,x);return h}
+function choiceFrom(ids,x,h,pos,rem){const f=phi(x,h,pos,rem);let best=ids[0],bs=-Infinity,runner=null,rs=-Infinity;for(const id of ids){const s=dot(brain.selW[id],f);if(s>bs){runner=best;rs=bs;best=id;bs=s}else if(s>rs){runner=id;rs=s}}return{id:best,score:bs,runner,margin:bs-rs}}
+function halton(index,base){let f=1,r=0,i=index;while(i>0){f/=base;r+=f*(i%base);i=Math.floor(i/base)}return r}
+function inc(o,id){o[id]=(o[id]||0)+1}
+function dominant(counts){let id=null,n=-1,total=0;for(const [k,v] of Object.entries(counts)){total+=v;if(v>n){id=+k;n=v}}return{id,n,share:total?n/total:0,total}}
+function tv(a,b){const keys=new Set([...Object.keys(a),...Object.keys(b)]),ta=Object.values(a).reduce((s,v)=>s+v,0),tb=Object.values(b).reduce((s,v)=>s+v,0);let z=0;for(const k of keys)z+=Math.abs((a[k]||0)/ta-(b[k]||0)/tb);return z/2}
+function adjacentTV(rows){if(rows.length<2)return 0;let z=0;for(let i=1;i<rows.length;i++)z+=tv(rows[i-1].counts,rows[i].counts);return z/(rows.length-1)}
+function fmtPct(v){return(100*v).toFixed(1)+'%'}
+function top(counts,k=5){const t=Object.values(counts).reduce((s,v)=>s+v,0)||1;return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,k).map(([id,n])=>'A'+id+' '+fmtPct(n/t)).join(' · ')}
+function src(){return{rounds:brain.rounds,wins:brain.wins,births:brain.births.length,discoveries:(brain.discoveries||[]).length}}
+function setBusy(v){busy=v;for(const id of['loadSaved','paste','scan','copy'])$(id).disabled=v}
+function progress(f,t){$('fill').style.width=(100*f).toFixed(1)+'%';$('progress').textContent=t}
+async function yieldFrame(){await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)))}
+function loadBrain(b){if(!valid(b)){alert('That is not a valid Build 023 brain.');return}brain=JSON.parse(JSON.stringify(b));const fam=family();report={version:27,source:src(),family:fam.map(id=>({id,span:span(id),kernel:kernel(id),historicalUses:id<PRIMS?null:(birth(id).uses||0)})),hiddenCheck:null,natural:null,positionSweep:null,budgetSweep:null,roleGrid:null};save();render()}
+function save(){try{localStorage.setItem(REPORT_KEY,JSON.stringify(report))}catch{}}
+async function run(){if(!brain||busy)return;setBusy(true);try{
+ const fam=family(),continuers=fam.filter(id=>span(id)<LEN),all=tokenIds(),fixedShort=all.filter(id=>span(id)<LEN),common=all.filter(id=>span(id)<=3);
+ const nat=continuers.map(id=>({prefix:id,span:span(id),pos:span(id),rem:LEN-span(id),fitCounts:{},fixedCounts:{},tv:0}));
+ const posRows=POS.map(pos=>({pos,rem:5,counts:{}})),remRows=REM.map(rem=>({pos:3,rem,counts:{}}));
+ const cells=[];for(const pos of POS)for(const rem of REM)cells.push({pos,rem,counts:{}});
+ let maxHiddenDelta=0,kernelIdentical=fam.every(id=>sameKernel(id,[3]));
+ for(let i=1;i<=N;i++){
+   const x=BASES.map(b=>2*halton(i,b)-1),h=applySeq([3],vec(H),x);
+   if(i<=128){for(const id of fam){const q=applySeq(kernel(id),vec(H),x);for(let j=0;j<H;j++)maxHiddenDelta=Math.max(maxHiddenDelta,Math.abs(h[j]-q[j]))}}
+   for(const r of nat){
+     const fit=all.filter(id=>span(id)>0&&span(id)<=r.rem);
+     inc(r.fitCounts,choiceFrom(fit,x,h,r.pos,r.rem).id);
+     inc(r.fixedCounts,choiceFrom(fixedShort,x,h,r.pos,r.rem).id);
+   }
+   for(const r of posRows)inc(r.counts,choiceFrom(common,x,h,r.pos,r.rem).id);
+   for(const r of remRows)inc(r.counts,choiceFrom(common,x,h,r.pos,r.rem).id);
+   for(const c of cells)inc(c.counts,choiceFrom(fam,x,h,c.pos,c.rem).id);
+   if(i%128===0){progress(i/N,i.toLocaleString()+' / '+N.toLocaleString()+' matched inputs');await yieldFrame()}
+ }
+ for(const r of nat)r.tv=tv(r.fitCounts,r.fixedCounts);
+ const eligibilityMeanTV=nat.reduce((s,r)=>s+r.tv,0)/nat.length;
+ const positionAdjacentTV=adjacentTV(posRows),budgetAdjacentTV=adjacentTV(remRows);
+ const roleDistinct=[...new Set(cells.map(c=>dominant(c.counts).id))];
+ report.hiddenCheck={kernelIdentical,sampled:128,maxHiddenDelta};
+ report.natural={n:N,fixedPool:'span<8',rows:nat,meanEligibilityTV:eligibilityMeanTV};
+ report.positionSweep={n:N,fixedRem:5,pool:'span<=3',rows:posRows,adjacentTV:positionAdjacentTV};
+ report.budgetSweep={n:N,fixedPos:3,pool:'span<=3',rows:remRows,adjacentTV:budgetAdjacentTV};
+ report.roleGrid={n:N,pool:'all kernel[3] synonyms, eligibility ignored',positions:POS,remaining:REM,cells,distinctDominantIds:roleDistinct};
+ save();render();
+ }finally{setBusy(false);progress(0,'Idle. Source brain unchanged.')}}
+function isNaturalCell(pos,rem){return pos+rem===LEN&&POS.includes(pos)&&REM.includes(rem)}
+function render(){
+ const ok=!!brain,fam=ok?family():[];
+ $('status').textContent=ok?'FROZEN':'MISSING';$('status').className=ok?'good':'warn';$('rounds').textContent=ok?brain.rounds.toLocaleString():'0';$('familyN').textContent=fam.length;$('samples').textContent=report.natural?report.natural.n.toLocaleString():'0';
+ $('familyChips').innerHTML=ok?fam.map(id=>'<span class="chip">A'+id+' · span '+span(id)+' · ['+kernel(id).join(',')+']</span>').join(''):'<span class="sub">Load Build 023.</span>';
+ const done=!!report.roleGrid;
+ if(done){
+   $('hiddenDelta').textContent=report.hiddenCheck.maxHiddenDelta.toExponential(1);
+   $('eligTV').textContent=fmtPct(report.natural.meanEligibilityTV);
+   $('posTV').textContent=fmtPct(report.positionSweep.adjacentTV);
+   $('remTV').textContent=fmtPct(report.budgetSweep.adjacentTV);
+   const hc=report.hiddenCheck.maxHiddenDelta===0;
+   const pos=report.positionSweep.adjacentTV,rem=report.budgetSweep.adjacentTV,gate=report.natural.meanEligibilityTV;
+   let v=(hc?'<span class="good">Same hidden transformation confirmed exactly.</span> ':'<span class="bad">Hidden mismatch detected.</span> ');
+   v+='With x, h, and candidate pool fixed, changing position moves the continuation distribution by '+fmtPct(pos)+' average adjacent TV; changing remaining budget moves it by '+fmtPct(rem)+'. ';
+   v+='Changing real eligibility contributes '+fmtPct(gate)+' mean FIT↔FIXED-SHORT TV across the four sibling contexts. ';
+   v+='The family-only score grid has '+report.roleGrid.distinctDominantIds.length+' distinct dominant [3] synonym'+(report.roleGrid.distinctDominantIds.length===1?'':'s')+'.';
+   $('verdict').innerHTML=v;
+   $('naturalRows').innerHTML=report.natural.rows.map(r=>{const a=dominant(r.fitCounts),b=dominant(r.fixedCounts);return'<div class="row"><div class="main">Force A'+r.prefix+' · span '+r.span+' → pos '+r.pos+' / rem '+r.rem+'</div><div class="meta">FIT: <span class="cyan">A'+a.id+' '+fmtPct(a.share)+'</span> · '+top(r.fitCounts,4)+'<br>FIXED-SHORT: <span class="violet">A'+b.id+' '+fmtPct(b.share)+'</span> · '+top(r.fixedCounts,4)+'<br>eligibility TV '+fmtPct(r.tv)+'</div></div>'}).join('');
+   $('posRows').innerHTML=report.positionSweep.rows.map(r=>{const d=dominant(r.counts);return'<div class="row"><div class="main">pos '+r.pos+' · rem 5 → <span class="cyan">A'+d.id+' '+fmtPct(d.share)+'</span></div><div class="meta">'+top(r.counts,5)+'</div></div>'}).join('');
+   $('remRows').innerHTML=report.budgetSweep.rows.map(r=>{const d=dominant(r.counts);return'<div class="row"><div class="main">pos 3 · rem '+r.rem+' → <span class="cyan">A'+d.id+' '+fmtPct(d.share)+'</span></div><div class="meta">'+top(r.counts,5)+'</div></div>'}).join('');
+   let g='<div class="head">pos\rem</div>'+REM.map(r=>'<div class="head">'+r+'</div>').join('');
+   for(const p of POS){g+='<div class="head">'+p+'</div>';for(const r of REM){const c=report.roleGrid.cells.find(x=>x.pos===p&&x.rem===r),d=dominant(c.counts);g+='<div class="cell '+(isNaturalCell(p,r)?'diag':'')+'"><b>A'+d.id+'</b><span>'+fmtPct(d.share)+'</span></div>'}}$('roleGrid').innerHTML=g;
+ }else{
+   $('hiddenDelta').textContent='—';$('eligTV').textContent='—';$('posTV').textContent='—';$('remTV').textContent='—';$('verdict').textContent='Run the microscope.';
+   $('naturalRows').innerHTML='<div class="sub">Run the microscope.</div>';$('posRows').innerHTML='<div class="sub">Run the microscope.</div>';$('remRows').innerHTML='<div class="sub">Run the microscope.</div>';$('roleGrid').innerHTML='<div class="sub">Run the microscope.</div>';
+ }
+ $('raw').textContent=JSON.stringify(report,null,2)
+}
+$('loadSaved').onclick=()=>{try{const b=JSON.parse(localStorage.getItem(SOURCE_KEY));if(!valid(b))throw 0;loadBrain(b)}catch{alert('No valid Build 023 brain is stored on this origin. Paste the saved specimen instead.')}};
+$('paste').onclick=()=>{const t=prompt('Paste Build 023 brain JSON:');if(!t)return;try{loadBrain(JSON.parse(t))}catch{alert('Invalid JSON.')}};
+$('scan').onclick=run;
+$('copy').onclick=async()=>{const t=JSON.stringify(report);try{await navigator.clipboard.writeText(t);$('copy').textContent='COPIED';setTimeout(()=>$('copy').textContent='COPY REPORT',900)}catch{prompt('Copy report:',t)}};
+render();try{const b=JSON.parse(localStorage.getItem(SOURCE_KEY));if(valid(b))loadBrain(b)}catch{}
+})();
+</script></body></html>
