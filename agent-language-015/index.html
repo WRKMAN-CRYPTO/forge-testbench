@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0b"><title>AGENT LANGUAGE // 015</title><style>
+:root{--bg:#090d0b;--panel:#131a15;--ink:#edf4ef;--muted:#91a198;--line:#2a3a31;--hot:#b9ff79;--bad:#ff8d78;--warn:#ffd66f;--cyan:#77dfff;--purple:#d39cff}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{max-width:940px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{font-size:20px;margin:0;letter-spacing:.08em}.sub{font-size:11px;color:var(--muted);line-height:1.5}.badge{font-size:10px;color:var(--warn);border:1px solid #6b5c35;border-radius:999px;padding:6px 8px;white-space:nowrap}
+.grid{display:grid;gap:10px;margin-top:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px}.panel h2{font-size:11px;color:var(--muted);letter-spacing:.14em;margin:0 0 11px}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:10px;text-align:center}.stat b{display:block;font-size:20px}.stat span{font-size:9px;color:var(--muted);line-height:1.35}.rows{display:grid;gap:7px}.row{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:10px}.row.same{border-color:#456b4b}.row.a31{border-color:#6c9649}.row.a27{border-color:#8a5a4e}.row.diff{border-color:#6b5c35}.main{font-size:13px;font-weight:800;line-height:1.45}.meta{font-size:10px;color:var(--muted);line-height:1.55;margin-top:4px}.good{color:var(--hot)}.bad{color:var(--bad)}.warn{color:var(--warn)}.cyan{color:var(--cyan)}.purple{color:var(--purple)}
+button{font:inherit;color:inherit;background:#18211c;border:1px solid #35483d;border-radius:12px;min-height:48px;padding:10px;width:100%;touch-action:manipulation}.danger{border-color:#70473f}.callout{background:#0d120f;border:1px solid #5b8045;border-radius:12px;padding:11px}.foot{font-size:10px;color:var(--muted);line-height:1.55;margin:12px 2px}
+@media(min-width:760px){.grid{grid-template-columns:1fr 1fr}.span2{grid-column:1/-1}.stats{grid-template-columns:repeat(4,1fr)}}
+</style></head><body><div class="app">
+<div class="top"><div><h1>AGENT LANGUAGE // 015</h1><div class="sub">Frozen differentiation assay. A27 and A31 are tested across all 16 states with learning disabled.</div></div><div class="badge">DIALECT MAP</div></div>
+<div class="grid">
+<section class="panel span2"><h2>SPECIMEN</h2><div id="specimen" class="callout">Looking for Build 014…</div><div style="margin-top:8px"><button class="danger" id="refreeze">REFREEZE CURRENT BUILD 014</button></div></section>
+<section class="panel"><h2>BEHAVIORAL OVERLAP</h2><div class="stats">
+<div class="stat"><b id="same">—</b><span>SAME OUTPUT / 16</span></div>
+<div class="stat"><b id="preserve">—</b><span>A31 PRESERVES A27-CORRECT STATES</span></div>
+<div class="stat"><b id="a31only">—</b><span>A31-ONLY CORRECT</span></div>
+<div class="stat"><b id="a27only">—</b><span>A27-ONLY CORRECT</span></div>
+</div></section>
+<section class="panel"><h2>TERRITORY</h2><div class="stats">
+<div class="stat"><b id="sel31">—</b><span>A31 SELECTOR WINS</span></div>
+<div class="stat"><b id="sel27">—</b><span>A27 SELECTOR WINS</span></div>
+<div class="stat"><b id="policy31">—</b><span>GREEDY POLICIES USING A31</span></div>
+<div class="stat"><b id="policy27">—</b><span>GREEDY POLICIES USING A27</span></div>
+</div></section>
+<section class="panel span2"><h2>16-STATE DISSECTION</h2><div id="states" class="rows"></div></section>
+<section class="panel span2"><h2>INTERPRETATION</h2><div id="readout" class="callout"></div></section>
+</div>
+<div class="foot">Each candidate is injected alone from the exact state-start hidden vector <span class="warn">h=[0,0,0,0]</span> and read directly through the frozen output head. Selector scores are measured at that same initial context. The source Build 014 brain is copied into a separate frozen key and is never modified.</div>
+</div><script>(()=>{'use strict';
+const SOURCE='forge-agent-language-014',FROZEN='forge-agent-language-015-frozen',PRIMS=8,OUTS=4,LEN=6,H=4,A27=27,A31=31;
+const $=id=>document.getElementById(id),vec=n=>Array(n).fill(0);
+function valid(b){return b&&b.version===14&&Array.isArray(b.births)&&b.births.some(x=>x.id===A31)&&Array.isArray(b.selW)&&Array.isArray(b.Wh)&&Array.isArray(b.Wx)&&Array.isArray(b.Wout)}
+function law(s){const b0=s&1,b1=(s>>1)&1,b2=(s>>2)&1,b3=(s>>3)&1;return(b0^b1)+2*(b2^b3)}
+function bits(s){return[0,1,2,3].map(i=>(s>>i)&1)}function featX(s){return bits(s).map(v=>v?1:-1)}
+function dot(a,b){let z=0;for(let i=0;i<a.length;i++)z+=a[i]*b[i];return z}
+function phi(x,h,pos,rem){return[1,...x,...h,pos/(LEN-1),rem/LEN]}
+let brain=null;
+function birth(id){return brain.births.find(b=>b.id===id)}
+function kernel(id){if(id<PRIMS)return[id];const b=birth(id);return b&&Array.isArray(b.kernel)?b.kernel.slice():[]}
+function span(id){if(id<PRIMS)return 1;const b=birth(id);return b?b.span:0}
+function applyPrim(id,h,x){const out=vec(H);for(let r=0;r<H;r++){let z=brain.bias[id][r];for(let c=0;c<H;c++)z+=brain.Wh[id][r][c]*h[c];for(let c=0;c<4;c++)z+=brain.Wx[id][r][c]*x[c];out[r]=Math.tanh(z)}return out}
+function applySeq(seq,h,x){for(const id of seq)h=applyPrim(id,h,x);return h}
+function runToken(state,id){const x=featX(state),h=applySeq(kernel(id),vec(H),x),ls=brain.Wout.map((r,o)=>dot(r,h)+brain.bout[o]);let out=0;for(let i=1;i<OUTS;i++)if(ls[i]>ls[out])out=i;const sorted=ls.slice().sort((a,b)=>b-a),margin=sorted[0]-sorted[1];return{id,h,ls,out,terminal:PRIMS+out,correct:out===law(state),margin}}
+function dist(a,b){let z=0;for(let i=0;i<a.length;i++){const d=a[i]-b[i];z+=d*d}return Math.sqrt(z)}
+function tokenIds(){return[...Array(PRIMS).keys(),...brain.births.map(b=>b.id)]}
+function greedyThought(state){const x=featX(state),tokens=[],expanded=[];let h=vec(H),rem=LEN,pos=0;while(rem>0){const ids=tokenIds().filter(id=>span(id)>0&&span(id)<=rem),f=phi(x,h,pos,rem),scores=ids.map(id=>dot(brain.selW[id],f));let ix=0;for(let i=1;i<scores.length;i++)if(scores[i]>scores[ix])ix=i;const id=ids[ix];tokens.push(id);const k=kernel(id);expanded.push(...k);h=applySeq(k,h,x);rem-=span(id);pos+=span(id)}const ls=brain.Wout.map((r,o)=>dot(r,h)+brain.bout[o]);let out=0;for(let i=1;i<OUTS;i++)if(ls[i]>ls[out])out=i;return{tokens,expanded,terminal:PRIMS+out,correct:out===law(state)}}
+function selector(state,id){const x=featX(state),f=phi(x,vec(H),0,LEN),row=brain.selW[id];return row?dot(row,f):NaN}
+function capture(){let s=null;try{s=JSON.parse(localStorage.getItem(SOURCE))}catch{}if(!valid(s)){alert('No valid Build 014 specimen found on this device. Open Build 014 first, then return here.');return false}const frozen=JSON.parse(JSON.stringify(s));frozen._frozen015={capturedTotalRounds:s.rounds,capturedExperimentRounds:s.ecology&&s.ecology[0]?s.ecology[0].rounds:null,capturedA31Uses:s.ecology&&s.ecology[0]?s.ecology[0].a31Uses:null,capturedA27Uses:s.ecology&&s.ecology[0]?s.ecology[0].a27Uses:null};localStorage.setItem(FROZEN,JSON.stringify(frozen));brain=frozen;return true}
+function load(){let f=null;try{f=JSON.parse(localStorage.getItem(FROZEN))}catch{}if(valid(f)){brain=f;return true}return capture()}
+function category(r27,r31){if(r27.terminal===r31.terminal)return r27.correct?'same':'diff';if(r31.correct&&!r27.correct)return'a31';if(r27.correct&&!r31.correct)return'a27';return'diff'}
+function render(){
+ if(!brain){$('specimen').innerHTML='<span class="bad">NO BUILD 014 SPECIMEN</span><div class="meta">Open Build 014 on this device, then come back and refreeze.</div>';return}
+ const m=brain._frozen015||{},e=brain.ecology&&brain.ecology[0]?brain.ecology[0]:{};
+ $('specimen').innerHTML='<div class="main"><span class="good">FROZEN BUILD 014</span> · learning disabled</div><div class="meta">total rounds '+Number(brain.rounds||0).toLocaleString()+' · experiment rounds '+Number(m.capturedExperimentRounds??e.rounds??0).toLocaleString()+' · A31 uses '+Number(m.capturedA31Uses??e.a31Uses??0).toLocaleString()+' · A27 uses '+Number(m.capturedA27Uses??e.a27Uses??0).toLocaleString()+'<br>A27 kernel '+kernel(A27).map(x=>'A'+x).join(' → ')+' · A31 kernel '+kernel(A31).map(x=>'A'+x).join(' → ')+'</div>';
+ const rows=[];let same=0,a31only=0,a27only=0,a27correct=0,preserve=0,sel31=0,sel27=0,policy31=0,policy27=0;
+ for(let s=0;s<16;s++){const r27=runToken(s,A27),r31=runToken(s,A31),sc27=selector(s,A27),sc31=selector(s,A31),g=greedyThought(s),cat=category(r27,r31);if(r27.terminal===r31.terminal)same++;if(r27.correct){a27correct++;if(r31.correct)preserve++}if(r31.correct&&!r27.correct)a31only++;if(r27.correct&&!r31.correct)a27only++;if(sc31>sc27)sel31++;else if(sc27>sc31)sel27++;if(g.tokens.includes(A31))policy31++;if(g.tokens.includes(A27))policy27++;rows.push({s,r27,r31,sc27,sc31,g,cat,d:dist(r27.h,r31.h)})}
+ $('same').textContent=same+'/16';$('preserve').textContent=preserve+'/'+a27correct;$('a31only').textContent=a31only;$('a27only').textContent=a27only;$('sel31').textContent=sel31;$('sel27').textContent=sel27;$('policy31').textContent=policy31;$('policy27').textContent=policy27;
+ $('states').innerHTML=rows.map(q=>{const label=q.cat==='same'?'SAME + CORRECT':q.cat==='a31'?'A31 ONLY CORRECT':q.cat==='a27'?'A27 ONLY CORRECT':q.r27.terminal===q.r31.terminal?'SAME OUTPUT / WRONG':'DIFFERENT OUTPUTS';const cls=q.cat;const lc=q.cat==='same'||q.cat==='a31'?'good':q.cat==='a27'?'bad':'warn';return '<div class="row '+cls+'"><div class="main">'+bits(q.s).join('')+' · want A'+(PRIMS+law(q.s))+' · <span class="'+lc+'">'+label+'</span></div><div class="meta">A27 '+kernel(A27).map(x=>'A'+x).join('→')+' ⇒ A'+q.r27.terminal+' · margin '+q.r27.margin.toFixed(3)+' · selector '+q.sc27.toFixed(3)+'<br>A31 A6 ⇒ A'+q.r31.terminal+' · margin '+q.r31.margin.toFixed(3)+' · selector '+q.sc31.toFixed(3)+' · hidden Δ '+q.d.toFixed(3)+'<br>greedy policy '+q.g.tokens.map(x=>'A'+x).join(' → ')+' ⇒ A'+q.g.terminal+(q.g.correct?' ✓':' ✕')+'</div></div>'}).join('');
+ let msg='';
+ if(a27only===0&&preserve===a27correct){msg='<div class="main good">A31 does not break any state that A27 currently gets right.</div><div class="meta">Across this frozen specimen, the one-op A6 lexeme preserves every correct A27 grounded decision. '+same+' of 16 states produce the exact same output under both words.'+(a31only?' A31 also fixes '+a31only+' state'+(a31only===1?'':'s')+' that A27 misses.':'')+'</div>'}
+ else{msg='<div class="main warn">The words have begun to differentiate.</div><div class="meta">A31 preserves '+preserve+' of '+a27correct+' states where A27 is correct, while A27 remains uniquely correct in '+a27only+' state'+(a27only===1?'':'s')+'. Those are the places where replacing A27 globally would destroy behavior.'+(a31only?' A31 is uniquely correct in '+a31only+' state'+(a31only===1?'':'s')+'.':'')+'</div>'}
+ $('readout').innerHTML=msg;
+}
+$('refreeze').onclick=()=>{if(confirm('Replace the frozen Build 015 specimen with the CURRENT Build 014 brain?')){if(capture())render()}};
+load();render();
+})();</script></body></html>
