@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0b"><title>AGENT LANGUAGE // 028</title><style>
+:root{--bg:#090d0b;--panel:#131a15;--ink:#edf4ef;--muted:#91a198;--line:#2a3a31;--hot:#b9ff79;--cyan:#77dfff;--warn:#ffd66f;--violet:#d39cff;--bad:#ff8d78}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{max-width:980px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{font-size:20px;margin:0;letter-spacing:.08em}.sub{font-size:11px;color:var(--muted);line-height:1.55}.badge{font-size:10px;color:var(--warn);border:1px solid #6b5c35;border-radius:999px;padding:6px 8px;white-space:nowrap}
+.grid{display:grid;gap:10px;margin-top:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px}.panel h2{font-size:11px;color:var(--muted);letter-spacing:.14em;margin:0 0 11px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{font:inherit;color:inherit;background:#18211c;border:1px solid #35483d;border-radius:12px;min-height:48px;padding:10px;touch-action:manipulation}.primary{background:#1c3426;border-color:#58836a}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:9px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:9px;color:var(--muted)}.rows{display:grid;gap:7px}.row{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px}.main{font-size:13px;font-weight:800}.meta{font-size:10px;color:var(--muted);line-height:1.55;margin-top:3px}.good{color:var(--hot)}.bad{color:var(--bad)}.cyan{color:var(--cyan)}.warn{color:var(--warn)}.violet{color:var(--violet)}
+.progress{height:7px;background:#0d120f;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:9px}.fill{height:100%;width:0;background:var(--warn)}
+.grid4{display:grid;grid-template-columns:52px repeat(4,minmax(0,1fr));gap:5px}.cell,.head{border:1px solid var(--line);border-radius:9px;padding:7px;text-align:center;min-width:0}.head{font-size:9px;color:var(--muted);display:flex;align-items:center;justify-content:center}.cell{background:#0d120f}.cell.hot{border-color:#6c6139}.cell b{display:block;font-size:12px}.cell span{display:block;font-size:8px;color:var(--muted);margin-top:3px}
+.bar{height:7px;border-radius:999px;background:#0a0e0c;border:1px solid var(--line);overflow:hidden;margin-top:5px}.bar>i{display:block;height:100%;background:var(--cyan)}
+.coef{display:grid;grid-template-columns:70px 1fr 76px;gap:7px;align-items:center}.coef code{font-size:9px;color:var(--muted)}.coef .v{text-align:right;font-size:10px}.foot{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 2px}pre{font-size:9px;white-space:pre-wrap;overflow-wrap:anywhere;color:#aec0b5}details{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}summary{font-size:11px;color:var(--muted)}
+@media(min-width:760px){.grid{grid-template-columns:1fr 1fr}.span2{grid-column:1/-1}.controls{grid-template-columns:repeat(4,1fr)}.stats{grid-template-columns:repeat(4,1fr)}}
+</style></head><body><div class="app">
+<div class="top"><div><h1>AGENT LANGUAGE // 028</h1><div class="sub">Open the selector. Decompose A22 versus A29 into input, hidden-state, position, and remaining-budget pressure.</div></div><div class="badge">SELECTOR AUTOPSY</div></div>
+<div class="grid">
+<section class="panel span2"><h2>FROZEN SOURCE</h2><div class="stats"><div class="stat"><b id="status">—</b><span>SOURCE</span></div><div class="stat"><b id="rounds">0</b><span>TRAIN ROUNDS</span></div><div class="stat"><b id="pair">A22↔A29</b><span>SAME KERNEL [3]</span></div><div class="stat"><b id="samples">0</b><span>MATCHED INPUTS</span></div></div><div class="controls" style="margin-top:10px"><button class="primary" id="loadSaved">LOAD SAVED 023</button><button id="paste">PASTE 023 BRAIN</button><button id="run">RUN AUTOPSY</button><button id="copy">COPY REPORT</button></div><div class="progress"><div class="fill" id="fill"></div></div><div class="sub" id="progress" style="margin-top:6px">Idle. Exact coefficients, sampled environment.</div></section>
+
+<section class="panel"><h2>CONTEXT PRESSURE · EXACT</h2><div class="stats"><div class="stat"><b id="posStep">—</b><span>Δ SCORE / +1 POS</span></div><div class="stat"><b id="remStep">—</b><span>Δ SCORE / +1 REM</span></div><div class="stat"><b id="posSwing">—</b><span>POS 1→5</span></div><div class="stat"><b id="remSwing">—</b><span>REM 7→3</span></div></div><div id="pressureText" class="sub" style="margin-top:10px">Run the autopsy.</div></section>
+
+<section class="panel"><h2>WHAT THE EQUATION IS</h2><div class="sub"><span class="cyan">Δ = score(A22) − score(A29)</span><br><br>Δ = bias + input(x) + hidden(h) + <span class="warn">Δwpos·pos/7</span> + <span class="violet">Δwrem·rem/8</span><br><br>Because both words execute [3], the post-[3] hidden state is held identical. Positive Δ favors A22. Negative Δ favors A29.</div></section>
+
+<section class="panel span2"><h2>FEATURE COEFFICIENT LEDGER · A22 − A29</h2><div id="coefRows" class="rows"><div class="sub">Run the autopsy.</div></div></section>
+
+<section class="panel span2"><h2>PAIRWISE BOUNDARY GRID</h2><div class="sub" style="margin-bottom:9px">8192 identical six-dimensional inputs. Each cell shows the fraction where A22 beats A29 after executing [3]. No eligibility gate is involved.</div><div id="pairGrid" class="grid4"><div class="sub">Run the autopsy.</div></div></section>
+
+<section class="panel"><h2>REMOVE POSITION TERM</h2><div id="noPosRows" class="rows"><div class="sub">Run the autopsy.</div></div></section>
+
+<section class="panel"><h2>REMOVE BUDGET TERM</h2><div id="noRemRows" class="rows"><div class="sub">Run the autopsy.</div></div></section>
+
+<section class="panel span2"><h2>ENVIRONMENT VS CONTEXT</h2><div class="stats"><div class="stat"><b id="envMean">—</b><span>MEAN BASE Δ</span></div><div class="stat"><b id="envSD">—</b><span>BASE Δ SD</span></div><div class="stat"><b id="contextSwing">—</b><span>TOTAL CONTEXT SWING</span></div><div class="stat"><b id="swingSD">—</b><span>SWING / ENV SD</span></div></div><div id="envText" class="sub" style="margin-top:10px">The base term is bias + input + hidden contribution. It changes with the six-dimensional stimulus. Context then translates the pairwise boundary on top of that landscape.</div></section>
+
+<section class="panel span2"><h2>[3] FAMILY CONTEXT SLOPES</h2><div id="familyRows" class="rows"><div class="sub">Run the autopsy.</div></div></section>
+
+<section class="panel span2"><h2>RAW REPORT</h2><details><summary>OPEN JSON</summary><pre id="raw"></pre></details></section>
+</div>
+<div class="foot"><span class="warn">Interpretation:</span> position and remaining-budget coefficients are exact properties of the frozen selector. The boundary percentages use a deterministic Halton census only to show how those exact terms interact with the learned nonlinear hidden-state landscape.</div>
+</div><script>
+(()=>{'use strict';
+const SOURCE_KEY='forge-agent-language-023',REPORT_KEY='forge-agent-language-028-results';
+const PRIMS=8,LEN=8,H=8,N=8192,BASES=[2,3,5,7,11,13],A=22,B=29,POS=[1,2,3,5],REM=[7,6,5,3];
+const $=id=>document.getElementById(id),vec=n=>Array(n).fill(0);
+let brain=null,report={version:28,source:null,pair:[A,B],coefficients:null,context:null,environment:null,grid:null,ablations:null,family:null},busy=false;
+function valid(b){return b&&b.version===23&&Array.isArray(b.births)&&Array.isArray(b.selW)&&Array.isArray(b.Wh)&&Array.isArray(b.Wx)}
+function birth(id){return brain.births.find(b=>b.id===id)}
+function tokenIds(){return[...Array(PRIMS).keys(),...brain.births.map(b=>b.id)]}
+function kernel(id){if(id<PRIMS)return[id];const z=birth(id);return z&&Array.isArray(z.kernel)?z.kernel.slice():[]}
+function span(id){if(id<PRIMS)return 1;const z=birth(id);return z?z.span:0}
+function dot(a,b){let z=0;for(let i=0;i<a.length;i++)z+=a[i]*b[i];return z}
+function applyPrim(id,h,x){const h0=h.slice(),out=vec(H);for(let r=0;r<H;r++){let z=brain.bias[id][r];for(let c=0;c<H;c++)z+=brain.Wh[id][r][c]*h0[c];for(let c=0;c<6;c++)z+=brain.Wx[id][r][c]*x[c];out[r]=Math.tanh(z)}return out}
+function applySeq(seq,h,x){for(const id of seq)h=applyPrim(id,h,x);return h}
+function halton(index,base){let f=1,r=0,i=index;while(i>0){f/=base;r+=f*(i%base);i=Math.floor(i/base)}return r}
+function diffW(a=A,b=B){return brain.selW[a].map((v,i)=>v-brain.selW[b][i])}
+function sameKernel(id,k){const a=kernel(id);return a.length===k.length&&a.every((v,i)=>v===k[i])}
+function family(){return tokenIds().filter(id=>sameKernel(id,[3])).sort((a,b)=>span(a)-span(b)||a-b)}
+function src(){return{rounds:brain.rounds,wins:brain.wins,births:brain.births.length,discoveries:(brain.discoveries||[]).length}}
+function save(){try{localStorage.setItem(REPORT_KEY,JSON.stringify(report))}catch{}}
+function loadBrain(b){if(!valid(b)){alert('That is not a valid Build 023 brain.');return}brain=JSON.parse(JSON.stringify(b));report={version:28,source:src(),pair:[A,B],coefficients:null,context:null,environment:null,grid:null,ablations:null,family:null};save();render()}
+function setBusy(v){busy=v;for(const id of['loadSaved','paste','run','copy'])$(id).disabled=v}
+function progress(f,t){$('fill').style.width=(100*f).toFixed(1)+'%';$('progress').textContent=t}
+async function yieldFrame(){await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)))}
+function stats(a){const n=a.length,m=a.reduce((s,v)=>s+v,0)/n,sd=Math.sqrt(a.reduce((s,v)=>s+(v-m)*(v-m),0)/n);return{n,mean:m,sd,min:Math.min(...a),max:Math.max(...a)}}
+function fmt(v,d=5){return(Number(v)>=0?'+':'')+Number(v).toFixed(d)}
+function pct(v){return(100*v).toFixed(1)+'%'}
+async function run(){
+ if(!brain||busy)return;setBusy(true);try{
+  const dw=diffW(),posStep=dw[15]/7,remStep=dw[16]/8,posSwing=4*posStep,remSwing=-4*remStep,totalSwing=posSwing+remSwing;
+  const features=[{name:'bias',index:0,coef:dw[0]}];
+  for(let i=0;i<6;i++)features.push({name:'σ'+i,index:1+i,coef:dw[1+i]});
+  for(let i=0;i<8;i++)features.push({name:'h'+i,index:7+i,coef:dw[7+i]});
+  features.push({name:'position',index:15,coef:dw[15],normalizedPerUnit:posStep});
+  features.push({name:'remaining',index:16,coef:dw[16],normalizedPerUnit:remStep});
+  const bases=[],cells=[];for(const p of POS)for(const r of REM)cells.push({pos:p,rem:r,a22:0,a29:0,meanDelta:0,noPos22:0,noRem22:0,noCtx22:0});
+  for(let i=1;i<=N;i++){
+    const x=BASES.map(b=>2*halton(i,b)-1),h=applySeq([3],vec(H),x);
+    let base=dw[0];for(let j=0;j<6;j++)base+=dw[1+j]*x[j];for(let j=0;j<8;j++)base+=dw[7+j]*h[j];
+    bases.push(base);
+    for(const c of cells){
+      const pterm=posStep*c.pos,rterm=remStep*c.rem,d=base+pterm+rterm;
+      c.meanDelta+=d;if(d>=0)c.a22++;else c.a29++;
+      if(base+rterm>=0)c.noPos22++;
+      if(base+pterm>=0)c.noRem22++;
+      if(base>=0)c.noCtx22++;
+    }
+    if(i%256===0){progress(i/N,i.toLocaleString()+' / '+N.toLocaleString()+' matched inputs');await yieldFrame()}
+  }
+  for(const c of cells)c.meanDelta/=N;
+  const es=stats(bases),fam=family().map(id=>({id,span:span(id),wPos:brain.selW[id][15],perPos:brain.selW[id][15]/7,wRem:brain.selW[id][16],perRem:brain.selW[id][16]/8,relPosTo29:(brain.selW[id][15]-brain.selW[B][15])/7,relRemTo29:(brain.selW[id][16]-brain.selW[B][16])/8}));
+  report.coefficients={features,rawDelta:dw};
+  report.context={posWeightDelta:dw[15],remWeightDelta:dw[16],posStep,remStep,posSwing1to5:posSwing,remSwing7to3:remSwing,totalSwing};
+  report.environment=es;
+  report.grid={n:N,positions:POS,remaining:REM,cells};
+  report.ablations={note:'Counts are A22 pairwise wins with selected context term removed.'};
+  report.family=fam;
+  save();render();
+ }finally{setBusy(false);progress(0,'Idle. Source brain unchanged.')}}
+function render(){
+ const ok=!!brain,done=!!report.grid;$('status').textContent=ok?'FROZEN':'MISSING';$('status').className=ok?'good':'warn';$('rounds').textContent=ok?brain.rounds.toLocaleString():'0';$('samples').textContent=done?report.grid.n.toLocaleString():'0';
+ if(done){
+  const c=report.context,e=report.environment;
+  $('posStep').textContent=fmt(c.posStep,4);$('remStep').textContent=fmt(c.remStep,4);$('posSwing').textContent=fmt(c.posSwing1to5,4);$('remSwing').textContent=fmt(c.remSwing7to3,4);
+  const pDir=c.posStep>0?'favors A22 as position increases':'favors A29 as position increases',rDir=c.remStep<0?'favors A22 as remaining budget shrinks':'favors A29 as remaining budget shrinks';
+  $('pressureText').innerHTML='Position term <span class="'+(c.posStep>0?'good':'bad')+'">'+pDir+'</span>. Remaining-budget term <span class="'+(c.remStep<0?'good':'bad')+'">'+rDir+'</span>. Moving from pos1/rem7 to pos5/rem3 shifts A22−A29 by <span class="warn">'+fmt(c.totalSwing,5)+'</span> score units.';
+  const maxAbs=Math.max(...report.coefficients.features.map(f=>Math.abs(f.coef)))||1;
+  $('coefRows').innerHTML=report.coefficients.features.map(f=>'<div class="row coef"><code>'+f.name+'</code><div><div class="bar"><i style="width:'+(100*Math.abs(f.coef)/maxAbs).toFixed(1)+'%"></i></div></div><div class="v '+(f.coef>=0?'good':'bad')+'">'+fmt(f.coef,5)+'</div></div>').join('');
+  let g='<div class="head">pos / rem</div>'+REM.map(r=>'<div class="head">'+r+'</div>').join('');
+  for(const p of POS){g+='<div class="head">'+p+'</div>';for(const r of REM){const z=report.grid.cells.find(q=>q.pos===p&&q.rem===r),share=z.a22/N;g+='<div class="cell '+(share>=.5?'hot':'')+'"><b>A22 '+pct(share)+'</b><span>mean Δ '+fmt(z.meanDelta,3)+'</span></div>'}}$('pairGrid').innerHTML=g;
+  const natural=report.grid.cells.filter(z=>z.pos+z.rem===8);
+  $('noPosRows').innerHTML=natural.map(z=>'<div class="row"><div class="main">pos '+z.pos+' / rem '+z.rem+'</div><div class="meta">full A22 '+pct(z.a22/N)+' · remove position → <span class="cyan">'+pct(z.noPos22/N)+'</span> · no context '+pct(z.noCtx22/N)+'</div></div>').join('');
+  $('noRemRows').innerHTML=natural.map(z=>'<div class="row"><div class="main">pos '+z.pos+' / rem '+z.rem+'</div><div class="meta">full A22 '+pct(z.a22/N)+' · remove remaining → <span class="violet">'+pct(z.noRem22/N)+'</span> · no context '+pct(z.noCtx22/N)+'</div></div>').join('');
+  $('envMean').textContent=fmt(e.mean,3);$('envSD').textContent=e.sd.toFixed(3);$('contextSwing').textContent=fmt(c.totalSwing,3);$('swingSD').textContent=(Math.abs(c.totalSwing)/(e.sd||1)).toFixed(3)+'×';
+  $('envText').innerHTML='Across the 8192 matched inputs, the non-context base term has SD '+e.sd.toFixed(4)+'. The complete pos1/rem7 → pos5/rem3 context move shifts the pairwise boundary by '+fmt(c.totalSwing,4)+', equal to '+(Math.abs(c.totalSwing)/(e.sd||1)).toFixed(3)+' environmental standard deviations.';
+  $('familyRows').innerHTML=report.family.map(f=>'<div class="row"><div class="main">A'+f.id+' · span '+f.span+'</div><div class="meta">position slope '+fmt(f.perPos,5)+' / step · remaining slope '+fmt(f.perRem,5)+' / unit<br>relative to A29: pos '+fmt(f.relPosTo29,5)+' · rem '+fmt(f.relRemTo29,5)+'</div></div>').join('');
+ }else{
+  for(const id of['posStep','remStep','posSwing','remSwing','envMean','envSD','contextSwing','swingSD'])$(id).textContent='—';
+  $('pressureText').textContent='Run the autopsy.';$('coefRows').innerHTML='<div class="sub">Run the autopsy.</div>';$('pairGrid').innerHTML='<div class="sub">Run the autopsy.</div>';$('noPosRows').innerHTML='<div class="sub">Run the autopsy.</div>';$('noRemRows').innerHTML='<div class="sub">Run the autopsy.</div>';$('familyRows').innerHTML='<div class="sub">Run the autopsy.</div>';
+ }
+ $('raw').textContent=JSON.stringify(report,null,2)
+}
+$('loadSaved').onclick=()=>{try{const b=JSON.parse(localStorage.getItem(SOURCE_KEY));if(!valid(b))throw 0;loadBrain(b)}catch{alert('No valid Build 023 brain is stored on this origin. Paste the saved specimen instead.')}};
+$('paste').onclick=()=>{const t=prompt('Paste Build 023 brain JSON:');if(!t)return;try{loadBrain(JSON.parse(t))}catch{alert('Invalid JSON.')}};
+$('run').onclick=run;
+$('copy').onclick=async()=>{const t=JSON.stringify(report);try{await navigator.clipboard.writeText(t);$('copy').textContent='COPIED';setTimeout(()=>$('copy').textContent='COPY REPORT',900)}catch{prompt('Copy report:',t)}};
+render();try{const b=JSON.parse(localStorage.getItem(SOURCE_KEY));if(valid(b))loadBrain(b)}catch{}
+})();
+</script></body></html>
