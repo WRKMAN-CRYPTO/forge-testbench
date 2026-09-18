@@ -22,7 +22,7 @@
 <div class="foot">A newborn keeps the <span class="note">span</span> of the repeated phrase it replaces, but executes only its exhaustively tested <span class="note">causal kernel</span>. Successful rounds reward both symbolic compression and primitive operations avoided. Failures receive no discount. Build 010 starts fresh and never rewrites Build 006.</div>
 </div><script>(()=>{'use strict';
 const KEY='forge-agent-language-010';const PRIMS=8,OUTS=4,LEN=6,H=4,TEMP=.72,OUT_TEMP=.72;
-const LR_SEL=.014,LR_TR=.010,LR_OUT=.020,MAX_NEW=18,BIRTH_MIN=80,BIRTH_RATE=.94,BIRTH_STATES=2,SYM_BONUS=.03,CAUSAL_BONUS=.06,MAX_EXAMPLES=96;
+const LR_SEL=.014,LR_TR=.010,LR_OUT=.020,MAX_NEW=36,BIRTH_MIN=80,BIRTH_RATE=.94,BIRTH_STATES=2,SYM_BONUS=.03,CAUSAL_BONUS=.06,MAX_EXAMPLES=96;
 const STATES=[...Array(16).keys()];let autoTimer=null;const $=id=>document.getElementById(id),rnd=(s=.04)=>Math.random()*s*2-s,clip=(v,m=5)=>Math.max(-m,Math.min(m,v)),pct=v=>Number.isFinite(v)?Math.round(v*100)+'%':'0%';
 const vec=n=>Array(n).fill(0),mat=(r,c,s=.12)=>Array.from({length:r},()=>Array.from({length:c},()=>rnd(s)));
 function law(s){const b0=s&1,b1=(s>>1)&1,b2=(s>>2)&1,b3=(s>>3)&1;return(b0^b1)+2*(b2^b3)}
