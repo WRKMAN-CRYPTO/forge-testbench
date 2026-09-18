@@ -111,7 +111,7 @@ function render(){
    $('naturalRows').innerHTML=report.natural.rows.map(r=>{const a=dominant(r.fitCounts),b=dominant(r.fixedCounts);return'<div class="row"><div class="main">Force A'+r.prefix+' · span '+r.span+' → pos '+r.pos+' / rem '+r.rem+'</div><div class="meta">FIT: <span class="cyan">A'+a.id+' '+fmtPct(a.share)+'</span> · '+top(r.fitCounts,4)+'<br>FIXED-SHORT: <span class="violet">A'+b.id+' '+fmtPct(b.share)+'</span> · '+top(r.fixedCounts,4)+'<br>eligibility TV '+fmtPct(r.tv)+'</div></div>'}).join('');
    $('posRows').innerHTML=report.positionSweep.rows.map(r=>{const d=dominant(r.counts);return'<div class="row"><div class="main">pos '+r.pos+' · rem 5 → <span class="cyan">A'+d.id+' '+fmtPct(d.share)+'</span></div><div class="meta">'+top(r.counts,5)+'</div></div>'}).join('');
    $('remRows').innerHTML=report.budgetSweep.rows.map(r=>{const d=dominant(r.counts);return'<div class="row"><div class="main">pos 3 · rem '+r.rem+' → <span class="cyan">A'+d.id+' '+fmtPct(d.share)+'</span></div><div class="meta">'+top(r.counts,5)+'</div></div>'}).join('');
-   let g='<div class="head">pos\rem</div>'+REM.map(r=>'<div class="head">'+r+'</div>').join('');
+   let g='<div class="head">pos / rem</div>'+REM.map(r=>'<div class="head">'+r+'</div>').join('');
    for(const p of POS){g+='<div class="head">'+p+'</div>';for(const r of REM){const c=report.roleGrid.cells.find(x=>x.pos===p&&x.rem===r),d=dominant(c.counts);g+='<div class="cell '+(isNaturalCell(p,r)?'diag':'')+'"><b>A'+d.id+'</b><span>'+fmtPct(d.share)+'</span></div>'}}$('roleGrid').innerHTML=g;
  }else{
    $('hiddenDelta').textContent='—';$('eligTV').textContent='—';$('posTV').textContent='—';$('remTV').textContent='—';$('verdict').textContent='Run the microscope.';
