@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0b"><title>AGENT LANGUAGE // 029</title><style>
+:root{--bg:#090d0b;--panel:#131a15;--ink:#edf4ef;--muted:#91a198;--line:#2a3a31;--hot:#b9ff79;--cyan:#77dfff;--warn:#ffd66f;--violet:#d39cff;--bad:#ff8d78}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{max-width:980px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{font-size:20px;margin:0;letter-spacing:.08em}.sub{font-size:11px;color:var(--muted);line-height:1.55}.badge{font-size:10px;color:var(--hot);border:1px solid #537249;border-radius:999px;padding:6px 8px;white-space:nowrap}.grid{display:grid;gap:10px;margin-top:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px}.panel h2{font-size:11px;color:var(--muted);letter-spacing:.14em;margin:0 0 11px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{font:inherit;color:inherit;background:#18211c;border:1px solid #35483d;border-radius:12px;min-height:48px;padding:10px;touch-action:manipulation}.primary{background:#1c3426;border-color:#58836a}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:9px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:9px;color:var(--muted)}.rows{display:grid;gap:7px}.row{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px}.row.goodrow{border-color:#4d7148}.row.badrow{border-color:#754a44}.main{font-size:13px;font-weight:800}.meta{font-size:10px;color:var(--muted);line-height:1.55;margin-top:3px}.good{color:var(--hot)}.bad{color:var(--bad)}.cyan{color:var(--cyan)}.warn{color:var(--warn)}.violet{color:var(--violet)}.familyLine{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.chip{font-size:9px;border:1px solid var(--line);border-radius:999px;padding:5px 7px}.foot{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 2px}pre{font-size:9px;white-space:pre-wrap;overflow-wrap:anywhere;color:#aec0b5}details{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}summary{font-size:11px;color:var(--muted)}
+@media(min-width:760px){.grid{grid-template-columns:1fr 1fr}.span2{grid-column:1/-1}.controls{grid-template-columns:repeat(4,1fr)}.stats{grid-template-columns:repeat(4,1fr)}}
+</style></head><body><div class="app">
+<div class="top"><div><h1>AGENT LANGUAGE // 029</h1><div class="sub">Test the size-to-space rule across every operational-equivalence family in the frozen language.</div></div><div class="badge">SIZE ↔ SPACE</div></div>
+<div class="grid">
+<section class="panel span2"><h2>FROZEN SOURCE</h2><div class="stats"><div class="stat"><b id="status">—</b><span>SOURCE</span></div><div class="stat"><b id="rounds">0</b><span>TRAIN ROUNDS</span></div><div class="stat"><b id="familiesN">0</b><span>SAME-KERNEL FAMILIES</span></div><div class="stat"><b id="pairsN">0</b><span>WITHIN-FAMILY PAIRS</span></div></div><div class="controls" style="margin-top:10px"><button class="primary" id="loadSaved">LOAD SAVED 023</button><button id="paste">PASTE 023 BRAIN</button><button id="test">TEST ALL FAMILIES</button><button id="copy">COPY REPORT</button></div></section>
+
+<section class="panel"><h2>GLOBAL VERDICT</h2><div class="stats"><div class="stat"><b id="concord">—</b><span>LARGER→MORE ROOM</span></div><div class="stat"><b id="mono3">—</b><span>MONOTONIC 3+ FAMS</span></div><div class="stat"><b id="betaRem">—</b><span>FIXED-EFFECT β REM</span></div><div class="stat"><b id="betaPos">—</b><span>FIXED-EFFECT β POS</span></div></div><div id="verdict" class="sub" style="margin-top:10px">Run the test.</div></section>
+
+<section class="panel"><h2>WHAT COUNTS AS SUPPORT?</h2><div class="sub">Inside one kernel family, compare every smaller-span token with every larger-span token. A pair supports the rule when the larger token has a larger <span class="cyan">remaining-budget slope</span>.<br><br>The fixed-effect regression subtracts each family's own mean first, so family-specific selector offsets cannot create the pooled span slope.</div></section>
+
+<section class="panel span2"><h2>FAMILIES</h2><div id="familyRows" class="rows"><div class="sub">Run the test.</div></div></section>
+
+<section class="panel"><h2>PAIRWISE CONCORDANCE</h2><div id="pairRows" class="rows"><div class="sub">Run the test.</div></div></section>
+
+<section class="panel"><h2>POSITION CONTROL</h2><div id="posRows" class="rows"><div class="sub">Run the test.</div></div></section>
+
+<section class="panel span2"><h2>RAW REPORT</h2><details><summary>OPEN JSON</summary><pre id="raw"></pre></details></section>
+</div>
+<div class="foot"><span class="warn">Scope:</span> this is one mature brain. A repeated pattern across families is stronger than a single-family curiosity, but it is not yet a population-level law. The next confirmation would be independent mature brains.</div>
+</div><script>
+(()=>{'use strict';
+const SOURCE_KEY='forge-agent-language-023',REPORT_KEY='forge-agent-language-029-results',PRIMS=8,LEN=8;
+const $=id=>document.getElementById(id);let brain=null,report={version:29,source:null,families:null,summary:null,pairs:null,regression:null};
+function valid(b){return b&&b.version===23&&Array.isArray(b.births)&&Array.isArray(b.selW)}
+function birth(id){return brain.births.find(b=>b.id===id)}
+function tokenIds(){return[...Array(PRIMS).keys(),...brain.births.map(b=>b.id)]}
+function kernel(id){if(id<PRIMS)return[id];const b=birth(id);return b&&Array.isArray(b.kernel)?b.kernel.slice():[]}
+function span(id){if(id<PRIMS)return 1;const b=birth(id);return b?b.span:0}
+function bornAt(id){return id<PRIMS?0:(birth(id)?.bornAt??null)}
+function uses(id){return brain.uses?.[id]||0}
+function key(k){return k.join(',')}
+function slopeRem(id){return brain.selW[id][16]/LEN}
+function slopePos(id){return brain.selW[id][15]/(LEN-1)}
+function groups(){
+ const m=new Map();for(const id of tokenIds()){const k=kernel(id),q=key(k);if(!m.has(q))m.set(q,{kernel:k,ids:[]});m.get(q).ids.push(id)}
+ return[...m.values()].filter(g=>g.ids.length>=2).map(g=>({...g,ids:g.ids.sort((a,b)=>span(a)-span(b)||a-b)})).sort((a,b)=>b.ids.length-a.ids.length||key(a.kernel).localeCompare(key(b.kernel)))
+}
+function pairwise(g,field){
+ const out=[];for(let i=0;i<g.ids.length;i++)for(let j=i+1;j<g.ids.length;j++){const a=g.ids[i],b=g.ids[j],sa=span(a),sb=span(b);if(sa===sb)continue;const small=sa<sb?a:b,large=sa<sb?b:a,ds=field(large)-field(small);out.push({kernel:g.kernel,small,large,smallSpan:span(small),largeSpan:span(large),delta:ds,support:ds>0,tie:Math.abs(ds)<1e-12})}return out
+}
+function monotonic(g,field){const xs=g.ids.slice().sort((a,b)=>span(a)-span(b));let inc=true,strict=true;for(let i=1;i<xs.length;i++){const d=field(xs[i])-field(xs[i-1]);if(d<0)inc=false;if(d<=0)strict=false}return{inc,strict}}
+function fixedEffectBeta(fams,field){
+ let num=0,den=0,sst=0,sse=0,pts=[];for(const g of fams){const vals=g.ids.map(id=>({id,x:span(id),y:field(id)})),mx=vals.reduce((s,v)=>s+v.x,0)/vals.length,my=vals.reduce((s,v)=>s+v.y,0)/vals.length;for(const v of vals){const xc=v.x-mx,yc=v.y-my;num+=xc*yc;den+=xc*xc;sst+=yc*yc;pts.push({kernel:g.kernel,id:v.id,span:v.x,y:v.y,xc,yc})}}
+ const beta=den?num/den:0;for(const p of pts)sse+=(p.yc-beta*p.xc)**2;return{beta,r2:sst?1-sse/sst:0,n:pts.length,points:pts}
+}
+function src(){return{rounds:brain.rounds,wins:brain.wins,births:brain.births.length,discoveries:(brain.discoveries||[]).length}}
+function save(){try{localStorage.setItem(REPORT_KEY,JSON.stringify(report))}catch{}}
+function loadBrain(b){if(!valid(b)){alert('That is not a valid Build 023 brain.');return}brain=JSON.parse(JSON.stringify(b));report={version:29,source:src(),families:null,summary:null,pairs:null,regression:null};save();render()}
+function run(){
+ if(!brain)return;const fams=groups(),families=[],allRem=[],allPos=[];
+ for(const g of fams){
+   const remPairs=pairwise(g,slopeRem),posPairs=pairwise(g,slopePos),mr=monotonic(g,slopeRem),mp=monotonic(g,slopePos);
+   allRem.push(...remPairs);allPos.push(...posPairs);
+   families.push({kernel:g.kernel,ids:g.ids,members:g.ids.map(id=>({id,span:span(id),remSlope:slopeRem(id),posSlope:slopePos(id),bornAt:bornAt(id),uses:uses(id)})),rem:{pairs:remPairs,support:remPairs.filter(p=>p.support).length,total:remPairs.length,monotonic:mr},pos:{pairs:posPairs,support:posPairs.filter(p=>p.support).length,total:posPairs.length,monotonic:mp}})
+ }
+ const three=families.filter(f=>f.ids.length>=3),remSupport=allRem.filter(p=>p.support).length,posSupport=allPos.filter(p=>p.support).length,regRem=fixedEffectBeta(fams,slopeRem),regPos=fixedEffectBeta(fams,slopePos);
+ report.families=families;report.pairs={remaining:allRem,position:allPos};report.regression={remaining:regRem,position:regPos};
+ report.summary={familyCount:fams.length,pairCount:allRem.length,remainingSupport:remSupport,remainingShare:allRem.length?remSupport/allRem.length:0,positionSupport:posSupport,positionShare:allPos.length?posSupport/allPos.length:0,threePlusCount:three.length,threePlusRemMonotonic:three.filter(f=>f.rem.monotonic.strict).length,threePlusPosMonotonic:three.filter(f=>f.pos.monotonic.strict).length};
+ save();render()
+}
+function fmt(v,d=4){return(Number(v)>=0?'+':'')+Number(v).toFixed(d)}
+function pct(v){return(100*v).toFixed(1)+'%'}
+function render(){
+ const ok=!!brain,s=report.summary;$('status').textContent=ok?'FROZEN':'MISSING';$('status').className=ok?'good':'warn';$('rounds').textContent=ok?brain.rounds.toLocaleString():'0';$('familiesN').textContent=s?s.familyCount:(ok?groups().length:'0');$('pairsN').textContent=s?s.pairCount:'0';
+ if(s){
+   $('concord').textContent=s.remainingSupport+'/'+s.pairCount;$('mono3').textContent=s.threePlusRemMonotonic+'/'+s.threePlusCount;$('betaRem').textContent=fmt(report.regression.remaining.beta,4);$('betaPos').textContent=fmt(report.regression.position.beta,4);
+   const strong=s.remainingShare>.75&&s.threePlusRemMonotonic===s.threePlusCount;
+   $('verdict').innerHTML=(strong?'<span class="good">Broad within-brain support.</span> ':'<span class="warn">Mixed within-brain support.</span> ')+'Larger-span same-kernel words have larger remaining-budget slopes in '+s.remainingSupport+'/'+s.pairCount+' pairwise comparisons ('+pct(s.remainingShare)+'). Strict monotonic ordering holds in '+s.threePlusRemMonotonic+'/'+s.threePlusCount+' families with at least three members. Family-fixed span coefficient β='+fmt(report.regression.remaining.beta,5)+'; position control β='+fmt(report.regression.position.beta,5)+'.';
+   $('familyRows').innerHTML=report.families.map(f=>{const good=f.rem.support===f.rem.total,cls=good?'goodrow':'';return'<div class="row '+cls+'"><div class="main">kernel ['+f.kernel.join(',')+'] · '+f.ids.length+' synonyms · REM '+f.rem.support+'/'+f.rem.total+(f.ids.length>=3?' · monotonic '+(f.rem.monotonic.strict?'YES':'NO'):'')+'</div><div class="familyLine">'+f.members.map(m=>'<span class="chip">A'+m.id+' s'+m.span+' · rem '+fmt(m.remSlope,4)+' · pos '+fmt(m.posSlope,4)+'</span>').join('')+'</div><div class="meta">position concordance '+f.pos.support+'/'+f.pos.total+(f.ids.length>=3?' · position monotonic '+(f.pos.monotonic.strict?'YES':'NO'):'')+'</div></div>'}).join('');
+   $('pairRows').innerHTML=report.families.map(f=>'<div class="row"><div class="main">['+f.kernel.join(',')+'] · '+f.rem.support+'/'+f.rem.total+' support</div><div class="meta">'+f.rem.pairs.map(p=>'A'+p.small+'(s'+p.smallSpan+')→A'+p.large+'(s'+p.largeSpan+') '+fmt(p.delta,4)).join(' · ')+'</div></div>').join('');
+   $('posRows').innerHTML='<div class="row"><div class="main">Position is the control</div><div class="meta">larger-span token has larger position slope in '+s.positionSupport+'/'+s.pairCount+' pairs ('+pct(s.positionShare)+') · strict monotonic 3+ families '+s.threePlusPosMonotonic+'/'+s.threePlusCount+' · fixed-effect β '+fmt(report.regression.position.beta,5)+'</div></div>'+report.families.map(f=>'<div class="row"><div class="main">['+f.kernel.join(',')+'] · POS '+f.pos.support+'/'+f.pos.total+'</div><div class="meta">'+f.pos.pairs.map(p=>'A'+p.small+'→A'+p.large+' '+fmt(p.delta,4)).join(' · ')+'</div></div>').join('');
+ }else{$('concord').textContent='—';$('mono3').textContent='—';$('betaRem').textContent='—';$('betaPos').textContent='—';$('verdict').textContent='Run the test.';$('familyRows').innerHTML='<div class="sub">Run the test.</div>';$('pairRows').innerHTML='<div class="sub">Run the test.</div>';$('posRows').innerHTML='<div class="sub">Run the test.</div>'}
+ $('raw').textContent=JSON.stringify(report,null,2)
+}
+$('loadSaved').onclick=()=>{try{const b=JSON.parse(localStorage.getItem(SOURCE_KEY));if(!valid(b))throw 0;loadBrain(b)}catch{alert('No valid Build 023 brain is stored on this origin. Paste the saved specimen instead.')}};
+$('paste').onclick=()=>{const t=prompt('Paste Build 023 brain JSON:');if(!t)return;try{loadBrain(JSON.parse(t))}catch{alert('Invalid JSON.')}};
+$('test').onclick=run;$('copy').onclick=async()=>{const t=JSON.stringify(report);try{await navigator.clipboard.writeText(t);$('copy').textContent='COPIED';setTimeout(()=>$('copy').textContent='COPY REPORT',900)}catch{prompt('Copy report:',t)}};
+render();try{const b=JSON.parse(localStorage.getItem(SOURCE_KEY));if(valid(b))loadBrain(b)}catch{}
+})();
+</script></body></html>
