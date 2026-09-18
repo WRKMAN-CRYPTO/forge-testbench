@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0b"><title>AGENT LANGUAGE // 012</title><style>
+:root{--bg:#090d0b;--panel:#131a15;--ink:#edf4ef;--muted:#91a198;--line:#2a3a31;--hot:#b9ff79;--bad:#ff8d78;--warn:#ffd66f;--cyan:#77dfff;--purple:#d39cff}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}.app{max-width:940px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{font-size:20px;margin:0;letter-spacing:.08em}.sub,.meta{font-size:10px;color:var(--muted);line-height:1.55}.badge{font-size:10px;color:var(--warn);border:1px solid #6b5c35;border-radius:999px;padding:6px 8px;white-space:nowrap}.grid{display:grid;gap:10px;margin-top:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px}.panel h2{font-size:11px;color:var(--muted);letter-spacing:.14em;margin:0 0 11px}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:9px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:9px;color:var(--muted)}.rows{display:grid;gap:7px}.row{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px}.row.win{border-color:#4f704f}.row.target{border-color:#75633d}.main{font-size:13px;font-weight:800}.seq{font-size:12px;line-height:1.6;margin-top:3px}.hot{color:var(--hot)}.bad{color:var(--bad)}.warn{color:var(--warn)}.cyan{color:var(--cyan)}.purple{color:var(--purple)}button{width:100%;font:inherit;color:inherit;background:#1c3426;border:1px solid #58836a;border-radius:12px;min-height:48px;padding:10px}.hero{font-size:clamp(26px,8vw,54px);font-weight:900;letter-spacing:.02em}.foot{font-size:10px;color:var(--muted);line-height:1.55;margin:12px 2px}.callout{border:1px solid #516b3c;background:#111b13;border-radius:12px;padding:12px}.callout.badbox{border-color:#70473f}.mono{word-break:break-word}
+@media(min-width:760px){.grid{grid-template-columns:1fr 1fr}.span2{grid-column:1/-1}.stats{grid-template-columns:repeat(4,1fr)}}
+</style></head><body><div class="app">
+<div class="top"><div><h1>AGENT LANGUAGE // 012</h1><div class="sub">Frozen state-0 interrogation. One chair. No learning.</div></div><div class="badge">CAUSAL FLOOR</div></div>
+<div class="grid">
+<section class="panel span2"><h2>SPECIMEN</h2><div id="status" class="sub">Loading Build 011…</div></section>
+<section class="panel"><h2>STATE 0 BASELINE</h2><div id="baseHero" class="hero">—</div><div id="baseMeta" class="meta"></div></section>
+<section class="panel"><h2>CAUSAL FLOOR</h2><div id="floorHero" class="hero">—</div><div id="floorMeta" class="meta"></div></section>
+<section class="panel span2"><h2>ZERO + SINGLE PRIMITIVES</h2><div id="singles" class="rows"></div></section>
+<section class="panel"><h2>EXISTING FULL-SPAN ONE-OP WORDS</h2><div id="lexemes" class="rows"></div></section>
+<section class="panel"><h2>ORDERED PAIRS</h2><div id="pairs" class="rows"></div></section>
+<section class="panel span2"><h2>BASELINE POLICY CHECK</h2><div class="stats"><div class="stat"><b id="acc">—</b><span>16-STATE ACCURACY</span></div><div class="stat"><b id="oneops">—</b><span>ONE-OP STATES</span></div><div class="stat"><b id="twoops">—</b><span>TWO-OP STATES</span></div><div class="stat"><b id="state0tok">—</b><span>STATE 0 TOKEN</span></div></div><div id="states" class="rows" style="margin-top:9px"></div></section>
+<section class="panel span2"><button id="rerun">RERUN FROZEN DISSECTION</button></section>
+</div>
+<div class="foot">Candidate programs are injected at state 0's exact pre-target hidden state and read directly through the frozen output head. A shorter candidate replaces the entire full-span baseline word; policy selection is not rerun. Hidden distance is descriptive only. Grounded-output equality defines behavioral equivalence for this assay.</div>
+</div><script>(()=>{'use strict';
+const SOURCE='forge-agent-language-011',FROZEN='forge-agent-language-012-frozen',PRIMS=8,OUTS=4,LEN=6,H=4,STATES=[...Array(16).keys()];const $=id=>document.getElementById(id);
+let brain=null;try{const f=localStorage.getItem(FROZEN);if(f)brain=JSON.parse(f);else{const s=localStorage.getItem(SOURCE);if(s){brain=JSON.parse(s);localStorage.setItem(FROZEN,JSON.stringify(brain))}}}catch{}
+function birth(id){return brain.births.find(b=>b.id===id)}function tokenIds(){return[...Array(PRIMS).keys(),...brain.births.map(b=>b.id)]}
+function kernel(id){if(id<PRIMS)return[id];const b=birth(id);return b&&Array.isArray(b.kernel)?b.kernel.slice():[]}
+function span(id){if(id<PRIMS)return 1;const b=birth(id);return b?b.span:0}
+function bits(s){return[0,1,2,3].map(i=>(s>>i)&1)}function featX(s){return bits(s).map(v=>v?1:-1)}function dot(a,b){let z=0;for(let i=0;i<a.length;i++)z+=a[i]*b[i];return z}function phi(x,h,pos,rem){return[1,...x,...h,pos/(LEN-1),rem/LEN]}
+function applyPrim(id,h,x){const out=Array(H).fill(0);for(let r=0;r<H;r++){let z=brain.bias[id][r];for(let c=0;c<H;c++)z+=brain.Wh[id][r][c]*h[c];for(let c=0;c<4;c++)z+=brain.Wx[id][r][c]*x[c];out[r]=Math.tanh(z)}return out}
+function applySeq(seq,h,x){for(const id of seq)h=applyPrim(id,h,x);return h}
+function logits(h){return brain.Wout.map((r,o)=>dot(r,h)+brain.bout[o])}function argmax(a){let k=0;for(let i=1;i<a.length;i++)if(a[i]>a[k])k=i;return k}
+function margin(ls){const q=ls.slice().sort((a,b)=>b-a);return q[0]-q[1]}function law(s){const b0=s&1,b1=(s>>1)&1,b2=(s>>2)&1,b3=(s>>3)&1;return(b0^b1)+2*(b2^b3)}
+function greedy(state){const x=featX(state),tokens=[],expanded=[];let h=Array(H).fill(0),rem=LEN,pos=0,guard=0;while(rem>0&&guard++<20){const ids=tokenIds().filter(id=>span(id)>0&&span(id)<=rem);if(!ids.length)break;const f=phi(x,h,pos,rem);let id=ids[0],best=-Infinity;for(const q of ids){const w=brain.selW[q];if(!w)continue;const sc=dot(w,f);if(sc>best){best=sc;id=q}}tokens.push(id);const k=kernel(id);expanded.push(...k);h=applySeq(k,h,x);rem-=span(id);pos+=span(id)}const ls=logits(h),out=argmax(ls);return{state,x,tokens,expanded,h,ls,out,terminal:PRIMS+out,correct:out===law(state)}}
+function runSeq(seq,x,h0){const h=applySeq(seq,h0.slice(),x),ls=logits(h),out=argmax(ls);return{seq,h,ls,out,terminal:PRIMS+out,margin:margin(ls)}}
+function dist(a,b){let z=0;for(let i=0;i<a.length;i++){const d=a[i]-b[i];z+=d*d}return Math.sqrt(z)}
+function fmtSeq(seq){return seq.length?seq.map(i=>'A'+i).join(' → '):'NO-OP'}
+function run(){
+ if(!brain||brain.version!==11){$('status').innerHTML='<span class="bad">No Build 011 brain found on this device.</span> Open 011 once, then return here.';return}
+ const base=STATES.map(greedy),b0=base[0],target=b0.tokens[0],targetKernel=kernel(target),preH=Array(H).fill(0),x=b0.x,orig=runSeq(targetKernel,x,preH),want=law(0);
+ $('status').textContent='Frozen from Build 011 · '+brain.rounds.toLocaleString()+' rounds · '+brain.births.length+' newborns · source specimen never modified';
+ $('baseHero').innerHTML='<span class="warn">A'+target+'</span> · '+fmtSeq(targetKernel);
+ $('baseMeta').textContent='span '+span(target)+' · output A'+orig.terminal+' · margin '+orig.margin.toFixed(3)+' · exact pre-target h = [0, 0, 0, 0]';
+ const candidates=[{name:'NO-OP',seq:[]},...Array.from({length:PRIMS},(_,i)=>({name:'A'+i,seq:[i]}))].map(c=>({...c,...runSeq(c.seq,x,preH)}));
+ const correct=candidates.filter(c=>c.out===want),floor=correct.length?Math.min(...correct.map(c=>c.seq.length)):null,minima=correct.filter(c=>c.seq.length===floor);
+ $('floorHero').innerHTML=floor===null?'<span class="bad">&gt; 1 OP</span>':'<span class="hot">'+floor+' OP</span>';
+ $('floorMeta').innerHTML=floor===null?'No zero- or one-transform replacement preserves A'+(PRIMS+want)+'.':minima.map(c=>fmtSeq(c.seq)).join(' · ')+' reproduces grounded output A'+(PRIMS+want)+' from the exact same starting state.';
+ $('singles').innerHTML=candidates.map(c=>{const ok=c.out===want;return '<div class="row '+(ok?'win':'')+'"><div class="main">'+c.name+' → <span class="'+(ok?'hot':'bad')+'">A'+c.terminal+'</span>'+ (ok?' · EQUIVALENT':'') +'</div><div class="meta">margin '+c.margin.toFixed(3)+' · hidden L2 from A'+target+' '+dist(c.h,orig.h).toFixed(3)+' · logits ['+c.ls.map(v=>v.toFixed(2)).join(', ')+']</div></div>'}).join('');
+ const fullOne=brain.births.filter(b=>b.span===LEN&&kernel(b.id).length===1);
+ const winnerPrims=new Set(minima.flatMap(c=>c.seq));
+ $('lexemes').innerHTML=(fullOne.map(b=>{const r=runSeq(kernel(b.id),x,preH);return '<div class="row"><div class="main"><span class="purple">A'+b.id+'</span> · kernel '+fmtSeq(kernel(b.id))+' → A'+r.terminal+'</div><div class="meta">span 6 · one primitive op</div></div>'}).join('')||'<div class="sub">No full-span one-op words.</div>')+
+ [...winnerPrims].filter(p=>!fullOne.some(b=>kernel(b.id)[0]===p)).map(p=>'<div class="callout"><div class="main hot">MISSING LEXEME: span 6 / kernel A'+p+'</div><div class="meta">A'+p+' is behaviorally sufficient here, but no existing full-span one-operation token executes it.</div></div>').join('');
+ const pairs=[];for(let a=0;a<PRIMS;a++)for(let b=0;b<PRIMS;b++){const r=runSeq([a,b],x,preH);if(r.out===want)pairs.push({...r,a,b,d:dist(r.h,orig.h)})}pairs.sort((u,v)=>u.d-v.d);
+ $('pairs').innerHTML='<div class="meta">'+pairs.length+' / '+(PRIMS*PRIMS)+' ordered two-primitive programs also produce A'+(PRIMS+want)+'. Closest hidden states shown first.</div>'+pairs.slice(0,12).map(r=>'<div class="row '+(r.a===targetKernel[0]&&r.b===targetKernel[1]?'target':'')+'"><div class="main">'+fmtSeq(r.seq)+' → A'+r.terminal+(r.a===targetKernel[0]&&r.b===targetKernel[1]?' · BASELINE KERNEL':'')+'</div><div class="meta">margin '+r.margin.toFixed(3)+' · hidden L2 '+r.d.toFixed(3)+'</div></div>').join('');
+ const acc=base.filter(r=>r.correct).length,one=base.filter(r=>r.expanded.length===1).length,two=base.filter(r=>r.expanded.length===2).length;
+ $('acc').textContent=acc+'/16';$('oneops').textContent=one;$('twoops').textContent=two;$('state0tok').textContent='A'+target;
+ $('states').innerHTML=base.map(r=>'<div class="row '+(r.state===0?'target':'')+'"><div class="main">'+bits(r.state).join('')+' · '+r.tokens.map(t=>'A'+t).join(' → ')+' · '+r.expanded.length+' op'+(r.expanded.length===1?'':'s')+' → <span class="'+(r.correct?'hot':'bad')+'">A'+r.terminal+'</span></div><div class="meta">want A'+(PRIMS+law(r.state))+'</div></div>').join('');
+ localStorage.setItem('forge-agent-language-012-result',JSON.stringify({fromRounds:brain.rounds,state0:{target,targetKernel,want,baselineOutput:orig.terminal,baselineMargin:orig.margin,floor,minima:minima.map(c=>c.seq),singles:candidates.map(c=>({seq:c.seq,terminal:c.terminal,margin:c.margin,distance:dist(c.h,orig.h)})),pairEquivalentCount:pairs.length},baselineAccuracy:acc,oneOpStates:one,twoOpStates:two}));
+}
+$('rerun').onclick=run;run();
+})();</script></body></html>
