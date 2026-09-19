@@ -294,14 +294,22 @@ function draw3D(){
  const dpr=Math.max(1,Math.min(2,devicePixelRatio||1)),w=space.clientWidth||760,h=w*3/4;if(space.width!==Math.floor(w*dpr)||space.height!==Math.floor(h*dpr)){space.width=Math.floor(w*dpr);space.height=Math.floor(h*dpr)}
  xctx.setTransform(dpr,0,0,dpr,0,0);xctx.clearRect(0,0,w,h);xctx.fillStyle='#050806';xctx.fillRect(0,0,w,h);drawVolumeFrame(w,h);
  const selected=S.seeds.find(s=>s.id===selectedId),lineage=selected?.lineage,items=[],fieldColors=['','#314733','#56627f','#765a78','#827347'];
+ const lod=view.zoom<.58?'POINTS':view.zoom<.9?'FINE':view.zoom<1.35?'NORMAL':'CLOSE';
  if(view.fields){for(const i of S.world.fieldCells){const t=S.world.type[i];const z=Math.floor(i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;const rem=i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,p=project3(centerPoint(x,y,z),w,h);items.push({kind:'field',x:p.x,y:p.y,z:p.z,p:p.p,color:fieldColors[t],alpha:view.focusSlice?.35:.16})}}
- for(const s of S.seeds){if(view.lineageOnly&&lineage!=null&&s.lineage!==lineage)continue;const p=project3(centerPoint(s.x,s.y,s.z),w,h),ghost=view.focusSlice&&s.z!==sliceZ;items.push({kind:'seed',x:p.x,y:p.y,z:p.z,p:p.p,seed:s,alpha:ghost?.10:.96})}
+ for(const s of S.seeds){if(view.lineageOnly&&lineage!=null&&s.lineage!==lineage)continue;const p=project3(centerPoint(s.x,s.y,s.z),w,h),ghost=view.focusSlice&&s.z!==sliceZ,baseAlpha=lod==='POINTS'?.42:lod==='FINE'?.68:lod==='NORMAL'?.88:.96;items.push({kind:'seed',x:p.x,y:p.y,z:p.z,p:p.p,seed:s,alpha:ghost?.08:baseAlpha})}
  items.sort((a,b)=>b.z-a.z);pickPoints=[];
- for(const q of items){xctx.save();xctx.globalAlpha=q.alpha;if(q.kind==='field'){const r=Math.max(.7,1.15*q.p);xctx.fillStyle=q.color;xctx.fillRect(q.x-r,q.y-r,r*2,r*2)}else{const r=Math.max(2.1,3.7*q.p);xctx.beginPath();xctx.fillStyle=lineageColor(q.seed.lineage,.96);xctx.arc(q.x,q.y,r,0,Math.PI*2);xctx.fill();if(q.seed.id===selectedId){xctx.lineWidth=2;xctx.strokeStyle='#fff';xctx.stroke()}pickPoints.push({x:q.x,y:q.y,r:Math.max(10,r*2.3),depth:q.z,id:q.seed.id})}xctx.restore()}
+ for(const q of items){xctx.save();xctx.globalAlpha=q.alpha;if(q.kind==='field'){const r=Math.max(.45,Math.min(1.4,1.15*q.p*view.zoom));xctx.fillStyle=q.color;xctx.fillRect(q.x-r,q.y-r,r*2,r*2)}else{
+   const scale=lod==='POINTS'?.62:lod==='FINE'?1.15:lod==='NORMAL'?2.15:3.15,r=Math.max(lod==='POINTS'?.38:lod==='FINE'?.7:lod==='NORMAL'?1.15:1.65,scale*q.p*view.zoom);
+   xctx.fillStyle=lineageColor(q.seed.lineage,1);
+   if(lod==='POINTS'){const d=Math.max(.8,r*1.45);xctx.fillRect(q.x-d*.5,q.y-d*.5,d,d)}
+   else{xctx.beginPath();xctx.arc(q.x,q.y,r,0,Math.PI*2);xctx.fill()}
+   if(q.seed.id===selectedId){xctx.globalAlpha=1;xctx.beginPath();xctx.arc(q.x,q.y,Math.max(3.2,r+2),0,Math.PI*2);xctx.lineWidth=1.5;xctx.strokeStyle='#fff';xctx.stroke()}
+   pickPoints.push({x:q.x,y:q.y,r:Math.max(7,r*2.1),depth:q.z,id:q.seed.id})
+  }xctx.restore()}
  if(view.legacy){const changes=fossilChanges();xctx.save();xctx.strokeStyle='#ffd66f';xctx.lineWidth=1.4;xctx.globalAlpha=.9;for(const q of changes){const z=Math.floor(q.i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;const rem=q.i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,p=project3(centerPoint(x,y,z),w,h),r=Math.max(2.2,3*q.p);xctx.strokeRect(p.x-r,p.y-r,r*2,r*2)}xctx.restore()}
  if(view.spine){const C=layerCentroids().filter(Boolean);if(C.length){xctx.save();xctx.lineWidth=2.2;xctx.strokeStyle='#ffd66f';xctx.globalAlpha=.9;xctx.beginPath();C.forEach((q,i)=>{const p=project3(centerPoint(q.x,q.y,q.z),w,h);i?xctx.lineTo(p.x,p.y):xctx.moveTo(p.x,p.y)});xctx.stroke();for(const q of C){const p=project3(centerPoint(q.x,q.y,q.z),w,h);xctx.beginPath();xctx.fillStyle='#ffd66f';xctx.arc(p.x,p.y,3.2,0,Math.PI*2);xctx.fill()}xctx.restore()}}
  const axis=[['X',{x:3,y:0,z:0},'#b9ff79'],['Y',{x:0,y:3,z:0},'#77dfff'],['Z',{x:0,y:0,z:3},'#ffd66f']],o=project3({x:-(W-1)/2-2,y:-(H-1)/2-2,z:-(D-1)/2},w,h);xctx.font='9px ui-monospace';for(const [label,v,col] of axis){const p=project3({x:-(W-1)/2-2+v.x,y:-(H-1)/2-2+v.y,z:-(D-1)/2+v.z},w,h);xctx.strokeStyle=col;xctx.fillStyle=col;xctx.beginPath();xctx.moveTo(o.x,o.y);xctx.lineTo(p.x,p.y);xctx.stroke();xctx.fillText(label,p.x+3,p.y)}
- $('spaceStatus').textContent='center '+chunkName(CENTER_CHUNK)+' · fixed W5 founder cohort · order '+layoutText()+' · '+S.seeds.length+' living · slice Z'+(sliceZ+1)+(sliceZ===MID_Z?' founder plane':'')+' · drag rotate · pinch zoom · tap seed';
+ $('spaceStatus').textContent='center '+chunkName(CENTER_CHUNK)+' · fixed W5 founder cohort · order '+layoutText()+' · '+S.seeds.length+' living · '+lod.toLowerCase()+' LOD · slice Z'+(sliceZ+1)+(sliceZ===MID_Z?' founder plane':'')+' · drag rotate · pinch zoom · tap seed';
 }
 function markViewDirty(){viewDirty=true}
 function viewerFrame(t){if(view.auto){view.yaw+=.004;viewDirty=true}if(viewDirty&&(!running||liveSpeed<1000||t-last3D>100)){draw3D();viewDirty=false;last3D=t}viewRaf=requestAnimationFrame(viewerFrame)}
