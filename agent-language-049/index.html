@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0b"><title>AGENT LANGUAGE // 049 · WORLD CUBE</title><style>
+:root{--bg:#090d0b;--panel:#131a15;--ink:#edf4ef;--muted:#91a198;--line:#2a3a31;--hot:#b9ff79;--cyan:#77dfff;--warn:#ffd66f;--violet:#d39cff;--bad:#ff8d78}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{max-width:1080px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{font-size:20px;margin:0;letter-spacing:.08em}.sub{font-size:11px;color:var(--muted);line-height:1.55}.badge{font-size:10px;color:var(--hot);border:1px solid #537249;border-radius:999px;padding:6px 8px;white-space:nowrap}
+.grid{display:grid;gap:10px;margin-top:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px;min-width:0}.panel h2{font-size:11px;color:var(--muted);letter-spacing:.14em;margin:0 0 11px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}button,select,input{font:inherit;color:inherit;background:#18211c;border:1px solid #35483d;border-radius:12px;min-height:48px;padding:10px}button{touch-action:manipulation}.primary{background:#1c3426;border-color:#58836a}.danger{border-color:#6d4038}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:9px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:9px;color:var(--muted)}.row{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px}.main{font-size:13px;font-weight:800}.meta{font-size:10px;color:var(--muted);line-height:1.55;margin-top:3px}.good{color:var(--hot)}.cyan{color:var(--cyan)}.warn{color:var(--warn)}.violet{color:var(--violet)}.bad{color:var(--bad)}.dishWrap{background:#070a08;border:1px solid #223128;border-radius:16px;padding:8px;overflow:hidden}.dishWrap canvas{display:block;width:100%;aspect-ratio:4/3;border-radius:10px;touch-action:manipulation}.observatoryWrap{background:#050806;border:1px solid #223128;border-radius:16px;padding:6px;overflow:hidden;position:relative}.observatoryWrap canvas{display:block;width:100%;aspect-ratio:4/3;border-radius:11px;touch-action:none}.viewerControls{margin-top:9px}.viewerControls button.on{background:#20392a;border-color:#6a946f;color:var(--hot)}.viewerHint{margin-top:7px}.chunkGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.chunkLayerLabel{grid-column:1/-1;font-size:9px;letter-spacing:.13em;color:var(--cyan);opacity:.72;padding:7px 2px 1px;border-top:1px solid #223128}.chunkLayerLabel:first-child{border-top:0;padding-top:0}.chunkCard{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px;min-height:92px}.chunkCard.origin{border-color:#77dfff}.chunkCard.occupied{box-shadow:inset 0 0 0 1px #365845}.chunkCard b{display:block;font-size:15px}.chunkCard span{display:block;font-size:9px;color:var(--muted);line-height:1.45;margin-top:3px}.fieldSummary{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.fieldCards{display:grid;gap:8px;max-height:620px;overflow:auto;margin-top:10px}.fieldCard{background:#0d120f;border:1px solid #223128;border-radius:12px;padding:10px}.fieldCard.live{border-color:#365845}.fieldHead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.fieldHead b{font-size:15px}.profileGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}.profileCell{background:#111813;border:1px solid #223128;border-radius:8px;padding:7px}.profileCell b{display:block;font-size:12px}.profileCell span{font-size:8px;color:var(--muted)}.fieldNote{font-size:9px;color:var(--muted);line-height:1.5;margin-top:7px}.fossilGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.fossilStat{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px;text-align:center}.fossilStat b{display:block;font-size:17px}.fossilStat span{font-size:9px;color:var(--muted)}.writerList{display:grid;gap:6px;margin-top:9px}.writerRow{display:grid;grid-template-columns:70px 1fr 70px;gap:7px;align-items:center;font-size:9px}.writerTrack{height:7px;background:#0d120f;border:1px solid var(--line);border-radius:999px;overflow:hidden}.writerFill{height:100%;background:var(--violet)}.surveyNav{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;margin-top:10px}.surveyNav input{width:100%;min-width:0}.surveyList{display:grid;gap:6px;max-height:300px;overflow:auto;margin-top:10px}.surveyRow{display:grid;grid-template-columns:48px 1fr auto;gap:8px;align-items:center;background:#0d120f;border:1px solid #223128;border-radius:10px;padding:8px}.surveyRow.current{border-color:#77dfff}.surveyRow .w{font-weight:800}.surveyRow .s{font-size:9px;color:var(--muted);line-height:1.45}.surveyRow .r{font-size:9px;text-align:right}.structureGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.structureCell{background:#0d120f;border:1px solid #223128;border-radius:10px;padding:8px}.structureCell b{display:block;font-size:15px}.structureCell span{font-size:9px;color:var(--muted)}.sliceControl{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin-top:9px}.sliceControl button{min-height:38px;padding:7px 11px}.sliceControl input{width:100%}.depthBar{display:grid;grid-template-columns:34px 1fr 42px;gap:7px;align-items:center;font-size:9px}.depthTrack{height:8px;background:#0d120f;border:1px solid var(--line);border-radius:999px;overflow:hidden}.depthFill{height:100%;background:var(--cyan)}.legend{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.key{font-size:9px;border:1px solid var(--line);border-radius:999px;padding:4px 7px}.swatch{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px}.bar{height:7px;background:#0d120f;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:5px}.bar>i{display:block;height:100%;background:var(--hot);width:0}.spark{width:100%;height:90px;background:#0d120f;border:1px solid #223128;border-radius:11px}.events{display:grid;gap:6px;max-height:280px;overflow:auto}.event{font-size:10px;line-height:1.45;padding:7px 8px;background:#0d120f;border:1px solid #223128;border-radius:9px}.genes{display:grid;gap:7px}.gene{background:#0d120f;border:1px solid #223128;border-radius:10px;padding:8px}.genome{font-size:10px;line-height:1.7;word-break:break-word}.token{display:inline-block;border:1px solid #35483d;border-radius:6px;padding:1px 4px;margin:1px}.word{border-color:#6f5c7d;color:#e0c7ef}.foot{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 2px}details{border-top:1px solid var(--line);padding-top:9px;margin-top:10px}summary{font-size:11px;color:var(--muted)}code{color:#d9e7de}
+@media(min-width:780px){.grid{grid-template-columns:1.2fr .8fr}.span2{grid-column:1/-1}.stats{grid-template-columns:repeat(4,1fr)}.controls{grid-template-columns:repeat(6,1fr)}}
+</style></head><body><div class="app">
+<div class="top"><div><h1>AGENT LANGUAGE // 049 · WORLD CUBE</h1><div class="sub">Twenty-seven deterministic worlds now share one traversable 3×3×3 habitat cube. The original W5 founder cohort stays fixed in the exact center world while 26 surrounding habitats occupy the shell. X, Y and Z world faces are traversable; only the outside faces of the full cube are closed.</div></div><div class="badge">OPEN FACES</div></div>
+<div class="grid">
+<section class="panel span2"><h2>CONTROL</h2><div class="stats"><div class="stat"><b id="worldNo">W5</b><span>CENTER WORLD</span></div><div class="stat"><b id="tick">0</b><span>TICKS</span></div><div class="stat"><b id="pop">0</b><span>TOTAL SEEDS</span></div><div class="stat"><b id="gen">0</b><span>MAX GENERATION</span></div><div class="stat"><b id="words">0</b><span>WORDS BORN</span></div><div class="stat"><b id="dynasty">1 / 9</b><span>OCCUPIED WORLDS</span></div></div><div class="controls" style="margin-top:10px"><button id="play" class="primary">PLAY</button><button id="step1k">+1K</button><button id="step10k">+10K</button><select id="speed" aria-label="Live speed"><option value="1">LIVE 1×</option><option value="5">LIVE 5×</option><option value="25">LIVE 25×</option><option value="100">LIVE 100×</option><option value="1000">LIVE 1,000×</option><option value="10000">LIVE 10,000×</option></select><button id="rotateWorlds">CYCLE SHELL</button><button id="replay" class="danger">REPLAY CUBE</button></div><div id="status" class="sub" style="margin-top:7px">Nine chunks ready. The founders stay in the center chunk.</div></section>
+
+<section class="panel span2"><h2>WORLD CUBE · 3×3×3 CHUNKS</h2><div id="chunkGrid" class="chunkGrid"></div><div id="layoutStatus" class="sub" style="margin-top:9px">order 123 / 456 / 789</div><div id="cubeStatus" class="sub" style="margin-top:4px">Founders fixed in the center world. Twenty-six surrounding habitats begin virgin.</div></section>
+
+<section class="panel span2"><h2>MIGRATION READOUT</h2><div class="stats"><div class="stat"><b id="founderAlive">32</b><span>FOUNDERS ALIVE</span></div><div class="stat"><b id="descAlive">0</b><span>DESCENDANTS ALIVE</span></div><div class="stat"><b id="oldestAge">0</b><span>OLDEST AGE</span></div><div class="stat"><b id="post8Birth">—</b><span>FIRST BORDER CROSSING</span></div></div><div id="pairedStatus" class="sub" style="margin-top:9px">Founders stay in the center chunk while world identities rotate underneath the 3×3 layout.</div></section>
+
+<section class="panel span2"><h2>FOSSIL / LEGACY</h2><div class="fossilGrid"><div class="fossilStat"><b id="fossilChanged">0</b><span>γ CELLS DIFFERENT NOW</span></div><div class="fossilStat"><b id="fossilTouched">0</b><span>γ CELLS TOUCHED EVER</span></div><div class="fossilStat"><b id="fossilWrites">0</b><span>SUCCESSFUL P7 WRITES</span></div><div class="fossilStat"><b id="fossilWriters">0</b><span>WRITER LINEAGES</span></div><div class="fossilStat"><b id="fossilLargest">0</b><span>LARGEST Δ COMPONENT</span></div><div class="fossilStat"><b id="fossilSignature">—</b><span>CURRENT OUTPUT SIGNATURE</span></div></div><div id="fossilStatus" class="sub" style="margin-top:9px">Waiting for γ memory.</div><div id="writerList" class="writerList"></div></section>
+
+<section class="panel span2"><h2>LINEAGE FIELD GUIDE</h2><div class="fieldSummary"><div class="fossilStat"><b id="guideObserved">0</b><span>LINEAGES OBSERVED</span></div><div class="fossilStat"><b id="guideLiving">0</b><span>LIVING LINEAGES</span></div><div class="fossilStat"><b id="guideMover">—</b><span>MOST MOVEMENT / 1K ACTIONS</span></div><div class="fossilStat"><b id="guideWriter">—</b><span>MOST WRITES / 1K ACTIONS</span></div></div><div id="guideStatus" class="sub" style="margin-top:9px">Catalog initializing…</div><div id="fieldCards" class="fieldCards"></div></section>
+
+<section class="panel span2"><h2>3D OBSERVATORY</h2><div class="observatoryWrap"><canvas id="space" width="760" height="570" aria-label="Rotatable three-dimensional view of the living volume"></canvas></div><div class="controls viewerControls"><button id="viewIso">ISO</button><button id="viewFront">FRONT</button><button id="viewSide">SIDE</button><button id="viewTop">TOP</button><button id="showFields">FIELDS OFF</button><button id="showLegacy" class="on">LEGACY Δ ON</button><button id="showSpine" class="on">SPINE ON</button><button id="focusSlice">ALL LAYERS</button><button id="lineageOnly">ALL LINEAGES</button><button id="showMotion" class="on">MOTION ON</button><button id="autoRotate">AUTO OFF</button><button id="resetView">RESET VIEW</button></div><div id="spaceStatus" class="sub viewerHint">Drag to rotate · pinch to zoom · tap an agent to inspect · motion trace auto-compresses with scale.</div></section>
+
+<section class="panel"><h2>VOLUME SLICE</h2><div class="dishWrap"><canvas id="dish" width="640" height="480" aria-label="Seedbed 3D slice"></canvas></div><div class="sliceControl"><button id="zDown" aria-label="Previous Z slice">Z−</button><input id="zSlice" type="range" min="0" max="23" step="1" value="11" aria-label="Z slice"><button id="zUp" aria-label="Next Z slice">Z+</button></div><div id="sliceLabel" class="sub" style="margin-top:6px"></div><div class="legend"><span class="key"><span class="swatch" style="background:#314733"></span>α</span><span class="key"><span class="swatch" style="background:#3a4052"></span>β</span><span class="key"><span class="swatch" style="background:#493b4c"></span>γ</span><span class="key"><span class="swatch" style="background:#4a4430"></span>δ</span><span class="key">○ Z+ · × Z−</span><span class="key"><span class="swatch" style="background:#ffd66f"></span>γ Δ from birth</span></div></section>
+
+<section class="panel"><h2>SELECTED SEED</h2><div id="inspect" class="sub">Tap a seed in the current slice.</div><details><summary>PRIMITIVE ALPHABET</summary><div class="sub" style="margin-top:8px"><code>P0</code> move · <code>P1</code> previous heading · <code>P2</code> next heading · <code>P3</code> touch · <code>P4</code> sample · <code>P5</code> flip internal bit · <code>P6</code> skip next if bit=0 · <code>P7</code> write bit.<br><br>The alphabet is unchanged. Headings now cycle through N, E, S, W, Z+, Z−, so existing turn genes can discover depth without adding a new primitive.</div></details></section>
+
+<section class="panel"><h2>DEPTH PROFILE</h2><div id="depthProfile" class="genes"><div class="sub">Waiting for life.</div></div></section>
+
+<section class="panel"><h2>STRUCTURE READOUT</h2><div id="structureReadout" class="sub">Waiting for the volume.</div></section>
+
+<section class="panel"><h2>HEREDITY</h2><div id="heredity" class="genes"><div class="sub">Waiting for descendants.</div></div><div class="sub" style="margin-top:8px">Observer threshold for “established”: one founder lineage must maintain ≥8 living descendants and ≥40% of the population for 1,000 consecutive ticks. This milestone does not affect the dish.</div></section>
+
+<section class="panel"><h2>POPULATION TRACE</h2><canvas id="spark" class="spark" width="640" height="90" aria-label="Population history chart"></canvas><div id="birthDeath" class="sub" style="margin-top:7px"></div></section>
+
+<section class="panel"><h2>CONSERVATION WATCH</h2><div id="conserve" class="genes"><div class="sub">No conserved structures yet.</div></div></section>
+
+<section class="panel span2"><h2>FOSSIL RECORD</h2><div id="events" class="events"><div class="event">tick 0 · 32 unrelated random founders entered the dish.</div></div></section>
+
+<section class="panel span2"><h2>CUBE INTERVENTION</h2><div class="sub">Build 049 expands the habitat itself: twenty-seven deterministic 32×24×8 worlds are arranged as a traversable 3×3×3 cube, producing one 96×72×24 simulation volume. The original W5 founder cohort remains fixed in the exact center chunk at cube coordinates 2,2,2. W5 also remains the center habitat; the other 26 deterministic worlds form the shell.<br><br>Every world's internal habitat is generated exactly as before. Placement changes only its global X/Y/Z offset. Crossing an internal X, Y or Z world face is ordinary movement. Only the six outside faces of the complete cube are closed. Birth capacity remains <b>180 per destination world</b>, gating births rather than migration.<br><br>CYCLE SHELL shifts only the 26 surrounding world identities through the fixed shell slots, then replays from tick 0. W5 and its founder cohort never leave the center. The 3D observatory stretches Z for display so the three world layers read as a cube; this visual scaling never changes simulation distances, movement, energy or ecology.<br><br>The field guide, fossil observer and adaptive motion trace remain passive. Migration records first entry, first local birth, world-face crossings and worlds visited. No observer calls RNG or changes ecological state.</div></section>
+</div>
+<div class="foot"><span class="warn">Observer-only:</span> camera rotation, field visibility, motion persistence, trace aggregation, slice focus, lineage filtering, centroid calculations and seed selection never feed back into the volume. The organisms do not know they inhabit a 3×3×3 world cube, or that they are being rendered.</div>
+</div><script>
+(()=>{'use strict';
+const VERSION=49,STORE='forge-agent-language-049-world-cube',SURVEY_STORE='forge-agent-language-049-world-cube-survey',FOSSIL_STORE='forge-agent-language-049-world-cube-fossil',CATALOG_STORE='forge-agent-language-049-world-cube-catalog',BASELINE_STORE='forge-agent-language-042-survey-ledger',WORLD_COUNT=50,GRID=3,CHUNK_W=32,CHUNK_H=24,CHUNK_D=8,CHUNK_COUNT=27,CENTER_CHUNK=13,LOCAL_MID_Z=3,W=CHUNK_W*GRID,H=CHUNK_H*GRID,D=CHUNK_D*GRID,MID_Z=CHUNK_D+LOCAL_MID_Z,Z_VISUAL_SCALE=3.5,N=W*H*D,FOUNDERS=32,POP_CAP=180,MAX_AGE=Infinity,BIRTH_THRESHOLD=18,BIRTH_COST=6;
+const BASE_LEAK=.015,ACTION_COST=.005,RECOMB=.16,LEGACY_WORLD_SEEDS=[37037,37117,37223,37337,37447,37561,37673,37783];
+const $=id=>document.getElementById(id),canvas=$('dish'),ctx=canvas.getContext('2d'),spark=$('spark'),sctx=spark.getContext('2d'),space=$('space'),xctx=space.getContext('2d');
+let running=false,busy=false,raf=0,selectedId=null,saveCounter=0,liveSpeed=1,sliceZ=MID_Z,layoutRotation=0;
+let S=null,SURVEY={},FOSSILS={},CATALOG={},BASELINE={},viewRaf=0,last3D=0,viewDirty=true,pickPoints=[];
+let motionHeat=new Float32Array(N),motionStamp=new Uint32Array(N);
+const MOTION_TAU=350,MOTION_CUTOFF=1400;
+const view={yaw:-.72,pitch:.46,zoom:1.04,panX:0,panY:0,fields:false,legacy:true,spine:true,motion:true,focusSlice:false,lineageOnly:false,auto:false};
+
+function hash32(str){let h=2166136261>>>0;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}h+=0x6D2B79F5;h=Math.imul(h^(h>>>15),h|1);h^=h+Math.imul(h^(h>>>7),h|61);return(h^(h>>>14))>>>0}
+function worldSeedAt(i){return i<LEGACY_WORLD_SEEDS.length?LEGACY_WORLD_SEEDS[i]:hash32('agent-language-040-volume-world-'+(i+1))}
+function chunkIndex(gx,gy,gz){return(gz*GRID+gy)*GRID+gx}
+function chunkCoords(c){const gz=Math.floor(c/(GRID*GRID)),r=c-gz*GRID*GRID,gy=Math.floor(r/GRID),gx=r%GRID;return{gx,gy,gz}}
+function chunkOrigin(c){const q=chunkCoords(c);return{x:q.gx*CHUNK_W,y:q.gy*CHUNK_H,z:q.gz*CHUNK_D}}
+function chunkOfXYZ(x,y,z){return chunkIndex(Math.floor(x/CHUNK_W),Math.floor(y/CHUNK_H),Math.floor(z/CHUNK_D))}
+function layoutWorlds(rotation=layoutRotation){
+ const shell=Array.from({length:CHUNK_COUNT},(_,i)=>i+1).filter(w=>w!==5),n=shell.length,shift=((rotation%n)+n)%n,out=Array(CHUNK_COUNT);let p=0;
+ for(let i=0;i<CHUNK_COUNT;i++)out[i]=i===CENTER_CHUNK?5:shell[(p++-shift+n)%n];
+ return out
+}
+function originChunk(){return CENTER_CHUNK}
+function chunkName(c){return'W'+((S?.chunkWorlds&&S.chunkWorlds[c])||layoutWorlds()[c])}
+function layoutText(){return'center '+chunkName(CENTER_CHUNK)+' · shell shift '+(S?.layoutRotation??layoutRotation)+'/25'}
+function seededStream(seed){let a=seed>>>0;const r=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296};return{rand:r,ri:n=>Math.floor(r()*n),state:()=>a>>>0}}
+
+function rand(){let a=S.rng>>>0;a=(a+0x6D2B79F5)>>>0;S.rng=a;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}
+function ri(n){return Math.floor(rand()*n)}function chance(p){return rand()<p}
+function idx(x,y,z){return(z*H+y)*W+x}function inside(x,y,z){return x>=0&&x<W&&y>=0&&y<H&&z>=0&&z<D}function dirName(d){return['N','E','S','W','Z+','Z−'][d]||'?'}
+function pushEvent(text,kind=''){S.events.unshift({tick:S.tick,text,kind});if(S.events.length>60)S.events.length=60}
+function lineageColor(n,a=1){const hue=(n*137.508)%360;return 'hsla('+hue+',65%,62%,'+a+')'}
+function resetMotion(){motionHeat.fill(0);motionStamp.fill(0)}
+function markMotionCell(i){
+ const prev=motionStamp[i],age=prev?Math.max(0,S.tick-prev):0,carried=prev?motionHeat[i]*Math.exp(-age/MOTION_TAU):0;
+ motionHeat[i]=Math.min(10,carried+1);motionStamp[i]=S.tick
+}
+function markMotion(ox,oy,oz,nx,ny,nz){markMotionCell(idx(ox,oy,oz));markMotionCell(idx(nx,ny,nz))}
+
+function blankWorld(){
+ return{type:Array(N).fill(0),charge:Array(N).fill(0),phase:Array(N).fill(0),mark:Array(N).fill(0),markCharge:Array(N).fill(0),dir:Array(N).fill(0),alphaCells:[],gammaCells:[],fieldCells:[]}
+}
+function localRand(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}}
+function fillExtraLayers(world,worldSeed,chunk){
+ const o=chunkOrigin(chunk),ox=o.x,oy=o.y,oz=o.z;
+ for(let lz=0;lz<CHUNK_D;lz++){if(lz===LOCAL_MID_Z)continue;const z=oz+lz,vr=localRand((worldSeed^Math.imul(lz+1,0x9e3779b1))>>>0),vri=n=>Math.floor(vr()*n);
+  function blob(t,count,steps){for(let b=0;b<count;b++){let x=vri(CHUNK_W),y=vri(CHUNK_H);for(let k=0;k<steps;k++){const i=idx(ox+x,oy+y,z);world.type[i]=t;if(t===1)world.charge[i]=1+2*vr();if(t===2)world.phase[i]=vri(32);if(t===3){world.mark[i]=vri(2);world.markCharge[i]=.4+vr()}if(t===4)world.dir[i]=vri(6);const d=vri(4);x=Math.max(0,Math.min(CHUNK_W-1,x+[0,1,0,-1][d]));y=Math.max(0,Math.min(CHUNK_H-1,y+[-1,0,1,0][d]))}}}
+  blob(1,7,18);blob(2,6,16);blob(3,6,16);blob(4,7,18)
+ }
+}
+function indexRenewables(world){world.alphaCells=[];world.gammaCells=[];world.fieldCells=[];for(let i=0;i<N;i++){if(world.type[i])world.fieldCells.push(i);if(world.type[i]===1)world.alphaCells.push(i);else if(world.type[i]===3)world.gammaCells.push(i)}}
+function paintChunkCenter(world,chunk,stream){
+ const o=chunkOrigin(chunk),ox=o.x,oy=o.y,z=o.z+LOCAL_MID_Z,r=stream.rand,ri=stream.ri;
+ function blob(t,count,steps){for(let b=0;b<count;b++){let x=ri(CHUNK_W),y=ri(CHUNK_H);for(let k=0;k<steps;k++){const i=idx(ox+x,oy+y,z);world.type[i]=t;if(t===1)world.charge[i]=1+2*r();if(t===2)world.phase[i]=ri(32);if(t===3){world.mark[i]=ri(2);world.markCharge[i]=.4+r()}if(t===4)world.dir[i]=ri(4);const d=ri(4);x=Math.max(0,Math.min(CHUNK_W-1,x+[0,1,0,-1][d]));y=Math.max(0,Math.min(CHUNK_H-1,y+[-1,0,1,0][d]))}}}
+ blob(1,7,18);blob(2,6,16);blob(3,6,16);blob(4,7,18)
+}
+function founderGenome(stream){const n=12+stream.ri(9),g=[];for(let i=0;i<n;i++)g.push(stream.ri(8));return g}
+function founderFromStream(x,y,lineage,stream){return{id:S.nextId++,x,y,z:MID_Z,dir:stream.ri(4),bit:stream.ri(2),pc:0,genome:founderGenome(stream),energy:9+stream.rand()*2,age:0,cool:40,generation:0,lineage,parent:null,born:S.tick}}
+function randomGenome(){const n=12+ri(9),g=[];for(let i=0;i<n;i++)g.push(ri(8));return g}
+function newSeed(x,y,lineage){return{id:S.nextId++,x,y,z:MID_Z,dir:ri(4),bit:ri(2),pc:0,genome:randomGenome(),energy:9+rand()*2,age:0,cool:40,generation:0,lineage,parent:null,born:S.tick}}
+function saveCatalog(){try{localStorage.setItem(CATALOG_STORE,JSON.stringify(CATALOG))}catch{}}
+function loadCatalog(){try{const q=JSON.parse(localStorage.getItem(CATALOG_STORE));if(q&&typeof q==='object')CATALOG=q}catch{}}
+function initCatalogWorld(force=false){
+ if(!S)return null;const k=String((S.worldIndex??0)+1),old=CATALOG[k];if(old&&!force&&old.seed===S.worldSeed)return old;
+ const r={world:(S.worldIndex??0)+1,seed:S.worldSeed,lastTick:S.tick,lineages:{}};CATALOG[k]=r;
+ for(const s of S.seeds){const q=catalogLine(s.lineage);q.firstSeen=0;q.lastSeen=0;q.maxEnergy=Math.max(q.maxEnergy,s.energy);catalogRange(q,s.x,s.y,s.z)}
+ saveCatalog();return r
+}
+function catalogWorld(){if(!S)return null;const k=String((S.worldIndex??0)+1),r=CATALOG[k];return r&&r.seed===S.worldSeed?r:initCatalogWorld(false)}
+function catalogLine(lineage){
+ const w=catalogWorld(),k=String(lineage);if(!w.lineages[k])w.lineages[k]={lineage,firstSeen:S?.tick||0,lastSeen:S?.tick||0,actions:0,moveAttempts:0,moves:0,zMoves:0,wallBlocks:0,seedBlocks:0,touches:0,touchNet:0,writeAttempts:0,writes:0,gamma:{},births:0,deaths:0,deathLifeSum:0,maxDeadAge:0,longDeaths:0,maxEnergy:0,peakLiving:0,chunkCrossings:0,chunks:{},minX:W,maxX:-1,minY:H,maxY:-1,minZ:D,maxZ:-1};return w.lineages[k]
+}
+function catalogRange(q,x,y,z){q.minX=Math.min(q.minX,x);q.maxX=Math.max(q.maxX,x);q.minY=Math.min(q.minY,y);q.maxY=Math.max(q.maxY,y);q.minZ=Math.min(q.minZ,z);q.maxZ=Math.max(q.maxZ,z);if(!q.chunks)q.chunks={};q.chunks[String(chunkOfXYZ(x,y,z))]=1}
+function observeAction(s){try{const q=catalogLine(s.lineage);q.actions++;q.lastSeen=S.tick;q.maxEnergy=Math.max(q.maxEnergy,s.energy);catalogRange(q,s.x,s.y,s.z)}catch{}}
+function observeMoveAttempt(s,nx,ny,nz){try{const q=catalogLine(s.lineage);q.moveAttempts++;if(!inside(nx,ny,nz))q.wallBlocks++}catch{}}
+function observeMoveBlocked(s){try{catalogLine(s.lineage).seedBlocks++}catch{}}
+function observeMoveSuccess(s,ox,oy,oz){try{markMotion(ox,oy,oz,s.x,s.y,s.z);const q=catalogLine(s.lineage);q.moves++;if(s.z!==oz)q.zMoves++;catalogRange(q,s.x,s.y,s.z)}catch{}}
+function observeTouch(s,delta){try{const q=catalogLine(s.lineage);q.touches++;q.touchNet+=delta}catch{}}
+function observeWriteAttempt(s){try{catalogLine(s.lineage).writeAttempts++}catch{}}
+function observeCatalogWrite(s,i){try{const q=catalogLine(s.lineage);q.writes++;q.gamma[String(i)]=1}catch{}}
+function observeBirthCatalog(parent,child){try{const q=catalogLine(parent.lineage);q.births++;q.lastSeen=S.tick;const cq=catalogLine(child.lineage);cq.firstSeen=Math.min(cq.firstSeen,S.tick);catalogRange(cq,child.x,child.y,child.z)}catch{}}
+function observeDeathCatalog(s){try{const q=catalogLine(s.lineage);q.deaths++;q.deathLifeSum+=s.age;q.maxDeadAge=Math.max(q.maxDeadAge,s.age);if(s.age>=1000)q.longDeaths++;q.lastSeen=S.tick;q.maxEnergy=Math.max(q.maxEnergy,s.energy)}catch{}}
+function observeCatalogScan(){try{const w=catalogWorld();w.lastTick=S.tick;const count={};for(const s of S.seeds){count[s.lineage]=(count[s.lineage]||0)+1;const q=catalogLine(s.lineage);q.lastSeen=S.tick;q.maxEnergy=Math.max(q.maxEnergy,s.energy);catalogRange(q,s.x,s.y,s.z)}for(const [lin,n] of Object.entries(count)){const q=catalogLine(+lin);q.peakLiving=Math.max(q.peakLiving||0,n)}}catch{}}
+function currentLineageShape(lineage){
+ const seeds=S.seeds.filter(s=>s.lineage===lineage);if(!seeds.length)return{living:0,components:0,largest:0,bbox:'—',density:0};
+ const cells=new Map();for(const s of seeds)cells.set(idx(s.x,s.y,s.z),s);const seen=new Set(),dirs=[];for(let dz=-1;dz<=1;dz++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(dx||dy||dz)dirs.push([dx,dy,dz]);
+ let components=0,largest=0,minX=W,maxX=-1,minY=H,maxY=-1,minZ=D,maxZ=-1;
+ for(const s of seeds){minX=Math.min(minX,s.x);maxX=Math.max(maxX,s.x);minY=Math.min(minY,s.y);maxY=Math.max(maxY,s.y);minZ=Math.min(minZ,s.z);maxZ=Math.max(maxZ,s.z);const start=idx(s.x,s.y,s.z);if(seen.has(start))continue;components++;let n=0,stack=[s];seen.add(start);while(stack.length){const a=stack.pop();n++;for(const [dx,dy,dz] of dirs){const x=a.x+dx,y=a.y+dy,z=a.z+dz;if(!inside(x,y,z))continue;const j=idx(x,y,z),b=cells.get(j);if(b&&!seen.has(j)){seen.add(j);stack.push(b)}}}largest=Math.max(largest,n)}
+ const bx=maxX-minX+1,by=maxY-minY+1,bz=maxZ-minZ+1,vol=bx*by*bz;return{living:seeds.length,components,largest,bbox:bx+'×'+by+'×'+bz,density:vol?seeds.length/vol:0}
+}
+function saveFossils(){try{localStorage.setItem(FOSSIL_STORE,JSON.stringify(FOSSILS))}catch{}}
+function loadFossils(){try{const q=JSON.parse(localStorage.getItem(FOSSIL_STORE));if(q&&typeof q==='object')FOSSILS=q}catch{}}
+function gammaBirthSnapshot(){let bits='';for(const i of S.world.gammaCells)bits+=S.world.mark[i]?'1':'0';return bits}
+function initFossilWorld(force=false){
+ if(!S)return null;const k=String((S.worldIndex??0)+1),existing=FOSSILS[k];
+ if(existing&&!force&&existing.seed===S.worldSeed)return existing;
+ const r={world:(S.worldIndex??0)+1,seed:S.worldSeed,birthBits:gammaBirthSnapshot(),writes:0,touched:{},byLineage:{},firstWriteTick:null,lastWriteTick:null,maxChanged:0,lastSeenTick:S.tick,final:null,partial:S.tick!==0};
+ FOSSILS[k]=r;saveFossils();return r
+}
+function fossilRecord(){if(!S)return null;const k=String((S.worldIndex??0)+1),r=FOSSILS[k];if(r&&r.seed===S.worldSeed)return r;return initFossilWorld(false)}
+function observeGammaWrite(s,i,from,to){try{const r=fossilRecord();if(!r)return;r.writes++;r.touched[String(i)]=1;r.byLineage[String(s.lineage)]=(r.byLineage[String(s.lineage)]||0)+1;if(r.firstWriteTick==null)r.firstWriteTick=S.tick;r.lastWriteTick=S.tick}catch{}}
+function fossilChanges(){
+ const r=fossilRecord();if(!r)return[];const out=[],g=S.world.gammaCells,b=r.birthBits||'';
+ for(let k=0;k<g.length;k++){const i=g[k],birth=b.charCodeAt(k)===49?1:0;if(S.world.mark[i]!==birth)out.push({i,bit:S.world.mark[i],birth})}
+ return out
+}
+function fossilComponents(changes){
+ if(!changes.length)return{count:0,largest:0};const set=new Set(changes.map(q=>q.i)),seen=new Set();let count=0,largest=0;
+ const dirs=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+ for(const start of set){if(seen.has(start))continue;count++;let n=0,stack=[start];seen.add(start);while(stack.length){const i=stack.pop();n++;const z=Math.floor(i/(W*H)),rem=i-z*W*H,y=Math.floor(rem/W),x=rem-y*W;for(const [dx,dy,dz] of dirs){const nx=x+dx,ny=y+dy,nz=z+dz;if(!inside(nx,ny,nz))continue;const j=idx(nx,ny,nz);if(set.has(j)&&!seen.has(j)){seen.add(j);stack.push(j)}}}largest=Math.max(largest,n)}
+ return{count,largest}
+}
+function fossilSignature(changes){if(!changes.length)return'00000000';const s=changes.map(q=>q.i+':'+q.bit).join('|');return hash32(s).toString(16).padStart(8,'0').toUpperCase()}
+function observeFossilScan(){const r=fossilRecord();if(!r)return;const ch=fossilChanges();r.maxChanged=Math.max(r.maxChanged||0,ch.length);r.lastSeenTick=S.tick}
+function finalizeFossil(){const r=fossilRecord();if(!r||r.final)return;const ch=fossilChanges(),cc=fossilComponents(ch);r.final={tick:S.tick,changed:ch.map(q=>[q.i,q.bit]),changedCount:ch.length,components:cc.count,largest:cc.largest,signature:fossilSignature(ch),writes:r.writes,touched:Object.keys(r.touched||{}).length};saveFossils()}
+function fresh(){
+ checkpointSurvey();resetMotion();
+ const chunkWorlds=layoutWorlds(layoutRotation),origin=CENTER_CHUNK,originSeed=worldSeedAt(4);
+ S={version:VERSION,worldIndex:4,worldSeed:originSeed,layoutRotation,chunkWorlds,originChunk:origin,chunkSeeds:chunkWorlds.map(w=>worldSeedAt(w-1)),rng:originSeed,tick:0,nextId:1,nextLineage:1,world:null,seeds:[],registry:[],stats:{births:0,deaths:0,recombinations:0,mutations:0,condensations:0,maxGeneration:0},events:[],history:[],firstConservedWord:null,firstBoundaryWord:null,firstEstablishedLineage:null,lineageStreaks:{},topWord:null,topMotif:null,cube:{firstEntered:Array(CHUNK_COUNT).fill(null),firstBirth:Array(CHUNK_COUNT).fill(null),maxPop:Array(CHUNK_COUNT).fill(0),crossings:0}};
+ S.world=blankWorld();
+ for(let chunk=0;chunk<CHUNK_COUNT;chunk++){const worldNo=chunkWorlds[chunk],seed=worldSeedAt(worldNo-1),stream=seededStream(seed);paintChunkCenter(S.world,chunk,stream);fillExtraLayers(S.world,seed,chunk)}
+ const founders=seededStream(originSeed),scratch=blankWorld();paintChunkCenter(scratch,CENTER_CHUNK,founders);
+ const o=chunkOrigin(origin),ox=o.x,oy=o.y,used=new Set();
+ for(let n=0;n<FOUNDERS;n++){let x,y,k;do{x=founders.ri(CHUNK_W);y=founders.ri(CHUNK_H);k=y*CHUNK_W+x}while(used.has(k));used.add(k);const lin=S.nextLineage++;S.seeds.push(founderFromStream(ox+x,oy+y,lin,founders))}
+ S.rng=founders.state();
+ indexRenewables(S.world);S.cube.firstEntered[origin]=0;S.cube.maxPop[origin]=FOUNDERS;sliceZ=MID_Z;initCatalogWorld(true);initFossilWorld(true);
+ pushEvent('world cube opened · W5 founder cohort fixed in the exact center world · 26 surrounding worlds biologically virgin.','birth');
+ save();render()
+}
+function saveSurvey(){try{localStorage.setItem(SURVEY_STORE,JSON.stringify(SURVEY))}catch{}}
+function loadSurvey(){try{const q=JSON.parse(localStorage.getItem(SURVEY_STORE));if(q&&typeof q==='object')SURVEY=q}catch{}}
+function loadBaseline(){try{const q=JSON.parse(localStorage.getItem(BASELINE_STORE));if(q&&typeof q==='object')BASELINE=q}catch{}}
+function surveyRecord(){if(!S)return null;const k=String((S.worldIndex??0)+1);if(!SURVEY[k]){const hist=(S.history||[]).map(q=>q.pop).filter(n=>n>0),now=S.seeds?.length||0;SURVEY[k]={world:(S.worldIndex??0)+1,seed:S.worldSeed,lastTick:S.tick||0,living:now,maxPopulation:Math.max(now,...hist,0),minPositivePopulation:Math.min(...(hist.length?hist:[now||FOUNDERS])),currentLineages:0,minPositiveLineages:FOUNDERS,oneLineageTick:null,extinctionTick:now?null:(S.tick||0),maxGeneration:S.stats?.maxGeneration||0,maxOccupiedLayers:0,foundersAlive:FOUNDERS,descendantsAlive:0,oldestAge:0,lastBirthCount:S.stats?.births||0,lastBirthTick:null,firstBirthTick:null,firstPost8000Birth:null,at8000:null}}return SURVEY[k]}
+function observeSurveyFast(){const r=surveyRecord();if(!r)return;const pop=S.seeds.length,births=S.stats.births||0;r.lastTick=S.tick;r.living=pop;r.maxPopulation=Math.max(r.maxPopulation||0,pop);if(pop>0)r.minPositivePopulation=Math.min(r.minPositivePopulation??pop,pop);else if(r.extinctionTick==null)r.extinctionTick=S.tick;r.maxGeneration=Math.max(r.maxGeneration||0,S.stats.maxGeneration||0);if(births>(r.lastBirthCount||0)){r.lastBirthTick=S.tick;if(r.firstBirthTick==null)r.firstBirthTick=S.tick;if(S.tick>8000&&r.firstPost8000Birth==null)r.firstPost8000Birth=S.tick}r.lastBirthCount=births;if(!pop)finalizeFossil()}
+function observeSurveyScan(){const r=surveyRecord();if(!r)return;const lines=new Set(),layers=new Set();let founders=0,desc=0,oldest=0;for(const s of S.seeds){lines.add(s.lineage);layers.add(s.z);if(s.generation===0)founders++;else desc++;if(s.age>oldest)oldest=s.age}r.currentLineages=lines.size;if(lines.size>0)r.minPositiveLineages=Math.min(r.minPositiveLineages??lines.size,lines.size);if(lines.size===1&&r.oneLineageTick==null)r.oneLineageTick=S.tick;r.maxOccupiedLayers=Math.max(r.maxOccupiedLayers||0,layers.size);r.foundersAlive=founders;r.descendantsAlive=desc;r.oldestAge=Math.max(r.oldestAge||0,oldest);if(S.tick===8000&&!r.at8000)r.at8000={population:S.seeds.length,founders,descendants:desc,lineages:lines.size,births:S.stats.births};observeFossilScan()}
+function checkpointSurvey(){if(!S)return;observeSurveyFast();observeSurveyScan();saveSurvey()}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(S));saveSurvey();saveFossils();saveCatalog()}catch{}}
+function load(){try{const q=JSON.parse(localStorage.getItem(STORE));if(q&&q.version===VERSION){S=q;layoutRotation=S.layoutRotation||0;if(!S.chunkWorlds)S.chunkWorlds=layoutWorlds(layoutRotation);S.originChunk=CENTER_CHUNK;if(!S.world.alphaCells||!S.world.gammaCells||!S.world.fieldCells)indexRenewables(S.world);if(!S.cube)S.cube={firstEntered:Array(CHUNK_COUNT).fill(null),firstBirth:Array(CHUNK_COUNT).fill(null),maxPop:Array(CHUNK_COUNT).fill(0),crossings:0};sliceZ=MID_Z;return true}}catch{}return false}
+
+function wordSeq(tok){if(tok<8)return[tok];return S.registry[tok-8]?.seq||[]}
+function tokenLabel(t){return t<8?'P'+t:'W'+(t-8)}
+function tokenHTML(t){return '<span class="token '+(t>=8?'word':'')+'">'+tokenLabel(t)+'</span>'}
+function seqKey(a){return a.join(',')}
+function getOrCreateWord(seq,lineage){
+ const key=seqKey(seq);let ix=S.registry.findIndex(w=>w.key===key);if(ix>=0)return ix+8;
+ const id=S.registry.length;S.registry.push({id,seq:seq.slice(),key,born:S.tick,lineage});S.stats.condensations++;pushEvent('word W'+id+' born: '+seq.map(x=>'P'+x).join(' '),'word');return id+8
+}
+function expandGenome(g,limit=96){const out=[];for(const t of g){out.push(...wordSeq(t));if(out.length>=limit)break}return out.slice(0,limit)}
+function condense(g,lineage){
+ if(g.length<2)return g;const i=ri(g.length-1),a=wordSeq(g[i]),b=wordSeq(g[i+1]),seq=[...a,...b];if(seq.length<2||seq.length>4)return g;
+ const w=getOrCreateWord(seq,lineage),ng=g.slice();ng.splice(i,2,w);return ng
+}
+function mutateGenome(g,lineage){
+ let a=g.slice(),changed=false;
+ if(chance(.12)&&a.length){a[ri(a.length)]=ri(8);changed=true}
+ if(chance(.05)&&a.length<36){a.splice(ri(a.length+1),0,ri(8));changed=true}
+ if(chance(.05)&&a.length>5){a.splice(ri(a.length),1);changed=true}
+ if(chance(.04)&&a.length<34){const st=ri(a.length),len=1+ri(Math.min(4,a.length-st)),blk=a.slice(st,st+len);a.splice(ri(a.length+1),0,...blk);changed=true}
+ if(chance(.08)){const before=a.join('|');a=condense(a,lineage);if(a.join('|')!==before)changed=true}
+ if(chance(.03)){const wi=a.map((t,i)=>t>=8?i:-1).filter(i=>i>=0);if(wi.length){const i=wi[ri(wi.length)],seq=wordSeq(a[i]);a.splice(i,1,...seq);changed=true}}
+ if(changed)S.stats.mutations++;return a
+}
+function crossover(a,b){const ca=ri(a.length+1),cb=ri(b.length+1);let g=[...a.slice(0,ca),...b.slice(cb)];if(g.length<5)g=[...a.slice(0,Math.min(a.length,5)),...g];if(g.length>36)g=g.slice(0,36);return g}
+
+function currentChunkCounts(){const a=Array(CHUNK_COUNT).fill(0);for(const s of S.seeds)a[chunkOfXYZ(s.x,s.y,s.z)]++;return a}
+function noteChunkEntry(s,chunk,kind){
+ if(!S.cube)return;if(S.cube.firstEntered[chunk]==null)S.cube.firstEntered[chunk]=S.tick;
+ if(kind==='birth'&&S.cube.firstBirth[chunk]==null)S.cube.firstBirth[chunk]=S.tick;
+ const q=catalogLine(s.lineage);if(!q.chunks)q.chunks={};q.chunks[String(chunk)]=1
+}
+function occupancy(){const o=new Int32Array(N);o.fill(-1);for(let i=0;i<S.seeds.length;i++){const s=S.seeds[i];if(s.energy>0)o[idx(s.x,s.y,s.z)]=i}return o}
+function betaPhase(i){return ((S.tick+S.world.phase[i])%32)<16?1:0}
+function sampleCell(s,i){const t=S.world.type[i];if(t===1)s.bit=S.world.charge[i]>1.5?1:0;else if(t===2)s.bit=betaPhase(i);else if(t===3)s.bit=S.world.mark[i];else if(t===4)s.bit=S.world.dir[i]&1;else s.bit=0}
+function touchCell(s,i){const before=s.energy,t=S.world.type[i];if(t===1){const take=Math.min(1.0,S.world.charge[i]);S.world.charge[i]-=take;s.energy+=take}else if(t===2){if(s.bit===betaPhase(i))s.energy+=.28;else s.energy-=.05}observeTouch(s,s.energy-before)}
+function writeCell(s,i){observeWriteAttempt(s);if(S.world.type[i]===3&&S.world.mark[i]!==s.bit&&S.world.markCharge[i]>=.20){const before=S.world.mark[i];S.world.mark[i]=s.bit;S.world.markCharge[i]-=.20;s.energy+=.20;observeGammaWrite(s,i,before,s.bit);observeCatalogWrite(s,i)}}
+function moveSeed(s,occ){const dx=[0,1,0,-1,0,0][s.dir],dy=[-1,0,1,0,0,0][s.dir],dz=[0,0,0,0,1,-1][s.dir],nx=s.x+dx,ny=s.y+dy,nz=s.z+dz;observeMoveAttempt(s,nx,ny,nz);if(!inside(nx,ny,nz))return;const ni=idx(nx,ny,nz);if(occ[ni]>=0){observeMoveBlocked(s);return}const ox=s.x,oy=s.y,oz=s.z,oldChunk=chunkOfXYZ(ox,oy,oz),newChunk=chunkOfXYZ(nx,ny,nz);occ[idx(s.x,s.y,s.z)]=-1;s.x=nx;s.y=ny;s.z=nz;occ[ni]=0;if(oldChunk!==newChunk){if(S._chunkCounts){S._chunkCounts[oldChunk]--;S._chunkCounts[newChunk]++}S.cube.crossings++;const q=catalogLine(s.lineage);q.chunkCrossings=(q.chunkCrossings||0)+1;noteChunkEntry(s,newChunk,'move')}if(S.world.type[ni]===4){const opposite=[2,3,0,1,5,4];if(s.dir===S.world.dir[ni])s.energy+=.14;else if(opposite[s.dir]===S.world.dir[ni])s.energy-=.02}observeMoveSuccess(s,ox,oy,oz)}
+function execPrim(s,p,occ){const i=idx(s.x,s.y,s.z);if(p===0)moveSeed(s,occ);else if(p===1)s.dir=(s.dir+5)%6;else if(p===2)s.dir=(s.dir+1)%6;else if(p===3)touchCell(s,i);else if(p===4)sampleCell(s,i);else if(p===5)s.bit^=1;else if(p===6){if(s.bit===0)s.pc=(s.pc+1)%Math.max(1,s.genome.length)}else if(p===7)writeCell(s,i)}
+function executeToken(s,occ){if(!s.genome.length)return;observeAction(s);const tok=s.genome[s.pc%s.genome.length];s.pc=(s.pc+1)%s.genome.length;const seq=wordSeq(tok);s.energy-=ACTION_COST+.003*Math.max(0,seq.length-1);for(const p of seq)execPrim(s,p,occ)}
+
+function nearbyMate(s){const mates=[];for(const q of S.seeds){if(q.id!==s.id&&q.energy>0&&Math.abs(q.x-s.x)<=1&&Math.abs(q.y-s.y)<=1&&Math.abs(q.z-s.z)<=1)mates.push(q)}return mates.length?mates[ri(mates.length)]:null}
+function birth(s,occ){
+ if(s.energy<BIRTH_THRESHOLD||s.cool>0)return null;
+ const spots=[];for(let dz=-1;dz<=1;dz++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy&&!dz)continue;const x=s.x+dx,y=s.y+dy,z=s.z+dz;if(!inside(x,y,z))continue;const chunk=chunkOfXYZ(x,y,z);if((S._chunkCounts?.[chunk]??0)>=POP_CAP)continue;if(occ[idx(x,y,z)]<0)spots.push([x,y,z,chunk])}
+ if(!spots.length)return null;
+ const [x,y,z,chunk]=spots[ri(spots.length)],mate=chance(RECOMB)?nearbyMate(s):null;
+ let genome=mate?crossover(s.genome,mate.genome):s.genome.slice();if(mate)S.stats.recombinations++;
+ genome=mutateGenome(genome,s.lineage);
+ s.energy-=BIRTH_COST;s.cool=35;
+ const child={id:S.nextId++,x,y,z,dir:ri(6),bit:ri(2),pc:0,genome,energy:BIRTH_COST,age:0,cool:55,generation:Math.max(s.generation,mate?mate.generation:0)+1,lineage:s.lineage,parent:s.id,born:S.tick};
+ S.stats.births++;S.stats.maxGeneration=Math.max(S.stats.maxGeneration,child.generation);observeBirthCatalog(s,child);noteChunkEntry(child,chunk,'birth');return child
+}
+function updateWorld(){for(const i of S.world.alphaCells)S.world.charge[i]=Math.min(3,S.world.charge[i]+.014);for(const i of S.world.gammaCells)S.world.markCharge[i]=Math.min(1.2,S.world.markCharge[i]+.005)}
+function step(){
+ S.tick++;updateWorld();const occ=occupancy(),born=[];S._chunkCounts=currentChunkCounts();const start=S.seeds.length?S.tick%S.seeds.length:0;
+ for(let q=0;q<S.seeds.length;q++){const s=S.seeds[(start+q)%S.seeds.length];if(s.energy<=0)continue;s.age++;if(s.cool>0)s.cool--;s.energy-=BASE_LEAK;executeToken(s,occ);const ch=birth(s,occ);if(ch){born.push(ch);occ[idx(ch.x,ch.y,ch.z)]=0}}
+ if(born.length)S.seeds.push(...born);
+ const before=S.seeds.length;for(const s of S.seeds)if(!(s.energy>0&&s.age<MAX_AGE))observeDeathCatalog(s);S.seeds=S.seeds.filter(s=>s.energy>0&&s.age<MAX_AGE);S.stats.deaths+=before-S.seeds.length;
+ const counts=currentChunkCounts();for(let i=0;i<CHUNK_COUNT;i++)S.cube.maxPop[i]=Math.max(S.cube.maxPop[i]||0,counts[i]);delete S._chunkCounts;
+ if(!S.seeds.length){pushEvent('the cube went silent. no lineage remained.','death');running=false}
+ if(S.tick%250===0){scanConservation();scanEstablishment()}
+ if(S.tick%100===0){S.history.push({tick:S.tick,pop:S.seeds.length,births:S.stats.births,deaths:S.stats.deaths,words:S.registry.length});if(S.history.length>360)S.history.shift()}
+ observeSurveyFast();if(S.tick%50===0||!S.seeds.length){observeSurveyScan();observeCatalogScan()}
+ if(++saveCounter>=(liveSpeed>=1000?10000:1000)){saveCounter=0;save()}
+}
+function scanEstablishment(){
+ const counts=new Map();for(const s of S.seeds)counts.set(s.lineage,(counts.get(s.lineage)||0)+1);
+ const pop=S.seeds.length,alive=new Set(counts.keys());
+ for(const k of Object.keys(S.lineageStreaks||{}))if(!alive.has(+k))S.lineageStreaks[k]=0;
+ for(const [lin,c] of counts){const qualifies=c>=8&&pop>0&&c/pop>=.40;S.lineageStreaks[lin]=qualifies?(S.lineageStreaks[lin]||0)+250:0;if(!S.firstEstablishedLineage&&S.lineageStreaks[lin]>=1000){S.firstEstablishedLineage={tick:S.tick,lineage:lin,count:c,share:c/pop};pushEvent('lineage '+lin+' established: '+c+' living · '+Math.round(100*c/pop)+'% share sustained for 1,000 ticks.','milestone')}}
+}
+function scanConservation(){
+ const pop=S.seeds.length;if(!pop){S.topWord=null;S.topMotif=null;return}
+ const wc=new Map(),mc=new Map();
+ for(const s of S.seeds){const uw=new Set(s.genome.filter(t=>t>=8));for(const w of uw)wc.set(w,(wc.get(w)||0)+1);const ex=expandGenome(s.genome,80),seen=new Set();for(let i=0;i<ex.length-2;i++)seen.add(ex.slice(i,i+3).join(','));for(const k of seen)mc.set(k,(mc.get(k)||0)+1)}
+ const best=[...wc.entries()].sort((a,b)=>b[1]-a[1])[0];S.topWord=best?{token:best[0],count:best[1],share:best[1]/pop}:null;
+ const bm=[...mc.entries()].sort((a,b)=>b[1]-a[1])[0];S.topMotif=bm?{seq:bm[0].split(',').map(Number),count:bm[1],share:bm[1]/pop}:null;
+ if(pop>=12&&!S.firstConservedWord&&best&&best[1]/pop>=.35){S.firstConservedWord={tick:S.tick,token:best[0],share:best[1]/pop};pushEvent('first conserved word: '+tokenLabel(best[0])+' reached '+Math.round(100*best[1]/pop)+'% of living seeds.','milestone')}
+ if(pop>=12&&!S.firstBoundaryWord){const candidates=[...wc.entries()].filter(([t,c])=>c/pop>=.35&&wordSeq(t).some(p=>p===3||p===7)).sort((a,b)=>b[1]-a[1]);if(candidates.length){const [t,c]=candidates[0];S.firstBoundaryWord={tick:S.tick,token:t,share:c/pop};pushEvent('first conserved external-action word: '+tokenLabel(t)+' = '+wordSeq(t).map(p=>'P'+p).join(' ')+' · '+Math.round(100*c/pop)+'% prevalence.','boundary')}}
+}
+
+function drawDish(){
+ const dpr=Math.max(1,Math.min(2,devicePixelRatio||1)),cssW=canvas.clientWidth||640,cssH=cssW*3/4;if(canvas.width!==Math.floor(cssW*dpr)||canvas.height!==Math.floor(cssH*dpr)){canvas.width=Math.floor(cssW*dpr);canvas.height=Math.floor(cssH*dpr)}
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cssW,cssH);ctx.fillStyle='#070a08';ctx.fillRect(0,0,cssW,cssH);
+ const cw=cssW/W,ch=cssH/H,fill=['#0b100d','#314733','#3a4052','#493b4c','#4a4430'];
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=idx(x,y,sliceZ),t=S.world.type[i];ctx.fillStyle=fill[t];ctx.fillRect(x*cw+.5,y*ch+.5,cw-1,ch-1);if(t===3&&S.world.mark[i]){ctx.fillStyle='rgba(237,244,239,.28)';ctx.fillRect(x*cw+cw*.35,y*ch+ch*.35,cw*.3,ch*.3)}}
+ ctx.save();ctx.strokeStyle='rgba(119,223,255,.55)';ctx.lineWidth=1.5;for(let gx=1;gx<GRID;gx++){const x=gx*CHUNK_W*cw;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,cssH);ctx.stroke()}for(let gy=1;gy<GRID;gy++){const y=gy*CHUNK_H*ch;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cssW,y);ctx.stroke()}ctx.font='9px ui-monospace';ctx.fillStyle='rgba(119,223,255,.65)';const gz=Math.floor(sliceZ/CHUNK_D);for(let gy=0;gy<GRID;gy++)for(let gx=0;gx<GRID;gx++){const ci=chunkIndex(gx,gy,gz);ctx.fillText(chunkName(ci),gx*CHUNK_W*cw+4,gy*CHUNK_H*ch+11)}ctx.restore();
+ if(view.legacy){const rec=fossilRecord(),bits=rec?.birthBits||'',g=S.world.gammaCells;ctx.save();ctx.strokeStyle='#ffd66f';ctx.lineWidth=Math.max(1,Math.min(cw,ch)*.12);for(let k=0;k<g.length;k++){const i=g[k],z=Math.floor(i/(W*H));if(z!==sliceZ)continue;const birth=bits.charCodeAt(k)===49?1:0;if(S.world.mark[i]===birth)continue;const rem=i-z*W*H,y=Math.floor(rem/W),x=rem-y*W;ctx.strokeRect(x*cw+2,y*ch+2,Math.max(1,cw-4),Math.max(1,ch-4))}ctx.restore()}
+ for(const s of S.seeds){if(s.z!==sliceZ)continue;const px=(s.x+.5)*cw,py=(s.y+.5)*ch,r=Math.max(2,Math.min(cw,ch)*.34);ctx.beginPath();ctx.fillStyle=lineageColor(s.lineage,.92);ctx.arc(px,py,r,0,Math.PI*2);ctx.fill();if(s.id===selectedId){ctx.lineWidth=2;ctx.strokeStyle='#ffffff';ctx.stroke()}ctx.strokeStyle='#07100a';ctx.lineWidth=1.5;if(s.dir<4){const ang=[-Math.PI/2,0,Math.PI/2,Math.PI][s.dir];ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px+Math.cos(ang)*r,py+Math.sin(ang)*r);ctx.stroke()}else if(s.dir===4){ctx.beginPath();ctx.arc(px,py,r*.34,0,Math.PI*2);ctx.stroke()}else{ctx.beginPath();ctx.moveTo(px-r*.3,py-r*.3);ctx.lineTo(px+r*.3,py+r*.3);ctx.moveTo(px+r*.3,py-r*.3);ctx.lineTo(px-r*.3,py+r*.3);ctx.stroke()}}
+}
+function renderDepth(){$('zSlice').max=String(D-1);const counts=Array(D).fill(0);for(const s of S.seeds)counts[s.z]++;const max=Math.max(1,...counts);$('depthProfile').innerHTML=counts.map((n,z)=>'<div class="depthBar"><span>Z'+(z+1)+(z===MID_Z?'*':'')+'</span><div class="depthTrack"><div class="depthFill" style="width:'+(100*n/max)+'%"></div></div><span>'+n+'</span></div>').join('');const here=counts[sliceZ];$('sliceLabel').textContent='slice '+(sliceZ+1)+' / '+D+' · '+here+' living here'+(sliceZ===MID_Z?' · founder plane':'');$('zSlice').value=String(sliceZ)}
+function layerCentroids(){
+ const out=Array(D).fill(null),sum=Array.from({length:D},()=>({x:0,y:0,n:0}));
+ for(const s of S.seeds){const q=sum[s.z];q.x+=s.x;q.y+=s.y;q.n++}
+ for(let z=0;z<D;z++)if(sum[z].n)out[z]={x:sum[z].x/sum[z].n,y:sum[z].y/sum[z].n,z,n:sum[z].n};
+ return out
+}
+function structureMetrics(){
+ const C=layerCentroids(),live=C.filter(Boolean);if(!live.length)return{C,populated:0,path:0,end:0,tortuosity:0,sweep:0};
+ let path=0;for(let i=1;i<live.length;i++)path+=Math.hypot(live[i].x-live[i-1].x,live[i].y-live[i-1].y);
+ const end=live.length>1?Math.hypot(live.at(-1).x-live[0].x,live.at(-1).y-live[0].y):0;
+ const total=live.reduce((a,q)=>a+q.n,0),gx=live.reduce((a,q)=>a+q.x*q.n,0)/total,gy=live.reduce((a,q)=>a+q.y*q.n,0)/total;
+ const ang=live.map(q=>({a:Math.atan2(q.y-gy,q.x-gx),r:Math.hypot(q.x-gx,q.y-gy)})).filter(q=>q.r>.75);
+ let sweep=0;if(ang.length>1){let prev=ang[0].a;for(let i=1;i<ang.length;i++){let d=ang[i].a-prev;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;sweep+=d;prev=ang[i].a}}
+ return{C,populated:live.length,path,end,tortuosity:end>.001?path/end:0,sweep:sweep*180/Math.PI}
+}
+function renderStructure(){
+ const m=structureMetrics(),selected=S.seeds.find(s=>s.id===selectedId),cells=[
+  ['OCCUPIED Z',m.populated+' / '+D],
+  ['SPINE PATH',m.path.toFixed(2)+' cells'],
+  ['END OFFSET',m.end.toFixed(2)+' cells'],
+  ['PATH / END',m.tortuosity?m.tortuosity.toFixed(2):'—'],
+  ['ANGULAR SWEEP',Math.abs(m.sweep).toFixed(0)+'°'],
+  ['FILTER',view.lineageOnly&&selected?'lineage '+selected.lineage:'all living']
+ ];
+ $('structureReadout').innerHTML='<div class="structureGrid">'+cells.map(q=>'<div class="structureCell"><b>'+q[1]+'</b><span>'+q[0]+'</span></div>').join('')+'</div><div class="sub" style="margin-top:8px">Angular sweep follows the layer-centroid path around the population-wide center. It is descriptive only; near-center centroids are ignored because their angle is unstable.</div>'
+}
+function centerPoint(x,y,z){return{x:x-(W-1)/2,y:(H-1)/2-y,z:(z-(D-1)/2)*Z_VISUAL_SCALE}}
+function rotatePoint3(p){const cy=Math.cos(view.yaw),sy=Math.sin(view.yaw),cp=Math.cos(view.pitch),sp=Math.sin(view.pitch);const x1=p.x*cy-p.z*sy,z1=p.x*sy+p.z*cy,y2=p.y*cp-z1*sp,z2=p.y*sp+z1*cp;return{x:x1,y:y2,z:z2}}
+function project3(p,w,h){const r=rotatePoint3(p),base=Math.min(w/(W+12),h/(H+12))*view.zoom,cam=Math.max(W,H,D*Z_VISUAL_SCALE)*1.35,persp=cam/Math.max(cam*.45,cam+r.z);return{x:w*.5+r.x*base*persp+view.panX,y:h*.5-r.y*base*persp+view.panY,z:r.z,p:persp}}
+function drawSegment3(a,b,w,h,stroke,width=1,alpha=1){const A=project3(a,w,h),B=project3(b,w,h);xctx.save();xctx.globalAlpha=alpha;xctx.strokeStyle=stroke;xctx.lineWidth=width;xctx.beginPath();xctx.moveTo(A.x,A.y);xctx.lineTo(B.x,B.y);xctx.stroke();xctx.restore()}
+function drawVolumeFrame(w,h){
+ const x0=-(W-1)/2,x1=(W-1)/2,y0=-(H-1)/2,y1=(H-1)/2,z0=-(D-1)/2*Z_VISUAL_SCALE,z1=(D-1)/2*Z_VISUAL_SCALE;
+ const edge=(a,b,alpha=.16,width=1,stroke='#839088')=>drawSegment3(a,b,w,h,stroke,width,alpha);
+ for(const z of [z0,z1]){edge({x:x0,y:y0,z},{x:x1,y:y0,z});edge({x:x1,y:y0,z},{x:x1,y:y1,z});edge({x:x1,y:y1,z},{x:x0,y:y1,z});edge({x:x0,y:y1,z},{x:x0,y:y0,z})}
+ for(const x of [x0,x1])for(const y of [y0,y1])edge({x,y,z:z0},{x,y,z:z1});
+ const xCuts=[CHUNK_W-.5-(W-1)/2,CHUNK_W*2-.5-(W-1)/2],yCuts=[(H-1)/2-(CHUNK_H-.5),(H-1)/2-(CHUNK_H*2-.5)],zCuts=[(CHUNK_D-.5-(D-1)/2)*Z_VISUAL_SCALE,(CHUNK_D*2-.5-(D-1)/2)*Z_VISUAL_SCALE];
+ for(const x of xCuts){edge({x,y:y0,z:z0},{x,y:y1,z:z0},.22,1,'#77dfff');edge({x,y:y1,z:z0},{x,y:y1,z:z1},.22,1,'#77dfff');edge({x,y:y1,z:z1},{x,y:y0,z:z1},.22,1,'#77dfff');edge({x,y:y0,z:z1},{x,y:y0,z:z0},.22,1,'#77dfff')}
+ for(const y of yCuts){edge({x:x0,y,z:z0},{x:x1,y,z:z0},.22,1,'#77dfff');edge({x:x1,y,z:z0},{x:x1,y,z:z1},.22,1,'#77dfff');edge({x:x1,y,z:z1},{x:x0,y,z:z1},.22,1,'#77dfff');edge({x:x0,y,z:z1},{x:x0,y,z:z0},.22,1,'#77dfff')}
+ for(const z of zCuts){edge({x:x0,y:y0,z},{x:x1,y:y0,z},.22,1,'#77dfff');edge({x:x1,y:y0,z},{x:x1,y:y1,z},.22,1,'#77dfff');edge({x:x1,y:y1,z},{x:x0,y:y1,z},.22,1,'#77dfff');edge({x:x0,y:y1,z},{x:x0,y:y0,z},.22,1,'#77dfff')}
+ const zs=(sliceZ-(D-1)/2)*Z_VISUAL_SCALE;edge({x:x0,y:y0,z:zs},{x:x1,y:y0,z:zs},.34,1.2,'#77dfff');edge({x:x1,y:y0,z:zs},{x:x1,y:y1,z:zs},.34,1.2,'#77dfff');edge({x:x1,y:y1,z:zs},{x:x0,y:y1,z:zs},.34,1.2,'#77dfff');edge({x:x0,y:y1,z:zs},{x:x0,y:y0,z:zs},.34,1.2,'#77dfff')
+}
+function motionTraceProfile(){
+ if(view.zoom<.68)return{mode:'territory',xy:6,z:2};
+ if(view.zoom<1)return{mode:'corridors',xy:3,z:1};
+ return{mode:'footprints',xy:1,z:1}
+}
+function motionSample(i){
+ const stamp=motionStamp[i];if(!stamp)return null;
+ const age=S.tick-stamp;if(age<0||age>MOTION_CUTOFF)return null;
+ const strength=motionHeat[i]*Math.exp(-age/MOTION_TAU);if(strength<.08)return null;
+ return{age,strength}
+}
+function drawMotionTrace(w,h){
+ const profile=motionTraceProfile(),cellPx=Math.min(w/(W+8),h/(H+8))*view.zoom;
+ xctx.save();xctx.fillStyle='#77dfff';
+ if(profile.xy===1&&profile.z===1){
+  for(let i=0;i<N;i++){const sample=motionSample(i);if(!sample)continue;const z=Math.floor(i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;const rem=i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,p=project3(centerPoint(x,y,z),w,h),fresh=Math.exp(-sample.age/(MOTION_TAU*.9)),r=Math.max(.35,Math.min(2.2,.35+.22*sample.strength))*Math.max(.55,Math.min(1.15,view.zoom));xctx.globalAlpha=Math.min(.44,(.025+.05*sample.strength)*(.45+.55*fresh));xctx.fillRect(p.x-r,p.y-r,r*2,r*2)}
+  xctx.restore();return profile.mode
+ }
+ const bins=new Map();
+ for(let i=0;i<N;i++){
+  const sample=motionSample(i);if(!sample)continue;
+  const z=Math.floor(i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;
+  const rem=i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,bx=Math.floor(x/profile.xy),by=Math.floor(y/profile.xy),bz=Math.floor(z/profile.z),key=bx+','+by+','+bz;
+  let b=bins.get(key);if(!b){b={sum:0,count:0,wx:0,wy:0,wz:0,wa:0};bins.set(key,b)}
+  b.sum+=sample.strength;b.count++;b.wx+=(x+.5)*sample.strength;b.wy+=(y+.5)*sample.strength;b.wz+=(z+.5)*sample.strength;b.wa+=sample.age*sample.strength
+ }
+ const volume=profile.xy*profile.xy*profile.z;
+ for(const b of bins.values()){
+  const inv=1/Math.max(.0001,b.sum),x=b.wx*inv-.5,y=b.wy*inv-.5,z=b.wz*inv-.5,avgAge=b.wa*inv,fresh=Math.exp(-avgAge/(MOTION_TAU*1.1)),occ=Math.min(1,b.count/volume),energy=Math.min(1,Math.log1p(b.sum)/Math.log(8)),p=project3(centerPoint(x,y,z),w,h),r=Math.max(.8,cellPx*profile.xy*(.14+.22*occ+.12*energy)*p.p);
+  xctx.globalAlpha=Math.min(profile.mode==='territory'?.32:.38,.025+.15*fresh+.11*energy);xctx.fillRect(p.x-r,p.y-r,r*2,r*2)
+ }
+ xctx.restore();return profile.mode
+}
+function draw3D(){
+ const dpr=Math.max(1,Math.min(2,devicePixelRatio||1)),w=space.clientWidth||760,h=w*3/4;if(space.width!==Math.floor(w*dpr)||space.height!==Math.floor(h*dpr)){space.width=Math.floor(w*dpr);space.height=Math.floor(h*dpr)}
+ xctx.setTransform(dpr,0,0,dpr,0,0);xctx.clearRect(0,0,w,h);xctx.fillStyle='#050806';xctx.fillRect(0,0,w,h);drawVolumeFrame(w,h);
+ let motionMode='off';if(view.motion)motionMode=drawMotionTrace(w,h);
+ const selected=S.seeds.find(s=>s.id===selectedId),lineage=selected?.lineage,items=[],fieldColors=['','#314733','#56627f','#765a78','#827347'];
+ const lod=view.zoom<.58?'POINTS':view.zoom<.9?'FINE':view.zoom<1.35?'NORMAL':'CLOSE';
+ if(view.fields){for(const i of S.world.fieldCells){const t=S.world.type[i];const z=Math.floor(i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;const rem=i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,p=project3(centerPoint(x,y,z),w,h);items.push({kind:'field',x:p.x,y:p.y,z:p.z,p:p.p,color:fieldColors[t],alpha:view.focusSlice?.35:.16})}}
+ for(const s of S.seeds){if(view.lineageOnly&&lineage!=null&&s.lineage!==lineage)continue;const p=project3(centerPoint(s.x,s.y,s.z),w,h),ghost=view.focusSlice&&s.z!==sliceZ,baseAlpha=lod==='POINTS'?.42:lod==='FINE'?.68:lod==='NORMAL'?.88:.96;items.push({kind:'seed',x:p.x,y:p.y,z:p.z,p:p.p,seed:s,alpha:ghost?.08:baseAlpha})}
+ items.sort((a,b)=>b.z-a.z);pickPoints=[];
+ for(const q of items){xctx.save();xctx.globalAlpha=q.alpha;if(q.kind==='field'){const r=Math.max(.45,Math.min(1.4,1.15*q.p*view.zoom));xctx.fillStyle=q.color;xctx.fillRect(q.x-r,q.y-r,r*2,r*2)}else{
+   const scale=lod==='POINTS'?.62:lod==='FINE'?1.15:lod==='NORMAL'?2.15:3.15,r=Math.max(lod==='POINTS'?.38:lod==='FINE'?.7:lod==='NORMAL'?1.15:1.65,scale*q.p*view.zoom);
+   xctx.fillStyle=lineageColor(q.seed.lineage,1);
+   if(lod==='POINTS'){const d=Math.max(.8,r*1.45);xctx.fillRect(q.x-d*.5,q.y-d*.5,d,d)}
+   else{xctx.beginPath();xctx.arc(q.x,q.y,r,0,Math.PI*2);xctx.fill()}
+   if(q.seed.id===selectedId){xctx.globalAlpha=1;xctx.beginPath();xctx.arc(q.x,q.y,Math.max(3.2,r+2),0,Math.PI*2);xctx.lineWidth=1.5;xctx.strokeStyle='#fff';xctx.stroke()}
+   pickPoints.push({x:q.x,y:q.y,r:Math.max(7,r*2.1),depth:q.z,id:q.seed.id})
+  }xctx.restore()}
+ if(view.legacy){const changes=fossilChanges();xctx.save();xctx.strokeStyle='#ffd66f';xctx.lineWidth=1.4;xctx.globalAlpha=.9;for(const q of changes){const z=Math.floor(q.i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;const rem=q.i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,p=project3(centerPoint(x,y,z),w,h),r=Math.max(2.2,3*q.p);xctx.strokeRect(p.x-r,p.y-r,r*2,r*2)}xctx.restore()}
+ if(view.spine){const C=layerCentroids().filter(Boolean);if(C.length){xctx.save();xctx.lineWidth=2.2;xctx.strokeStyle='#ffd66f';xctx.globalAlpha=.9;xctx.beginPath();C.forEach((q,i)=>{const p=project3(centerPoint(q.x,q.y,q.z),w,h);i?xctx.lineTo(p.x,p.y):xctx.moveTo(p.x,p.y)});xctx.stroke();for(const q of C){const p=project3(centerPoint(q.x,q.y,q.z),w,h);xctx.beginPath();xctx.fillStyle='#ffd66f';xctx.arc(p.x,p.y,3.2,0,Math.PI*2);xctx.fill()}xctx.restore()}}
+ const axis=[['X',{x:3,y:0,z:0},'#b9ff79'],['Y',{x:0,y:3,z:0},'#77dfff'],['Z',{x:0,y:0,z:3*Z_VISUAL_SCALE},'#ffd66f']],o=project3({x:-(W-1)/2-2,y:-(H-1)/2-2,z:-(D-1)/2*Z_VISUAL_SCALE},w,h);xctx.font='9px ui-monospace';for(const [label,v,col] of axis){const p=project3({x:-(W-1)/2-2+v.x,y:-(H-1)/2-2+v.y,z:-(D-1)/2*Z_VISUAL_SCALE+v.z},w,h);xctx.strokeStyle=col;xctx.fillStyle=col;xctx.beginPath();xctx.moveTo(o.x,o.y);xctx.lineTo(p.x,p.y);xctx.stroke();xctx.fillText(label,p.x+3,p.y)}
+ $('spaceStatus').textContent='cube center '+chunkName(CENTER_CHUNK)+' · fixed W5 founder cohort · '+layoutText()+' · '+S.seeds.length+' living · '+lod.toLowerCase()+' LOD · motion '+(view.motion?motionMode+' · ~'+MOTION_CUTOFF.toLocaleString()+'t':'off')+' · slice Z'+(sliceZ+1)+(sliceZ===MID_Z?' founder plane':'')+' · drag rotate · pinch zoom · tap seed';
+}
+function markViewDirty(){viewDirty=true}
+function viewerFrame(t){if(view.auto){view.yaw+=.004;viewDirty=true}if(viewDirty&&(!running||liveSpeed<1000||t-last3D>100)){draw3D();viewDirty=false;last3D=t}viewRaf=requestAnimationFrame(viewerFrame)}
+function drawSpark(){
+ const w=spark.clientWidth||640,h=90,dpr=Math.max(1,Math.min(2,devicePixelRatio||1));if(spark.width!==Math.floor(w*dpr)||spark.height!==Math.floor(h*dpr)){spark.width=Math.floor(w*dpr);spark.height=Math.floor(h*dpr)}sctx.setTransform(dpr,0,0,dpr,0,0);sctx.clearRect(0,0,w,h);sctx.fillStyle='#0d120f';sctx.fillRect(0,0,w,h);if(S.history.length<2)return;const max=Math.max(FOUNDERS,...S.history.map(q=>q.pop),1),pts=S.history; sctx.strokeStyle='#b9ff79';sctx.lineWidth=2;sctx.beginPath();pts.forEach((q,i)=>{const x=i/(pts.length-1)*(w-8)+4,y=h-6-(q.pop/max)*(h-12);i?sctx.lineTo(x,y):sctx.moveTo(x,y)});sctx.stroke();sctx.fillStyle='#91a198';sctx.font='9px ui-monospace';sctx.fillText('0',4,h-3);sctx.fillText(String(max),4,10)
+}
+function renderInspect(){
+ const s=S.seeds.find(q=>q.id===selectedId);if(!s){$('inspect').innerHTML='Tap a seed in the dish.';return}
+ const expanded=expandGenome(s.genome,80);$('inspect').innerHTML='<div class="main">seed #'+s.id+' · lineage '+s.lineage+' · generation '+s.generation+'</div><div class="meta">energy '+s.energy.toFixed(2)+' · age '+s.age+' · cell '+s.x+','+s.y+','+s.z+' · bit '+s.bit+' · heading '+dirName(s.dir)+' · '+s.genome.length+' hereditary tokens / '+expanded.length+' primitive ops when expanded</div><div class="genome" style="margin-top:8px">'+s.genome.map(tokenHTML).join('')+'</div>'
+}
+function renderHeredity(){
+ const line=new Map();for(const s of S.seeds)line.set(s.lineage,(line.get(s.lineage)||0)+1);const top=[...line.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4);if(!top.length){$('heredity').innerHTML='<div class="sub">No living lineage.</div>';return}
+ $('heredity').innerHTML=top.map(([l,c])=>'<div class="gene"><div class="main" style="color:'+lineageColor(l,1)+'">lineage '+l+' · '+c+' living</div><div class="bar"><i style="width:'+Math.min(100,100*c/Math.max(1,S.seeds.length))+'%;background:'+lineageColor(l,1)+'"></i></div></div>').join('')
+}
+function renderConserve(){
+ const blocks=[];if(S.topWord){const t=S.topWord.token;blocks.push('<div class="gene"><div class="main">most common word · '+tokenLabel(t)+'</div><div class="meta">'+wordSeq(t).map(p=>'P'+p).join(' ')+' · '+Math.round(100*S.topWord.share)+'% of living seeds</div></div>')}
+ if(S.topMotif)blocks.push('<div class="gene"><div class="main">most common 3-op motif</div><div class="meta">'+S.topMotif.seq.map(p=>'P'+p).join(' ')+' · '+Math.round(100*S.topMotif.share)+'% prevalence</div></div>');
+ if(S.firstConservedWord)blocks.push('<div class="gene"><div class="main good">first conserved word</div><div class="meta">tick '+S.firstConservedWord.tick.toLocaleString()+' · '+tokenLabel(S.firstConservedWord.token)+' · '+Math.round(100*S.firstConservedWord.share)+'%</div></div>');
+ if(S.firstBoundaryWord)blocks.push('<div class="gene"><div class="main cyan">first conserved external-action word</div><div class="meta">tick '+S.firstBoundaryWord.tick.toLocaleString()+' · '+tokenLabel(S.firstBoundaryWord.token)+' = '+wordSeq(S.firstBoundaryWord.token).map(p=>'P'+p).join(' ')+'</div></div>');
+ if(S.firstEstablishedLineage)blocks.push('<div class="gene"><div class="main good">first established lineage · L'+S.firstEstablishedLineage.lineage+'</div><div class="meta">tick '+S.firstEstablishedLineage.tick.toLocaleString()+' · '+S.firstEstablishedLineage.count+' living · '+Math.round(100*S.firstEstablishedLineage.share)+'% share after 1,000-tick hold</div></div>');
+ $('conserve').innerHTML=blocks.length?blocks.join(''):'<div class="sub">No conserved structures yet.</div>'
+}
+function renderEvents(){$('events').innerHTML=S.events.length?S.events.map(e=>'<div class="event"><span class="'+(e.kind==='milestone'?'good':e.kind==='boundary'?'cyan':e.kind==='word'?'violet':e.kind==='death'?'bad':'')+'">tick '+e.tick.toLocaleString()+'</span> · '+e.text+'</div>').join(''):'<div class="event">No events.</div>'}
+
+
+function renderContinent(){
+ const counts=Array(CHUNK_COUNT).fill(0),lines=Array.from({length:CHUNK_COUNT},()=>new Set()),origin=originChunk();for(const s of S.seeds){const ch=chunkOfXYZ(s.x,s.y,s.z);counts[ch]++;lines[ch].add(s.lineage)}
+ const occupied=counts.filter(n=>n>0).length;$('dynasty').textContent=occupied+' / '+CHUNK_COUNT;
+ let html='';const layerNames=['LOWER WORLDS','CENTER WORLDS','UPPER WORLDS'];
+ for(let gz=0;gz<GRID;gz++){html+='<div class="chunkLayerLabel">'+layerNames[gz]+' · Z WORLD LAYER '+(gz+1)+'/3</div>';for(let gy=0;gy<GRID;gy++)for(let gx=0;gx<GRID;gx++){const i=chunkIndex(gx,gy,gz),n=counts[i],entered=S.cube.firstEntered[i],born=S.cube.firstBirth[i],peak=S.cube.maxPop[i]||n;html+='<div class="chunkCard '+(i===origin?'origin ':'')+(n?'occupied':'')+'"><b>'+chunkName(i)+' · '+n+' living</b><span>'+lines[i].size+' lineage'+(lines[i].size===1?'':'s')+' · peak '+peak+'<br>'+(entered==null?'virgin / unentered':'first entry '+entered.toLocaleString())+(born==null?'':' · first birth '+born.toLocaleString())+'</span></div>'}}
+ $('chunkGrid').innerHTML=html;
+ const first=S.cube.firstEntered.map((t,i)=>i===origin||t==null?null:{i,t}).filter(Boolean).sort((a,b)=>a.t-b.t)[0];
+ $('layoutStatus').textContent=layoutText()+' · center coordinates 2,2,2';
+ $('cubeStatus').textContent='founders fixed at cube center · '+occupied+'/'+CHUNK_COUNT+' worlds occupied · '+S.cube.crossings.toLocaleString()+' world-face crossings'+(first?' · first frontier '+chunkName(first.i)+' @ '+first.t.toLocaleString():' · no world face crossed yet')
+}
+function renderMigration(){
+ const origin=originChunk(),founders=S.seeds.filter(s=>s.generation===0).length,desc=S.seeds.length-founders,oldest=S.seeds.reduce((m,s)=>Math.max(m,s.age),0),frontiers=S.cube.firstEntered.map((t,i)=>i===origin||t==null?null:t).filter(t=>t!=null),first=frontiers.length?Math.min(...frontiers):null;
+ $('founderAlive').textContent=founders;$('descAlive').textContent=desc;$('oldestAge').textContent=oldest.toLocaleString();$('post8Birth').textContent=first==null?'—':first.toLocaleString();
+ $('pairedStatus').textContent=first==null?'founders remain inside the center chunk, currently '+chunkName(CENTER_CHUNK)+'. All 26 surrounding worlds are still biologically untouched.':'the center world boundary has been crossed · '+S.cube.firstEntered.filter(t=>t!=null).length+' worlds have been entered.'
+}
+function perK(n,d){return d?1000*n/d:0}
+function renderFieldGuide(){
+ observeCatalogScan();const w=catalogWorld(),livingCount={};for(const s of S.seeds)livingCount[s.lineage]=(livingCount[s.lineage]||0)+1;
+ const rows=Object.values(w.lineages||{}).map(q=>{const sh=currentLineageShape(q.lineage),actions=Math.max(1,q.actions||0),moveRate=perK(q.moves||0,actions),writeRate=perK(q.writes||0,actions),attemptMoveRate=perK(q.moveAttempts||0,actions),writeAttemptRate=perK(q.writeAttempts||0,actions),birthRate=perK(q.births||0,actions),avgDead=q.deaths?q.deathLifeSum/q.deaths:0,range=q.maxX>=0?(q.maxX-q.minX+1)+'×'+(q.maxY-q.minY+1)+'×'+(q.maxZ-q.minZ+1):'—';return{...q,sh,living:livingCount[q.lineage]||0,moveRate,writeRate,attemptMoveRate,writeAttemptRate,birthRate,avgDead,range,uniqueGamma:Object.keys(q.gamma||{}).length}}).sort((a,b)=>b.living-a.living||b.peakLiving-a.peakLiving||a.lineage-b.lineage);
+ const eligible=rows.filter(q=>q.actions>=100),mover=eligible.slice().sort((a,b)=>b.moveRate-a.moveRate)[0],writer=eligible.slice().sort((a,b)=>b.writeRate-a.writeRate)[0];
+ $('guideObserved').textContent=rows.length;$('guideLiving').textContent=rows.filter(q=>q.living>0).length;$('guideMover').textContent=mover?'L'+mover.lineage+' · '+mover.moveRate.toFixed(1):'—';$('guideWriter').textContent=writer?'L'+writer.lineage+' · '+writer.writeRate.toFixed(1):'—';
+ $('guideStatus').textContent='Rates are per 1,000 executed hereditary tokens. Current shape uses 26-neighbor connectivity; historical range is the bounding box of every observed position.';
+ $('fieldCards').innerHTML=rows.map(q=>{const moveSuccess=q.moveAttempts?100*q.moves/q.moveAttempts:0,writeSuccess=q.writeAttempts?100*q.writes/q.writeAttempts:0,touchNet=q.touchNet||0,shape=q.living?(q.sh.components+' component'+(q.sh.components===1?'':'s')+' · largest '+q.sh.largest+'/'+q.living+' · box '+q.sh.bbox+' · density '+Math.round(100*q.sh.density)+'%'):'extinct · historical range '+q.range;return '<div class="fieldCard '+(q.living?'live':'')+'"><div class="fieldHead"><b style="color:'+lineageColor(q.lineage,1)+'">L'+q.lineage+' · '+q.living+' living</b><span class="sub">peak '+q.peakLiving+' · actions '+(q.actions||0).toLocaleString()+'</span></div><div class="profileGrid"><div class="profileCell"><b>'+q.moveRate.toFixed(1)+'</b><span>MOVES / 1K ACTIONS</span></div><div class="profileCell"><b>'+moveSuccess.toFixed(0)+'%</b><span>MOVE SUCCESS</span></div><div class="profileCell"><b>'+q.writeRate.toFixed(2)+'</b><span>P7 WRITES / 1K ACTIONS</span></div><div class="profileCell"><b>'+writeSuccess.toFixed(0)+'%</b><span>P7 SUCCESS</span></div><div class="profileCell"><b>'+q.birthRate.toFixed(2)+'</b><span>BIRTHS / 1K ACTIONS</span></div><div class="profileCell"><b>'+q.uniqueGamma+'</b><span>UNIQUE γ CELLS WRITTEN</span></div></div><div class="fieldNote">'+shape+'<br>move attempts '+(q.moveAttempts||0).toLocaleString()+' · Z moves '+(q.zMoves||0).toLocaleString()+' · wall blocks '+(q.wallBlocks||0).toLocaleString()+' · seed blocks '+(q.seedBlocks||0).toLocaleString()+'<br>P7 attempts '+(q.writeAttempts||0).toLocaleString()+' · writes '+(q.writes||0).toLocaleString()+' · P3 touches '+(q.touches||0).toLocaleString()+' · net touch energy '+touchNet.toFixed(1)+'<br>births '+(q.births||0).toLocaleString()+' · deaths '+(q.deaths||0).toLocaleString()+' · mean age at death '+Math.round(q.avgDead).toLocaleString()+' · deaths ≥1K '+(q.longDeaths||0).toLocaleString()+'<br>max observed energy '+(q.maxEnergy||0).toFixed(1)+' · historical range '+q.range+' · chunks visited '+Object.keys(q.chunks||{}).length+' · border crossings '+(q.chunkCrossings||0).toLocaleString()+'</div></div>'}).join('')
+}
+function renderFossil(){
+ const r=fossilRecord(),ch=fossilChanges(),cc=fossilComponents(ch),touched=Object.keys(r?.touched||{}).length,writers=Object.entries(r?.byLineage||{}).map(([lineage,count])=>({lineage:+lineage,count})).sort((a,b)=>b.count-a.count),maxW=Math.max(1,...writers.map(q=>q.count));
+ $('fossilChanged').textContent=ch.length;$('fossilTouched').textContent=touched;$('fossilWrites').textContent=(r?.writes||0).toLocaleString();$('fossilWriters').textContent=writers.length;$('fossilLargest').textContent=cc.largest;$('fossilSignature').textContent=fossilSignature(ch);
+ let msg='birth γ cells '+S.world.gammaCells.length+' · '+cc.count+' current Δ component'+(cc.count===1?'':'s')+' · max changed observed '+(r?.maxChanged||0);
+ if(r?.firstWriteTick!=null)msg+=' · first P7 write '+r.firstWriteTick.toLocaleString()+' · last '+r.lastWriteTick.toLocaleString();else msg+=' · no successful P7 write yet';
+ if(r?.final)msg+='<br><span class="warn">SEALED FOSSIL @ '+r.final.tick.toLocaleString()+' · '+r.final.changedCount+' changed · signature '+r.final.signature+'</span>';
+ $('fossilStatus').innerHTML=msg;
+ $('writerList').innerHTML=writers.slice(0,6).map(q=>'<div class="writerRow"><span>L'+q.lineage+'</span><div class="writerTrack"><div class="writerFill" style="width:'+(100*q.count/maxW)+'%"></div></div><span>'+q.count.toLocaleString()+' writes</span></div>').join('')||'<div class="sub">No writer lineage yet.</div>'
+}
+
+
+function render(){
+ $('worldNo').textContent=chunkName(CENTER_CHUNK);$('tick').textContent=S.tick.toLocaleString();$('pop').textContent=S.seeds.length;$('gen').textContent=S.stats.maxGeneration;$('words').textContent=S.registry.length;$('birthDeath').textContent='births '+S.stats.births.toLocaleString()+' · deaths '+S.stats.deaths.toLocaleString()+' · recombinations '+S.stats.recombinations.toLocaleString()+' · mutations '+S.stats.mutations.toLocaleString();
+ renderContinent();renderMigration();drawDish();drawSpark();renderInspect();renderDepth();renderStructure();renderHeredity();renderConserve();renderEvents();renderFossil();renderFieldGuide();markViewDirty()
+}
+function liveLoop(){
+ if(!running)return;
+ const n=liveSpeed;
+ if(n<=100){
+  for(let i=0;i<n&&running;i++)step();
+  render();
+  if(running)raf=requestAnimationFrame(liveLoop);
+  return
+ }
+ let remaining=n;
+ function pump(){
+  if(!running)return;
+  const started=performance.now();
+  while(remaining>0&&running&&(performance.now()-started)<12){
+   const batch=Math.min(50,remaining);
+   for(let i=0;i<batch&&running;i++)step();
+   remaining-=batch
+  }
+  render();
+  if(!running)return;
+  raf=requestAnimationFrame(remaining>0?pump:liveLoop)
+ }
+ pump()
+}
+function setRunning(v){running=v;$('play').textContent=v?'PAUSE':'PLAY';if(v){cancelAnimationFrame(raf);raf=requestAnimationFrame(liveLoop)}}
+async function bulk(n){
+ if(busy)return;busy=true;setRunning(false);document.querySelectorAll('button,select').forEach(x=>x.disabled=true);try{const start=S.tick;for(let done=0;done<n&&S.seeds.length;){const batch=Math.min(500,n-done);for(let i=0;i<batch;i++)step();done+=batch;if(done%5000===0||done===n){$('status').textContent='bulk evolution · '+done.toLocaleString()+' / '+n.toLocaleString()+' ticks';render();await new Promise(q=>requestAnimationFrame(()=>setTimeout(q,0)))}}save();$('status').textContent='advanced from '+start.toLocaleString()+' to '+S.tick.toLocaleString()+' ticks.'}finally{busy=false;document.querySelectorAll('button,select').forEach(x=>x.disabled=false)}}
+canvas.addEventListener('pointerdown',e=>{const r=canvas.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H),s=S.seeds.find(q=>q.x===x&&q.y===y&&q.z===sliceZ);selectedId=s?s.id:null;renderInspect();renderStructure();drawDish();markViewDirty()});
+const pointers=new Map();let gesture=null,lastTap=0;
+function resetCamera(){view.yaw=-.72;view.pitch=.46;view.zoom=1.04;view.panX=0;view.panY=0;markViewDirty()}
+space.addEventListener('pointerdown',e=>{space.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1)gesture={x:e.clientX,y:e.clientY,yaw:view.yaw,pitch:view.pitch,moved:false,pinch:false};else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);gesture={pinch:true,dist:d,zoom:view.zoom,moved:true}}});
+space.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1&&gesture&&!gesture.pinch){const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;if(Math.hypot(dx,dy)>4)gesture.moved=true;view.yaw=gesture.yaw+dx*.012;view.pitch=Math.max(-1.45,Math.min(1.45,gesture.pitch+dy*.012));markViewDirty()}else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(gesture?.pinch&&gesture.dist>0)view.zoom=Math.max(.45,Math.min(3.2,gesture.zoom*d/gesture.dist));markViewDirty()}});
+function endSpacePointer(e){const wasSingle=pointers.size===1&&gesture&&!gesture.pinch,wasMoved=gesture?.moved;pointers.delete(e.pointerId);if(wasSingle&&!wasMoved){const r=space.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bestD=22;for(const q of pickPoints){const d=Math.hypot(q.x-x,q.y-y);if(d<Math.min(bestD,q.r)){bestD=d;best=q}}if(best){selectedId=best.id;const s=S.seeds.find(q=>q.id===selectedId);if(s){sliceZ=s.z;render()}}const now=performance.now();if(now-lastTap<320)resetCamera();lastTap=now}if(pointers.size===1){const a=[...pointers.values()][0];gesture={x:a.x,y:a.y,yaw:view.yaw,pitch:view.pitch,moved:true,pinch:false}}else if(!pointers.size)gesture=null}
+space.addEventListener('pointerup',endSpacePointer);space.addEventListener('pointercancel',endSpacePointer);
+$('zSlice').oninput=()=>{sliceZ=+$('zSlice').value;renderDepth();drawDish();markViewDirty()};$('zDown').onclick=()=>{sliceZ=(sliceZ+D-1)%D;renderDepth();drawDish();markViewDirty()};$('zUp').onclick=()=>{sliceZ=(sliceZ+1)%D;renderDepth();drawDish();markViewDirty()};
+$('viewIso').onclick=()=>{view.yaw=-.72;view.pitch=.46;markViewDirty()};$('viewFront').onclick=()=>{view.yaw=0;view.pitch=0;markViewDirty()};$('viewSide').onclick=()=>{view.yaw=Math.PI/2;view.pitch=0;markViewDirty()};$('viewTop').onclick=()=>{view.yaw=0;view.pitch=-1.45;markViewDirty()};
+$('showFields').onclick=()=>{view.fields=!view.fields;$('showFields').textContent=view.fields?'FIELDS ON':'FIELDS OFF';$('showFields').classList.toggle('on',view.fields);markViewDirty()};
+$('showLegacy').onclick=()=>{view.legacy=!view.legacy;$('showLegacy').textContent=view.legacy?'LEGACY Δ ON':'LEGACY Δ OFF';$('showLegacy').classList.toggle('on',view.legacy);drawDish();markViewDirty()};
+$('showSpine').onclick=()=>{view.spine=!view.spine;$('showSpine').textContent=view.spine?'SPINE ON':'SPINE OFF';$('showSpine').classList.toggle('on',view.spine);markViewDirty()};
+$('focusSlice').onclick=()=>{view.focusSlice=!view.focusSlice;$('focusSlice').textContent=view.focusSlice?'SLICE FOCUS':'ALL LAYERS';$('focusSlice').classList.toggle('on',view.focusSlice);markViewDirty()};
+$('lineageOnly').onclick=()=>{const s=S.seeds.find(q=>q.id===selectedId);if(!s){$('status').textContent='select a seed first to isolate its lineage.';return}view.lineageOnly=!view.lineageOnly;$('lineageOnly').textContent=view.lineageOnly?'LINEAGE '+s.lineage:'ALL LINEAGES';$('lineageOnly').classList.toggle('on',view.lineageOnly);renderStructure();markViewDirty()};
+$('showMotion').onclick=()=>{view.motion=!view.motion;$('showMotion').textContent=view.motion?'MOTION ON':'MOTION OFF';$('showMotion').classList.toggle('on',view.motion);markViewDirty()};
+$('autoRotate').onclick=()=>{view.auto=!view.auto;$('autoRotate').textContent=view.auto?'AUTO ON':'AUTO OFF';$('autoRotate').classList.toggle('on',view.auto);markViewDirty()};$('resetView').onclick=resetCamera;
+$('speed').onchange=()=>{liveSpeed=+$('speed').value||1;$('status').textContent=liveSpeed>=1000?'turbo live · '+liveSpeed.toLocaleString()+'× · time-sliced for responsive controls.':'live speed set to '+liveSpeed+'×.';save()};
+$('play').onclick=()=>setRunning(!running);$('step1k').onclick=()=>bulk(1000);$('step10k').onclick=()=>bulk(10000);
+$('rotateWorlds').onclick=()=>{setRunning(false);layoutRotation=(layoutRotation+1)%26;selectedId=null;fresh();resetCamera();$('status').textContent='outer shell cycled · '+layoutText()+' · founders remain in the exact center world.';render()};
+$('replay').onclick=()=>{if(confirm('Replay this 3×3×3 world cube from tick 0?')){setRunning(false);fresh();selectedId=null;resetCamera();$('status').textContent='world cube replayed · '+layoutText()+' · founders fixed at cube center.';render()}};
+loadCatalog();loadFossils();loadSurvey();loadBaseline();if(!load()){fresh();$('status').textContent='world cube started · '+layoutText()+' · founders fixed at cube center.'}else{if(S.firstEstablishedLineage===undefined)S.firstEstablishedLineage=null;if(!S.lineageStreaks)S.lineageStreaks={};if(!CATALOG[String((S.worldIndex??0)+1)])initCatalogWorld(false);if(!FOSSILS[String((S.worldIndex??0)+1)])initFossilWorld(false);$('status').textContent='world cube resumed at tick '+S.tick.toLocaleString()+' · '+layoutText()+' · '+S.seeds.length+' living.';render()}viewRaf=requestAnimationFrame(viewerFrame)
+})();
+</script></body></html>
