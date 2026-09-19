@@ -284,7 +284,7 @@ function drawSegment3(a,b,w,h,stroke,width=1,alpha=1){const A=project3(a,w,h),B=
 function drawVolumeFrame(w,h){
  for(let z=0;z<D;z++){const zc=z-(D-1)/2,corners=[{x:-(W-1)/2,y:-(H-1)/2,z:zc},{x:(W-1)/2,y:-(H-1)/2,z:zc},{x:(W-1)/2,y:(H-1)/2,z:zc},{x:-(W-1)/2,y:(H-1)/2,z:zc}],a=z===sliceZ?.32:.07;for(let i=0;i<4;i++)drawSegment3(corners[i],corners[(i+1)%4],w,h,z===sliceZ?'#77dfff':'#839088',z===sliceZ?1.2:1,a)}
  const low=-(D-1)/2,high=(D-1)/2,xs=[-(W-1)/2,(W-1)/2],ys=[-(H-1)/2,(H-1)/2];for(const x of xs)for(const y of ys)drawSegment3({x,y,z:low},{x,y,z:high},w,h,'#839088',1,.14);
- const xCuts=[CHUNK_W-(W-1)/2,CHUNK_W*2-(W-1)/2],yCuts=[(H-1)/2-CHUNK_H,(H-1)/2-CHUNK_H*2];
+ const xCuts=[CHUNK_W-.5-(W-1)/2,CHUNK_W*2-.5-(W-1)/2],yCuts=[(H-1)/2-(CHUNK_H-.5),(H-1)/2-(CHUNK_H*2-.5)];
  for(const z of [low,high]){for(const x of xCuts)drawSegment3({x,y:-(H-1)/2,z},{x,y:(H-1)/2,z},w,h,'#77dfff',1,.25);for(const y of yCuts)drawSegment3({x:-(W-1)/2,y,z},{x:(W-1)/2,y,z},w,h,'#77dfff',1,.25)}
 }
 function draw3D(){
@@ -322,16 +322,8 @@ function renderConserve(){
  $('conserve').innerHTML=blocks.length?blocks.join(''):'<div class="sub">No conserved structures yet.</div>'
 }
 function renderEvents(){$('events').innerHTML=S.events.length?S.events.map(e=>'<div class="event"><span class="'+(e.kind==='milestone'?'good':e.kind==='boundary'?'cyan':e.kind==='word'?'violet':e.kind==='death'?'bad':'')+'">tick '+e.tick.toLocaleString()+'</span> · '+e.text+'</div>').join(''):'<div class="event">No events.</div>'}
-function baselineAgeCapWorlds(){return Object.values(BASELINE).filter(q=>q&&q.extinctionTick===8000).map(q=>q.world).sort((a,b)=>a-b)}
-function renderLongevity(){
- const r=surveyRecord(),b=BASELINE[String(r.world)],ageCases=baselineAgeCapWorlds(),founders=S.seeds.filter(s=>s.generation===0).length,desc=S.seeds.length-founders,oldest=S.seeds.reduce((m,s)=>Math.max(m,s.age),0);
- $('founderAlive').textContent=founders;$('descAlive').textContent=desc;$('oldestAge').textContent=oldest.toLocaleString();$('post8Birth').textContent=r.firstPost8000Birth==null?'—':r.firstPost8000Birth.toLocaleString();
- let base=b?'042: tick '+(b.lastTick||0).toLocaleString()+' · '+(b.extinctionTick!=null?'extinct @ '+b.extinctionTick.toLocaleString():'last seen alive '+b.living)+' · bottleneck '+b.minPositivePopulation:'042: this world has not been recorded in the local survey ledger';
- if(b?.extinctionTick===8000)base+=' · AGE-CAP CASE';
- let here='043: '+S.seeds.length+' living · '+founders+' founder'+(founders===1?'':'s')+' · '+desc+' descendant'+(desc===1?'':'s');
- if(r.at8000)here+=' · at tick 8000: '+r.at8000.population+' living ('+r.at8000.founders+' founders / '+r.at8000.descendants+' descendants)';
- $('pairedStatus').innerHTML='<span class="'+(b?.extinctionTick===8000?'warn':'cyan')+'">'+base+'</span><br>'+here+'<br>'+ageCases.length+' Build 042 world'+(ageCases.length===1?'':'s')+' currently recorded as exact-8000 extinctions on this device.'
-}
+
+
 function renderContinent(){
  const counts=Array(9).fill(0),lines=Array.from({length:9},()=>new Set());for(const s of S.seeds){const ch=chunkOfXY(s.x,s.y);counts[ch]++;lines[ch].add(s.lineage)}
  const occupied=counts.filter(n=>n>0).length;$('dynasty').textContent=occupied+' / 9';
@@ -362,15 +354,7 @@ function renderFossil(){
  $('fossilStatus').innerHTML=msg;
  $('writerList').innerHTML=writers.slice(0,6).map(q=>'<div class="writerRow"><span>L'+q.lineage+'</span><div class="writerTrack"><div class="writerFill" style="width:'+(100*q.count/maxW)+'%"></div></div><span>'+q.count.toLocaleString()+' writes</span></div>').join('')||'<div class="sub">No writer lineage yet.</div>'
 }
-function renderSurvey(){
- observeSurveyFast();if(S.tick%50===0||S.tick===0)observeSurveyScan();
- const rows=Object.values(SURVEY).sort((a,b)=>a.world-b.world),visited=rows.length,extinct=rows.filter(r=>r.extinctionTick!=null).length,single=rows.filter(r=>r.oneLineageTick!=null).length,alive=rows.filter(r=>r.living>0).length;
- $('surveyVisited').textContent=visited+' / '+WORLD_COUNT;$('surveyAlive').textContent=alive;$('surveyExtinct').textContent=extinct;$('surveySingle').textContent=single;$('worldJump').value=String((S.worldIndex??0)+1);
- const r=surveyRecord(),base=BASELINE[String(r.world)],pair=base?.extinctionTick===8000?' · 042 AGE-CAP CASE':'';
- $('surveyCurrent').textContent='World '+r.world+' · seed '+r.seed+' · '+r.currentLineages+' living lineage'+(r.currentLineages===1?'':'s')+' · bottleneck '+r.minPositivePopulation+' · peak '+r.maxPopulation+' · max Z '+r.maxOccupiedLayers+'/8'+pair;
- $('surveyList').innerHTML=rows.map(q=>{const b=BASELINE[String(q.world)],tag=b?.extinctionTick===8000?' · 042@8000':'';return '<div class="surveyRow '+(q.world===r.world?'current':'')+'"><div class="w">W'+q.world+'</div><div class="s">tick '+(q.lastTick||0).toLocaleString()+' · pop '+q.living+' · peak '+q.maxPopulation+' · bottleneck '+q.minPositivePopulation+' · lineages '+q.currentLineages+' · founders '+(q.foundersAlive??'—')+' · descendants '+(q.descendantsAlive??'—')+tag+'</div><div class="r '+(q.extinctionTick!=null?'bad':q.firstPost8000Birth!=null?'good':q.oneLineageTick!=null?'warn':'cyan')+'">'+(q.extinctionTick!=null?'EXTINCT @ '+q.extinctionTick.toLocaleString():q.firstPost8000Birth!=null?'BIRTH >8K @ '+q.firstPost8000Birth.toLocaleString():q.oneLineageTick!=null?'1 LINE @ '+q.oneLineageTick.toLocaleString():'RUNNING')+'</div></div>'}).join('')||'<div class="sub">No continent record yet.</div>';
- renderLongevity()
-}
+
 
 function render(){
  $('worldNo').textContent='W5';$('tick').textContent=S.tick.toLocaleString();$('pop').textContent=S.seeds.length;$('gen').textContent=S.stats.maxGeneration;$('words').textContent=S.registry.length;$('birthDeath').textContent='births '+S.stats.births.toLocaleString()+' · deaths '+S.stats.deaths.toLocaleString()+' · recombinations '+S.stats.recombinations.toLocaleString()+' · mutations '+S.stats.mutations.toLocaleString();
