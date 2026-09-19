@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0b"><title>AGENT LANGUAGE // 043 · LONGEVITY CONTROL</title><style>
+:root{--bg:#090d0b;--panel:#131a15;--ink:#edf4ef;--muted:#91a198;--line:#2a3a31;--hot:#b9ff79;--cyan:#77dfff;--warn:#ffd66f;--violet:#d39cff;--bad:#ff8d78}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{max-width:1080px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{font-size:20px;margin:0;letter-spacing:.08em}.sub{font-size:11px;color:var(--muted);line-height:1.55}.badge{font-size:10px;color:var(--hot);border:1px solid #537249;border-radius:999px;padding:6px 8px;white-space:nowrap}
+.grid{display:grid;gap:10px;margin-top:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px;min-width:0}.panel h2{font-size:11px;color:var(--muted);letter-spacing:.14em;margin:0 0 11px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}button,select,input{font:inherit;color:inherit;background:#18211c;border:1px solid #35483d;border-radius:12px;min-height:48px;padding:10px}button{touch-action:manipulation}.primary{background:#1c3426;border-color:#58836a}.danger{border-color:#6d4038}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:9px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:9px;color:var(--muted)}.row{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px}.main{font-size:13px;font-weight:800}.meta{font-size:10px;color:var(--muted);line-height:1.55;margin-top:3px}.good{color:var(--hot)}.cyan{color:var(--cyan)}.warn{color:var(--warn)}.violet{color:var(--violet)}.bad{color:var(--bad)}.dishWrap{background:#070a08;border:1px solid #223128;border-radius:16px;padding:8px;overflow:hidden}.dishWrap canvas{display:block;width:100%;aspect-ratio:4/3;border-radius:10px;touch-action:manipulation}.observatoryWrap{background:#050806;border:1px solid #223128;border-radius:16px;padding:6px;overflow:hidden;position:relative}.observatoryWrap canvas{display:block;width:100%;aspect-ratio:4/3;border-radius:11px;touch-action:none}.viewerControls{margin-top:9px}.viewerControls button.on{background:#20392a;border-color:#6a946f;color:var(--hot)}.viewerHint{margin-top:7px}.surveyNav{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;margin-top:10px}.surveyNav input{width:100%;min-width:0}.surveyList{display:grid;gap:6px;max-height:300px;overflow:auto;margin-top:10px}.surveyRow{display:grid;grid-template-columns:48px 1fr auto;gap:8px;align-items:center;background:#0d120f;border:1px solid #223128;border-radius:10px;padding:8px}.surveyRow.current{border-color:#77dfff}.surveyRow .w{font-weight:800}.surveyRow .s{font-size:9px;color:var(--muted);line-height:1.45}.surveyRow .r{font-size:9px;text-align:right}.structureGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.structureCell{background:#0d120f;border:1px solid #223128;border-radius:10px;padding:8px}.structureCell b{display:block;font-size:15px}.structureCell span{font-size:9px;color:var(--muted)}.sliceControl{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin-top:9px}.sliceControl button{min-height:38px;padding:7px 11px}.sliceControl input{width:100%}.depthBar{display:grid;grid-template-columns:34px 1fr 42px;gap:7px;align-items:center;font-size:9px}.depthTrack{height:8px;background:#0d120f;border:1px solid var(--line);border-radius:999px;overflow:hidden}.depthFill{height:100%;background:var(--cyan)}.legend{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.key{font-size:9px;border:1px solid var(--line);border-radius:999px;padding:4px 7px}.swatch{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px}.bar{height:7px;background:#0d120f;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:5px}.bar>i{display:block;height:100%;background:var(--hot);width:0}.spark{width:100%;height:90px;background:#0d120f;border:1px solid #223128;border-radius:11px}.events{display:grid;gap:6px;max-height:280px;overflow:auto}.event{font-size:10px;line-height:1.45;padding:7px 8px;background:#0d120f;border:1px solid #223128;border-radius:9px}.genes{display:grid;gap:7px}.gene{background:#0d120f;border:1px solid #223128;border-radius:10px;padding:8px}.genome{font-size:10px;line-height:1.7;word-break:break-word}.token{display:inline-block;border:1px solid #35483d;border-radius:6px;padding:1px 4px;margin:1px}.word{border-color:#6f5c7d;color:#e0c7ef}.foot{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 2px}details{border-top:1px solid var(--line);padding-top:9px;margin-top:10px}summary{font-size:11px;color:var(--muted)}code{color:#d9e7de}
+@media(min-width:780px){.grid{grid-template-columns:1.2fr .8fr}.span2{grid-column:1/-1}.stats{grid-template-columns:repeat(4,1fr)}.controls{grid-template-columns:repeat(5,1fr)}}
+</style></head><body><div class="app">
+<div class="top"><div><h1>AGENT LANGUAGE // 043 · LONGEVITY CONTROL</h1><div class="sub">The same fifty deterministic worlds, with one deliberate intervention: no maximum age. Founders now die only when the ecology kills them.</div></div><div class="badge">NO AGE CAP</div></div>
+<div class="grid">
+<section class="panel span2"><h2>CONTROL</h2><div class="stats"><div class="stat"><b id="worldNo">1</b><span>WORLD</span></div><div class="stat"><b id="tick">0</b><span>TICKS</span></div><div class="stat"><b id="pop">0</b><span>SEEDS</span></div><div class="stat"><b id="gen">0</b><span>MAX GENERATION</span></div><div class="stat"><b id="words">0</b><span>WORDS BORN</span></div><div class="stat"><b id="dynasty">—</b><span>ESTABLISHED LINEAGE</span></div></div><div class="controls" style="margin-top:10px"><button id="play" class="primary">PLAY</button><button id="step1k">+1K</button><button id="step10k">+10K</button><select id="speed" aria-label="Live speed"><option value="1">LIVE 1×</option><option value="5">LIVE 5×</option><option value="25">LIVE 25×</option><option value="100">LIVE 100×</option><option value="1000">LIVE 1,000×</option><option value="10000">LIVE 10,000×</option></select><button id="nextAgeCap">NEXT 042 @8000</button><button id="prevWorld">PREV WORLD</button><button id="nextWorld">NEXT WORLD</button><button id="replay" class="danger">REPLAY WORLD</button></div><div id="status" class="sub" style="margin-top:7px">Looking for the latest Build 040 volume…</div></section>
+
+<section class="panel span2"><h2>50-WORLD LONGEVITY SURVEY</h2><div class="stats"><div class="stat"><b id="surveyVisited">0</b><span>VISITED</span></div><div class="stat"><b id="surveyAlive">0</b><span>ALIVE NOW / LAST SEEN</span></div><div class="stat"><b id="surveyExtinct">0</b><span>ECOLOGICAL EXTINCTIONS</span></div><div class="stat"><b id="surveySingle">0</b><span>REACHED 1 LINEAGE</span></div></div><div class="surveyNav"><button id="surveyPrev">←</button><input id="worldJump" type="number" inputmode="numeric" min="1" max="50" value="1" aria-label="World number 1 through 50"><button id="surveyGo">GO</button><button id="surveyNext">→</button></div><div id="surveyCurrent" class="sub" style="margin-top:9px">Survey ledger initializing…</div><div id="surveyList" class="surveyList"></div></section>
+
+<section class="panel span2"><h2>LONGEVITY READOUT</h2><div class="stats"><div class="stat"><b id="founderAlive">0</b><span>FOUNDERS ALIVE</span></div><div class="stat"><b id="descAlive">0</b><span>DESCENDANTS ALIVE</span></div><div class="stat"><b id="oldestAge">0</b><span>OLDEST AGE</span></div><div class="stat"><b id="post8Birth">—</b><span>FIRST BIRTH AFTER 8000</span></div></div><div id="pairedStatus" class="sub" style="margin-top:9px">Reading Build 042 survey ledger for paired cases…</div></section>
+
+<section class="panel span2"><h2>3D OBSERVATORY</h2><div class="observatoryWrap"><canvas id="space" width="760" height="570" aria-label="Rotatable three-dimensional view of the living volume"></canvas></div><div class="controls viewerControls"><button id="viewIso">ISO</button><button id="viewFront">FRONT</button><button id="viewSide">SIDE</button><button id="viewTop">TOP</button><button id="showFields">FIELDS OFF</button><button id="showSpine" class="on">SPINE ON</button><button id="focusSlice">ALL LAYERS</button><button id="lineageOnly">ALL LINEAGES</button><button id="autoRotate">AUTO OFF</button><button id="resetView">RESET VIEW</button></div><div id="spaceStatus" class="sub viewerHint">Drag to rotate · pinch to zoom · tap an agent to inspect · colored line = centroid spine.</div></section>
+
+<section class="panel"><h2>VOLUME SLICE</h2><div class="dishWrap"><canvas id="dish" width="640" height="480" aria-label="Seedbed 3D slice"></canvas></div><div class="sliceControl"><button id="zDown" aria-label="Previous Z slice">Z−</button><input id="zSlice" type="range" min="0" max="7" step="1" value="3" aria-label="Z slice"><button id="zUp" aria-label="Next Z slice">Z+</button></div><div id="sliceLabel" class="sub" style="margin-top:6px"></div><div class="legend"><span class="key"><span class="swatch" style="background:#314733"></span>α</span><span class="key"><span class="swatch" style="background:#3a4052"></span>β</span><span class="key"><span class="swatch" style="background:#493b4c"></span>γ</span><span class="key"><span class="swatch" style="background:#4a4430"></span>δ</span><span class="key">○ Z+ · × Z−</span></div></section>
+
+<section class="panel"><h2>SELECTED SEED</h2><div id="inspect" class="sub">Tap a seed in the current slice.</div><details><summary>PRIMITIVE ALPHABET</summary><div class="sub" style="margin-top:8px"><code>P0</code> move · <code>P1</code> previous heading · <code>P2</code> next heading · <code>P3</code> touch · <code>P4</code> sample · <code>P5</code> flip internal bit · <code>P6</code> skip next if bit=0 · <code>P7</code> write bit.<br><br>The alphabet is unchanged. Headings now cycle through N, E, S, W, Z+, Z−, so existing turn genes can discover depth without adding a new primitive.</div></details></section>
+
+<section class="panel"><h2>DEPTH PROFILE</h2><div id="depthProfile" class="genes"><div class="sub">Waiting for life.</div></div></section>
+
+<section class="panel"><h2>STRUCTURE READOUT</h2><div id="structureReadout" class="sub">Waiting for the volume.</div></section>
+
+<section class="panel"><h2>HEREDITY</h2><div id="heredity" class="genes"><div class="sub">Waiting for descendants.</div></div><div class="sub" style="margin-top:8px">Observer threshold for “established”: one founder lineage must maintain ≥8 living descendants and ≥40% of the population for 1,000 consecutive ticks. This milestone does not affect the dish.</div></section>
+
+<section class="panel"><h2>POPULATION TRACE</h2><canvas id="spark" class="spark" width="640" height="90" aria-label="Population history chart"></canvas><div id="birthDeath" class="sub" style="margin-top:7px"></div></section>
+
+<section class="panel"><h2>CONSERVATION WATCH</h2><div id="conserve" class="genes"><div class="sub">No conserved structures yet.</div></div></section>
+
+<section class="panel span2"><h2>FOSSIL RECORD</h2><div id="events" class="events"><div class="event">tick 0 · 32 unrelated random founders entered the dish.</div></div></section>
+
+<section class="panel span2"><h2>CONTROL CONTRACT</h2><div class="sub">Build 043 is paired to Build 042. It uses the same fifty world seeds, identical world generation, energy, movement, reproduction, mutation, recombination, population logic and RNG sequence. The single ecological change is <code>MAX_AGE = Infinity</code>. The age check remains in place, but no finite age can trigger it.<br><br>043 never imports an evolved 042/041 world state. Every longevity world starts clean at tick 0 so the pair remains identical until the moment the old 8,000-tick age rule would have mattered. The Build 042 survey ledger is read only as an observer reference, especially for worlds recorded extinct exactly at tick 8,000.<br><br>The longevity ledger additionally records founders versus descendants, the state at tick 8,000, oldest observed age, last birth tick and the first reproduction after tick 8,000. None of those measurements call RNG or feed back into the organisms.</div></section>
+</div>
+<div class="foot"><span class="warn">Observer-only:</span> camera rotation, field visibility, slice focus, lineage filtering, centroid calculations and seed selection never feed back into the volume. The organisms do not know they are being rendered.</div>
+</div><script>
+(()=>{'use strict';
+const VERSION=43,STORE='forge-agent-language-043-longevity-control',SURVEY_STORE='forge-agent-language-043-survey-ledger',BASELINE_STORE='forge-agent-language-042-survey-ledger',WORLD_COUNT=50,W=32,H=24,D=8,MID_Z=3,N=W*H*D,FOUNDERS=32,POP_CAP=180,MAX_AGE=Infinity,BIRTH_THRESHOLD=18,BIRTH_COST=6;
+const BASE_LEAK=.015,ACTION_COST=.005,RECOMB=.16,LEGACY_WORLD_SEEDS=[37037,37117,37223,37337,37447,37561,37673,37783];
+const $=id=>document.getElementById(id),canvas=$('dish'),ctx=canvas.getContext('2d'),spark=$('spark'),sctx=spark.getContext('2d'),space=$('space'),xctx=space.getContext('2d');
+let running=false,busy=false,raf=0,selectedId=null,saveCounter=0,liveSpeed=1,sliceZ=MID_Z;
+let S=null,SURVEY={},BASELINE={},viewRaf=0,last3D=0,viewDirty=true,pickPoints=[];
+const view={yaw:-.72,pitch:.46,zoom:1.04,panX:0,panY:0,fields:false,spine:true,focusSlice:false,lineageOnly:false,auto:false};
+
+function hash32(str){let h=2166136261>>>0;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}h+=0x6D2B79F5;h=Math.imul(h^(h>>>15),h|1);h^=h+Math.imul(h^(h>>>7),h|61);return(h^(h>>>14))>>>0}
+function worldSeedAt(i){return i<LEGACY_WORLD_SEEDS.length?LEGACY_WORLD_SEEDS[i]:hash32('agent-language-040-volume-world-'+(i+1))}
+function rand(){let a=S.rng>>>0;a=(a+0x6D2B79F5)>>>0;S.rng=a;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}
+function ri(n){return Math.floor(rand()*n)}function chance(p){return rand()<p}
+function idx(x,y,z){return(z*H+y)*W+x}function inside(x,y,z){return x>=0&&x<W&&y>=0&&y<H&&z>=0&&z<D}function dirName(d){return['N','E','S','W','Z+','Z−'][d]||'?'}
+function pushEvent(text,kind=''){S.events.unshift({tick:S.tick,text,kind});if(S.events.length>60)S.events.length=60}
+function lineageColor(n,a=1){const hue=(n*137.508)%360;return 'hsla('+hue+',65%,62%,'+a+')'}
+
+function blankWorld(){
+ const type=Array(N).fill(0),charge=Array(N).fill(0),phase=Array(N).fill(0),mark=Array(N).fill(0),markCharge=Array(N).fill(0),dir=Array(N).fill(0);
+ function blob(t,count,steps){for(let b=0;b<count;b++){let x=ri(W),y=ri(H);for(let k=0;k<steps;k++){const i=idx(x,y,MID_Z);type[i]=t;if(t===1)charge[i]=1+2*rand();if(t===2)phase[i]=ri(32);if(t===3){mark[i]=ri(2);markCharge[i]=.4+rand()}if(t===4)dir[i]=ri(4);const d=ri(4);x=Math.max(0,Math.min(W-1,x+[0,1,0,-1][d]));y=Math.max(0,Math.min(H-1,y+[-1,0,1,0][d]))}}}
+ blob(1,7,18);blob(2,6,16);blob(3,6,16);blob(4,7,18);
+ return{type,charge,phase,mark,markCharge,dir,alphaCells:[],gammaCells:[]}
+}
+function localRand(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}}
+function fillExtraLayers(world,worldSeed){
+ for(let z=0;z<D;z++){if(z===MID_Z)continue;const vr=localRand((worldSeed^Math.imul(z+1,0x9e3779b1))>>>0),vri=n=>Math.floor(vr()*n);
+  function blob(t,count,steps){for(let b=0;b<count;b++){let x=vri(W),y=vri(H);for(let k=0;k<steps;k++){const i=idx(x,y,z);world.type[i]=t;if(t===1)world.charge[i]=1+2*vr();if(t===2)world.phase[i]=vri(32);if(t===3){world.mark[i]=vri(2);world.markCharge[i]=.4+vr()}if(t===4)world.dir[i]=vri(6);const d=vri(4);x=Math.max(0,Math.min(W-1,x+[0,1,0,-1][d]));y=Math.max(0,Math.min(H-1,y+[-1,0,1,0][d]))}}}
+  blob(1,7,18);blob(2,6,16);blob(3,6,16);blob(4,7,18)
+ }
+ indexRenewables(world)
+}
+function indexRenewables(world){world.alphaCells=[];world.gammaCells=[];for(let i=0;i<N;i++){if(world.type[i]===1)world.alphaCells.push(i);else if(world.type[i]===3)world.gammaCells.push(i)}}
+function randomGenome(){const n=12+ri(9),g=[];for(let i=0;i<n;i++)g.push(ri(8));return g}
+function newSeed(x,y,lineage){return{id:S.nextId++,x,y,z:MID_Z,dir:ri(4),bit:ri(2),pc:0,genome:randomGenome(),energy:9+rand()*2,age:0,cool:40,generation:0,lineage,parent:null,born:S.tick}}
+function fresh(worldIndex=0){
+ checkpointSurvey();const wi=((worldIndex%WORLD_COUNT)+WORLD_COUNT)%WORLD_COUNT,ws=worldSeedAt(wi);
+ S={version:VERSION,worldIndex:wi,worldSeed:ws,rng:ws,tick:0,nextId:1,nextLineage:1,world:null,seeds:[],registry:[],stats:{births:0,deaths:0,recombinations:0,mutations:0,condensations:0,maxGeneration:0},events:[],history:[],firstConservedWord:null,firstBoundaryWord:null,firstEstablishedLineage:null,lineageStreaks:{},topWord:null,topMotif:null};
+ S.world=blankWorld();
+ const used=new Set();for(let n=0;n<FOUNDERS;n++){let x,y,k;do{x=ri(W);y=ri(H);k=idx(x,y,MID_Z)}while(used.has(k));used.add(k);const lin=S.nextLineage++;S.seeds.push(newSeed(x,y,lin))}
+ fillExtraLayers(S.world,ws);sliceZ=MID_Z;
+ pushEvent('world '+(wi+1)+' · 32 Build-037-matched founders entered slice '+(MID_Z+1)+' of '+D+'.','birth');
+ save();render()
+}
+function saveSurvey(){try{localStorage.setItem(SURVEY_STORE,JSON.stringify(SURVEY))}catch{}}
+function loadSurvey(){try{const q=JSON.parse(localStorage.getItem(SURVEY_STORE));if(q&&typeof q==='object')SURVEY=q}catch{}}
+function loadBaseline(){try{const q=JSON.parse(localStorage.getItem(BASELINE_STORE));if(q&&typeof q==='object')BASELINE=q}catch{}}
+function surveyRecord(){if(!S)return null;const k=String((S.worldIndex??0)+1);if(!SURVEY[k]){const hist=(S.history||[]).map(q=>q.pop).filter(n=>n>0),now=S.seeds?.length||0;SURVEY[k]={world:(S.worldIndex??0)+1,seed:S.worldSeed,lastTick:S.tick||0,living:now,maxPopulation:Math.max(now,...hist,0),minPositivePopulation:Math.min(...(hist.length?hist:[now||FOUNDERS])),currentLineages:0,minPositiveLineages:FOUNDERS,oneLineageTick:null,extinctionTick:now?null:(S.tick||0),maxGeneration:S.stats?.maxGeneration||0,maxOccupiedLayers:0,foundersAlive:FOUNDERS,descendantsAlive:0,oldestAge:0,lastBirthCount:S.stats?.births||0,lastBirthTick:null,firstBirthTick:null,firstPost8000Birth:null,at8000:null}}return SURVEY[k]}
+function observeSurveyFast(){const r=surveyRecord();if(!r)return;const pop=S.seeds.length,births=S.stats.births||0;r.lastTick=S.tick;r.living=pop;r.maxPopulation=Math.max(r.maxPopulation||0,pop);if(pop>0)r.minPositivePopulation=Math.min(r.minPositivePopulation??pop,pop);else if(r.extinctionTick==null)r.extinctionTick=S.tick;r.maxGeneration=Math.max(r.maxGeneration||0,S.stats.maxGeneration||0);if(births>(r.lastBirthCount||0)){r.lastBirthTick=S.tick;if(r.firstBirthTick==null)r.firstBirthTick=S.tick;if(S.tick>8000&&r.firstPost8000Birth==null)r.firstPost8000Birth=S.tick}r.lastBirthCount=births}
+function observeSurveyScan(){const r=surveyRecord();if(!r)return;const lines=new Set(),layers=new Set();let founders=0,desc=0,oldest=0;for(const s of S.seeds){lines.add(s.lineage);layers.add(s.z);if(s.generation===0)founders++;else desc++;if(s.age>oldest)oldest=s.age}r.currentLineages=lines.size;if(lines.size>0)r.minPositiveLineages=Math.min(r.minPositiveLineages??lines.size,lines.size);if(lines.size===1&&r.oneLineageTick==null)r.oneLineageTick=S.tick;r.maxOccupiedLayers=Math.max(r.maxOccupiedLayers||0,layers.size);r.foundersAlive=founders;r.descendantsAlive=desc;r.oldestAge=Math.max(r.oldestAge||0,oldest);if(S.tick===8000&&!r.at8000)r.at8000={population:S.seeds.length,founders,descendants:desc,lineages:lines.size,births:S.stats.births}}
+function checkpointSurvey(){if(!S)return;observeSurveyFast();observeSurveyScan();saveSurvey()}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(S));saveSurvey()}catch{}}
+function load(){try{const q=JSON.parse(localStorage.getItem(STORE));if(q&&q.version===VERSION){S=q;if(!S.world.alphaCells||!S.world.gammaCells)indexRenewables(S.world);sliceZ=MID_Z;return true}}catch{}return false}
+
+function wordSeq(tok){if(tok<8)return[tok];return S.registry[tok-8]?.seq||[]}
+function tokenLabel(t){return t<8?'P'+t:'W'+(t-8)}
+function tokenHTML(t){return '<span class="token '+(t>=8?'word':'')+'">'+tokenLabel(t)+'</span>'}
+function seqKey(a){return a.join(',')}
+function getOrCreateWord(seq,lineage){
+ const key=seqKey(seq);let ix=S.registry.findIndex(w=>w.key===key);if(ix>=0)return ix+8;
+ const id=S.registry.length;S.registry.push({id,seq:seq.slice(),key,born:S.tick,lineage});S.stats.condensations++;pushEvent('word W'+id+' born: '+seq.map(x=>'P'+x).join(' '),'word');return id+8
+}
+function expandGenome(g,limit=96){const out=[];for(const t of g){out.push(...wordSeq(t));if(out.length>=limit)break}return out.slice(0,limit)}
+function condense(g,lineage){
+ if(g.length<2)return g;const i=ri(g.length-1),a=wordSeq(g[i]),b=wordSeq(g[i+1]),seq=[...a,...b];if(seq.length<2||seq.length>4)return g;
+ const w=getOrCreateWord(seq,lineage),ng=g.slice();ng.splice(i,2,w);return ng
+}
+function mutateGenome(g,lineage){
+ let a=g.slice(),changed=false;
+ if(chance(.12)&&a.length){a[ri(a.length)]=ri(8);changed=true}
+ if(chance(.05)&&a.length<36){a.splice(ri(a.length+1),0,ri(8));changed=true}
+ if(chance(.05)&&a.length>5){a.splice(ri(a.length),1);changed=true}
+ if(chance(.04)&&a.length<34){const st=ri(a.length),len=1+ri(Math.min(4,a.length-st)),blk=a.slice(st,st+len);a.splice(ri(a.length+1),0,...blk);changed=true}
+ if(chance(.08)){const before=a.join('|');a=condense(a,lineage);if(a.join('|')!==before)changed=true}
+ if(chance(.03)){const wi=a.map((t,i)=>t>=8?i:-1).filter(i=>i>=0);if(wi.length){const i=wi[ri(wi.length)],seq=wordSeq(a[i]);a.splice(i,1,...seq);changed=true}}
+ if(changed)S.stats.mutations++;return a
+}
+function crossover(a,b){const ca=ri(a.length+1),cb=ri(b.length+1);let g=[...a.slice(0,ca),...b.slice(cb)];if(g.length<5)g=[...a.slice(0,Math.min(a.length,5)),...g];if(g.length>36)g=g.slice(0,36);return g}
+
+function occupancy(){const o=new Int32Array(N);o.fill(-1);for(let i=0;i<S.seeds.length;i++){const s=S.seeds[i];if(s.energy>0)o[idx(s.x,s.y,s.z)]=i}return o}
+function betaPhase(i){return ((S.tick+S.world.phase[i])%32)<16?1:0}
+function sampleCell(s,i){const t=S.world.type[i];if(t===1)s.bit=S.world.charge[i]>1.5?1:0;else if(t===2)s.bit=betaPhase(i);else if(t===3)s.bit=S.world.mark[i];else if(t===4)s.bit=S.world.dir[i]&1;else s.bit=0}
+function touchCell(s,i){const t=S.world.type[i];if(t===1){const take=Math.min(1.0,S.world.charge[i]);S.world.charge[i]-=take;s.energy+=take}else if(t===2){if(s.bit===betaPhase(i))s.energy+=.28;else s.energy-=.05}}
+function writeCell(s,i){if(S.world.type[i]===3&&S.world.mark[i]!==s.bit&&S.world.markCharge[i]>=.20){S.world.mark[i]=s.bit;S.world.markCharge[i]-=.20;s.energy+=.20}}
+function moveSeed(s,occ){const dx=[0,1,0,-1,0,0][s.dir],dy=[-1,0,1,0,0,0][s.dir],dz=[0,0,0,0,1,-1][s.dir],nx=s.x+dx,ny=s.y+dy,nz=s.z+dz;if(!inside(nx,ny,nz))return;const ni=idx(nx,ny,nz);if(occ[ni]>=0)return;occ[idx(s.x,s.y,s.z)]=-1;s.x=nx;s.y=ny;s.z=nz;occ[ni]=0;if(S.world.type[ni]===4){const opposite=[2,3,0,1,5,4];if(s.dir===S.world.dir[ni])s.energy+=.14;else if(opposite[s.dir]===S.world.dir[ni])s.energy-=.02}}
+function execPrim(s,p,occ){const i=idx(s.x,s.y,s.z);if(p===0)moveSeed(s,occ);else if(p===1)s.dir=(s.dir+5)%6;else if(p===2)s.dir=(s.dir+1)%6;else if(p===3)touchCell(s,i);else if(p===4)sampleCell(s,i);else if(p===5)s.bit^=1;else if(p===6){if(s.bit===0)s.pc=(s.pc+1)%Math.max(1,s.genome.length)}else if(p===7)writeCell(s,i)}
+function executeToken(s,occ){if(!s.genome.length)return;const tok=s.genome[s.pc%s.genome.length];s.pc=(s.pc+1)%s.genome.length;const seq=wordSeq(tok);s.energy-=ACTION_COST+.003*Math.max(0,seq.length-1);for(const p of seq)execPrim(s,p,occ)}
+
+function nearbyMate(s){const mates=[];for(const q of S.seeds){if(q.id!==s.id&&q.energy>0&&Math.abs(q.x-s.x)<=1&&Math.abs(q.y-s.y)<=1&&Math.abs(q.z-s.z)<=1)mates.push(q)}return mates.length?mates[ri(mates.length)]:null}
+function birth(s,occ){
+ if(S.seeds.length>=POP_CAP||s.energy<BIRTH_THRESHOLD||s.cool>0)return null;
+ const spots=[];for(let dz=-1;dz<=1;dz++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy&&!dz)continue;const x=s.x+dx,y=s.y+dy,z=s.z+dz;if(inside(x,y,z)&&occ[idx(x,y,z)]<0)spots.push([x,y,z])}
+ if(!spots.length)return null;
+ const [x,y,z]=spots[ri(spots.length)],mate=chance(RECOMB)?nearbyMate(s):null;
+ let genome=mate?crossover(s.genome,mate.genome):s.genome.slice();if(mate)S.stats.recombinations++;
+ genome=mutateGenome(genome,s.lineage);
+ s.energy-=BIRTH_COST;s.cool=35;
+ const child={id:S.nextId++,x,y,z,dir:ri(6),bit:ri(2),pc:0,genome,energy:BIRTH_COST,age:0,cool:55,generation:Math.max(s.generation,mate?mate.generation:0)+1,lineage:s.lineage,parent:s.id,born:S.tick};
+ S.stats.births++;S.stats.maxGeneration=Math.max(S.stats.maxGeneration,child.generation);return child
+}
+function updateWorld(){for(const i of S.world.alphaCells)S.world.charge[i]=Math.min(3,S.world.charge[i]+.014);for(const i of S.world.gammaCells)S.world.markCharge[i]=Math.min(1.2,S.world.markCharge[i]+.005)}
+function step(){
+ S.tick++;updateWorld();const occ=occupancy(),born=[];const start=S.seeds.length?S.tick%S.seeds.length:0;
+ for(let q=0;q<S.seeds.length;q++){const s=S.seeds[(start+q)%S.seeds.length];if(s.energy<=0)continue;s.age++;if(s.cool>0)s.cool--;s.energy-=BASE_LEAK;executeToken(s,occ);const c=birth(s,occ);if(c){born.push(c);occ[idx(c.x,c.y,c.z)]=0}}
+ if(born.length)S.seeds.push(...born);
+ const before=S.seeds.length;S.seeds=S.seeds.filter(s=>s.energy>0&&s.age<MAX_AGE);S.stats.deaths+=before-S.seeds.length;
+ if(!S.seeds.length){pushEvent('the dish went silent. no lineage remained.','death');running=false}
+ if(S.tick%250===0){scanConservation();scanEstablishment()}
+ if(S.tick%100===0){S.history.push({tick:S.tick,pop:S.seeds.length,births:S.stats.births,deaths:S.stats.deaths,words:S.registry.length});if(S.history.length>360)S.history.shift()}
+ observeSurveyFast();if(S.tick%50===0||!S.seeds.length)observeSurveyScan();
+ if(++saveCounter>=(liveSpeed>=1000?10000:1000)){saveCounter=0;save()}
+}
+function scanEstablishment(){
+ const counts=new Map();for(const s of S.seeds)counts.set(s.lineage,(counts.get(s.lineage)||0)+1);
+ const pop=S.seeds.length,alive=new Set(counts.keys());
+ for(const k of Object.keys(S.lineageStreaks||{}))if(!alive.has(+k))S.lineageStreaks[k]=0;
+ for(const [lin,c] of counts){const qualifies=c>=8&&pop>0&&c/pop>=.40;S.lineageStreaks[lin]=qualifies?(S.lineageStreaks[lin]||0)+250:0;if(!S.firstEstablishedLineage&&S.lineageStreaks[lin]>=1000){S.firstEstablishedLineage={tick:S.tick,lineage:lin,count:c,share:c/pop};pushEvent('lineage '+lin+' established: '+c+' living · '+Math.round(100*c/pop)+'% share sustained for 1,000 ticks.','milestone')}}
+}
+function scanConservation(){
+ const pop=S.seeds.length;if(!pop){S.topWord=null;S.topMotif=null;return}
+ const wc=new Map(),mc=new Map();
+ for(const s of S.seeds){const uw=new Set(s.genome.filter(t=>t>=8));for(const w of uw)wc.set(w,(wc.get(w)||0)+1);const ex=expandGenome(s.genome,80),seen=new Set();for(let i=0;i<ex.length-2;i++)seen.add(ex.slice(i,i+3).join(','));for(const k of seen)mc.set(k,(mc.get(k)||0)+1)}
+ const best=[...wc.entries()].sort((a,b)=>b[1]-a[1])[0];S.topWord=best?{token:best[0],count:best[1],share:best[1]/pop}:null;
+ const bm=[...mc.entries()].sort((a,b)=>b[1]-a[1])[0];S.topMotif=bm?{seq:bm[0].split(',').map(Number),count:bm[1],share:bm[1]/pop}:null;
+ if(pop>=12&&!S.firstConservedWord&&best&&best[1]/pop>=.35){S.firstConservedWord={tick:S.tick,token:best[0],share:best[1]/pop};pushEvent('first conserved word: '+tokenLabel(best[0])+' reached '+Math.round(100*best[1]/pop)+'% of living seeds.','milestone')}
+ if(pop>=12&&!S.firstBoundaryWord){const candidates=[...wc.entries()].filter(([t,c])=>c/pop>=.35&&wordSeq(t).some(p=>p===3||p===7)).sort((a,b)=>b[1]-a[1]);if(candidates.length){const [t,c]=candidates[0];S.firstBoundaryWord={tick:S.tick,token:t,share:c/pop};pushEvent('first conserved external-action word: '+tokenLabel(t)+' = '+wordSeq(t).map(p=>'P'+p).join(' ')+' · '+Math.round(100*c/pop)+'% prevalence.','boundary')}}
+}
+
+function drawDish(){
+ const dpr=Math.max(1,Math.min(2,devicePixelRatio||1)),cssW=canvas.clientWidth||640,cssH=cssW*3/4;if(canvas.width!==Math.floor(cssW*dpr)||canvas.height!==Math.floor(cssH*dpr)){canvas.width=Math.floor(cssW*dpr);canvas.height=Math.floor(cssH*dpr)}
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cssW,cssH);ctx.fillStyle='#070a08';ctx.fillRect(0,0,cssW,cssH);
+ const cw=cssW/W,ch=cssH/H,fill=['#0b100d','#314733','#3a4052','#493b4c','#4a4430'];
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=idx(x,y,sliceZ),t=S.world.type[i];ctx.fillStyle=fill[t];ctx.fillRect(x*cw+.5,y*ch+.5,cw-1,ch-1);if(t===3&&S.world.mark[i]){ctx.fillStyle='rgba(237,244,239,.28)';ctx.fillRect(x*cw+cw*.35,y*ch+ch*.35,cw*.3,ch*.3)}}
+ for(const s of S.seeds){if(s.z!==sliceZ)continue;const px=(s.x+.5)*cw,py=(s.y+.5)*ch,r=Math.max(2,Math.min(cw,ch)*.34);ctx.beginPath();ctx.fillStyle=lineageColor(s.lineage,.92);ctx.arc(px,py,r,0,Math.PI*2);ctx.fill();if(s.id===selectedId){ctx.lineWidth=2;ctx.strokeStyle='#ffffff';ctx.stroke()}ctx.strokeStyle='#07100a';ctx.lineWidth=1.5;if(s.dir<4){const ang=[-Math.PI/2,0,Math.PI/2,Math.PI][s.dir];ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px+Math.cos(ang)*r,py+Math.sin(ang)*r);ctx.stroke()}else if(s.dir===4){ctx.beginPath();ctx.arc(px,py,r*.34,0,Math.PI*2);ctx.stroke()}else{ctx.beginPath();ctx.moveTo(px-r*.3,py-r*.3);ctx.lineTo(px+r*.3,py+r*.3);ctx.moveTo(px+r*.3,py-r*.3);ctx.lineTo(px-r*.3,py+r*.3);ctx.stroke()}}
+}
+function renderDepth(){const counts=Array(D).fill(0);for(const s of S.seeds)counts[s.z]++;const max=Math.max(1,...counts);$('depthProfile').innerHTML=counts.map((n,z)=>'<div class="depthBar"><span>Z'+(z+1)+(z===MID_Z?'*':'')+'</span><div class="depthTrack"><div class="depthFill" style="width:'+(100*n/max)+'%"></div></div><span>'+n+'</span></div>').join('');const here=counts[sliceZ];$('sliceLabel').textContent='slice '+(sliceZ+1)+' / '+D+' · '+here+' living here'+(sliceZ===MID_Z?' · founder plane':'');$('zSlice').value=String(sliceZ)}
+function layerCentroids(){
+ const out=Array(D).fill(null),sum=Array.from({length:D},()=>({x:0,y:0,n:0}));
+ for(const s of S.seeds){const q=sum[s.z];q.x+=s.x;q.y+=s.y;q.n++}
+ for(let z=0;z<D;z++)if(sum[z].n)out[z]={x:sum[z].x/sum[z].n,y:sum[z].y/sum[z].n,z,n:sum[z].n};
+ return out
+}
+function structureMetrics(){
+ const C=layerCentroids(),live=C.filter(Boolean);if(!live.length)return{C,populated:0,path:0,end:0,tortuosity:0,sweep:0};
+ let path=0;for(let i=1;i<live.length;i++)path+=Math.hypot(live[i].x-live[i-1].x,live[i].y-live[i-1].y);
+ const end=live.length>1?Math.hypot(live.at(-1).x-live[0].x,live.at(-1).y-live[0].y):0;
+ const total=live.reduce((a,q)=>a+q.n,0),gx=live.reduce((a,q)=>a+q.x*q.n,0)/total,gy=live.reduce((a,q)=>a+q.y*q.n,0)/total;
+ const ang=live.map(q=>({a:Math.atan2(q.y-gy,q.x-gx),r:Math.hypot(q.x-gx,q.y-gy)})).filter(q=>q.r>.75);
+ let sweep=0;if(ang.length>1){let prev=ang[0].a;for(let i=1;i<ang.length;i++){let d=ang[i].a-prev;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;sweep+=d;prev=ang[i].a}}
+ return{C,populated:live.length,path,end,tortuosity:end>.001?path/end:0,sweep:sweep*180/Math.PI}
+}
+function renderStructure(){
+ const m=structureMetrics(),selected=S.seeds.find(s=>s.id===selectedId),cells=[
+  ['OCCUPIED Z',m.populated+' / '+D],
+  ['SPINE PATH',m.path.toFixed(2)+' cells'],
+  ['END OFFSET',m.end.toFixed(2)+' cells'],
+  ['PATH / END',m.tortuosity?m.tortuosity.toFixed(2):'—'],
+  ['ANGULAR SWEEP',Math.abs(m.sweep).toFixed(0)+'°'],
+  ['FILTER',view.lineageOnly&&selected?'lineage '+selected.lineage:'all living']
+ ];
+ $('structureReadout').innerHTML='<div class="structureGrid">'+cells.map(q=>'<div class="structureCell"><b>'+q[1]+'</b><span>'+q[0]+'</span></div>').join('')+'</div><div class="sub" style="margin-top:8px">Angular sweep follows the layer-centroid path around the population-wide center. It is descriptive only; near-center centroids are ignored because their angle is unstable.</div>'
+}
+function centerPoint(x,y,z){return{x:x-(W-1)/2,y:(H-1)/2-y,z:z-(D-1)/2}}
+function rotatePoint3(p){const cy=Math.cos(view.yaw),sy=Math.sin(view.yaw),cp=Math.cos(view.pitch),sp=Math.sin(view.pitch);const x1=p.x*cy-p.z*sy,z1=p.x*sy+p.z*cy,y2=p.y*cp-z1*sp,z2=p.y*sp+z1*cp;return{x:x1,y:y2,z:z2}}
+function project3(p,w,h){const r=rotatePoint3(p),base=Math.min(w/(W+8),h/(H+8))*view.zoom,cam=58,persp=cam/Math.max(18,cam+r.z);return{x:w*.5+r.x*base*persp+view.panX,y:h*.5-r.y*base*persp+view.panY,z:r.z,p:persp}}
+function drawSegment3(a,b,w,h,stroke,width=1,alpha=1){const A=project3(a,w,h),B=project3(b,w,h);xctx.save();xctx.globalAlpha=alpha;xctx.strokeStyle=stroke;xctx.lineWidth=width;xctx.beginPath();xctx.moveTo(A.x,A.y);xctx.lineTo(B.x,B.y);xctx.stroke();xctx.restore()}
+function drawVolumeFrame(w,h){
+ for(let z=0;z<D;z++){const zc=z-(D-1)/2,corners=[{x:-(W-1)/2,y:-(H-1)/2,z:zc},{x:(W-1)/2,y:-(H-1)/2,z:zc},{x:(W-1)/2,y:(H-1)/2,z:zc},{x:-(W-1)/2,y:(H-1)/2,z:zc}],a=z===sliceZ?.45:.12;for(let i=0;i<4;i++)drawSegment3(corners[i],corners[(i+1)%4],w,h,z===sliceZ?'#77dfff':'#839088',z===sliceZ?1.4:1,a)}
+ const low=-(D-1)/2,high=(D-1)/2,xs=[-(W-1)/2,(W-1)/2],ys=[-(H-1)/2,(H-1)/2];for(const x of xs)for(const y of ys)drawSegment3({x,y,z:low},{x,y,z:high},w,h,'#839088',1,.16)
+}
+function draw3D(){
+ const dpr=Math.max(1,Math.min(2,devicePixelRatio||1)),w=space.clientWidth||760,h=w*3/4;if(space.width!==Math.floor(w*dpr)||space.height!==Math.floor(h*dpr)){space.width=Math.floor(w*dpr);space.height=Math.floor(h*dpr)}
+ xctx.setTransform(dpr,0,0,dpr,0,0);xctx.clearRect(0,0,w,h);xctx.fillStyle='#050806';xctx.fillRect(0,0,w,h);drawVolumeFrame(w,h);
+ const selected=S.seeds.find(s=>s.id===selectedId),lineage=selected?.lineage,items=[],fieldColors=['','#314733','#56627f','#765a78','#827347'];
+ if(view.fields){for(let i=0;i<N;i++){const t=S.world.type[i];if(!t)continue;const z=Math.floor(i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;const rem=i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,p=project3(centerPoint(x,y,z),w,h);items.push({kind:'field',x:p.x,y:p.y,z:p.z,p:p.p,color:fieldColors[t],alpha:view.focusSlice?.35:.16})}}
+ for(const s of S.seeds){if(view.lineageOnly&&lineage!=null&&s.lineage!==lineage)continue;const p=project3(centerPoint(s.x,s.y,s.z),w,h),ghost=view.focusSlice&&s.z!==sliceZ;items.push({kind:'seed',x:p.x,y:p.y,z:p.z,p:p.p,seed:s,alpha:ghost?.10:.96})}
+ items.sort((a,b)=>b.z-a.z);pickPoints=[];
+ for(const q of items){xctx.save();xctx.globalAlpha=q.alpha;if(q.kind==='field'){const r=Math.max(.7,1.15*q.p);xctx.fillStyle=q.color;xctx.fillRect(q.x-r,q.y-r,r*2,r*2)}else{const r=Math.max(2.1,3.7*q.p);xctx.beginPath();xctx.fillStyle=lineageColor(q.seed.lineage,.96);xctx.arc(q.x,q.y,r,0,Math.PI*2);xctx.fill();if(q.seed.id===selectedId){xctx.lineWidth=2;xctx.strokeStyle='#fff';xctx.stroke()}pickPoints.push({x:q.x,y:q.y,r:Math.max(10,r*2.3),depth:q.z,id:q.seed.id})}xctx.restore()}
+ if(view.spine){const C=layerCentroids().filter(Boolean);if(C.length){xctx.save();xctx.lineWidth=2.2;xctx.strokeStyle='#ffd66f';xctx.globalAlpha=.9;xctx.beginPath();C.forEach((q,i)=>{const p=project3(centerPoint(q.x,q.y,q.z),w,h);i?xctx.lineTo(p.x,p.y):xctx.moveTo(p.x,p.y)});xctx.stroke();for(const q of C){const p=project3(centerPoint(q.x,q.y,q.z),w,h);xctx.beginPath();xctx.fillStyle='#ffd66f';xctx.arc(p.x,p.y,3.2,0,Math.PI*2);xctx.fill()}xctx.restore()}}
+ const axis=[['X',{x:3,y:0,z:0},'#b9ff79'],['Y',{x:0,y:3,z:0},'#77dfff'],['Z',{x:0,y:0,z:3},'#ffd66f']],o=project3({x:-(W-1)/2-2,y:-(H-1)/2-2,z:-(D-1)/2},w,h);xctx.font='9px ui-monospace';for(const [label,v,col] of axis){const p=project3({x:-(W-1)/2-2+v.x,y:-(H-1)/2-2+v.y,z:-(D-1)/2+v.z},w,h);xctx.strokeStyle=col;xctx.fillStyle=col;xctx.beginPath();xctx.moveTo(o.x,o.y);xctx.lineTo(p.x,p.y);xctx.stroke();xctx.fillText(label,p.x+3,p.y)}
+ $('spaceStatus').textContent='world '+((S.worldIndex??0)+1)+' · '+S.seeds.length+' living · slice Z'+(sliceZ+1)+(sliceZ===MID_Z?' founder plane':'')+' · drag rotate · pinch zoom · tap seed';
+}
+function markViewDirty(){viewDirty=true}
+function viewerFrame(t){if(view.auto){view.yaw+=.004;viewDirty=true}if(viewDirty&&(!running||liveSpeed<1000||t-last3D>100)){draw3D();viewDirty=false;last3D=t}viewRaf=requestAnimationFrame(viewerFrame)}
+function drawSpark(){
+ const w=spark.clientWidth||640,h=90,dpr=Math.max(1,Math.min(2,devicePixelRatio||1));if(spark.width!==Math.floor(w*dpr)||spark.height!==Math.floor(h*dpr)){spark.width=Math.floor(w*dpr);spark.height=Math.floor(h*dpr)}sctx.setTransform(dpr,0,0,dpr,0,0);sctx.clearRect(0,0,w,h);sctx.fillStyle='#0d120f';sctx.fillRect(0,0,w,h);if(S.history.length<2)return;const max=Math.max(FOUNDERS,...S.history.map(q=>q.pop),1),pts=S.history; sctx.strokeStyle='#b9ff79';sctx.lineWidth=2;sctx.beginPath();pts.forEach((q,i)=>{const x=i/(pts.length-1)*(w-8)+4,y=h-6-(q.pop/max)*(h-12);i?sctx.lineTo(x,y):sctx.moveTo(x,y)});sctx.stroke();sctx.fillStyle='#91a198';sctx.font='9px ui-monospace';sctx.fillText('0',4,h-3);sctx.fillText(String(max),4,10)
+}
+function renderInspect(){
+ const s=S.seeds.find(q=>q.id===selectedId);if(!s){$('inspect').innerHTML='Tap a seed in the dish.';return}
+ const expanded=expandGenome(s.genome,80);$('inspect').innerHTML='<div class="main">seed #'+s.id+' · lineage '+s.lineage+' · generation '+s.generation+'</div><div class="meta">energy '+s.energy.toFixed(2)+' · age '+s.age+' · cell '+s.x+','+s.y+','+s.z+' · bit '+s.bit+' · heading '+dirName(s.dir)+' · '+s.genome.length+' hereditary tokens / '+expanded.length+' primitive ops when expanded</div><div class="genome" style="margin-top:8px">'+s.genome.map(tokenHTML).join('')+'</div>'
+}
+function renderHeredity(){
+ const line=new Map();for(const s of S.seeds)line.set(s.lineage,(line.get(s.lineage)||0)+1);const top=[...line.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4);if(!top.length){$('heredity').innerHTML='<div class="sub">No living lineage.</div>';return}
+ $('heredity').innerHTML=top.map(([l,c])=>'<div class="gene"><div class="main" style="color:'+lineageColor(l,1)+'">lineage '+l+' · '+c+' living</div><div class="bar"><i style="width:'+Math.min(100,100*c/Math.max(1,S.seeds.length))+'%;background:'+lineageColor(l,1)+'"></i></div></div>').join('')
+}
+function renderConserve(){
+ const blocks=[];if(S.topWord){const t=S.topWord.token;blocks.push('<div class="gene"><div class="main">most common word · '+tokenLabel(t)+'</div><div class="meta">'+wordSeq(t).map(p=>'P'+p).join(' ')+' · '+Math.round(100*S.topWord.share)+'% of living seeds</div></div>')}
+ if(S.topMotif)blocks.push('<div class="gene"><div class="main">most common 3-op motif</div><div class="meta">'+S.topMotif.seq.map(p=>'P'+p).join(' ')+' · '+Math.round(100*S.topMotif.share)+'% prevalence</div></div>');
+ if(S.firstConservedWord)blocks.push('<div class="gene"><div class="main good">first conserved word</div><div class="meta">tick '+S.firstConservedWord.tick.toLocaleString()+' · '+tokenLabel(S.firstConservedWord.token)+' · '+Math.round(100*S.firstConservedWord.share)+'%</div></div>');
+ if(S.firstBoundaryWord)blocks.push('<div class="gene"><div class="main cyan">first conserved external-action word</div><div class="meta">tick '+S.firstBoundaryWord.tick.toLocaleString()+' · '+tokenLabel(S.firstBoundaryWord.token)+' = '+wordSeq(S.firstBoundaryWord.token).map(p=>'P'+p).join(' ')+'</div></div>');
+ if(S.firstEstablishedLineage)blocks.push('<div class="gene"><div class="main good">first established lineage · L'+S.firstEstablishedLineage.lineage+'</div><div class="meta">tick '+S.firstEstablishedLineage.tick.toLocaleString()+' · '+S.firstEstablishedLineage.count+' living · '+Math.round(100*S.firstEstablishedLineage.share)+'% share after 1,000-tick hold</div></div>');
+ $('conserve').innerHTML=blocks.length?blocks.join(''):'<div class="sub">No conserved structures yet.</div>'
+}
+function renderEvents(){$('events').innerHTML=S.events.length?S.events.map(e=>'<div class="event"><span class="'+(e.kind==='milestone'?'good':e.kind==='boundary'?'cyan':e.kind==='word'?'violet':e.kind==='death'?'bad':'')+'">tick '+e.tick.toLocaleString()+'</span> · '+e.text+'</div>').join(''):'<div class="event">No events.</div>'}
+function baselineAgeCapWorlds(){return Object.values(BASELINE).filter(q=>q&&q.extinctionTick===8000).map(q=>q.world).sort((a,b)=>a-b)}
+function renderLongevity(){
+ const r=surveyRecord(),b=BASELINE[String(r.world)],ageCases=baselineAgeCapWorlds(),founders=S.seeds.filter(s=>s.generation===0).length,desc=S.seeds.length-founders,oldest=S.seeds.reduce((m,s)=>Math.max(m,s.age),0);
+ $('founderAlive').textContent=founders;$('descAlive').textContent=desc;$('oldestAge').textContent=oldest.toLocaleString();$('post8Birth').textContent=r.firstPost8000Birth==null?'—':r.firstPost8000Birth.toLocaleString();
+ let base=b?'042: tick '+(b.lastTick||0).toLocaleString()+' · '+(b.extinctionTick!=null?'extinct @ '+b.extinctionTick.toLocaleString():'last seen alive '+b.living)+' · bottleneck '+b.minPositivePopulation:'042: this world has not been recorded in the local survey ledger';
+ if(b?.extinctionTick===8000)base+=' · AGE-CAP CASE';
+ let here='043: '+S.seeds.length+' living · '+founders+' founder'+(founders===1?'':'s')+' · '+desc+' descendant'+(desc===1?'':'s');
+ if(r.at8000)here+=' · at tick 8000: '+r.at8000.population+' living ('+r.at8000.founders+' founders / '+r.at8000.descendants+' descendants)';
+ $('pairedStatus').innerHTML='<span class="'+(b?.extinctionTick===8000?'warn':'cyan')+'">'+base+'</span><br>'+here+'<br>'+ageCases.length+' Build 042 world'+(ageCases.length===1?'':'s')+' currently recorded as exact-8000 extinctions on this device.'
+}
+function renderSurvey(){
+ observeSurveyFast();if(S.tick%50===0||S.tick===0)observeSurveyScan();
+ const rows=Object.values(SURVEY).sort((a,b)=>a.world-b.world),visited=rows.length,extinct=rows.filter(r=>r.extinctionTick!=null).length,single=rows.filter(r=>r.oneLineageTick!=null).length,alive=rows.filter(r=>r.living>0).length;
+ $('surveyVisited').textContent=visited+' / '+WORLD_COUNT;$('surveyAlive').textContent=alive;$('surveyExtinct').textContent=extinct;$('surveySingle').textContent=single;$('worldJump').value=String((S.worldIndex??0)+1);
+ const r=surveyRecord(),base=BASELINE[String(r.world)],pair=base?.extinctionTick===8000?' · 042 AGE-CAP CASE':'';
+ $('surveyCurrent').textContent='World '+r.world+' · seed '+r.seed+' · '+r.currentLineages+' living lineage'+(r.currentLineages===1?'':'s')+' · bottleneck '+r.minPositivePopulation+' · peak '+r.maxPopulation+' · max Z '+r.maxOccupiedLayers+'/8'+pair;
+ $('surveyList').innerHTML=rows.map(q=>{const b=BASELINE[String(q.world)],tag=b?.extinctionTick===8000?' · 042@8000':'';return '<div class="surveyRow '+(q.world===r.world?'current':'')+'"><div class="w">W'+q.world+'</div><div class="s">tick '+(q.lastTick||0).toLocaleString()+' · pop '+q.living+' · peak '+q.maxPopulation+' · bottleneck '+q.minPositivePopulation+' · lineages '+q.currentLineages+' · founders '+(q.foundersAlive??'—')+' · descendants '+(q.descendantsAlive??'—')+tag+'</div><div class="r '+(q.extinctionTick!=null?'bad':q.firstPost8000Birth!=null?'good':q.oneLineageTick!=null?'warn':'cyan')+'">'+(q.extinctionTick!=null?'EXTINCT @ '+q.extinctionTick.toLocaleString():q.firstPost8000Birth!=null?'BIRTH >8K @ '+q.firstPost8000Birth.toLocaleString():q.oneLineageTick!=null?'1 LINE @ '+q.oneLineageTick.toLocaleString():'RUNNING')+'</div></div>'}).join('')||'<div class="sub">No longevity worlds visited yet.</div>';
+ renderLongevity()
+}
+
+function render(){
+ $('worldNo').textContent=(S.worldIndex??0)+1;$('tick').textContent=S.tick.toLocaleString();$('pop').textContent=S.seeds.length;$('gen').textContent=S.stats.maxGeneration;$('words').textContent=S.registry.length;$('dynasty').textContent=S.firstEstablishedLineage?'L'+S.firstEstablishedLineage.lineage:'—';$('birthDeath').textContent='births '+S.stats.births.toLocaleString()+' · deaths '+S.stats.deaths.toLocaleString()+' · recombinations '+S.stats.recombinations.toLocaleString()+' · mutations '+S.stats.mutations.toLocaleString();
+ drawDish();drawSpark();renderInspect();renderDepth();renderStructure();renderHeredity();renderConserve();renderEvents();renderSurvey();markViewDirty()
+}
+function liveLoop(){
+ if(!running)return;
+ const n=liveSpeed;
+ if(n<=100){
+  for(let i=0;i<n&&running;i++)step();
+  render();
+  if(running)raf=requestAnimationFrame(liveLoop);
+  return
+ }
+ let remaining=n;
+ function pump(){
+  if(!running)return;
+  const started=performance.now();
+  while(remaining>0&&running&&(performance.now()-started)<12){
+   const batch=Math.min(50,remaining);
+   for(let i=0;i<batch&&running;i++)step();
+   remaining-=batch
+  }
+  render();
+  if(!running)return;
+  raf=requestAnimationFrame(remaining>0?pump:liveLoop)
+ }
+ pump()
+}
+function setRunning(v){running=v;$('play').textContent=v?'PAUSE':'PLAY';if(v){cancelAnimationFrame(raf);raf=requestAnimationFrame(liveLoop)}}
+async function bulk(n){
+ if(busy)return;busy=true;setRunning(false);document.querySelectorAll('button,select').forEach(x=>x.disabled=true);try{const start=S.tick;for(let done=0;done<n&&S.seeds.length;){const batch=Math.min(500,n-done);for(let i=0;i<batch;i++)step();done+=batch;if(done%5000===0||done===n){$('status').textContent='bulk evolution · '+done.toLocaleString()+' / '+n.toLocaleString()+' ticks';render();await new Promise(q=>requestAnimationFrame(()=>setTimeout(q,0)))}}save();$('status').textContent='advanced from '+start.toLocaleString()+' to '+S.tick.toLocaleString()+' ticks.'}finally{busy=false;document.querySelectorAll('button,select').forEach(x=>x.disabled=false)}}
+canvas.addEventListener('pointerdown',e=>{const r=canvas.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H),s=S.seeds.find(q=>q.x===x&&q.y===y&&q.z===sliceZ);selectedId=s?s.id:null;renderInspect();renderStructure();drawDish();markViewDirty()});
+const pointers=new Map();let gesture=null,lastTap=0;
+function resetCamera(){view.yaw=-.72;view.pitch=.46;view.zoom=1.04;view.panX=0;view.panY=0;markViewDirty()}
+space.addEventListener('pointerdown',e=>{space.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1)gesture={x:e.clientX,y:e.clientY,yaw:view.yaw,pitch:view.pitch,moved:false,pinch:false};else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);gesture={pinch:true,dist:d,zoom:view.zoom,moved:true}}});
+space.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1&&gesture&&!gesture.pinch){const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;if(Math.hypot(dx,dy)>4)gesture.moved=true;view.yaw=gesture.yaw+dx*.012;view.pitch=Math.max(-1.45,Math.min(1.45,gesture.pitch+dy*.012));markViewDirty()}else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(gesture?.pinch&&gesture.dist>0)view.zoom=Math.max(.45,Math.min(3.2,gesture.zoom*d/gesture.dist));markViewDirty()}});
+function endSpacePointer(e){const wasSingle=pointers.size===1&&gesture&&!gesture.pinch,wasMoved=gesture?.moved;pointers.delete(e.pointerId);if(wasSingle&&!wasMoved){const r=space.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bestD=22;for(const q of pickPoints){const d=Math.hypot(q.x-x,q.y-y);if(d<Math.min(bestD,q.r)){bestD=d;best=q}}if(best){selectedId=best.id;const s=S.seeds.find(q=>q.id===selectedId);if(s){sliceZ=s.z;render()}}const now=performance.now();if(now-lastTap<320)resetCamera();lastTap=now}if(pointers.size===1){const a=[...pointers.values()][0];gesture={x:a.x,y:a.y,yaw:view.yaw,pitch:view.pitch,moved:true,pinch:false}}else if(!pointers.size)gesture=null}
+space.addEventListener('pointerup',endSpacePointer);space.addEventListener('pointercancel',endSpacePointer);
+$('zSlice').oninput=()=>{sliceZ=+$('zSlice').value;renderDepth();drawDish();markViewDirty()};$('zDown').onclick=()=>{sliceZ=(sliceZ+D-1)%D;renderDepth();drawDish();markViewDirty()};$('zUp').onclick=()=>{sliceZ=(sliceZ+1)%D;renderDepth();drawDish();markViewDirty()};
+$('viewIso').onclick=()=>{view.yaw=-.72;view.pitch=.46;markViewDirty()};$('viewFront').onclick=()=>{view.yaw=0;view.pitch=0;markViewDirty()};$('viewSide').onclick=()=>{view.yaw=Math.PI/2;view.pitch=0;markViewDirty()};$('viewTop').onclick=()=>{view.yaw=0;view.pitch=-1.45;markViewDirty()};
+$('showFields').onclick=()=>{view.fields=!view.fields;$('showFields').textContent=view.fields?'FIELDS ON':'FIELDS OFF';$('showFields').classList.toggle('on',view.fields);markViewDirty()};
+$('showSpine').onclick=()=>{view.spine=!view.spine;$('showSpine').textContent=view.spine?'SPINE ON':'SPINE OFF';$('showSpine').classList.toggle('on',view.spine);markViewDirty()};
+$('focusSlice').onclick=()=>{view.focusSlice=!view.focusSlice;$('focusSlice').textContent=view.focusSlice?'SLICE FOCUS':'ALL LAYERS';$('focusSlice').classList.toggle('on',view.focusSlice);markViewDirty()};
+$('lineageOnly').onclick=()=>{const s=S.seeds.find(q=>q.id===selectedId);if(!s){$('status').textContent='select a seed first to isolate its lineage.';return}view.lineageOnly=!view.lineageOnly;$('lineageOnly').textContent=view.lineageOnly?'LINEAGE '+s.lineage:'ALL LINEAGES';$('lineageOnly').classList.toggle('on',view.lineageOnly);renderStructure();markViewDirty()};
+$('autoRotate').onclick=()=>{view.auto=!view.auto;$('autoRotate').textContent=view.auto?'AUTO ON':'AUTO OFF';$('autoRotate').classList.toggle('on',view.auto);markViewDirty()};$('resetView').onclick=resetCamera;
+$('nextAgeCap').onclick=()=>{const cases=baselineAgeCapWorlds();if(!cases.length){$('status').textContent='no exact-8000 Build 042 cases are present in this browser ledger yet.';return}const cur=(S.worldIndex??0)+1;let w=cases.find(n=>n>cur);if(w==null)w=cases[0];goWorld(w-1);$('status').textContent='paired longevity replay for Build 042 age-cap case · world '+w+'.'};
+$('speed').onchange=()=>{liveSpeed=+$('speed').value||1;$('status').textContent=liveSpeed>=1000?'turbo live · '+liveSpeed.toLocaleString()+'× · time-sliced for responsive controls.':'live speed set to '+liveSpeed+'×.';save()};
+$('play').onclick=()=>setRunning(!running);$('step1k').onclick=()=>bulk(1000);$('step10k').onclick=()=>bulk(10000);
+function goWorld(n){setRunning(false);const ni=Math.max(0,Math.min(WORLD_COUNT-1,n));fresh(ni);selectedId=null;resetCamera();$('status').textContent='world '+(ni+1)+' / '+WORLD_COUNT+' seeded under the paired longevity control.';render()}
+$('prevWorld').onclick=()=>goWorld(((S.worldIndex??0)-1+WORLD_COUNT)%WORLD_COUNT);$('nextWorld').onclick=()=>goWorld(((S.worldIndex??0)+1)%WORLD_COUNT);$('surveyPrev').onclick=()=>goWorld(((S.worldIndex??0)-1+WORLD_COUNT)%WORLD_COUNT);$('surveyNext').onclick=()=>goWorld(((S.worldIndex??0)+1)%WORLD_COUNT);$('surveyGo').onclick=()=>{const n=Math.max(1,Math.min(WORLD_COUNT,parseInt($('worldJump').value,10)||1));goWorld(n-1)};
+$('replay').onclick=()=>{if(confirm('Replay this world from its deterministic beginning? Its longevity ledger remains as historical evidence until the replay exceeds it.')){setRunning(false);fresh(S.worldIndex??0);$('status').textContent='world '+((S.worldIndex??0)+1)+' replayed from tick 0.';render()}};
+loadSurvey();loadBaseline();if(!load()){fresh(0);$('status').textContent='longevity control started clean · World 1 / 50 · no maximum age.'}else{if(S.firstEstablishedLineage===undefined)S.firstEstablishedLineage=null;if(!S.lineageStreaks)S.lineageStreaks={};for(const s of S.seeds)if(s.z===undefined)s.z=MID_Z;$('status').textContent='longevity survey resumed · world '+((S.worldIndex??0)+1)+' / '+WORLD_COUNT+' at tick '+S.tick.toLocaleString()+'.';render()}viewRaf=requestAnimationFrame(viewerFrame)
+})();
+</script></body></html>
