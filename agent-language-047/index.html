@@ -18,7 +18,7 @@
 
 <section class="panel span2"><h2>LINEAGE FIELD GUIDE</h2><div class="fieldSummary"><div class="fossilStat"><b id="guideObserved">0</b><span>LINEAGES OBSERVED</span></div><div class="fossilStat"><b id="guideLiving">0</b><span>LIVING LINEAGES</span></div><div class="fossilStat"><b id="guideMover">—</b><span>MOST MOVEMENT / 1K ACTIONS</span></div><div class="fossilStat"><b id="guideWriter">—</b><span>MOST WRITES / 1K ACTIONS</span></div></div><div id="guideStatus" class="sub" style="margin-top:9px">Catalog initializing…</div><div id="fieldCards" class="fieldCards"></div></section>
 
-<section class="panel span2"><h2>3D OBSERVATORY</h2><div class="observatoryWrap"><canvas id="space" width="760" height="570" aria-label="Rotatable three-dimensional view of the living volume"></canvas></div><div class="controls viewerControls"><button id="viewIso">ISO</button><button id="viewFront">FRONT</button><button id="viewSide">SIDE</button><button id="viewTop">TOP</button><button id="showFields">FIELDS OFF</button><button id="showLegacy" class="on">LEGACY Δ ON</button><button id="showSpine" class="on">SPINE ON</button><button id="focusSlice">ALL LAYERS</button><button id="lineageOnly">ALL LINEAGES</button><button id="autoRotate">AUTO OFF</button><button id="resetView">RESET VIEW</button></div><div id="spaceStatus" class="sub viewerHint">Drag to rotate · pinch to zoom · tap an agent to inspect · colored line = centroid spine.</div></section>
+<section class="panel span2"><h2>3D OBSERVATORY</h2><div class="observatoryWrap"><canvas id="space" width="760" height="570" aria-label="Rotatable three-dimensional view of the living volume"></canvas></div><div class="controls viewerControls"><button id="viewIso">ISO</button><button id="viewFront">FRONT</button><button id="viewSide">SIDE</button><button id="viewTop">TOP</button><button id="showFields">FIELDS OFF</button><button id="showLegacy" class="on">LEGACY Δ ON</button><button id="showSpine" class="on">SPINE ON</button><button id="focusSlice">ALL LAYERS</button><button id="lineageOnly">ALL LINEAGES</button><button id="showMotion" class="on">MOTION ON</button><button id="autoRotate">AUTO OFF</button><button id="resetView">RESET VIEW</button></div><div id="spaceStatus" class="sub viewerHint">Drag to rotate · pinch to zoom · tap an agent to inspect · colored line = centroid spine.</div></section>
 
 <section class="panel"><h2>VOLUME SLICE</h2><div class="dishWrap"><canvas id="dish" width="640" height="480" aria-label="Seedbed 3D slice"></canvas></div><div class="sliceControl"><button id="zDown" aria-label="Previous Z slice">Z−</button><input id="zSlice" type="range" min="0" max="7" step="1" value="3" aria-label="Z slice"><button id="zUp" aria-label="Next Z slice">Z+</button></div><div id="sliceLabel" class="sub" style="margin-top:6px"></div><div class="legend"><span class="key"><span class="swatch" style="background:#314733"></span>α</span><span class="key"><span class="swatch" style="background:#3a4052"></span>β</span><span class="key"><span class="swatch" style="background:#493b4c"></span>γ</span><span class="key"><span class="swatch" style="background:#4a4430"></span>δ</span><span class="key">○ Z+ · × Z−</span><span class="key"><span class="swatch" style="background:#ffd66f"></span>γ Δ from birth</span></div></section>
 
@@ -38,7 +38,7 @@
 
 <section class="panel span2"><h2>CONTINENT INTERVENTION</h2><div class="sub">Build 047 keeps the 046 continent but makes the world order rotatable. The initial row-major arrangement is W1 W2 W3 / W4 W5 W6 / W7 W8 W9. Each ROTATE WORLDS press performs the cyclic shift 123456789 → 912345678 and replays from tick 0. The same original W5 founder cohort is always placed in the center chunk; the world habitats rotate around that fixed population. The other eight chunks begin biologically virgin.<br><br>Each chunk is still 32×24×8 and is generated from its original deterministic world seed. Rotation changes placement only; it does not rotate or mutate a habitat internally. The W5 founder genomes and post-founder simulation RNG state are reproduced independently of habitat placement, so the same starting population can be exposed to whichever world occupies the center slot. The intervention is the horizon: internal X/Y chunk walls are traversable; only the outside edge of the 96×72×8 continent is closed.<br><br>The old soft population gate becomes <b>180 per destination chunk</b>. It gates births, not migration, and same-tick births can still overshoot because scheduled newborns are appended after the parent pass. A parent at a border may place offspring directly into a neighboring chunk if that destination is below its birth gate.<br><br>The field guide and fossil observer remain passive. New migration measurements record first entry, first local birth, chunk crossings and chunks visited. No observer calls RNG or changes ecological state.</div></section>
 </div>
-<div class="foot"><span class="warn">Observer-only:</span> camera rotation, field visibility, slice focus, lineage filtering, centroid calculations and seed selection never feed back into the volume. The organisms do not know they are being rendered.</div>
+<div class="foot"><span class="warn">Observer-only:</span> camera rotation, field visibility, motion persistence, slice focus, lineage filtering, centroid calculations and seed selection never feed back into the volume. The organisms do not know they are being rendered.</div>
 </div><script>
 (()=>{'use strict';
 const VERSION=47,STORE='forge-agent-language-047-center-fixed',SURVEY_STORE='forge-agent-language-047-center-fixed-survey',FOSSIL_STORE='forge-agent-language-047-center-fixed-fossil',CATALOG_STORE='forge-agent-language-047-center-fixed-catalog',BASELINE_STORE='forge-agent-language-042-survey-ledger',WORLD_COUNT=50,GRID=3,CHUNK_W=32,CHUNK_H=24,CENTER_CHUNK=4,W=CHUNK_W*GRID,H=CHUNK_H*GRID,D=8,MID_Z=3,N=W*H*D,FOUNDERS=32,POP_CAP=180,MAX_AGE=Infinity,BIRTH_THRESHOLD=18,BIRTH_COST=6;
@@ -46,7 +46,9 @@ const BASE_LEAK=.015,ACTION_COST=.005,RECOMB=.16,LEGACY_WORLD_SEEDS=[37037,37117
 const $=id=>document.getElementById(id),canvas=$('dish'),ctx=canvas.getContext('2d'),spark=$('spark'),sctx=spark.getContext('2d'),space=$('space'),xctx=space.getContext('2d');
 let running=false,busy=false,raf=0,selectedId=null,saveCounter=0,liveSpeed=1,sliceZ=MID_Z,layoutRotation=0;
 let S=null,SURVEY={},FOSSILS={},CATALOG={},BASELINE={},viewRaf=0,last3D=0,viewDirty=true,pickPoints=[];
-const view={yaw:-.72,pitch:.46,zoom:1.04,panX:0,panY:0,fields:false,legacy:true,spine:true,focusSlice:false,lineageOnly:false,auto:false};
+let motionHeat=new Float32Array(N),motionStamp=new Uint32Array(N);
+const MOTION_TAU=350,MOTION_CUTOFF=1400;
+const view={yaw:-.72,pitch:.46,zoom:1.04,panX:0,panY:0,fields:false,legacy:true,spine:true,motion:true,focusSlice:false,lineageOnly:false,auto:false};
 
 function hash32(str){let h=2166136261>>>0;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}h+=0x6D2B79F5;h=Math.imul(h^(h>>>15),h|1);h^=h+Math.imul(h^(h>>>7),h|61);return(h^(h>>>14))>>>0}
 function worldSeedAt(i){return i<LEGACY_WORLD_SEEDS.length?LEGACY_WORLD_SEEDS[i]:hash32('agent-language-040-volume-world-'+(i+1))}
@@ -62,6 +64,12 @@ function ri(n){return Math.floor(rand()*n)}function chance(p){return rand()<p}
 function idx(x,y,z){return(z*H+y)*W+x}function inside(x,y,z){return x>=0&&x<W&&y>=0&&y<H&&z>=0&&z<D}function dirName(d){return['N','E','S','W','Z+','Z−'][d]||'?'}
 function pushEvent(text,kind=''){S.events.unshift({tick:S.tick,text,kind});if(S.events.length>60)S.events.length=60}
 function lineageColor(n,a=1){const hue=(n*137.508)%360;return 'hsla('+hue+',65%,62%,'+a+')'}
+function resetMotion(){motionHeat.fill(0);motionStamp.fill(0)}
+function markMotionCell(i){
+ const prev=motionStamp[i],age=prev?Math.max(0,S.tick-prev):0,carried=prev?motionHeat[i]*Math.exp(-age/MOTION_TAU):0;
+ motionHeat[i]=Math.min(10,carried+1);motionStamp[i]=S.tick
+}
+function markMotion(ox,oy,oz,nx,ny,nz){markMotionCell(idx(ox,oy,oz));markMotionCell(idx(nx,ny,nz))}
 
 function blankWorld(){
  return{type:Array(N).fill(0),charge:Array(N).fill(0),phase:Array(N).fill(0),mark:Array(N).fill(0),markCharge:Array(N).fill(0),dir:Array(N).fill(0),alphaCells:[],gammaCells:[],fieldCells:[]}
@@ -100,7 +108,7 @@ function catalogRange(q,x,y,z){q.minX=Math.min(q.minX,x);q.maxX=Math.max(q.maxX,
 function observeAction(s){try{const q=catalogLine(s.lineage);q.actions++;q.lastSeen=S.tick;q.maxEnergy=Math.max(q.maxEnergy,s.energy);catalogRange(q,s.x,s.y,s.z)}catch{}}
 function observeMoveAttempt(s,nx,ny,nz){try{const q=catalogLine(s.lineage);q.moveAttempts++;if(!inside(nx,ny,nz))q.wallBlocks++}catch{}}
 function observeMoveBlocked(s){try{catalogLine(s.lineage).seedBlocks++}catch{}}
-function observeMoveSuccess(s,ox,oy,oz){try{const q=catalogLine(s.lineage);q.moves++;if(s.z!==oz)q.zMoves++;catalogRange(q,s.x,s.y,s.z)}catch{}}
+function observeMoveSuccess(s,ox,oy,oz){try{markMotion(ox,oy,oz,s.x,s.y,s.z);const q=catalogLine(s.lineage);q.moves++;if(s.z!==oz)q.zMoves++;catalogRange(q,s.x,s.y,s.z)}catch{}}
 function observeTouch(s,delta){try{const q=catalogLine(s.lineage);q.touches++;q.touchNet+=delta}catch{}}
 function observeWriteAttempt(s){try{catalogLine(s.lineage).writeAttempts++}catch{}}
 function observeCatalogWrite(s,i){try{const q=catalogLine(s.lineage);q.writes++;q.gamma[String(i)]=1}catch{}}
@@ -140,7 +148,7 @@ function fossilSignature(changes){if(!changes.length)return'00000000';const s=ch
 function observeFossilScan(){const r=fossilRecord();if(!r)return;const ch=fossilChanges();r.maxChanged=Math.max(r.maxChanged||0,ch.length);r.lastSeenTick=S.tick}
 function finalizeFossil(){const r=fossilRecord();if(!r||r.final)return;const ch=fossilChanges(),cc=fossilComponents(ch);r.final={tick:S.tick,changed:ch.map(q=>[q.i,q.bit]),changedCount:ch.length,components:cc.count,largest:cc.largest,signature:fossilSignature(ch),writes:r.writes,touched:Object.keys(r.touched||{}).length};saveFossils()}
 function fresh(){
- checkpointSurvey();
+ checkpointSurvey();resetMotion();
  const chunkWorlds=layoutWorlds(layoutRotation),origin=CENTER_CHUNK,originSeed=worldSeedAt(4);
  S={version:VERSION,worldIndex:4,worldSeed:originSeed,layoutRotation,chunkWorlds,originChunk:origin,chunkSeeds:chunkWorlds.map(w=>worldSeedAt(w-1)),rng:originSeed,tick:0,nextId:1,nextLineage:1,world:null,seeds:[],registry:[],stats:{births:0,deaths:0,recombinations:0,mutations:0,condensations:0,maxGeneration:0},events:[],history:[],firstConservedWord:null,firstBoundaryWord:null,firstEstablishedLineage:null,lineageStreaks:{},topWord:null,topMotif:null,continent:{firstEntered:Array(9).fill(null),firstBirth:Array(9).fill(null),maxPop:Array(9).fill(0),crossings:0}};
  S.world=blankWorld();
@@ -293,6 +301,11 @@ function drawVolumeFrame(w,h){
 function draw3D(){
  const dpr=Math.max(1,Math.min(2,devicePixelRatio||1)),w=space.clientWidth||760,h=w*3/4;if(space.width!==Math.floor(w*dpr)||space.height!==Math.floor(h*dpr)){space.width=Math.floor(w*dpr);space.height=Math.floor(h*dpr)}
  xctx.setTransform(dpr,0,0,dpr,0,0);xctx.clearRect(0,0,w,h);xctx.fillStyle='#050806';xctx.fillRect(0,0,w,h);drawVolumeFrame(w,h);
+ if(view.motion){
+  xctx.save();xctx.fillStyle='#77dfff';
+  for(let i=0;i<N;i++){const stamp=motionStamp[i];if(!stamp)continue;const age=S.tick-stamp;if(age<0||age>MOTION_CUTOFF)continue;const strength=motionHeat[i]*Math.exp(-age/MOTION_TAU);if(strength<.10)continue;const z=Math.floor(i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;const rem=i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,p=project3(centerPoint(x,y,z),w,h),r=Math.max(.35,Math.min(2.2,.35+.22*strength))*Math.max(.55,Math.min(1.15,view.zoom));xctx.globalAlpha=Math.min(.42,.035+.045*strength);xctx.fillRect(p.x-r,p.y-r,r*2,r*2)}
+  xctx.restore()
+ }
  const selected=S.seeds.find(s=>s.id===selectedId),lineage=selected?.lineage,items=[],fieldColors=['','#314733','#56627f','#765a78','#827347'];
  const lod=view.zoom<.58?'POINTS':view.zoom<.9?'FINE':view.zoom<1.35?'NORMAL':'CLOSE';
  if(view.fields){for(const i of S.world.fieldCells){const t=S.world.type[i];const z=Math.floor(i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;const rem=i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,p=project3(centerPoint(x,y,z),w,h);items.push({kind:'field',x:p.x,y:p.y,z:p.z,p:p.p,color:fieldColors[t],alpha:view.focusSlice?.35:.16})}}
@@ -309,7 +322,7 @@ function draw3D(){
  if(view.legacy){const changes=fossilChanges();xctx.save();xctx.strokeStyle='#ffd66f';xctx.lineWidth=1.4;xctx.globalAlpha=.9;for(const q of changes){const z=Math.floor(q.i/(W*H));if(view.focusSlice&&z!==sliceZ)continue;const rem=q.i-z*W*H,y=Math.floor(rem/W),x=rem-y*W,p=project3(centerPoint(x,y,z),w,h),r=Math.max(2.2,3*q.p);xctx.strokeRect(p.x-r,p.y-r,r*2,r*2)}xctx.restore()}
  if(view.spine){const C=layerCentroids().filter(Boolean);if(C.length){xctx.save();xctx.lineWidth=2.2;xctx.strokeStyle='#ffd66f';xctx.globalAlpha=.9;xctx.beginPath();C.forEach((q,i)=>{const p=project3(centerPoint(q.x,q.y,q.z),w,h);i?xctx.lineTo(p.x,p.y):xctx.moveTo(p.x,p.y)});xctx.stroke();for(const q of C){const p=project3(centerPoint(q.x,q.y,q.z),w,h);xctx.beginPath();xctx.fillStyle='#ffd66f';xctx.arc(p.x,p.y,3.2,0,Math.PI*2);xctx.fill()}xctx.restore()}}
  const axis=[['X',{x:3,y:0,z:0},'#b9ff79'],['Y',{x:0,y:3,z:0},'#77dfff'],['Z',{x:0,y:0,z:3},'#ffd66f']],o=project3({x:-(W-1)/2-2,y:-(H-1)/2-2,z:-(D-1)/2},w,h);xctx.font='9px ui-monospace';for(const [label,v,col] of axis){const p=project3({x:-(W-1)/2-2+v.x,y:-(H-1)/2-2+v.y,z:-(D-1)/2+v.z},w,h);xctx.strokeStyle=col;xctx.fillStyle=col;xctx.beginPath();xctx.moveTo(o.x,o.y);xctx.lineTo(p.x,p.y);xctx.stroke();xctx.fillText(label,p.x+3,p.y)}
- $('spaceStatus').textContent='center '+chunkName(CENTER_CHUNK)+' · fixed W5 founder cohort · order '+layoutText()+' · '+S.seeds.length+' living · '+lod.toLowerCase()+' LOD · slice Z'+(sliceZ+1)+(sliceZ===MID_Z?' founder plane':'')+' · drag rotate · pinch zoom · tap seed';
+ $('spaceStatus').textContent='center '+chunkName(CENTER_CHUNK)+' · fixed W5 founder cohort · order '+layoutText()+' · '+S.seeds.length+' living · '+lod.toLowerCase()+' LOD · motion '+(view.motion?'~'+MOTION_CUTOFF.toLocaleString()+'t':'off')+' · slice Z'+(sliceZ+1)+(sliceZ===MID_Z?' founder plane':'')+' · drag rotate · pinch zoom · tap seed';
 }
 function markViewDirty(){viewDirty=true}
 function viewerFrame(t){if(view.auto){view.yaw+=.004;viewDirty=true}if(viewDirty&&(!running||liveSpeed<1000||t-last3D>100)){draw3D();viewDirty=false;last3D=t}viewRaf=requestAnimationFrame(viewerFrame)}
@@ -413,6 +426,7 @@ $('showLegacy').onclick=()=>{view.legacy=!view.legacy;$('showLegacy').textConten
 $('showSpine').onclick=()=>{view.spine=!view.spine;$('showSpine').textContent=view.spine?'SPINE ON':'SPINE OFF';$('showSpine').classList.toggle('on',view.spine);markViewDirty()};
 $('focusSlice').onclick=()=>{view.focusSlice=!view.focusSlice;$('focusSlice').textContent=view.focusSlice?'SLICE FOCUS':'ALL LAYERS';$('focusSlice').classList.toggle('on',view.focusSlice);markViewDirty()};
 $('lineageOnly').onclick=()=>{const s=S.seeds.find(q=>q.id===selectedId);if(!s){$('status').textContent='select a seed first to isolate its lineage.';return}view.lineageOnly=!view.lineageOnly;$('lineageOnly').textContent=view.lineageOnly?'LINEAGE '+s.lineage:'ALL LINEAGES';$('lineageOnly').classList.toggle('on',view.lineageOnly);renderStructure();markViewDirty()};
+$('showMotion').onclick=()=>{view.motion=!view.motion;$('showMotion').textContent=view.motion?'MOTION ON':'MOTION OFF';$('showMotion').classList.toggle('on',view.motion);markViewDirty()};
 $('autoRotate').onclick=()=>{view.auto=!view.auto;$('autoRotate').textContent=view.auto?'AUTO ON':'AUTO OFF';$('autoRotate').classList.toggle('on',view.auto);markViewDirty()};$('resetView').onclick=resetCamera;
 $('speed').onchange=()=>{liveSpeed=+$('speed').value||1;$('status').textContent=liveSpeed>=1000?'turbo live · '+liveSpeed.toLocaleString()+'× · time-sliced for responsive controls.':'live speed set to '+liveSpeed+'×.';save()};
 $('play').onclick=()=>setRunning(!running);$('step1k').onclick=()=>bulk(1000);$('step10k').onclick=()=>bulk(10000);
