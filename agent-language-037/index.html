@@ -8,7 +8,7 @@
 </style></head><body><div class="app">
 <div class="top"><div><h1>AGENT LANGUAGE // 037 · SEEDBED</h1><div class="sub">Same laws, many beginnings. Extinction remains possible, but the ecology has slightly more breathing room and can be reseeded into alternate deterministic worlds.</div></div><div class="badge">ESTABLISH</div></div>
 <div class="grid">
-<section class="panel span2"><h2>CONTROL</h2><div class="stats"><div class="stat"><b id="worldNo">1</b><span>WORLD</span></div><div class="stat"><b id="tick">0</b><span>TICKS</span></div><div class="stat"><b id="pop">0</b><span>SEEDS</span></div><div class="stat"><b id="gen">0</b><span>MAX GENERATION</span></div><div class="stat"><b id="words">0</b><span>WORDS BORN</span></div><div class="stat"><b id="dynasty">—</b><span>ESTABLISHED LINEAGE</span></div></div><div class="controls" style="margin-top:10px"><button id="play" class="primary">PLAY</button><button id="step1k">+1K</button><button id="step10k">+10K</button><select id="speed" aria-label="Live speed"><option value="1">LIVE 1×</option><option value="5">LIVE 5×</option><option value="25">LIVE 25×</option><option value="100">LIVE 100×</option></select><button id="nextWorld">NEXT WORLD</button><button id="replay" class="danger">REPLAY WORLD</button></div><div id="status" class="sub" style="margin-top:7px">World 1 is ready.</div></section>
+<section class="panel span2"><h2>CONTROL</h2><div class="stats"><div class="stat"><b id="worldNo">1</b><span>WORLD</span></div><div class="stat"><b id="tick">0</b><span>TICKS</span></div><div class="stat"><b id="pop">0</b><span>SEEDS</span></div><div class="stat"><b id="gen">0</b><span>MAX GENERATION</span></div><div class="stat"><b id="words">0</b><span>WORDS BORN</span></div><div class="stat"><b id="dynasty">—</b><span>ESTABLISHED LINEAGE</span></div></div><div class="controls" style="margin-top:10px"><button id="play" class="primary">PLAY</button><button id="step1k">+1K</button><button id="step10k">+10K</button><select id="speed" aria-label="Live speed"><option value="1">LIVE 1×</option><option value="5">LIVE 5×</option><option value="25">LIVE 25×</option><option value="100">LIVE 100×</option><option value="1000">LIVE 1,000×</option><option value="10000">LIVE 10,000×</option></select><button id="nextWorld">NEXT WORLD</button><button id="replay" class="danger">REPLAY WORLD</button></div><div id="status" class="sub" style="margin-top:7px">World 1 is ready.</div></section>
 
 <section class="panel"><h2>DISH</h2><div class="dishWrap"><canvas id="dish" width="640" height="480" aria-label="Seedbed simulation"></canvas></div><div class="legend"><span class="key"><span class="swatch" style="background:#314733"></span>α</span><span class="key"><span class="swatch" style="background:#3a4052"></span>β</span><span class="key"><span class="swatch" style="background:#493b4c"></span>γ</span><span class="key"><span class="swatch" style="background:#4a4430"></span>δ</span><span class="key">tap a seed to inspect</span></div></section>
 
@@ -30,7 +30,7 @@
 const VERSION=37,STORE='forge-agent-language-037-seedbed',W=32,H=24,N=W*H,FOUNDERS=32,POP_CAP=180,MAX_AGE=8000,BIRTH_THRESHOLD=18,BIRTH_COST=6;
 const BASE_LEAK=.015,ACTION_COST=.005,RECOMB=.16,WORLD_SEEDS=[37037,37117,37223,37337,37447,37561,37673,37783];
 const $=id=>document.getElementById(id),canvas=$('dish'),ctx=canvas.getContext('2d'),spark=$('spark'),sctx=spark.getContext('2d');
-let running=false,busy=false,raf=0,selectedId=null,saveCounter=0;
+let running=false,busy=false,raf=0,selectedId=null,saveCounter=0,liveSpeed=1;
 let S=null;
 
 function hash32(str){let h=2166136261>>>0;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}h+=0x6D2B79F5;h=Math.imul(h^(h>>>15),h|1);h^=h+Math.imul(h^(h>>>7),h|61);return(h^(h>>>14))>>>0}
@@ -114,7 +114,7 @@ function step(){
  if(!S.seeds.length){pushEvent('the dish went silent. no lineage remained.','death');running=false}
  if(S.tick%250===0){scanConservation();scanEstablishment()}
  if(S.tick%100===0){S.history.push({tick:S.tick,pop:S.seeds.length,births:S.stats.births,deaths:S.stats.deaths,words:S.registry.length});if(S.history.length>360)S.history.shift()}
- if(++saveCounter>=1000){saveCounter=0;save()}
+ if(++saveCounter>=(liveSpeed>=1000?10000:1000)){saveCounter=0;save()}
 }
 function scanEstablishment(){
  const counts=new Map();for(const s of S.seeds)counts.set(s.lineage,(counts.get(s.lineage)||0)+1);
@@ -164,12 +164,34 @@ function render(){
  drawDish();drawSpark();renderInspect();renderHeredity();renderConserve();renderEvents()
 }
 function liveLoop(){
- if(!running)return;const n=+$('speed').value||1;for(let i=0;i<n&&running;i++)step();render();raf=requestAnimationFrame(liveLoop)
+ if(!running)return;
+ const n=liveSpeed;
+ if(n<=100){
+  for(let i=0;i<n&&running;i++)step();
+  render();
+  if(running)raf=requestAnimationFrame(liveLoop);
+  return
+ }
+ let remaining=n;
+ function pump(){
+  if(!running)return;
+  const started=performance.now();
+  while(remaining>0&&running&&(performance.now()-started)<12){
+   const batch=Math.min(250,remaining);
+   for(let i=0;i<batch&&running;i++)step();
+   remaining-=batch
+  }
+  render();
+  if(!running)return;
+  raf=requestAnimationFrame(remaining>0?pump:liveLoop)
+ }
+ pump()
 }
 function setRunning(v){running=v;$('play').textContent=v?'PAUSE':'PLAY';if(v){cancelAnimationFrame(raf);raf=requestAnimationFrame(liveLoop)}}
 async function bulk(n){
  if(busy)return;busy=true;setRunning(false);document.querySelectorAll('button,select').forEach(x=>x.disabled=true);try{const start=S.tick;for(let done=0;done<n&&S.seeds.length;){const batch=Math.min(500,n-done);for(let i=0;i<batch;i++)step();done+=batch;if(done%5000===0||done===n){$('status').textContent='bulk evolution · '+done.toLocaleString()+' / '+n.toLocaleString()+' ticks';render();await new Promise(q=>requestAnimationFrame(()=>setTimeout(q,0)))}}save();$('status').textContent='advanced from '+start.toLocaleString()+' to '+S.tick.toLocaleString()+' ticks.'}finally{busy=false;document.querySelectorAll('button,select').forEach(x=>x.disabled=false)}}
 canvas.addEventListener('pointerdown',e=>{const r=canvas.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H),s=S.seeds.find(q=>q.x===x&&q.y===y);selectedId=s?s.id:null;renderInspect();drawDish()});
+$('speed').onchange=()=>{liveSpeed=+$('speed').value||1;$('status').textContent=liveSpeed>=1000?'turbo live · '+liveSpeed.toLocaleString()+'× · time-sliced for responsive controls.':'live speed set to '+liveSpeed+'×.';save()};
 $('play').onclick=()=>setRunning(!running);$('step1k').onclick=()=>bulk(1000);$('step10k').onclick=()=>bulk(10000);
 $('nextWorld').onclick=()=>{setRunning(false);const ni=((S.worldIndex??0)+1)%WORLD_SEEDS.length;fresh(ni);$('status').textContent='world '+(ni+1)+' seeded under the same laws.'};
 $('replay').onclick=()=>{if(confirm('Replay this world from its deterministic beginning?')){setRunning(false);fresh(S.worldIndex??0);$('status').textContent='world '+((S.worldIndex??0)+1)+' replayed from tick 0.'}};
