@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0b">
+<title>AGENT LANGUAGE // 053 · ONE-WAY MOUTH</title>
+<style>
+:root{--bg:#090d0b;--panel:#131a15;--ink:#edf4ef;--muted:#91a198;--line:#2a3a31;--hot:#b9ff79;--cyan:#77dfff;--warn:#ffd66f;--violet:#d39cff;--bad:#ff8d78}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}body{min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.app{max-width:1080px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{font-size:20px;margin:0;letter-spacing:.08em}.sub{font-size:11px;color:var(--muted);line-height:1.55}.badge{font-size:10px;color:var(--hot);border:1px solid #537249;border-radius:999px;padding:6px 8px;white-space:nowrap}
+.grid{display:grid;gap:10px;margin-top:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px;min-width:0}.panel h2{font-size:11px;color:var(--muted);letter-spacing:.14em;margin:0 0 11px}
+.controls{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}button,select,input,textarea{font:inherit;color:inherit;background:#18211c;border:1px solid #35483d;border-radius:12px;min-height:46px;padding:9px}button{touch-action:manipulation}.primary{background:#1c3426;border-color:#58836a}.danger{border-color:#6d4038}.on{background:#20392a!important;border-color:#6a946f!important;color:var(--hot)}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.stat{background:#0d120f;border:1px solid var(--line);border-radius:11px;padding:9px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:9px;color:var(--muted)}
+.viewer{background:#050806;border:1px solid #223128;border-radius:16px;padding:6px;overflow:hidden}.viewer canvas{display:block;width:100%;aspect-ratio:1/1;border-radius:11px;touch-action:none}
+.layers{display:grid;gap:8px}.layer{border-top:1px solid #223128;padding-top:8px}.layer:first-child{border-top:0;padding-top:0}.layerTitle{font-size:9px;color:var(--cyan);margin-bottom:6px}.blockGrid{display:grid;gap:5px}.block{min-height:58px;padding:6px;border-radius:9px;text-align:left;background:#0d120f}.block.sel{border-color:#fff}.block.spawn{box-shadow:inset 0 0 0 1px var(--cyan)}.block.off{opacity:.4}.block b{display:block;font-size:11px}.block span{font-size:8px;color:var(--muted)}
+.row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.triple{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.editor{display:grid;gap:8px}.codebox{width:100%;min-height:74px;resize:vertical;font-size:9px}
+.lineages{display:grid;gap:6px}.line{display:grid;grid-template-columns:70px 1fr auto;gap:7px;align-items:center;background:#0d120f;border:1px solid #223128;border-radius:9px;padding:7px;font-size:9px}.track{height:7px;background:#080b09;border-radius:999px;overflow:hidden}.fill{height:100%;background:var(--hot)}
+.originLegend{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.originChip{display:inline-flex;align-items:center;gap:5px;border:1px solid #2a3a31;border-radius:999px;padding:4px 7px;background:#0d120f;font-size:9px}.originDot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto}.mouth{margin:0;max-height:290px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:#050806;border:1px solid #223128;border-radius:12px;padding:10px;font-size:10px;line-height:1.55;color:#d9e8df}.mouthMeta{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}.mouthTag{border:1px solid #2a3a31;border-radius:999px;padding:4px 7px;background:#0d120f;font-size:9px;color:var(--muted)}.foot{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 2px}
+@media(min-width:780px){.grid{grid-template-columns:1.25fr .75fr}.span2{grid-column:1/-1}.stats{grid-template-columns:repeat(6,1fr)}.controls{grid-template-columns:repeat(6,1fr)}}
+</style></head>
+<body><div class="app">
+<div class="top"><div><h1>AGENT LANGUAGE // 053 · ONE-WAY MOUTH</h1><div class="sub">Build 052's birth map, plus a deliberately tiny outbound channel. A new P8 primitive can emit the agent's current bit to an observer-only terminal. No input comes back.</div></div><div class="badge">G2 · 16³</div></div>
+
+<div class="grid">
+<section class="panel span2"><h2>RUN</h2>
+<div class="stats"><div class="stat"><b id="tick">0</b><span>TICKS</span></div><div class="stat"><b id="pop">0</b><span>LIVING</span></div><div class="stat"><b id="gen">0</b><span>MAX GEN</span></div><div class="stat"><b id="lineageCount">0</b><span>LINEAGES</span></div><div class="stat"><b id="activeBlocks">0</b><span>BLOCKS</span></div><div class="stat"><b id="crossings">0</b><span>SEAM CROSSES</span></div></div>
+<div class="controls" style="margin-top:9px"><button id="play" class="primary">PLAY</button><button id="step1k">+1K</button><button id="step10k">+10K</button><select id="speed"><option value="1">LIVE 1×</option><option value="10">LIVE 10×</option><option value="100">LIVE 100×</option><option value="1000">LIVE 1,000×</option></select><button id="replay">REPLAY</button><button id="newFounders">NEW FOUNDER SEED</button></div>
+<div id="status" class="sub" style="margin-top:8px">Ready.</div></section>
+
+<section class="panel span2"><h2>3D OBSERVATORY</h2><div class="viewer"><canvas id="space" width="760" height="760"></canvas></div>
+<div class="controls" style="margin-top:8px"><button id="motion" class="on">MOTION ON</button><button id="blocks" class="on">BLOCKS ON</button><button id="auto">AUTO OFF</button><select id="colorMode" aria-label="Agent color mode"><option value="lineage">COLOR · LINEAGE</option><option value="birth" selected>COLOR · BIRTH BLOCK</option><option value="current">COLOR · CURRENT BLOCK</option></select><button id="resetView">RESET VIEW</button></div>
+<div class="sub" style="margin-top:7px">Drag to rotate · pinch to zoom · cyan is recent motion · color modes are observer-only.</div><div id="colorLegend" class="sub" style="margin-top:7px"></div></section>
+
+<section class="panel"><h2>LATTICE PRESETS</h2>
+<div class="controls"><button id="presetCube">3×3×3</button><button id="presetTower">10 HIGH</button><button id="presetRow">10 SIDEWAYS</button><button id="presetRing">3×3 RING</button></div>
+<div class="sub" style="margin-top:7px">Presets rebuild the lattice from the selected world seed. Ring leaves the middle block absent.</div>
+</section>
+
+<section class="panel"><h2>ARRANGEMENT RNG</h2>
+<div class="row"><input id="arrSeed" inputmode="numeric" value="510001" aria-label="Arrangement seed"><button id="randomize">RANDOMIZE</button></div>
+<div class="sub" style="margin-top:7px">One arrangement seed deterministically chooses every present block's world seed and one of 24 proper cube rotations.</div>
+</section>
+
+<section class="panel span2"><h2>BLOCK LATTICE</h2><div id="layers" class="layers"></div></section>
+
+<section class="panel"><h2>SELECTED BLOCK</h2><div class="editor">
+<div id="selectedLabel" class="sub">Select a block.</div>
+<div class="row"><input id="blockSeed" inputmode="numeric" aria-label="World seed"><button id="applySeed">APPLY SEED</button></div>
+<div class="triple"><button id="rotateBlock">ROTATE</button><button id="toggleBlock">REMOVE</button><button id="setSpawn">SET SPAWN</button></div>
+<div class="triple"><button id="cloneAll">CLONE ALL</button><button id="copyBlock">COPY</button><button id="pasteBlock">PASTE</button></div>
+</div></section>
+
+<section class="panel"><h2>EXPERIMENT ID</h2>
+<div id="experimentId" class="sub">—</div>
+<textarea id="shareCode" class="codebox" spellcheck="false" aria-label="Shareable experiment code"></textarea>
+<div class="triple" style="margin-top:8px"><button id="makeCode">REFRESH CODE</button><button id="copyCode">COPY CODE</button><button id="loadCode">LOAD CODE</button></div>
+</section>
+
+<section class="panel"><h2>LINEAGES</h2><div id="lineages" class="lineages"><div class="sub">Waiting for life.</div></div></section>
+
+<section class="panel"><h2>SELECTED AGENT</h2><div id="inspect" class="sub">Tap an agent in the 3D view.</div><div class="sub" style="margin-top:9px"><b>P0</b> move · <b>P1</b> previous heading · <b>P2</b> next heading · <b>P3</b> touch · <b>P4</b> sample · <b>P5</b> flip bit · <b>P6</b> conditional skip · <b>P7</b> write · <b>P8</b> emit bit.</div></section>
+
+<section class="panel span2"><h2>ONE-WAY OUTPUT</h2>
+<div id="mouthMeta" class="mouthMeta"></div>
+<pre id="mouth" class="mouth">No emissions yet.</pre>
+<div class="sub" style="margin-top:8px">P8 emits the agent's current 0/1 bit. The terminal is outside the world: agents cannot read it, emissions change no world cell, and no reward or response is sent back. Streams remain grouped by speaker so interleaved agents do not masquerade as one message.</div>
+</section>
+
+<section class="panel span2"><h2>WORLD LATTICE CONTRACT</h2><div class="sub">
+A world is <b>G2 + numeric seed</b>. G2 always regenerates the same canonical 16×16×16 habitat for the same seed. Placement adds one of 24 orientation-preserving cube rotations. Rotation never changes the underlying world identity.<br><br>
+Missing blocks are true void: agents cannot move or be born into them. Present blocks contain traversable empty cells plus deterministic α/β/γ/δ fields. Adjacent present blocks have open seams. Birth remains capped at 180 living agents per destination block; migration is not capped.<br><br>
+Each agent carries observer-only <b>birthBlock</b> metadata: the block index where that individual was born. It never affects movement, energy, reproduction, mutation, selection or world state. Current-block color is a control view; birth-block color is a permanent historical stamp.<br><br>
+Build 053 adds <b>P8 EMIT</b>. Founders are still generated from the original P0–P7 alphabet, preserving the same founder programs for the same founder seed. P8 can appear only through a small additional mutation path. EMIT copies the agent's current bit into an external observer log; the agent cannot read that log and the world receives nothing back.<br><br>
+The founder RNG is separate from habitat RNG. The share code stores lattice dimensions, every block seed/rotation/presence state, spawn block and founder seed. Build 053 can load Build 051/052 lattice share codes to recreate the same starting experiment.
+</div></section>
+</div>
+<div class="foot">Build 052 is untouched. Build 053 gives mutation a mouth, not a conversation. One-way glass stays one-way.</div>
+</div>
+
+<script>
+(()=>{'use strict';
+const VERSION=53,GEN='G2',B=16,POP_CAP=180,FOUNDERS=32,BIRTH_THRESHOLD=18,BIRTH_COST=6,BASE_LEAK=.015,ACTION_COST=.005,RECOMB=.16,WORD_BASE=9,EMIT=8,OUTPUT_CAP=4096,STORE='forge-agent-language-053-one-way-mouth';
+const $=id=>document.getElementById(id),canvas=$('space'),ctx=canvas.getContext('2d');
+let cfg=null,S=null,running=false,busy=false,raf=0,liveSpeed=1,selectedBlock=0,selectedId=null,clipboardBlock=null;
+let showMotion=true,showBlocks=true,autoRotate=false,colorMode='birth',view={yaw:-.72,pitch:.46,zoom:1.0},pointers=new Map(),gesture=null,pickPoints=[];
+let motionHeat=null,motionStamp=null,motionCells=new Set(),MOTION_TAU=350,MOTION_CUTOFF=1400;
+
+function hash32(str){let h=2166136261>>>0;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}h+=0x6D2B79F5;h=Math.imul(h^(h>>>15),h|1);h^=h+Math.imul(h^(h>>>7),h|61);return(h^(h>>>14))>>>0}
+function seeded(seed){let a=seed>>>0;const rand=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296};return{rand,ri:n=>Math.floor(rand()*n),state:()=>a>>>0}}
+function cfgHash(){return hash32(JSON.stringify({g:GEN,d:cfg.dims,b:cfg.blocks,s:cfg.spawn,f:cfg.founderSeed})).toString(16).padStart(8,'0').toUpperCase()}
+function defaultCfg(){return{dims:[3,3,3],arrangementSeed:510001,founderSeed:37447,spawn:13,blocks:Array.from({length:27},(_,i)=>({seed:hash32('G2-default-'+(i+1)),rot:0,present:true}))}}
+function dims(){return{lx:cfg.dims[0],ly:cfg.dims[1],lz:cfg.dims[2]}}
+function blockCount(){const q=dims();return q.lx*q.ly*q.lz}
+function blockIndex(x,y,z){const q=dims();return(z*q.ly+y)*q.lx+x}
+function blockCoords(i){const q=dims(),z=Math.floor(i/(q.lx*q.ly)),r=i-z*q.lx*q.ly,y=Math.floor(r/q.lx),x=r-y*q.lx;return{x,y,z}}
+function globalDims(){const q=dims();return{W:q.lx*B,H:q.ly*B,D:q.lz*B}}
+function blockOf(x,y,z){const q=dims();const bx=Math.floor(x/B),by=Math.floor(y/B),bz=Math.floor(z/B);if(bx<0||by<0||bz<0||bx>=q.lx||by>=q.ly||bz>=q.lz)return-1;return blockIndex(bx,by,bz)}
+function indexOf(x,y,z){const g=globalDims();return(z*g.H+y)*g.W+x}
+function inside(x,y,z){const g=globalDims();return x>=0&&y>=0&&z>=0&&x<g.W&&y<g.H&&z<g.D}
+function dirName(d){return['N','E','S','W','Z+','Z−'][d]||'?'}
+const DIRV=[[0,-1,0],[1,0,0],[0,1,0],[-1,0,0],[0,0,1],[0,0,-1]];
+function parity(p){let inv=0;for(let i=0;i<3;i++)for(let j=i+1;j<3;j++)if(p[i]>p[j])inv++;return inv%2?-1:1}
+const ROTATIONS=[];for(const p of [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]])for(const sx of [-1,1])for(const sy of [-1,1])for(const sz of [-1,1])if(parity(p)*sx*sy*sz===1)ROTATIONS.push({p,s:[sx,sy,sz]});
+function rotCoord(x,y,z,rn){const r=ROTATIONS[((rn%24)+24)%24],a=[x,y,z],o=[0,0,0];for(let k=0;k<3;k++)o[k]=r.s[k]>0?a[r.p[k]]:B-1-a[r.p[k]];return o}
+function rotDir(d,rn){const r=ROTATIONS[((rn%24)+24)%24],v=DIRV[d],o=[0,0,0];for(let k=0;k<3;k++)o[k]=r.s[k]*v[r.p[k]];return DIRV.findIndex(q=>q[0]===o[0]&&q[1]===o[1]&&q[2]===o[2])}
+
+const blockCache=new Map();
+function canonicalBlock(seed){
+ seed=seed>>>0;if(blockCache.has(seed))return blockCache.get(seed);
+ const n=B*B*B,type=new Uint8Array(n),charge=new Float32Array(n),phase=new Uint8Array(n),mark=new Uint8Array(n),markCharge=new Float32Array(n),dir=new Uint8Array(n),r=seeded(seed);
+ const li=(x,y,z)=>(z*B+y)*B+x;
+ function walk(t,count,steps){for(let b=0;b<count;b++){let x=r.ri(B),y=r.ri(B),z=r.ri(B);for(let k=0;k<steps;k++){const i=li(x,y,z);type[i]=t;if(t===1)charge[i]=1+2*r.rand();else if(t===2)phase[i]=r.ri(32);else if(t===3){mark[i]=r.ri(2);markCharge[i]=.4+r.rand()}else if(t===4)dir[i]=r.ri(6);const d=r.ri(6),v=DIRV[d];x=Math.max(0,Math.min(B-1,x+v[0]));y=Math.max(0,Math.min(B-1,y+v[1]));z=Math.max(0,Math.min(B-1,z+v[2]))}}}
+ walk(1,8,24);walk(2,7,22);walk(3,7,22);walk(4,8,24);
+ const out={type,charge,phase,mark,markCharge,dir};blockCache.set(seed,out);return out
+}
+function buildWorld(){
+ const g=globalDims(),N=g.W*g.H*g.D,w={valid:new Uint8Array(N),type:new Uint8Array(N),charge:new Float32Array(N),phase:new Uint8Array(N),mark:new Uint8Array(N),markCharge:new Float32Array(N),dir:new Uint8Array(N),alpha:[],gamma:[]};
+ for(let bi=0;bi<cfg.blocks.length;bi++){const spec=cfg.blocks[bi];if(!spec.present)continue;const bc=blockCoords(bi),src=canonicalBlock(spec.seed>>>0);for(let z=0;z<B;z++)for(let y=0;y<B;y++)for(let x=0;x<B;x++){const si=(z*B+y)*B+x,[rx,ry,rz]=rotCoord(x,y,z,spec.rot),gx=bc.x*B+rx,gy=bc.y*B+ry,gz=bc.z*B+rz,gi=(gz*g.H+gy)*g.W+gx;w.valid[gi]=1;w.type[gi]=src.type[si];w.charge[gi]=src.charge[si];w.phase[gi]=src.phase[si];w.mark[gi]=src.mark[si];w.markCharge[gi]=src.markCharge[si];w.dir[gi]=src.type[si]===4?rotDir(src.dir[si],spec.rot):0;if(w.type[gi]===1)w.alpha.push(gi);if(w.type[gi]===3)w.gamma.push(gi)}}
+ return w
+}
+function rand(){let a=S.rng>>>0;a=(a+0x6D2B79F5)>>>0;S.rng=a;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}
+function ri(n){return Math.floor(rand()*n)}function chance(p){return rand()<p}
+function founderGenome(r){const n=12+r.ri(9),g=[];for(let i=0;i<n;i++)g.push(r.ri(8));return g}
+function fresh(){
+ setRunning(false);selectedId=null;
+ if(!cfg.blocks[cfg.spawn]?.present){cfg.spawn=cfg.blocks.findIndex(b=>b.present);if(cfg.spawn<0){cfg.blocks[0].present=true;cfg.spawn=0}}
+ const world=buildWorld(),g=globalDims(),fr=seeded(cfg.founderSeed>>>0),bc=blockCoords(cfg.spawn),used=new Set(),seeds=[];
+ for(let n=0;n<FOUNDERS;n++){let x,y,z,k;do{x=fr.ri(B);y=fr.ri(B);z=fr.ri(B);k=(z*B+y)*B+x}while(used.has(k));used.add(k);seeds.push({id:n+1,x:bc.x*B+x,y:bc.y*B+y,z:bc.z*B+z,dir:fr.ri(6),bit:fr.ri(2),pc:0,genome:founderGenome(fr),energy:9+fr.rand()*2,age:0,cool:40,generation:0,lineage:n+1,birthBlock:cfg.spawn,parent:null})}
+ S={tick:0,nextId:FOUNDERS+1,rng:fr.state(),world,seeds,registry:[],output:[],stats:{births:0,deaths:0,mutations:0,recombinations:0,maxGeneration:0,crossings:0,emits:0},maxPop:FOUNDERS};
+ motionHeat=new Float32Array(g.W*g.H*g.D);motionStamp=new Uint32Array(g.W*g.H*g.D);motionCells=new Set();save();render()
+}
+function wordSeq(t){return t<WORD_BASE?[t]:(S.registry[t-WORD_BASE]?.seq||[])}
+function expandGenome(g,limit=96){const out=[];for(const t of g){out.push(...wordSeq(t));if(out.length>=limit)break}return out.slice(0,limit)}
+function seqKey(a){return a.join(',')}
+function getWord(seq){const k=seqKey(seq);let i=S.registry.findIndex(w=>w.key===k);if(i>=0)return i+WORD_BASE;S.registry.push({key:k,seq:seq.slice(),born:S.tick});return S.registry.length+WORD_BASE-1}
+function condense(g){if(g.length<2)return g;const i=ri(g.length-1),seq=[...wordSeq(g[i]),...wordSeq(g[i+1])];if(seq.length<2||seq.length>4)return g;const n=g.slice();n.splice(i,2,getWord(seq));return n}
+function mutate(g){let a=g.slice(),changed=false;if(chance(.12)&&a.length){a[ri(a.length)]=ri(8);changed=true}if(chance(.05)&&a.length<36){a.splice(ri(a.length+1),0,ri(8));changed=true}if(chance(.02)&&a.length){a[ri(a.length)]=EMIT;changed=true}if(chance(.05)&&a.length>5){a.splice(ri(a.length),1);changed=true}if(chance(.04)&&a.length<34){const st=ri(a.length),len=1+ri(Math.min(4,a.length-st)),blk=a.slice(st,st+len);a.splice(ri(a.length+1),0,...blk);changed=true}if(chance(.08)){const b=a.join('|');a=condense(a);if(a.join('|')!==b)changed=true}if(changed)S.stats.mutations++;return a}
+function crossover(a,b){const ca=ri(a.length+1),cb=ri(b.length+1);let g=[...a.slice(0,ca),...b.slice(cb)];if(g.length<5)g=[...a.slice(0,Math.min(5,a.length)),...g];return g.slice(0,36)}
+function occupancy(){const o=new Int32Array(S.world.valid.length);o.fill(-1);for(let i=0;i<S.seeds.length;i++){const s=S.seeds[i];if(s.energy>0)o[indexOf(s.x,s.y,s.z)]=i}return o}
+function blockCounts(){const a=Array(blockCount()).fill(0);for(const s of S.seeds){const b=blockOf(s.x,s.y,s.z);if(b>=0)a[b]++}return a}
+function markMotion(i){const prev=motionStamp[i],age=prev?Math.max(0,S.tick-prev):0,carry=prev?motionHeat[i]*Math.exp(-age/MOTION_TAU):0;motionHeat[i]=Math.min(10,carry+1);motionStamp[i]=S.tick;motionCells.add(i)}
+function betaPhase(i){return ((S.tick+S.world.phase[i])%32)<16?1:0}
+function sample(s,i){const t=S.world.type[i];if(t===1)s.bit=S.world.charge[i]>1.5?1:0;else if(t===2)s.bit=betaPhase(i);else if(t===3)s.bit=S.world.mark[i];else if(t===4)s.bit=S.world.dir[i]&1;else s.bit=0}
+function touch(s,i){const t=S.world.type[i];if(t===1){const q=Math.min(1,S.world.charge[i]);S.world.charge[i]-=q;s.energy+=q}else if(t===2){s.energy+=s.bit===betaPhase(i)?.28:-.05}}
+function write(s,i){if(S.world.type[i]===3&&S.world.mark[i]!==s.bit&&S.world.markCharge[i]>=.2){S.world.mark[i]=s.bit;S.world.markCharge[i]-=.2;s.energy+=.2}}
+function emit(s){S.stats.emits=(S.stats.emits||0)+1;const now=blockOf(s.x,s.y,s.z);(S.output||(S.output=[])).push([S.tick,s.id,s.generation,s.lineage,s.birthBlock,now,s.bit]);if(S.output.length>OUTPUT_CAP)S.output.splice(0,1024)}
+function move(s,occ){
+ const v=DIRV[s.dir],nx=s.x+v[0],ny=s.y+v[1],nz=s.z+v[2];if(!inside(nx,ny,nz))return;const ni=indexOf(nx,ny,nz);if(!S.world.valid[ni]||occ[ni]>=0)return;
+ const oi=indexOf(s.x,s.y,s.z),ob=blockOf(s.x,s.y,s.z),nb=blockOf(nx,ny,nz);occ[oi]=-1;s.x=nx;s.y=ny;s.z=nz;occ[ni]=0;markMotion(oi);markMotion(ni);if(ob!==nb)S.stats.crossings++;
+ if(S.world.type[ni]===4){const opp=[2,3,0,1,5,4];if(s.dir===S.world.dir[ni])s.energy+=.14;else if(opp[s.dir]===S.world.dir[ni])s.energy-=.02}
+}
+function execPrim(s,p,occ){const i=indexOf(s.x,s.y,s.z);if(p===0)move(s,occ);else if(p===1)s.dir=(s.dir+5)%6;else if(p===2)s.dir=(s.dir+1)%6;else if(p===3)touch(s,i);else if(p===4)sample(s,i);else if(p===5)s.bit^=1;else if(p===6){if(s.bit===0)s.pc=(s.pc+1)%Math.max(1,s.genome.length)}else if(p===7)write(s,i);else if(p===EMIT)emit(s)}
+function execute(s,occ){if(!s.genome.length)return;const tok=s.genome[s.pc%s.genome.length];s.pc=(s.pc+1)%s.genome.length;const seq=wordSeq(tok);s.energy-=ACTION_COST+.003*Math.max(0,seq.length-1);for(const p of seq)execPrim(s,p,occ)}
+function mate(s){const m=[];for(const q of S.seeds)if(q.id!==s.id&&q.energy>0&&Math.abs(q.x-s.x)<=1&&Math.abs(q.y-s.y)<=1&&Math.abs(q.z-s.z)<=1)m.push(q);return m.length?m[ri(m.length)]:null}
+function birth(s,occ,counts){
+ if(s.energy<BIRTH_THRESHOLD||s.cool>0)return null;const spots=[];
+ for(let dz=-1;dz<=1;dz++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy&&!dz)continue;const x=s.x+dx,y=s.y+dy,z=s.z+dz;if(!inside(x,y,z))continue;const i=indexOf(x,y,z),b=blockOf(x,y,z);if(b<0||!cfg.blocks[b].present||!S.world.valid[i]||counts[b]>=POP_CAP||occ[i]>=0)continue;spots.push([x,y,z,b])}
+ if(!spots.length)return null;const [x,y,z,b]=spots[ri(spots.length)],m=chance(RECOMB)?mate(s):null;let genome=m?crossover(s.genome,m.genome):s.genome.slice();if(m)S.stats.recombinations++;genome=mutate(genome);s.energy-=BIRTH_COST;s.cool=35;
+ const ch={id:S.nextId++,x,y,z,dir:ri(6),bit:ri(2),pc:0,genome,energy:BIRTH_COST,age:0,cool:55,generation:Math.max(s.generation,m?m.generation:0)+1,lineage:s.lineage,birthBlock:b,parent:s.id};S.stats.births++;S.stats.maxGeneration=Math.max(S.stats.maxGeneration,ch.generation);counts[b]++;return ch
+}
+function updateWorld(){for(const i of S.world.alpha)S.world.charge[i]=Math.min(3,S.world.charge[i]+.014);for(const i of S.world.gamma)S.world.markCharge[i]=Math.min(1.2,S.world.markCharge[i]+.005)}
+function step(){
+ if(!S.seeds.length){running=false;return}S.tick++;updateWorld();const occ=occupancy(),counts=blockCounts(),born=[],start=S.tick%S.seeds.length;
+ for(let q=0;q<S.seeds.length;q++){const s=S.seeds[(start+q)%S.seeds.length];if(s.energy<=0)continue;s.age++;if(s.cool>0)s.cool--;s.energy-=BASE_LEAK;execute(s,occ);const ch=birth(s,occ,counts);if(ch){born.push(ch);occ[indexOf(ch.x,ch.y,ch.z)]=0}}
+ if(born.length)S.seeds.push(...born);const before=S.seeds.length;S.seeds=S.seeds.filter(s=>s.energy>0);S.stats.deaths+=before-S.seeds.length;S.maxPop=Math.max(S.maxPop,S.seeds.length)
+}
+function runFrames(){if(!running)return;const n=liveSpeed;if(n<=100){for(let i=0;i<n&&running;i++)step();render();raf=requestAnimationFrame(runFrames);return}let left=n;function pump(){if(!running)return;const st=performance.now();while(left>0&&performance.now()-st<12){const b=Math.min(50,left);for(let i=0;i<b;i++)step();left-=b}render();raf=requestAnimationFrame(left>0?pump:runFrames)}pump()}
+function setRunning(v){running=v;$('play').textContent=v?'PAUSE':'PLAY';if(v){cancelAnimationFrame(raf);raf=requestAnimationFrame(runFrames)}}
+async function bulk(n){if(busy)return;busy=true;setRunning(false);for(let done=0;done<n&&S.seeds.length;){const b=Math.min(500,n-done);for(let i=0;i<b;i++)step();done+=b;if(done%5000===0){render();await new Promise(r=>requestAnimationFrame(r))}}busy=false;render();save()}
+
+function project(x,y,z,w,h){
+ const g=globalDims(),cx=(g.W-1)/2,cy=(g.H-1)/2,cz=(g.D-1)/2,scale=Math.min(w,h)*.72/Math.max(g.W,g.H,g.D)*view.zoom;
+ let X=x-cx,Y=y-cy,Z=z-cz,cyaw=Math.cos(view.yaw),syaw=Math.sin(view.yaw),cp=Math.cos(view.pitch),sp=Math.sin(view.pitch);
+ const x1=X*cyaw-Z*syaw,z1=X*syaw+Z*cyaw,y1=Y,y2=y1*cp-z1*sp,z2=y1*sp+z1*cp;
+ return{x:w/2+x1*scale,y:h/2+y2*scale,z:z2,r:scale}
+}
+function edge(a,b){ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y)}
+function drawBox(bi,w,h){
+ const bc=blockCoords(bi),x0=bc.x*B,y0=bc.y*B,z0=bc.z*B,x1=x0+B,y1=y0+B,z1=z0+B,p=[];for(const z of [z0,z1])for(const y of [y0,y1])for(const x of [x0,x1])p.push(project(x,y,z,w,h));
+ const E=[[0,1],[0,2],[0,4],[1,3],[1,5],[2,3],[2,6],[3,7],[4,5],[4,6],[5,7],[6,7]];ctx.beginPath();for(const [a,b] of E)edge(p[a],p[b]);ctx.stroke()
+}
+function draw(){
+ const css=canvas.clientWidth||700,dpr=Math.max(1,Math.min(2,devicePixelRatio||1));if(canvas.width!==Math.floor(css*dpr)||canvas.height!==Math.floor(css*dpr)){canvas.width=Math.floor(css*dpr);canvas.height=Math.floor(css*dpr)}ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#050806';ctx.fillRect(0,0,css,css);pickPoints=[];
+ if(showBlocks){ctx.lineWidth=1;for(let i=0;i<cfg.blocks.length;i++){if(!cfg.blocks[i].present)continue;ctx.strokeStyle=i===cfg.spawn?'rgba(119,223,255,.65)':i===selectedBlock?'rgba(255,255,255,.45)':'rgba(145,161,152,.18)';drawBox(i,css,css)}}
+ if(showMotion){ctx.fillStyle='rgba(119,223,255,.28)';const g=globalDims();for(const i of [...motionCells]){const age=S.tick-motionStamp[i];if(age>MOTION_CUTOFF){motionCells.delete(i);continue}const strength=motionHeat[i]*Math.exp(-age/MOTION_TAU);if(strength<.08)continue;const z=Math.floor(i/(g.W*g.H)),rem=i-z*g.W*g.H,y=Math.floor(rem/g.W),x=rem-y*g.W,p=project(x+.5,y+.5,z+.5,css,css),r=Math.max(.8,Math.min(3.2,p.r*.13))*Math.min(1,strength/2);ctx.globalAlpha=Math.min(.45,.08+strength*.06);ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
+ const pts=S.seeds.map(s=>{const p=project(s.x+.5,s.y+.5,s.z+.5,css,css);return{s,p}}).sort((a,b)=>a.p.z-b.p.z);
+ for(const q of pts){const r=Math.max(2,Math.min(7,q.p.r*.24));ctx.fillStyle=agentColor(q.s,.92);ctx.beginPath();ctx.arc(q.p.x,q.p.y,r,0,Math.PI*2);ctx.fill();if(q.s.id===selectedId){ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke()}pickPoints.push({x:q.p.x,y:q.p.y,r:Math.max(10,r+4),id:q.s.id})}
+}
+function lineageColor(n,a=1){return'hsla('+((n*137.508)%360)+',65%,62%,'+a+')'}
+function blockColor(n,a=1){if(n==null||n<0)return'hsla(0,0%,70%,'+a+')';return'hsla('+(((n+1)*137.508+23)%360)+',72%,62%,'+a+')'}
+function agentColor(s,a=.92){if(colorMode==='birth')return blockColor(s.birthBlock,a);if(colorMode==='current')return blockColor(blockOf(s.x,s.y,s.z),a);return lineageColor(s.lineage,a)}
+function renderColorLegend(){const box=$('colorLegend');if(colorMode==='lineage'){box.innerHTML='<b>LINEAGE</b> · color follows ancestry.';return}const label=colorMode==='birth'?'<b>BIRTH BLOCK</b> · permanent color stamped where each individual was born.':'<b>CURRENT BLOCK</b> · control view; color follows physical location.';const active=cfg.blocks.map((b,i)=>b.present?i:null).filter(i=>i!==null);box.innerHTML=label+'<div class="originLegend">'+active.map(i=>'<span class="originChip"><span class="originDot" style="background:'+blockColor(i,1)+'"></span>#'+i+'</span>').join('')+'</div>'}
+function renderBlocks(){
+ const q=dims();$('layers').innerHTML='';for(let z=0;z<q.lz;z++){const sec=document.createElement('div');sec.className='layer';sec.innerHTML='<div class="layerTitle">Z BLOCK LAYER '+(z+1)+' / '+q.lz+'</div>';const grid=document.createElement('div');grid.className='blockGrid';grid.style.gridTemplateColumns='repeat('+q.lx+',1fr)';for(let y=0;y<q.ly;y++)for(let x=0;x<q.lx;x++){const i=blockIndex(x,y,z),b=cfg.blocks[i],btn=document.createElement('button');btn.className='block '+(i===selectedBlock?'sel ':'')+(i===cfg.spawn?'spawn ':'')+(b.present?'':'off');btn.innerHTML='<b>'+(b.present?'G2:'+String(b.seed>>>0).slice(-6):'VOID')+'</b><span>#'+i+' · R'+b.rot+(i===cfg.spawn?' · SPAWN':'')+'</span>';btn.onclick=()=>{selectedBlock=i;render()};grid.appendChild(btn)}sec.appendChild(grid);$('layers').appendChild(sec)}
+ const b=cfg.blocks[selectedBlock];$('selectedLabel').textContent='block #'+selectedBlock+' · '+(b.present?'G2:'+String(b.seed>>>0)+' · rotation '+b.rot:'VOID')+(selectedBlock===cfg.spawn?' · SPAWN':'');$('blockSeed').value=String(b.seed>>>0);$('toggleBlock').textContent=b.present?'REMOVE':'RESTORE'
+}
+function renderLineages(){const m=new Map();for(const s of S.seeds)m.set(s.lineage,(m.get(s.lineage)||0)+1);const a=[...m.entries()].sort((x,y)=>y[1]-x[1]).slice(0,12),max=Math.max(1,...a.map(q=>q[1]));$('lineageCount').textContent=m.size;$('lineages').innerHTML=a.length?a.map(([l,n])=>'<div class="line"><b style="color:'+lineageColor(l,1)+'">L'+l+'</b><div class="track"><div class="fill" style="width:'+(100*n/max)+'%;background:'+lineageColor(l,1)+'"></div></div><span>'+n+'</span></div>').join(''):'<div class="sub">Extinct.</div>'}
+function renderInspect(){const s=S.seeds.find(q=>q.id===selectedId);if(!s){$('inspect').textContent='Tap an agent in the 3D view.';return}const ex=expandGenome(s.genome,80);$('inspect').innerHTML='<b>seed #'+s.id+' · L'+s.lineage+' · gen '+s.generation+'</b><br>energy '+s.energy.toFixed(2)+' · age '+s.age.toLocaleString()+' · xyz '+s.x+','+s.y+','+s.z+' · '+dirName(s.dir)+' · born #'+s.birthBlock+' · now #'+blockOf(s.x,s.y,s.z)+'<br><br>'+s.genome.map(t=>t<WORD_BASE?'P'+t:'W'+(t-WORD_BASE)).join(' ')+'<br><br>'+s.genome.length+' hereditary tokens / '+ex.length+' primitive ops expanded'}
+function renderMouth(){const out=S.output||[],meta=$('mouthMeta'),box=$('mouth'),total=S.stats.emits||out.length;if(!out.length){meta.innerHTML='<span class="mouthTag">0 EMITS</span><span class="mouthTag">0 SPEAKERS</span>';box.textContent='No emissions yet. P8 must first arise through mutation.';return}const recent=out.slice(-1200),m=new Map();for(const e of recent){const [tick,id,generation,lineage,birth,now,bit]=e;let q=m.get(id);if(!q)q={id,generation,lineage,birth,now,last:tick,bits:''};q.generation=generation;q.lineage=lineage;q.birth=birth;q.now=now;q.last=tick;q.bits=(q.bits+String(bit)).slice(-64);m.set(id,q)}const rows=[...m.values()].sort((a,b)=>b.last-a.last).slice(0,18);meta.innerHTML='<span class="mouthTag">'+total.toLocaleString()+' EMITS</span><span class="mouthTag">'+m.size.toLocaleString()+' RECENT SPEAKERS</span><span class="mouthTag">LAST '+Math.min(out.length,1200).toLocaleString()+' EVENTS</span>';box.textContent=rows.map(q=>'t'+String(q.last).padStart(7,'0')+'  #'+String(q.id).padStart(5,'0')+'  g'+q.generation+' L'+q.lineage+'  b'+q.birth+'→'+q.now+'  '+q.bits).join('\n')}
+function experimentCode(){const obj={v:VERSION,g:GEN,d:cfg.dims,a:cfg.arrangementSeed,f:cfg.founderSeed,s:cfg.spawn,b:cfg.blocks.map(x=>[x.seed>>>0,x.rot,x.present?1:0])};return btoa(unescape(encodeURIComponent(JSON.stringify(obj))))}
+function loadExperimentCode(code){const o=JSON.parse(decodeURIComponent(escape(atob(code.trim()))));if(![51,52,53].includes(o.v)||o.g!==GEN)throw Error('This code is not a Build 051/052/053 G2 specimen.');cfg={dims:o.d,arrangementSeed:o.a>>>0,founderSeed:o.f>>>0,spawn:o.s|0,blocks:o.b.map(x=>({seed:x[0]>>>0,rot:x[1]%24,present:!!x[2]}))};selectedBlock=Math.min(cfg.spawn,cfg.blocks.length-1);$('arrSeed').value=String(cfg.arrangementSeed);fresh()}
+function render(){
+ $('tick').textContent=S.tick.toLocaleString();$('pop').textContent=S.seeds.length.toLocaleString();$('gen').textContent=S.stats.maxGeneration;$('activeBlocks').textContent=cfg.blocks.filter(b=>b.present).length+'/'+cfg.blocks.length;$('crossings').textContent=S.stats.crossings.toLocaleString();$('experimentId').textContent='AL53 · '+GEN+' · '+cfg.dims.join('×')+' · '+cfgHash()+' · founder '+(cfg.founderSeed>>>0);renderBlocks();renderLineages();renderColorLegend();renderInspect();renderMouth();draw()
+}
+function save(){try{localStorage.setItem(STORE,JSON.stringify({cfg,S:{tick:S.tick,nextId:S.nextId,rng:S.rng,seeds:S.seeds,registry:S.registry,stats:S.stats,maxPop:S.maxPop}}))}catch{}}
+function restore(){try{const q=JSON.parse(localStorage.getItem(STORE));if(!q?.cfg||!q?.S)return false;cfg=q.cfg;const world=buildWorld();S={...q.S,world};S.output=S.output||[];S.stats.emits=S.stats.emits||0;for(const s of S.seeds)if(s.birthBlock==null)s.birthBlock=blockOf(s.x,s.y,s.z);const g=globalDims();motionHeat=new Float32Array(g.W*g.H*g.D);motionStamp=new Uint32Array(g.W*g.H*g.D);motionCells=new Set();selectedBlock=Math.min(cfg.spawn,cfg.blocks.length-1);return true}catch{return false}}
+function preset(kind){
+ const seed=(cfg.blocks[selectedBlock]?.seed>>>0)||37037;let d,blocks,spawn=0;
+ if(kind==='cube'){d=[3,3,3];blocks=Array.from({length:27},()=>({seed,rot:0,present:true}));spawn=13}
+ if(kind==='tower'){d=[1,1,10];blocks=Array.from({length:10},()=>({seed,rot:0,present:true}));spawn=0}
+ if(kind==='row'){d=[10,1,1];blocks=Array.from({length:10},()=>({seed,rot:0,present:true}));spawn=0}
+ if(kind==='ring'){d=[3,3,1];blocks=Array.from({length:9},()=>({seed,rot:0,present:true}));blocks[4].present=false;spawn=3}
+ cfg.dims=d;cfg.blocks=blocks;cfg.spawn=spawn;selectedBlock=spawn;fresh();$('status').textContent='preset built · '+kind+' · repeated G2:'+seed
+}
+function randomize(){
+ const seed=(+$('arrSeed').value>>>0)||1,r=seeded(seed);cfg.arrangementSeed=seed;for(const b of cfg.blocks)if(b.present){b.seed=r.ri(0x100000000)>>>0;b.rot=r.ri(24)}fresh();$('status').textContent='deterministic arrangement generated from '+seed
+}
+$('play').onclick=()=>setRunning(!running);$('step1k').onclick=()=>bulk(1000);$('step10k').onclick=()=>bulk(10000);$('speed').onchange=()=>{liveSpeed=+$('speed').value||1};
+$('replay').onclick=()=>{fresh();$('status').textContent='replayed from tick 0'};$('newFounders').onclick=()=>{cfg.founderSeed=hash32('founders-'+cfg.founderSeed);fresh();$('status').textContent='new deterministic founder seed '+cfg.founderSeed};
+$('presetCube').onclick=()=>preset('cube');$('presetTower').onclick=()=>preset('tower');$('presetRow').onclick=()=>preset('row');$('presetRing').onclick=()=>preset('ring');$('randomize').onclick=randomize;
+$('applySeed').onclick=()=>{cfg.blocks[selectedBlock].seed=(+$('blockSeed').value>>>0);cfg.blocks[selectedBlock].present=true;fresh();$('status').textContent='block #'+selectedBlock+' now G2:'+cfg.blocks[selectedBlock].seed};
+$('rotateBlock').onclick=()=>{cfg.blocks[selectedBlock].rot=(cfg.blocks[selectedBlock].rot+1)%24;fresh();$('status').textContent='block #'+selectedBlock+' rotated to R'+cfg.blocks[selectedBlock].rot};
+$('toggleBlock').onclick=()=>{cfg.blocks[selectedBlock].present=!cfg.blocks[selectedBlock].present;if(selectedBlock===cfg.spawn&&!cfg.blocks[selectedBlock].present){const n=cfg.blocks.findIndex(b=>b.present);if(n>=0)cfg.spawn=n}fresh()};
+$('setSpawn').onclick=()=>{if(!cfg.blocks[selectedBlock].present){$('status').textContent='restore this block before making it the spawn.';return}cfg.spawn=selectedBlock;fresh();$('status').textContent='founders now spawn in block #'+cfg.spawn};
+$('cloneAll').onclick=()=>{const src={...cfg.blocks[selectedBlock],present:true};cfg.blocks=cfg.blocks.map(b=>b.present?{...src}:{...b});fresh();$('status').textContent='all present blocks cloned from G2:'+src.seed+' R'+src.rot};
+$('copyBlock').onclick=()=>{clipboardBlock={...cfg.blocks[selectedBlock]};$('status').textContent='block copied'};$('pasteBlock').onclick=()=>{if(!clipboardBlock)return;cfg.blocks[selectedBlock]={...clipboardBlock};fresh();$('status').textContent='block pasted'};
+$('makeCode').onclick=()=>{$('shareCode').value=experimentCode();$('status').textContent='share code refreshed'};$('copyCode').onclick=async()=>{const code=experimentCode();$('shareCode').value=code;try{await navigator.clipboard.writeText(code);$('status').textContent='share code copied'}catch{$('status').textContent='share code ready below'}};
+$('loadCode').onclick=()=>{try{loadExperimentCode($('shareCode').value);$('status').textContent='shared specimen loaded exactly'}catch(e){$('status').textContent='could not load code · '+e.message}};
+$('motion').onclick=()=>{showMotion=!showMotion;$('motion').textContent=showMotion?'MOTION ON':'MOTION OFF';$('motion').classList.toggle('on',showMotion);draw()};$('blocks').onclick=()=>{showBlocks=!showBlocks;$('blocks').textContent=showBlocks?'BLOCKS ON':'BLOCKS OFF';$('blocks').classList.toggle('on',showBlocks);draw()};$('auto').onclick=()=>{autoRotate=!autoRotate;$('auto').textContent=autoRotate?'AUTO ON':'AUTO OFF';$('auto').classList.toggle('on',autoRotate)};$('colorMode').value=colorMode;$('colorMode').onchange=()=>{colorMode=$('colorMode').value;renderColorLegend();draw()};$('resetView').onclick=()=>{view={yaw:-.72,pitch:.46,zoom:1};draw()};
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1)gesture={x:e.clientX,y:e.clientY,yaw:view.yaw,pitch:view.pitch,moved:false};else if(pointers.size===2){const a=[...pointers.values()];gesture={pinch:true,dist:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),zoom:view.zoom,moved:true}}});
+canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1&&!gesture?.pinch){const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;if(Math.hypot(dx,dy)>4)gesture.moved=true;view.yaw=gesture.yaw+dx*.012;view.pitch=Math.max(-1.45,Math.min(1.45,gesture.pitch+dy*.012));draw()}else if(pointers.size===2&&gesture?.pinch){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);view.zoom=Math.max(.35,Math.min(4,gesture.zoom*d/gesture.dist));draw()}});
+function endPointer(e){const click=pointers.size===1&&!gesture?.moved&&!gesture?.pinch;pointers.delete(e.pointerId);if(click){const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=24;for(const p of pickPoints){const d=Math.hypot(p.x-x,p.y-y);if(d<bd){bd=d;best=p}}if(best){selectedId=best.id;renderInspect();draw()}}if(!pointers.size)gesture=null}
+canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointercancel',endPointer);
+function animate(){if(autoRotate){view.yaw+=.003;draw()}requestAnimationFrame(animate)}
+cfg=defaultCfg();if(!restore())fresh();else render();$('arrSeed').value=String(cfg.arrangementSeed);$('shareCode').value=experimentCode();requestAnimationFrame(animate)
+})();
+</script></body></html>
