@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d0f10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Compass">
+  <title>COMPASS</title>
+  <style>
+    :root{
+      color-scheme:dark;
+      --bg:#0d0f10;
+      --panel:#15191b;
+      --panel2:#1b2022;
+      --line:#2d3437;
+      --text:#f1f3ef;
+      --muted:#8e9896;
+      --north:#d6a646;
+      --good:#9dc59a;
+      --danger:#d28372;
+      --radius:18px;
+      --pad:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace}
+    body{
+      min-height:100dvh;
+      padding:
+        max(14px,env(safe-area-inset-top))
+        max(14px,env(safe-area-inset-right))
+        max(22px,env(safe-area-inset-bottom))
+        max(14px,env(safe-area-inset-left));
+      -webkit-tap-highlight-color:transparent;
+    }
+    button,.tap{
+      min-height:48px;
+      touch-action:manipulation;
+      -webkit-touch-callout:none;
+      -webkit-user-select:none;
+      user-select:none;
+    }
+    button,input,textarea{font:inherit}
+    button{
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:var(--panel2);
+      color:var(--text);
+      padding:11px 14px;
+      cursor:pointer;
+    }
+    button:active{transform:translateY(1px)}
+    button.primary{background:var(--north);color:#14120d;border-color:transparent;font-weight:900}
+    button.good{border-color:#415742;color:var(--good)}
+    button.danger{border-color:#5d3d36;color:var(--danger)}
+    button.ghost{background:transparent;color:var(--muted)}
+    input,textarea{
+      width:100%;
+      border:1px solid var(--line);
+      background:#0f1213;
+      color:var(--text);
+      border-radius:14px;
+      padding:13px 14px;
+      outline:none;
+      -webkit-user-select:text;
+      user-select:text;
+    }
+    input:focus,textarea:focus{border-color:#5d676a;box-shadow:0 0 0 3px rgba(214,166,70,.08)}
+    textarea{resize:none;min-height:76px;line-height:1.35}
+    .shell{width:min(100%,680px);margin:0 auto}
+    .top{
+      display:flex;align-items:center;justify-content:space-between;
+      margin:2px 2px 14px;
+    }
+    .brand{font-weight:950;letter-spacing:.16em;font-size:13px}
+    .saved{font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+    .saved.bad{color:var(--danger)}
+    .card{
+      background:linear-gradient(180deg,var(--panel),#121617);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:var(--pad);
+      margin-bottom:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.18);
+    }
+    .labelrow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+    .label{font-size:10px;letter-spacing:.16em;color:var(--muted);font-weight:900}
+    .north .label{color:var(--north)}
+    .northValue{
+      font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      font-weight:800;font-size:20px;line-height:1.18;
+      letter-spacing:-.02em;
+      overflow-wrap:anywhere;
+    }
+    .northEmpty{color:#6f7877;font-weight:650}
+    .editNorth{min-height:40px;padding:8px 10px;font-size:11px}
+    .hero{padding:20px 16px 16px}
+    .hero.empty{border-style:dashed}
+    .nowText{
+      font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      font-size:28px;line-height:1.08;font-weight:900;letter-spacing:-.035em;
+      margin:8px 0 12px;overflow-wrap:anywhere;
+    }
+    .nowMeta{color:var(--muted);font-size:11px;margin-bottom:14px}
+    .row{display:flex;gap:10px}
+    .row>*{flex:1}
+    .capture input{min-height:52px}
+    .captureRow{display:grid;grid-template-columns:1fr 52px;gap:10px}
+    .captureRow button{font-size:24px;padding:0}
+    .decision{
+      margin-top:12px;
+      padding-top:12px;
+      border-top:1px solid var(--line);
+    }
+    .decisionText{
+      font-size:16px;font-weight:800;line-height:1.3;
+      margin-bottom:10px;overflow-wrap:anywhere;
+    }
+    .decisionBtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+    .decisionBtns button{padding:9px 6px;font-size:11px;font-weight:900}
+    details.card{padding:0;overflow:hidden}
+    summary{
+      list-style:none;cursor:pointer;min-height:54px;
+      display:flex;align-items:center;justify-content:space-between;
+      padding:0 16px;
+      -webkit-user-select:none;user-select:none;
+    }
+    summary::-webkit-details-marker{display:none}
+    .count{
+      min-width:28px;height:28px;border-radius:14px;
+      display:grid;place-items:center;background:#242a2d;color:var(--muted);
+      font-size:11px;font-weight:900;padding:0 8px;
+    }
+    .drawer{border-top:1px solid var(--line);padding:10px}
+    .idea{
+      display:grid;grid-template-columns:1fr auto;gap:10px;
+      align-items:center;padding:12px 6px;border-bottom:1px solid #252b2e;
+    }
+    .idea:last-child{border-bottom:0}
+    .ideaText{font-size:14px;line-height:1.25;overflow-wrap:anywhere}
+    .ideaMeta{font-size:10px;color:var(--muted);margin-top:4px}
+    .ideaActions{display:flex;gap:6px}
+    .ideaActions button{min-height:42px;padding:7px 9px;font-size:10px}
+    .emptyList{color:var(--muted);font-size:12px;padding:14px 8px}
+    .dataActions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .tiny{color:var(--muted);font-size:10px;line-height:1.45;margin:10px 2px 0}
+    .toast{
+      position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));
+      transform:translate(-50%,20px);
+      background:#252b2d;border:1px solid #3a4346;border-radius:999px;
+      color:var(--text);padding:10px 14px;font-size:11px;
+      opacity:0;pointer-events:none;transition:.18s ease;
+      max-width:calc(100vw - 32px);text-align:center;z-index:20;
+    }
+    .toast.show{opacity:1;transform:translate(-50%,0)}
+    .hidden{display:none!important}
+    .fileLabel{
+      min-height:48px;border:1px solid var(--line);border-radius:14px;
+      display:grid;place-items:center;background:var(--panel2);font-size:12px;
+      -webkit-user-select:none;user-select:none;
+    }
+    @media (max-width:390px){
+      .nowText{font-size:24px}
+      .decisionBtns button{font-size:10px}
+      .ideaActions{flex-direction:column}
+    }
+    @media (prefers-reduced-motion:reduce){
+      *{scroll-behavior:auto!important;transition:none!important}
+    }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <div class="brand">COMPASS</div>
+    <div id="saveStatus" class="saved">LOCAL // READY</div>
+  </header>
+
+  <section class="card north" aria-labelledby="northLabel">
+    <div class="labelrow">
+      <div id="northLabel" class="label">NORTH</div>
+      <button id="editNorthBtn" class="ghost editNorth" type="button">EDIT</button>
+    </div>
+    <div id="northView" class="northValue northEmpty">What deserves to stay important?</div>
+    <div id="northEditor" class="hidden">
+      <textarea id="northInput" maxlength="220" placeholder="Example: Build something useful enough that someone will pay for it."></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="northCancel" class="ghost" type="button">CANCEL</button>
+        <button id="northSave" class="primary" type="button">SET NORTH</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="nowCard" class="card hero empty" aria-labelledby="nowLabel">
+    <div id="nowLabel" class="label">RIGHT NOW</div>
+    <div id="nowText" class="nowText">Nothing owns your attention.</div>
+    <div id="nowMeta" class="nowMeta">Good. Choose deliberately.</div>
+    <div id="nowActions" class="row hidden">
+      <button id="finishBtn" class="good" type="button">DONE</button>
+      <button id="parkActiveBtn" type="button">PARK IT</button>
+    </div>
+  </section>
+
+  <section class="card capture">
+    <div class="labelrow">
+      <div class="label">A NEW RABBIT HOLE APPEARS</div>
+    </div>
+    <div class="captureRow">
+      <input id="captureInput" maxlength="180" autocomplete="off" placeholder="What's pulling at you?">
+      <button id="captureBtn" class="primary" type="button" aria-label="Capture branch">+</button>
+    </div>
+    <div id="decision" class="decision hidden">
+      <div id="decisionText" class="decisionText"></div>
+      <div class="decisionBtns">
+        <button id="doBtn" class="good" type="button">DO</button>
+        <button id="parkBtn" type="button">PARK</button>
+        <button id="dropBtn" class="danger" type="button">DROP</button>
+      </div>
+    </div>
+  </section>
+
+  <details id="parkedDetails" class="card">
+    <summary>
+      <span class="label">PARKED</span>
+      <span id="parkedCount" class="count">0</span>
+    </summary>
+    <div id="parkedList" class="drawer"></div>
+  </details>
+
+  <details class="card">
+    <summary>
+      <span class="label">TRAIL</span>
+      <span id="doneCount" class="count">0</span>
+    </summary>
+    <div id="doneList" class="drawer"></div>
+  </details>
+
+  <details class="card">
+    <summary>
+      <span class="label">DATA</span>
+      <span class="count">↕</span>
+    </summary>
+    <div class="drawer">
+      <div class="dataActions">
+        <button id="exportBtn" type="button">EXPORT</button>
+        <label class="fileLabel" for="importInput">IMPORT</label>
+        <input id="importInput" class="hidden" type="file" accept="application/json,.json">
+      </div>
+      <div class="tiny">Saved only in this browser. Export occasionally if the parked list matters to you.</div>
+    </div>
+  </details>
+
+  <div class="tiny">COMPASS does not decide what matters. It keeps your decision visible.</div>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const KEY = 'forge-compass-v1';
+  const BACKUP_KEY = KEY + '-backup';
+  const CORRUPT_KEY = KEY + '-corrupt';
+  const VERSION = 1;
+
+  const fresh = () => ({
+    v: VERSION,
+    north: '',
+    active: null,
+    parked: [],
+    done: []
+  });
+
+  let state = fresh();
+  let pending = '';
+  let toastTimer = 0;
+
+  const $ = id => document.getElementById(id);
+
+  const els = {
+    saveStatus: $('saveStatus'),
+    northView: $('northView'),
+    northEditor: $('northEditor'),
+    northInput: $('northInput'),
+    editNorthBtn: $('editNorthBtn'),
+    northCancel: $('northCancel'),
+    northSave: $('northSave'),
+    nowCard: $('nowCard'),
+    nowText: $('nowText'),
+    nowMeta: $('nowMeta'),
+    nowActions: $('nowActions'),
+    finishBtn: $('finishBtn'),
+    parkActiveBtn: $('parkActiveBtn'),
+    captureInput: $('captureInput'),
+    captureBtn: $('captureBtn'),
+    decision: $('decision'),
+    decisionText: $('decisionText'),
+    doBtn: $('doBtn'),
+    parkBtn: $('parkBtn'),
+    dropBtn: $('dropBtn'),
+    parkedCount: $('parkedCount'),
+    parkedList: $('parkedList'),
+    parkedDetails: $('parkedDetails'),
+    doneCount: $('doneCount'),
+    doneList: $('doneList'),
+    exportBtn: $('exportBtn'),
+    importInput: $('importInput'),
+    toast: $('toast')
+  };
+
+  function validItem(x) {
+    return x && typeof x === 'object'
+      && typeof x.id === 'string'
+      && typeof x.text === 'string'
+      && typeof x.at === 'number';
+  }
+
+  function validate(raw) {
+    if (!raw || typeof raw !== 'object' || raw.v !== VERSION) return null;
+    if (typeof raw.north !== 'string') return null;
+    if (!(raw.active === null || validItem(raw.active))) return null;
+    if (!Array.isArray(raw.parked) || !raw.parked.every(validItem)) return null;
+    if (!Array.isArray(raw.done) || !raw.done.every(validItem)) return null;
+    return {
+      v: VERSION,
+      north: raw.north.slice(0, 220),
+      active: raw.active ? cleanItem(raw.active) : null,
+      parked: raw.parked.map(cleanItem).slice(0, 500),
+      done: raw.done.map(cleanItem).slice(0, 100)
+    };
+  }
+
+  function cleanItem(x) {
+    return {
+      id: String(x.id),
+      text: String(x.text).slice(0, 180),
+      at: Number(x.at) || Date.now()
+    };
+  }
+
+  function parseStored(text) {
+    if (!text) return null;
+    try { return validate(JSON.parse(text)); }
+    catch { return null; }
+  }
+
+  function load() {
+    try {
+      const primaryRaw = localStorage.getItem(KEY);
+      const primary = parseStored(primaryRaw);
+      if (primary) {
+        state = primary;
+        return;
+      }
+
+      const backupRaw = localStorage.getItem(BACKUP_KEY);
+      const backup = parseStored(backupRaw);
+      if (backup) {
+        if (primaryRaw) localStorage.setItem(CORRUPT_KEY, primaryRaw);
+        state = backup;
+        toast('Recovered from local backup.');
+        save();
+        return;
+      }
+
+      if (primaryRaw) {
+        localStorage.setItem(CORRUPT_KEY, primaryRaw);
+        toast('Stored data was unreadable. A raw copy was preserved.');
+      }
+    } catch {
+      setSaveStatus('LOCAL // UNAVAILABLE', true);
+    }
+  }
+
+  function save() {
+    try {
+      const current = localStorage.getItem(KEY);
+      if (current && parseStored(current)) localStorage.setItem(BACKUP_KEY, current);
+      localStorage.setItem(KEY, JSON.stringify(state));
+      setSaveStatus('LOCAL // SAVED', false);
+      return true;
+    } catch {
+      setSaveStatus('LOCAL // SAVE FAILED', true);
+      toast('Could not save on this browser.');
+      return false;
+    }
+  }
+
+  function setSaveStatus(text, bad) {
+    els.saveStatus.textContent = text;
+    els.saveStatus.classList.toggle('bad', !!bad);
+  }
+
+  function makeItem(text) {
+    return {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      text: text.trim(),
+      at: Date.now()
+    };
+  }
+
+  function age(at) {
+    const ms = Math.max(0, Date.now() - at);
+    const min = Math.floor(ms / 60000);
+    if (min < 1) return 'just now';
+    if (min < 60) return min + 'm ago';
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return hr + 'h ago';
+    const day = Math.floor(hr / 24);
+    if (day < 30) return day + 'd ago';
+    return new Date(at).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  }
+
+  function toast(message) {
+    clearTimeout(toastTimer);
+    els.toast.textContent = message;
+    els.toast.classList.add('show');
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1800);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+    })[c]);
+  }
+
+  function renderNorth() {
+    const has = !!state.north.trim();
+    els.northView.textContent = has ? state.north : 'What deserves to stay important?';
+    els.northView.classList.toggle('northEmpty', !has);
+  }
+
+  function renderNow() {
+    const item = state.active;
+    els.nowCard.classList.toggle('empty', !item);
+    els.nowActions.classList.toggle('hidden', !item);
+    if (!item) {
+      els.nowText.textContent = 'Nothing owns your attention.';
+      els.nowMeta.textContent = 'Good. Choose deliberately.';
+      return;
+    }
+    els.nowText.textContent = item.text;
+    els.nowMeta.textContent = 'Chosen ' + age(item.at);
+  }
+
+  function renderList(container, items, kind) {
+    if (!items.length) {
+      container.innerHTML = '<div class="emptyList">' + (kind === 'parked'
+        ? 'Nothing parked. The side tunnel is empty.'
+        : 'No finished trail yet.') + '</div>';
+      return;
+    }
+
+    container.innerHTML = items.map(item => {
+      const text = escapeHtml(item.text);
+      if (kind === 'parked') {
+        return '<div class="idea" data-id="' + item.id + '">' +
+          '<div><div class="ideaText">' + text + '</div><div class="ideaMeta">' + age(item.at) + '</div></div>' +
+          '<div class="ideaActions">' +
+            '<button class="promote" type="button">DO</button>' +
+            '<button class="removeParked danger" type="button">DROP</button>' +
+          '</div>' +
+        '</div>';
+      }
+      return '<div class="idea" data-id="' + item.id + '">' +
+        '<div><div class="ideaText">' + text + '</div><div class="ideaMeta">' + age(item.at) + '</div></div>' +
+        '<div class="ideaActions"><button class="removeDone ghost" type="button">CLEAR</button></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function render() {
+    renderNorth();
+    renderNow();
+    els.parkedCount.textContent = String(state.parked.length);
+    els.doneCount.textContent = String(state.done.length);
+    renderList(els.parkedList, state.parked, 'parked');
+    renderList(els.doneList, state.done, 'done');
+  }
+
+  function commit(mutator, message) {
+    mutator();
+    save();
+    render();
+    if (message) toast(message);
+  }
+
+  function capture() {
+    const text = els.captureInput.value.trim();
+    if (!text) {
+      els.captureInput.focus();
+      return;
+    }
+    pending = text;
+    els.decisionText.textContent = text;
+    els.decision.classList.remove('hidden');
+    els.captureInput.value = '';
+  }
+
+  function closeDecision() {
+    pending = '';
+    els.decision.classList.add('hidden');
+    els.decisionText.textContent = '';
+  }
+
+  function setActive(item, fromParked) {
+    commit(() => {
+      if (state.active) {
+        state.parked.unshift({...state.active, at: Date.now()});
+      }
+      if (fromParked) {
+        state.parked = state.parked.filter(x => x.id !== item.id);
+      }
+      state.active = {...item, at: Date.now()};
+    }, state.active ? 'Previous task parked. New task owns RIGHT NOW.' : 'RIGHT NOW chosen.');
+  }
+
+  els.editNorthBtn.addEventListener('click', () => {
+    els.northInput.value = state.north;
+    els.northView.classList.add('hidden');
+    els.editNorthBtn.classList.add('hidden');
+    els.northEditor.classList.remove('hidden');
+    els.northInput.focus();
+  });
+
+  els.northCancel.addEventListener('click', () => {
+    els.northEditor.classList.add('hidden');
+    els.northView.classList.remove('hidden');
+    els.editNorthBtn.classList.remove('hidden');
+  });
+
+  els.northSave.addEventListener('click', () => {
+    const next = els.northInput.value.trim();
+    commit(() => { state.north = next; }, next ? 'North set.' : 'North cleared.');
+    els.northEditor.classList.add('hidden');
+    els.northView.classList.remove('hidden');
+    els.editNorthBtn.classList.remove('hidden');
+  });
+
+  els.captureBtn.addEventListener('click', capture);
+  els.captureInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      capture();
+    }
+  });
+
+  els.doBtn.addEventListener('click', () => {
+    if (!pending) return;
+    const item = makeItem(pending);
+    closeDecision();
+    setActive(item, false);
+  });
+
+  els.parkBtn.addEventListener('click', () => {
+    if (!pending) return;
+    const item = makeItem(pending);
+    closeDecision();
+    commit(() => state.parked.unshift(item), 'Parked safely.');
+  });
+
+  els.dropBtn.addEventListener('click', () => {
+    if (!pending) return;
+    closeDecision();
+    toast('Dropped. It does not own you.');
+  });
+
+  els.finishBtn.addEventListener('click', () => {
+    if (!state.active) return;
+    commit(() => {
+      state.done.unshift({...state.active, at: Date.now()});
+      state.done = state.done.slice(0, 100);
+      state.active = null;
+    }, 'Done. Trail marked.');
+  });
+
+  els.parkActiveBtn.addEventListener('click', () => {
+    if (!state.active) return;
+    commit(() => {
+      state.parked.unshift({...state.active, at: Date.now()});
+      state.active = null;
+    }, 'Parked. RIGHT NOW is free.');
+  });
+
+  els.parkedList.addEventListener('click', e => {
+    const row = e.target.closest('.idea');
+    if (!row) return;
+    const item = state.parked.find(x => x.id === row.dataset.id);
+    if (!item) return;
+
+    if (e.target.closest('.promote')) {
+      setActive(item, true);
+      els.parkedDetails.open = false;
+      return;
+    }
+
+    if (e.target.closest('.removeParked')) {
+      commit(() => {
+        state.parked = state.parked.filter(x => x.id !== item.id);
+      }, 'Dropped from parked.');
+    }
+  });
+
+  els.doneList.addEventListener('click', e => {
+    const row = e.target.closest('.idea');
+    if (!row || !e.target.closest('.removeDone')) return;
+    commit(() => {
+      state.done = state.done.filter(x => x.id !== row.dataset.id);
+    }, 'Cleared from trail.');
+  });
+
+  els.exportBtn.addEventListener('click', () => {
+    try {
+      const payload = JSON.stringify(state, null, 2);
+      const blob = new Blob([payload], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'compass-backup-' + new Date().toISOString().slice(0,10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast('Backup exported.');
+    } catch {
+      toast('Export failed.');
+    }
+  });
+
+  els.importInput.addEventListener('change', async () => {
+    const file = els.importInput.files && els.importInput.files[0];
+    els.importInput.value = '';
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const imported = validate(JSON.parse(text));
+      if (!imported) throw new Error('invalid');
+      const old = JSON.stringify(state);
+      localStorage.setItem(BACKUP_KEY, old);
+      state = imported;
+      save();
+      render();
+      toast('Backup imported.');
+    } catch {
+      toast('That file is not a COMPASS backup.');
+    }
+  });
+
+  document.addEventListener('contextmenu', e => {
+    if (!e.target.closest('input,textarea')) e.preventDefault();
+  });
+
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
