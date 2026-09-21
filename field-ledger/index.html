@@ -13,7 +13,7 @@
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" sizes="512x512" href="apple-touch-icon.png">
 <title>FIELD LEDGER</title>
 <style>
 :root{
@@ -23,13 +23,17 @@
   --amber:#d8ad57;--blue:#86c9dc;--radius:18px;
 }
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;overscroll-behavior:none}
 body{
   min-height:100dvh;
   padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right))
           max(24px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
   -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;user-select:none;
 }
+body *:not(input):not(textarea):not(select){-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 button,label.tap{min-height:46px;touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 button,input,textarea,select{font:inherit}
 button{
