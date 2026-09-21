@@ -293,7 +293,10 @@ function save(){
 function commit(mut,msg){mut();save();render();if(msg)toast(msg)}
 function latestCorrections(){
  const m=new Map();
- for(const e of state.events)if(e.kind==='correction')m.set(e.targetId,e);
+ for(const e of state.events)if(e.kind==='correction'){
+   const prior=m.get(e.targetId);
+   if(!prior||e.createdAt>=prior.createdAt)m.set(e.targetId,e)
+ }
  return m
 }
 function effectivePunches(){
