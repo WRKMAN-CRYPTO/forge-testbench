@@ -59,8 +59,12 @@ textarea{resize:none;min-height:74px;line-height:1.35}
 .clock .now{font-size:20px;font-weight:900}
 .clock .date{font-size:9px;color:var(--muted);margin-top:3px}
 .elapsed{font-size:11px;color:var(--muted);margin:4px 0 13px}
-.siteRow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:11px}
+.siteRow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:8px}
 .siteRow button{padding:9px 11px}
+.siteSuggestions{display:flex;gap:7px;overflow:auto;padding:0 0 11px;scrollbar-width:none}
+.siteSuggestions:empty{display:none}
+.siteChip{white-space:nowrap;min-height:38px;border-radius:999px;padding:7px 11px;font-size:11px;color:var(--muted)}
+.siteChip:active{border-color:var(--amber);color:var(--amber)}
 .punch{
   width:100%;min-height:92px;border-radius:20px;font-size:25px;font-weight:950;
   letter-spacing:.02em;margin-top:2px
@@ -151,6 +155,7 @@ summary::-webkit-details-marker{display:none}
       <input id="siteInput" maxlength="80" autocomplete="off" placeholder="Site / job (optional)">
       <button id="saveSiteBtn" class="ghost" type="button">SET</button>
     </div>
+    <div id="siteSuggestions" class="siteSuggestions" aria-label="Recent job sites"></div>
     <button id="punchBtn" class="punch in" type="button">CLOCK IN</button>
     <div class="micro" style="margin-top:9px">Your personal record only. UKG remains your employer's official system.</div>
   </section>
@@ -237,7 +242,7 @@ let state=fresh(), toastTimer=0, tickTimer=0;
 const $=id=>document.getElementById(id);
 const el={
  saveStatus:$('saveStatus'),stateText:$('stateText'),liveTime:$('liveTime'),liveDate:$('liveDate'),elapsed:$('elapsed'),
- siteInput:$('siteInput'),saveSiteBtn:$('saveSiteBtn'),punchBtn:$('punchBtn'),
+ siteInput:$('siteInput'),saveSiteBtn:$('saveSiteBtn'),siteSuggestions:$('siteSuggestions'),punchBtn:$('punchBtn'),
  todayHours:$('todayHours'),todayPunches:$('todayPunches'),todayWarning:$('todayWarning'),todayTimeline:$('todayTimeline'),
  weekBadge:$('weekBadge'),weekRange:$('weekRange'),weekDays:$('weekDays'),weekHours:$('weekHours'),ukgHours:$('ukgHours'),difference:$('difference'),
  manualPunchBtn:$('manualPunchBtn'),noteBtn:$('noteBtn'),auditBadge:$('auditBadge'),auditList:$('auditList'),
@@ -354,6 +359,17 @@ function formatDuration(ms){
  const min=Math.max(0,Math.floor(ms/60000)),h=Math.floor(min/60),m=min%60;
  return h? h+'h '+m+'m':m+'m'
 }
+function siteSuggestions(){
+ const counts=new Map();
+ const addSite=v=>{const site=String(v||'').trim();if(!site)return;counts.set(site,(counts.get(site)||0)+1)};
+ for(const p of effectivePunches())addSite(p.site);
+ for(const e of state.events)if(e.kind==='note')addSite(e.site);
+ return [...counts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,6)
+}
+function renderSiteSuggestions(){
+ const sites=siteSuggestions();
+ el.siteSuggestions.innerHTML=sites.map(([site,count])=>'<button class="siteChip" type="button" data-site="'+esc(site)+'">'+esc(site)+(count>1?' · '+count:'')+'</button>').join('');
+}
 function renderNow(now=Date.now()){
  const s=currentStatus(now);
  el.stateText.textContent=s.on?'ON CLOCK':'OFF CLOCK';
@@ -423,7 +439,7 @@ function renderAudit(){
  }).join('')
 }
 function render(){
- renderNow();renderToday();renderWeek();renderAudit();
+ renderNow();renderSiteSuggestions();renderToday();renderWeek();renderAudit();
  el.weekStart.value=String(state.weekStart)
 }
 function addPunch(action,at=Date.now(),source='tap',site=state.site,note=''){
@@ -436,7 +452,14 @@ el.sheet.addEventListener('click',e=>{if(e.target===el.sheet)closeSheet()});
 
 el.saveSiteBtn.addEventListener('click',()=>{
  const v=el.siteInput.value.trim();
- commit(()=>{state.site=v},v?'Site set.':'Site cleared.')
+ commit(()=>{state.site=v},v?'Site set. It will join suggestions after it is used in a ledger entry.':'Site cleared.')
+});
+el.siteSuggestions.addEventListener('click',e=>{
+ const chip=e.target.closest('.siteChip');if(!chip)return;
+ el.siteInput.value=chip.dataset.site||'';
+ state.site=el.siteInput.value;
+ save();
+ el.siteInput.focus()
 });
 el.punchBtn.addEventListener('click',()=>{
  const s=currentStatus(),site=el.siteInput.value.trim().slice(0,80);addPunch(s.on?'out':'in',Date.now(),'tap',site)
