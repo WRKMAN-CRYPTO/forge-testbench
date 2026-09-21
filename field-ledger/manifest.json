@@ -1,0 +1,22 @@
+{
+  "id": "./",
+  "name": "FIELD LEDGER",
+  "short_name": "Ledger",
+  "description": "A local-first personal shadow timecard for comparing your own work record with the official time system.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b0e0f",
+  "theme_color": "#0b0e0f",
+  "categories": ["utilities", "productivity"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
