@@ -4,9 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0e0f">
+<meta name="color-scheme" content="dark">
+<meta name="application-name" content="FIELD LEDGER">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Field Ledger">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>FIELD LEDGER</title>
 <style>
 :root{
@@ -47,6 +54,16 @@ textarea{resize:none;min-height:74px;line-height:1.35}
 .brand{font-size:13px;font-weight:950;letter-spacing:.16em}
 .save{font-size:9px;letter-spacing:.08em;color:var(--muted)}
 .save.bad{color:var(--red)}
+.installCard{
+  display:none;align-items:center;gap:10px;background:#141819;border:1px solid var(--line);
+  border-radius:16px;padding:11px 12px;margin-bottom:12px;color:var(--muted);font-size:10px;line-height:1.35
+}
+.installCard.show{display:flex}
+.installCopy{min-width:0;flex:1}.installCopy strong{display:block;color:var(--text);font-size:11px;margin-bottom:2px}
+.installRoute{color:var(--amber);font-weight:900}
+.installAction{display:none;min-height:36px;padding:7px 10px;background:var(--amber);color:#16130b;border-color:transparent;font-weight:950}
+.installAction.show{display:block}
+.installClose{min-width:36px;min-height:36px;padding:4px;background:transparent;color:var(--muted);font-size:18px}
 .card{
   background:linear-gradient(180deg,var(--panel),#111516);
   border:1px solid var(--line);border-radius:var(--radius);
@@ -138,6 +155,15 @@ summary::-webkit-details-marker{display:none}
     <div class="brand">FIELD LEDGER</div>
     <div id="saveStatus" class="save">LOCAL // READY</div>
   </header>
+
+  <aside id="installCard" class="installCard" aria-label="Install FIELD LEDGER">
+    <div class="installCopy">
+      <strong>Keep FIELD LEDGER on your phone</strong>
+      <span id="installRoute" class="installRoute">Share ↑ → Add to Home Screen</span>
+    </div>
+    <button id="installAction" class="installAction" type="button">INSTALL</button>
+    <button id="installClose" class="installClose" type="button" aria-label="Dismiss install tip">×</button>
+  </aside>
 
   <section class="card" aria-labelledby="nowLabel">
     <div class="statusRow">
@@ -524,7 +550,40 @@ el.importInput.addEventListener('change',async()=>{
 });
 document.addEventListener('contextmenu',e=>{if(!e.target.closest('input,textarea,select'))e.preventDefault()});
 
-load();el.siteInput.value=state.site;render();
+function setupPwa(){
+ const dismissed='field-ledger-install-tip-dismissed';
+ const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+ const ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
+ let promptEvent=null;
+ const hide=()=>el.installCard.classList.remove('show');
+ const show=()=>{if(!standalone()&&!localStorage.getItem(dismissed))el.installCard.classList.add('show')};
+ if('serviceWorker' in navigator){
+   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}),{once:true})
+ }
+ addEventListener('beforeinstallprompt',e=>{
+   e.preventDefault();promptEvent=e;
+   el.installRoute.textContent='Install FIELD LEDGER as an app';
+   el.installAction.classList.add('show');show()
+ });
+ el.installAction.addEventListener('click',async()=>{
+   if(!promptEvent)return;
+   promptEvent.prompt();
+   const result=await promptEvent.userChoice.catch(()=>null);
+   if(result&&result.outcome==='accepted')hide();
+   promptEvent=null;el.installAction.classList.remove('show')
+ });
+ addEventListener('appinstalled',()=>{promptEvent=null;hide()});
+ el.installClose.addEventListener('click',()=>{
+   hide();try{localStorage.setItem(dismissed,'1')}catch{}
+ });
+ if(!standalone())setTimeout(()=>{
+   if(promptEvent)return;
+   el.installRoute.textContent=ios?'Share ↑ → Add to Home Screen':'Browser menu → Install app / Add to Home Screen';
+   show()
+ },650)
+}
+
+load();el.siteInput.value=state.site;render();setupPwa();
 tickTimer=setInterval(()=>{renderNow();renderToday();renderWeek()},15000);
 })();
 </script>
