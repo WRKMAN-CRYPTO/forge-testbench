@@ -425,7 +425,7 @@ function render(){
 }
 function addPunch(action,at=Date.now(),source='tap',site=state.site,note=''){
  const e={id:id(),kind:'punch',action,at,site:String(site||'').trim().slice(0,80),note:String(note||'').trim().slice(0,180),source,createdAt:Date.now()};
- commit(()=>state.events.push(e),(action==='in'?'Clocked in':'Clocked out')+' at '+timeText(at)+'.')
+ commit(()=>{if(source==='tap')state.site=e.site;state.events.push(e)},(action==='in'?'Clocked in':'Clocked out')+' at '+timeText(at)+'.')
 }
 function openSheet(title,html){el.sheetTitle.textContent=title;el.sheetBody.innerHTML=html;el.sheet.classList.remove('hidden');document.body.style.overflow='hidden'}
 function closeSheet(){el.sheet.classList.add('hidden');el.sheetBody.innerHTML='';document.body.style.overflow=''}
@@ -436,7 +436,7 @@ el.saveSiteBtn.addEventListener('click',()=>{
  commit(()=>{state.site=v},v?'Site set.':'Site cleared.')
 });
 el.punchBtn.addEventListener('click',()=>{
- const s=currentStatus();addPunch(s.on?'out':'in')
+ const s=currentStatus(),site=el.siteInput.value.trim().slice(0,80);addPunch(s.on?'out':'in',Date.now(),'tap',site)
 });
 el.todayTimeline.addEventListener('click',e=>{
  const b=e.target.closest('.correctBtn');if(!b)return;
