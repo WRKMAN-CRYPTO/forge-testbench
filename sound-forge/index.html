@@ -345,6 +345,7 @@
     let recordStartedAt = 0;
     let recordTicker = null;
     let busy = false;
+    let audioNeedsRearm = false;
 
     const TRACK_NAMES = ['DRUM','BASS','MACHINE','TEXTURE'];
     const DEFAULT_PATTERNS = [
@@ -384,7 +385,12 @@
     function createAudioContext() {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) throw new Error('Web Audio is not available in this browser.');
-      return new Ctx();
+      const ctx = new Ctx();
+      ctx.addEventListener?.('statechange', () => {
+        if (ctx !== audioCtx) return;
+        if (ctx.state === 'interrupted' || ctx.state === 'closed') audioNeedsRearm = true;
+      });
+      return ctx;
     }
 
     async function discardAudioContext() {
@@ -407,9 +413,10 @@
     }
 
     async function ensureContext() {
-      if (!audioCtx || audioCtx.state === 'closed' || audioCtx.state === 'interrupted') {
+      if (audioNeedsRearm || !audioCtx || audioCtx.state === 'closed' || audioCtx.state === 'interrupted') {
         await discardAudioContext();
         audioCtx = createAudioContext();
+        audioNeedsRearm = false;
       }
       if (audioCtx.state === 'suspended') {
         try {
@@ -423,6 +430,25 @@
           if (audioCtx.state === 'suspended') {
             try { await audioCtx.resume(); } catch {}
           }
+        }
+      }
+      if (audioCtx.state === 'running') audioNeedsRearm = false;
+      return audioCtx;
+    }
+
+    async function rearmPlaybackContext() {
+      await discardAudioContext();
+      audioCtx = createAudioContext();
+      audioNeedsRearm = false;
+      if (audioCtx.state === 'suspended') {
+        try {
+          await Promise.race([
+            audioCtx.resume(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Fresh audio session did not start.')), 800))
+          ]);
+        } catch {
+          audioNeedsRearm = true;
+          throw new Error('iPhone audio session would not wake. Tap Play once more.');
         }
       }
       return audioCtx;
@@ -615,10 +641,11 @@
       return out;
     }
 
-    async function startPlayback({original=false}={}) {
+    async function startPlayback({original=false, fresh=false}={}) {
       if (!originalBuffer || busy) return;
       try {
         stopDeck(false);
+        if (fresh || audioNeedsRearm) await rearmPlaybackContext();
         await ensureAudio();
         stopPlayback(false);
         const buffer = original ? originalBuffer : makeWorkingBuffer();
@@ -683,7 +710,7 @@
     async function restartIfPlaying() {
       if (!playing) return;
       stopPlayback(false);
-      await startPlayback({original:abHeld});
+      await startPlayback({original:abHeld, fresh:false});
     }
 
     async function loadFile(file) {
@@ -964,7 +991,7 @@
       }
       try {
         stopPlayback(false);
-        await ensureContext();
+        await rearmPlaybackContext();
         deckMaster = audioCtx.createGain();
         deckMaster.gain.value = 0.92;
         deckMaster.connect(audioCtx.destination);
@@ -1082,18 +1109,18 @@
       els.generator.setAttribute('aria-hidden',String(!open));
     });
     els.generator.addEventListener('click',e=>{ const b=e.target.closest('[data-gen]'); if(b) generate(b.dataset.gen); });
-    els.playBtn.addEventListener('click',()=> playing ? stopPlayback() : startPlayback());
+    els.playBtn.addEventListener('click',()=> playing ? stopPlayback() : startPlayback({fresh:true}));
     els.loopBtn.addEventListener('click',()=>{ loop=!loop; els.loopBtn.classList.toggle('active',loop); if(playSource) playSource.loop=loop; });
 
     const abStart = async (e) => {
       if (!originalBuffer || abHeld) return;
       e.preventDefault(); abHeld=true; els.abBtn.classList.add('active');
-      if (playing) { stopPlayback(false); await startPlayback({original:true}); }
+      if (playing) { stopPlayback(false); await startPlayback({original:true, fresh:false}); }
     };
     const abEnd = async (e) => {
       if (!abHeld) return;
       e.preventDefault(); abHeld=false; els.abBtn.classList.remove('active');
-      if (playing) { stopPlayback(false); await startPlayback({original:false}); }
+      if (playing) { stopPlayback(false); await startPlayback({original:false, fresh:false}); }
     };
     els.abBtn.addEventListener('pointerdown',abStart);
     ['pointerup','pointercancel','pointerleave'].forEach(evt=>els.abBtn.addEventListener(evt,abEnd));
@@ -1141,14 +1168,22 @@
 
     document.addEventListener('visibilitychange',()=>{
       if(document.hidden) {
+        audioNeedsRearm = true;
         if (playing) stopPlayback(false);
         if (deckPlaying) stopDeck(false);
+      } else if (audioCtx) {
+        audioNeedsRearm = true;
+        setStatus('Audio paused while Sound Forge was away. Tap Play or Loop to rearm.');
       }
     });
     window.addEventListener('pagehide',()=>{
+      audioNeedsRearm = true;
       if(recorder?.state==='recording') { try{recorder.stop();}catch{} }
       recordStream?.getTracks().forEach(t=>t.stop());
       if (deckPlaying) stopDeck(false);
+    });
+    window.addEventListener('pageshow',e=>{
+      if (e.persisted || audioCtx) audioNeedsRearm = true;
     });
 
     renderDeck();
