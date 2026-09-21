@@ -264,7 +264,7 @@ function validate(x){
  if(!x||typeof x!=='object'||x.v!==VERSION||typeof x.site!=='string'||!Array.isArray(x.events)||!x.events.every(eventValid))return null;
  const weekStart=Number.isInteger(x.weekStart)&&x.weekStart>=0&&x.weekStart<=6?x.weekStart:0;
  const ukg=x.ukg&&typeof x.ukg==='object'?Object.fromEntries(Object.entries(x.ukg).filter(([k,v])=>typeof k==='string'&&(typeof v==='number'||v===''))):{};
- return {v:VERSION,site:x.site.slice(0,80),weekStart,events:x.events.map(cleanEvent).slice(-5000),ukg}
+ return {v:VERSION,site:x.site.slice(0,80),weekStart,events:x.events.map(cleanEvent),ukg}
 }
 function parse(text){try{return validate(JSON.parse(text))}catch{return null}}
 function setSave(text,bad=false){el.saveStatus.textContent=text;el.saveStatus.classList.toggle('bad',bad)}
