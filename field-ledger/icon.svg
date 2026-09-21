@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="FIELD LEDGER app icon">
+  <rect width="512" height="512" rx="116" fill="#0b0e0f"/>
+  <rect x="42" y="42" width="428" height="428" rx="96" fill="#141819" stroke="#d8ad57" stroke-width="22"/>
+  <path d="M151 145h178c28 0 50 22 50 50v122c0 28-22 50-50 50H183l-50 46v-218c0-28 22-50 50-50Z" fill="#1a1f21" stroke="#d8ad57" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M199 215h114M199 263h114M199 311h72" stroke="#f1f2ed" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="342" cy="342" r="53" fill="#d8ad57"/>
+  <path d="M342 311v62M311 342h62" stroke="#16130b" stroke-width="18" stroke-linecap="round"/>
+</svg>
