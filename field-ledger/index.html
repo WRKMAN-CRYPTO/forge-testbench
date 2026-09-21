@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0e0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Field Ledger">
+<title>FIELD LEDGER</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0b0e0f;--panel:#141819;--panel2:#1a1f21;--line:#30383a;
+  --text:#f1f2ed;--muted:#8f9998;--green:#9ecf9b;--red:#e08d79;
+  --amber:#d8ad57;--blue:#86c9dc;--radius:18px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+body{
+  min-height:100dvh;
+  padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right))
+          max(24px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+  -webkit-tap-highlight-color:transparent;
+}
+button,label.tap{min-height:46px;touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+button,input,textarea,select{font:inherit}
+button{
+  border:1px solid var(--line);border-radius:14px;background:var(--panel2);
+  color:var(--text);padding:11px 13px;cursor:pointer
+}
+button:active{transform:translateY(1px)}
+button.primary{background:var(--amber);border-color:transparent;color:#16130b;font-weight:950}
+button.in{background:#203322;border-color:#416245;color:#c8efc4}
+button.out{background:#39251f;border-color:#70483e;color:#ffd0c3}
+button.ghost{background:transparent;color:var(--muted)}
+button.warn{border-color:#735f32;color:#e4bd68}
+input,textarea,select{
+  width:100%;border:1px solid var(--line);background:#0e1112;color:var(--text);
+  border-radius:13px;padding:12px 13px;outline:none;
+  -webkit-user-select:text;user-select:text
+}
+input:focus,textarea:focus,select:focus{border-color:#606d70;box-shadow:0 0 0 3px rgba(216,173,87,.08)}
+textarea{resize:none;min-height:74px;line-height:1.35}
+.shell{width:min(100%,680px);margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:end;gap:12px;margin:2px 2px 13px}
+.brand{font-size:13px;font-weight:950;letter-spacing:.16em}
+.save{font-size:9px;letter-spacing:.08em;color:var(--muted)}
+.save.bad{color:var(--red)}
+.card{
+  background:linear-gradient(180deg,var(--panel),#111516);
+  border:1px solid var(--line);border-radius:var(--radius);
+  margin-bottom:12px;padding:15px;box-shadow:0 10px 30px rgba(0,0,0,.18)
+}
+.label{font-size:9px;letter-spacing:.15em;color:var(--muted);font-weight:900}
+.statusRow{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.state{font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-weight:900;font-size:29px;letter-spacing:-.035em;margin-top:5px}
+.clock{text-align:right}
+.clock .now{font-size:20px;font-weight:900}
+.clock .date{font-size:9px;color:var(--muted);margin-top:3px}
+.elapsed{font-size:11px;color:var(--muted);margin:4px 0 13px}
+.siteRow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:11px}
+.siteRow button{padding:9px 11px}
+.punch{
+  width:100%;min-height:92px;border-radius:20px;font-size:25px;font-weight:950;
+  letter-spacing:.02em;margin-top:2px
+}
+.micro{font-size:9px;color:var(--muted);line-height:1.45}
+.summaryGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+.metric{background:#0f1213;border:1px solid #252c2e;border-radius:14px;padding:12px}
+.metric .n{font-size:24px;font-weight:900;margin-top:4px}
+.metric .u{font-size:10px;color:var(--muted)}
+details.card{padding:0;overflow:hidden}
+summary{
+  list-style:none;cursor:pointer;min-height:55px;padding:0 15px;display:flex;
+  align-items:center;justify-content:space-between;gap:12px;
+  -webkit-user-select:none;user-select:none
+}
+summary::-webkit-details-marker{display:none}
+.drawer{border-top:1px solid var(--line);padding:10px 12px 13px}
+.badge{min-width:28px;height:28px;border-radius:15px;display:grid;place-items:center;background:#242a2c;color:var(--muted);font-size:10px;padding:0 8px}
+.timeline{margin-top:8px}
+.event{display:grid;grid-template-columns:58px 1fr auto;gap:9px;align-items:start;padding:11px 2px;border-bottom:1px solid #252b2d}
+.event:last-child{border-bottom:0}
+.eventTime{font-size:11px;font-weight:900;padding-top:2px}
+.eventMain{min-width:0}
+.eventTitle{font-size:13px;font-weight:900;line-height:1.25;overflow-wrap:anywhere}
+.eventMeta{font-size:9px;color:var(--muted);line-height:1.45;margin-top:3px;overflow-wrap:anywhere}
+.eventActions button{min-height:38px;padding:6px 8px;font-size:9px}
+.corrected{color:var(--amber)}
+.day{display:grid;grid-template-columns:58px 1fr auto;gap:10px;align-items:center;padding:10px 2px;border-bottom:1px solid #252b2d}
+.day:last-child{border-bottom:0}.dayName{font-size:11px;font-weight:900}.dayBar{height:7px;background:#23292b;border-radius:99px;overflow:hidden}.dayFill{height:100%;background:#7fa77b;border-radius:99px}.dayHours{font-size:12px;font-weight:900}
+.compare{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.compareGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:8px}
+.diff{margin-top:9px;padding:11px 12px;border:1px solid #323a3c;border-radius:13px;font-size:12px}
+.diff.good{color:var(--green);border-color:#3d5740}.diff.bad{color:var(--red);border-color:#633f37}.diff.neutral{color:var(--muted)}
+.quickGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.empty{color:var(--muted);font-size:11px;padding:12px 3px}
+.auditItem{padding:10px 2px;border-bottom:1px solid #252b2d;font-size:10px;line-height:1.5}
+.auditItem:last-child{border-bottom:0}
+.auditKind{font-weight:900;color:var(--blue)}
+.settingsGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fileLabel{min-height:46px;border:1px solid var(--line);border-radius:14px;background:var(--panel2);display:grid;place-items:center;font-size:11px}
+.hidden{display:none!important}
+.sheet{
+  position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:50;display:flex;align-items:flex-end;
+  padding:12px max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+}
+.sheetCard{
+  width:min(100%,680px);margin:0 auto;background:#14191b;border:1px solid #3a4447;border-radius:22px;
+  padding:15px;box-shadow:0 -20px 60px rgba(0,0,0,.45);max-height:86dvh;overflow:auto
+}
+.sheetTitle{font-size:14px;font-weight:950;letter-spacing:.06em;margin-bottom:12px}
+.field{margin-bottom:10px}.field .label{display:block;margin-bottom:6px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.toast{
+  position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translate(-50%,18px);
+  background:#252b2d;border:1px solid #3a4346;border-radius:999px;color:var(--text);
+  padding:10px 14px;font-size:10px;opacity:0;pointer-events:none;transition:.18s ease;z-index:80;
+  max-width:calc(100vw - 30px);text-align:center
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.anomaly{color:var(--red);font-weight:900}
+@media(max-width:390px){
+  .state{font-size:25px}.punch{font-size:23px}.event{grid-template-columns:52px 1fr}.eventActions{grid-column:2}
+  .summaryGrid{grid-template-columns:1fr 1fr}.settingsGrid{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <div class="brand">FIELD LEDGER</div>
+    <div id="saveStatus" class="save">LOCAL // READY</div>
+  </header>
+
+  <section class="card" aria-labelledby="nowLabel">
+    <div class="statusRow">
+      <div>
+        <div id="nowLabel" class="label">NOW</div>
+        <div id="stateText" class="state">OFF CLOCK</div>
+      </div>
+      <div class="clock">
+        <div id="liveTime" class="now">--:--</div>
+        <div id="liveDate" class="date"></div>
+      </div>
+    </div>
+    <div id="elapsed" class="elapsed">No open shift.</div>
+    <div class="siteRow">
+      <input id="siteInput" maxlength="80" autocomplete="off" placeholder="Site / job (optional)">
+      <button id="saveSiteBtn" class="ghost" type="button">SET</button>
+    </div>
+    <button id="punchBtn" class="punch in" type="button">CLOCK IN</button>
+    <div class="micro" style="margin-top:9px">Your personal record only. UKG remains your employer's official system.</div>
+  </section>
+
+  <section class="card">
+    <div class="label">TODAY</div>
+    <div class="summaryGrid">
+      <div class="metric"><div class="label">LEDGER</div><div id="todayHours" class="n">0.00</div><div class="u">hours</div></div>
+      <div class="metric"><div class="label">PUNCHES</div><div id="todayPunches" class="n">0</div><div class="u">effective</div></div>
+    </div>
+    <div id="todayWarning" class="micro" style="margin-top:9px"></div>
+    <div id="todayTimeline" class="timeline"></div>
+  </section>
+
+  <details class="card" open>
+    <summary><span class="label">WEEK</span><span id="weekBadge" class="badge">0.00h</span></summary>
+    <div class="drawer">
+      <div id="weekRange" class="micro"></div>
+      <div id="weekDays"></div>
+      <div class="compare">
+        <div class="label">COMPARE WITH UKG</div>
+        <div class="compareGrid">
+          <div class="metric"><div class="label">LEDGER</div><div id="weekHours" class="n">0.00</div><div class="u">hours</div></div>
+          <div><label class="label" for="ukgHours">UKG SAYS</label><input id="ukgHours" inputmode="decimal" type="number" min="0" step="0.01" placeholder="hours"></div>
+        </div>
+        <div id="difference" class="diff neutral">Enter the UKG total when you want to compare.</div>
+      </div>
+    </div>
+  </details>
+
+  <details class="card">
+    <summary><span class="label">ADD / NOTE</span><span class="badge">+</span></summary>
+    <div class="drawer">
+      <div class="quickGrid">
+        <button id="manualPunchBtn" type="button">MISSED PUNCH</button>
+        <button id="noteBtn" type="button">ADD NOTE</button>
+      </div>
+      <div class="micro" style="margin-top:9px">Missed punches become new ledger events. Existing punches are corrected through the audit trail instead of overwritten.</div>
+    </div>
+  </details>
+
+  <details class="card">
+    <summary><span class="label">AUDIT TRAIL</span><span id="auditBadge" class="badge">0</span></summary>
+    <div id="auditList" class="drawer"></div>
+  </details>
+
+  <details class="card">
+    <summary><span class="label">DATA / SETTINGS</span><span class="badge">↕</span></summary>
+    <div class="drawer">
+      <div class="field">
+        <label class="label" for="weekStart">WEEK STARTS</label>
+        <select id="weekStart">
+          <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+          <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+        </select>
+      </div>
+      <div class="settingsGrid">
+        <button id="exportBtn" type="button">EXPORT BACKUP</button>
+        <label class="fileLabel tap" for="importInput">IMPORT BACKUP</label>
+        <input id="importInput" class="hidden" type="file" accept="application/json,.json">
+      </div>
+      <div class="micro" style="margin-top:9px">FIELD LEDGER never silently edits or deletes a recorded punch. Export backups if this record matters to you.</div>
+    </div>
+  </details>
+</main>
+
+<div id="sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheetCard">
+    <div id="sheetTitle" class="sheetTitle">ENTRY</div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+const KEY='forge-field-ledger-v1', BACKUP_KEY=KEY+'-backup', CORRUPT_KEY=KEY+'-corrupt', VERSION=1;
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const fresh=()=>({v:VERSION,site:'',weekStart:0,events:[],ukg:{}});
+let state=fresh(), toastTimer=0, tickTimer=0;
+
+const $=id=>document.getElementById(id);
+const el={
+ saveStatus:$('saveStatus'),stateText:$('stateText'),liveTime:$('liveTime'),liveDate:$('liveDate'),elapsed:$('elapsed'),
+ siteInput:$('siteInput'),saveSiteBtn:$('saveSiteBtn'),punchBtn:$('punchBtn'),
+ todayHours:$('todayHours'),todayPunches:$('todayPunches'),todayWarning:$('todayWarning'),todayTimeline:$('todayTimeline'),
+ weekBadge:$('weekBadge'),weekRange:$('weekRange'),weekDays:$('weekDays'),weekHours:$('weekHours'),ukgHours:$('ukgHours'),difference:$('difference'),
+ manualPunchBtn:$('manualPunchBtn'),noteBtn:$('noteBtn'),auditBadge:$('auditBadge'),auditList:$('auditList'),
+ weekStart:$('weekStart'),exportBtn:$('exportBtn'),importInput:$('importInput'),
+ sheet:$('sheet'),sheetTitle:$('sheetTitle'),sheetBody:$('sheetBody'),toast:$('toast')
+};
+
+function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+function eventValid(e){
+ if(!e||typeof e!=='object'||typeof e.id!=='string'||typeof e.kind!=='string'||typeof e.createdAt!=='number')return false;
+ if(e.kind==='punch')return (e.action==='in'||e.action==='out')&&typeof e.at==='number'&&typeof e.site==='string'&&typeof e.note==='string';
+ if(e.kind==='correction')return typeof e.targetId==='string'&&(e.action==='in'||e.action==='out')&&typeof e.at==='number'&&typeof e.site==='string'&&typeof e.note==='string'&&typeof e.reason==='string';
+ if(e.kind==='note')return typeof e.at==='number'&&typeof e.site==='string'&&typeof e.text==='string';
+ return false
+}
+function cleanEvent(e){
+ const base={id:String(e.id),kind:String(e.kind),createdAt:Number(e.createdAt)||Date.now()};
+ if(e.kind==='punch')return {...base,action:e.action==='out'?'out':'in',at:Number(e.at)||Date.now(),site:String(e.site||'').slice(0,80),note:String(e.note||'').slice(0,180),source:e.source==='manual'?'manual':'tap'};
+ if(e.kind==='correction')return {...base,targetId:String(e.targetId),action:e.action==='out'?'out':'in',at:Number(e.at)||Date.now(),site:String(e.site||'').slice(0,80),note:String(e.note||'').slice(0,180),reason:String(e.reason||'').slice(0,180)};
+ return {...base,at:Number(e.at)||Date.now(),site:String(e.site||'').slice(0,80),text:String(e.text||'').slice(0,240)}
+}
+function validate(x){
+ if(!x||typeof x!=='object'||x.v!==VERSION||typeof x.site!=='string'||!Array.isArray(x.events)||!x.events.every(eventValid))return null;
+ const weekStart=Number.isInteger(x.weekStart)&&x.weekStart>=0&&x.weekStart<=6?x.weekStart:0;
+ const ukg=x.ukg&&typeof x.ukg==='object'?Object.fromEntries(Object.entries(x.ukg).filter(([k,v])=>typeof k==='string'&&(typeof v==='number'||v===''))):{};
+ return {v:VERSION,site:x.site.slice(0,80),weekStart,events:x.events.map(cleanEvent).slice(-5000),ukg}
+}
+function parse(text){try{return validate(JSON.parse(text))}catch{return null}}
+function setSave(text,bad=false){el.saveStatus.textContent=text;el.saveStatus.classList.toggle('bad',bad)}
+function toast(msg){clearTimeout(toastTimer);el.toast.textContent=msg;el.toast.classList.add('show');toastTimer=setTimeout(()=>el.toast.classList.remove('show'),1800)}
+function load(){
+ try{
+   const raw=localStorage.getItem(KEY), good=parse(raw);
+   if(good){state=good;return}
+   const br=localStorage.getItem(BACKUP_KEY), backup=parse(br);
+   if(backup){
+     if(raw)localStorage.setItem(CORRUPT_KEY,raw);
+     state=backup;save();toast('Recovered from local backup.');return
+   }
+   if(raw){localStorage.setItem(CORRUPT_KEY,raw);toast('Unreadable data preserved as a raw recovery copy.')}
+ }catch{setSave('LOCAL // UNAVAILABLE',true)}
+}
+function save(){
+ try{
+   const old=localStorage.getItem(KEY);
+   if(old&&parse(old))localStorage.setItem(BACKUP_KEY,old);
+   localStorage.setItem(KEY,JSON.stringify(state));
+   setSave('LOCAL // SAVED');
+   return true
+ }catch{setSave('LOCAL // SAVE FAILED',true);toast('Could not save this change.');return false}
+}
+function commit(mut,msg){mut();save();render();if(msg)toast(msg)}
+function latestCorrections(){
+ const m=new Map();
+ for(const e of state.events)if(e.kind==='correction')m.set(e.targetId,e);
+ return m
+}
+function effectivePunches(){
+ const corr=latestCorrections();
+ return state.events.filter(e=>e.kind==='punch').map(e=>{
+   const c=corr.get(e.id);
+   return c?{id:e.id,action:c.action,at:c.at,site:c.site,note:c.note,source:e.source,createdAt:e.createdAt,corrected:true,original:e,correction:c}
+           :{...e,corrected:false,original:e,correction:null}
+ }).sort((a,b)=>a.at-b.at||a.createdAt-b.createdAt)
+}
+function punchesUntil(ts=Date.now()){return effectivePunches().filter(p=>p.at<=ts)}
+function currentStatus(now=Date.now()){
+ const p=punchesUntil(now),last=p[p.length-1];
+ return {on:!!last&&last.action==='in',last}
+}
+function pairIntervals(until=Date.now()){
+ const p=effectivePunches().filter(x=>x.at<=until),intervals=[],anomalies=[];let open=null;
+ for(const x of p){
+   if(x.action==='in'){
+     if(open)anomalies.push({type:'double-in',at:x.at,first:open,second:x});
+     else open=x
+   }else{
+     if(!open)anomalies.push({type:'out-without-in',at:x.at,event:x});
+     else if(x.at>=open.at){intervals.push({start:open.at,end:x.at,in:open,out:x});open=null}
+     else anomalies.push({type:'negative',at:x.at,event:x})
+   }
+ }
+ if(open)intervals.push({start:open.at,end:until,in:open,out:null,open:true});
+ return {intervals,anomalies,open}
+}
+function startOfDay(ts){
+ const d=new Date(ts);d.setHours(0,0,0,0);return d.getTime()
+}
+function startOfWeek(ts=Date.now()){
+ const d=new Date(ts);d.setHours(0,0,0,0);
+ const delta=(d.getDay()-state.weekStart+7)%7;d.setDate(d.getDate()-delta);return d.getTime()
+}
+function overlapMinutes(intervals,a,b){
+ let ms=0;for(const x of intervals){const s=Math.max(x.start,a),e=Math.min(x.end,b);if(e>s)ms+=e-s}return ms/60000
+}
+function hours(n){return (n/60).toFixed(2)}
+function timeText(ts){return new Date(ts).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
+function dateTimeText(ts){return new Date(ts).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+function dateKey(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function weekKey(){return dateKey(startOfWeek())}
+function localInput(ts){
+ const d=new Date(ts),pad=n=>String(n).padStart(2,'0');
+ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())
+}
+function parseLocalInput(v){const t=new Date(v).getTime();return Number.isFinite(t)?t:null}
+function formatDuration(ms){
+ const min=Math.max(0,Math.floor(ms/60000)),h=Math.floor(min/60),m=min%60;
+ return h? h+'h '+m+'m':m+'m'
+}
+function renderNow(now=Date.now()){
+ const s=currentStatus(now);
+ el.stateText.textContent=s.on?'ON CLOCK':'OFF CLOCK';
+ el.punchBtn.textContent=s.on?'CLOCK OUT':'CLOCK IN';
+ el.punchBtn.className='punch '+(s.on?'out':'in');
+ el.elapsed.textContent=s.on&&s.last?'Open '+formatDuration(now-s.last.at)+' · since '+timeText(s.last.at):'No open shift.';
+ el.siteInput.value===document.activeElement|| (el.siteInput.value=state.site);
+ const d=new Date(now);
+ el.liveTime.textContent=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ el.liveDate.textContent=d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})
+}
+function todayEntries(){
+ const a=startOfDay(Date.now()),b=a+86400000;
+ const corr=latestCorrections();
+ const punches=effectivePunches().filter(p=>p.at>=a&&p.at<b).map(p=>({kind:'punch',...p}));
+ const notes=state.events.filter(e=>e.kind==='note'&&e.at>=a&&e.at<b).map(e=>({...e}));
+ return [...punches,...notes].sort((x,y)=>y.at-x.at||y.createdAt-x.createdAt)
+}
+function renderToday(){
+ const now=Date.now(),a=startOfDay(now),b=a+86400000,{intervals,anomalies}=pairIntervals(now);
+ el.todayHours.textContent=hours(overlapMinutes(intervals,a,b));
+ const entries=todayEntries(),punches=entries.filter(e=>e.kind==='punch');
+ el.todayPunches.textContent=String(punches.length);
+ const todayAnom=anomalies.filter(x=>x.at>=a&&x.at<b);
+ el.todayWarning.innerHTML=todayAnom.length?'<span class="anomaly">CHECK '+todayAnom.length+' punch sequence'+(todayAnom.length===1?'':'s')+'.</span> Totals may be incomplete.':'';
+ if(!entries.length){el.todayTimeline.innerHTML='<div class="empty">No entries today.</div>';return}
+ el.todayTimeline.innerHTML=entries.map(e=>{
+   if(e.kind==='note')return '<div class="event"><div class="eventTime">'+esc(timeText(e.at))+'</div><div class="eventMain"><div class="eventTitle">NOTE</div><div class="eventMeta">'+esc(e.text)+(e.site?' · '+esc(e.site):'')+'</div></div><div></div></div>';
+   const orig=e.corrected?'Originally '+timeText(e.original.at)+' '+e.original.action.toUpperCase():'';
+   return '<div class="event" data-id="'+esc(e.id)+'"><div class="eventTime">'+esc(timeText(e.at))+'</div><div class="eventMain"><div class="eventTitle">'+(e.action==='in'?'CLOCK IN':'CLOCK OUT')+(e.corrected?' <span class="corrected">CORRECTED</span>':'')+'</div><div class="eventMeta">'+(e.site?esc(e.site):'No site')+(e.source==='manual'?' · missed punch added':'')+(e.note?' · '+esc(e.note):'')+(orig?' · '+esc(orig):'')+'</div></div><div class="eventActions"><button class="correctBtn" type="button">CORRECT</button></div></div>'
+ }).join('')
+}
+function renderWeek(){
+ const now=Date.now(),ws=startOfWeek(now),we=ws+7*86400000,{intervals,anomalies}=pairIntervals(now);
+ const total=overlapMinutes(intervals,ws,we),h=hours(total);
+ el.weekHours.textContent=h;el.weekBadge.textContent=h+'h';
+ const end=new Date(we-1);
+ el.weekRange.textContent=new Date(ws).toLocaleDateString([],{month:'short',day:'numeric'})+' – '+end.toLocaleDateString([],{month:'short',day:'numeric'});
+ let rows='',max=1,vals=[];
+ for(let i=0;i<7;i++){const a=ws+i*86400000,b=a+86400000,m=overlapMinutes(intervals,a,b);vals.push(m);max=Math.max(max,m)}
+ for(let i=0;i<7;i++){
+   const d=new Date(ws+i*86400000),m=vals[i],pct=Math.min(100,m/max*100);
+   rows+='<div class="day"><div class="dayName">'+DAYS[d.getDay()]+'</div><div class="dayBar"><div class="dayFill" style="width:'+pct.toFixed(1)+'%"></div></div><div class="dayHours">'+hours(m)+'</div></div>'
+ }
+ if(anomalies.some(x=>x.at>=ws&&x.at<we))rows+='<div class="micro anomaly" style="margin-top:9px">Week contains an unmatched punch sequence. Compare carefully.</div>';
+ el.weekDays.innerHTML=rows;
+ const key=dateKey(ws),v=state.ukg[key];
+ if(document.activeElement!==el.ukgHours)el.ukgHours.value=(typeof v==='number'&&Number.isFinite(v))?String(v):'';
+ renderDifference(total/60,v)
+}
+function renderDifference(ledger,ukg){
+ el.difference.className='diff neutral';
+ if(typeof ukg!=='number'||!Number.isFinite(ukg)){el.difference.textContent='Enter the UKG total when you want to compare.';return}
+ const diff=ledger-ukg,abs=Math.abs(diff);
+ if(abs<.005){el.difference.className='diff good';el.difference.textContent='MATCH · difference 0.00 hours';return}
+ el.difference.className='diff bad';
+ el.difference.textContent=(diff>0?'LEDGER IS HIGHER BY ':'UKG IS HIGHER BY ')+abs.toFixed(2)+' hours'
+}
+function renderAudit(){
+ const items=[...state.events].sort((a,b)=>b.createdAt-a.createdAt);
+ el.auditBadge.textContent=String(items.length);
+ if(!items.length){el.auditList.innerHTML='<div class="empty">Audit trail is empty.</div>';return}
+ el.auditList.innerHTML=items.slice(0,200).map(e=>{
+   if(e.kind==='punch')return '<div class="auditItem"><span class="auditKind">PUNCH '+e.action.toUpperCase()+'</span> · '+esc(dateTimeText(e.at))+(e.site?' · '+esc(e.site):'')+(e.source==='manual'?' · MANUAL':'')+'<br><span class="micro">event '+esc(e.id)+'</span></div>';
+   if(e.kind==='correction')return '<div class="auditItem"><span class="auditKind">CORRECTION</span> · '+esc(dateTimeText(e.at))+' '+e.action.toUpperCase()+(e.site?' · '+esc(e.site):'')+'<br>'+esc(e.reason||'No reason entered')+'<br><span class="micro">corrects '+esc(e.targetId)+' · recorded '+esc(dateTimeText(e.createdAt))+'</span></div>';
+   return '<div class="auditItem"><span class="auditKind">NOTE</span> · '+esc(dateTimeText(e.at))+(e.site?' · '+esc(e.site):'')+'<br>'+esc(e.text)+'</div>'
+ }).join('')
+}
+function render(){
+ renderNow();renderToday();renderWeek();renderAudit();
+ el.weekStart.value=String(state.weekStart)
+}
+function addPunch(action,at=Date.now(),source='tap',site=state.site,note=''){
+ const e={id:id(),kind:'punch',action,at,site:String(site||'').trim().slice(0,80),note:String(note||'').trim().slice(0,180),source,createdAt:Date.now()};
+ commit(()=>state.events.push(e),(action==='in'?'Clocked in':'Clocked out')+' at '+timeText(at)+'.')
+}
+function openSheet(title,html){el.sheetTitle.textContent=title;el.sheetBody.innerHTML=html;el.sheet.classList.remove('hidden');document.body.style.overflow='hidden'}
+function closeSheet(){el.sheet.classList.add('hidden');el.sheetBody.innerHTML='';document.body.style.overflow=''}
+el.sheet.addEventListener('click',e=>{if(e.target===el.sheet)closeSheet()});
+
+el.saveSiteBtn.addEventListener('click',()=>{
+ const v=el.siteInput.value.trim();
+ commit(()=>{state.site=v},v?'Site set.':'Site cleared.')
+});
+el.punchBtn.addEventListener('click',()=>{
+ const s=currentStatus();addPunch(s.on?'out':'in')
+});
+el.todayTimeline.addEventListener('click',e=>{
+ const b=e.target.closest('.correctBtn');if(!b)return;
+ const row=e.target.closest('.event'),p=effectivePunches().find(x=>x.id===row.dataset.id);if(!p)return;
+ openSheet('CORRECT PUNCH','<div class="micro" style="margin-bottom:10px">Original: '+esc(dateTimeText(p.original.at))+' '+p.original.action.toUpperCase()+'. Saving creates a new correction record. The original remains in the audit trail.</div>'+
+   '<div class="field"><label class="label">ACTION</label><select id="corrAction"><option value="in">CLOCK IN</option><option value="out">CLOCK OUT</option></select></div>'+
+   '<div class="field"><label class="label">TIME</label><input id="corrTime" type="datetime-local"></div>'+
+   '<div class="field"><label class="label">SITE / JOB</label><input id="corrSite" maxlength="80"></div>'+
+   '<div class="field"><label class="label">NOTE</label><input id="corrNote" maxlength="180"></div>'+
+   '<div class="field"><label class="label">WHY CORRECTED</label><textarea id="corrReason" maxlength="180" placeholder="Optional but useful"></textarea></div>'+
+   '<div class="row"><button id="corrCancel" class="ghost" type="button">CANCEL</button><button id="corrSave" class="primary" type="button">APPEND CORRECTION</button></div>');
+ const ca=$('corrAction'),ct=$('corrTime'),cs=$('corrSite'),cn=$('corrNote');
+ ca.value=p.action;ct.value=localInput(p.at);cs.value=p.site;cn.value=p.note;
+ $('corrCancel').onclick=closeSheet;
+ $('corrSave').onclick=()=>{
+   const at=parseLocalInput(ct.value);if(at===null){toast('Choose a valid time.');return}
+   const c={id:id(),kind:'correction',targetId:p.id,action:ca.value==='out'?'out':'in',at,site:cs.value.trim().slice(0,80),note:cn.value.trim().slice(0,180),reason:$('corrReason').value.trim().slice(0,180),createdAt:Date.now()};
+   closeSheet();commit(()=>state.events.push(c),'Correction appended.')
+ }
+});
+el.manualPunchBtn.addEventListener('click',()=>{
+ openSheet('ADD MISSED PUNCH','<div class="micro" style="margin-bottom:10px">This creates a new ledger event. Use CORRECT on an existing punch when the original punch was wrong.</div>'+
+   '<div class="field"><label class="label">ACTION</label><select id="manAction"><option value="in">CLOCK IN</option><option value="out">CLOCK OUT</option></select></div>'+
+   '<div class="field"><label class="label">TIME</label><input id="manTime" type="datetime-local"></div>'+
+   '<div class="field"><label class="label">SITE / JOB</label><input id="manSite" maxlength="80"></div>'+
+   '<div class="field"><label class="label">NOTE</label><input id="manNote" maxlength="180" placeholder="Why this was added, if useful"></div>'+
+   '<div class="row"><button id="manCancel" class="ghost" type="button">CANCEL</button><button id="manSave" class="primary" type="button">ADD PUNCH</button></div>');
+ $('manTime').value=localInput(Date.now());$('manSite').value=state.site;$('manCancel').onclick=closeSheet;
+ $('manSave').onclick=()=>{const at=parseLocalInput($('manTime').value);if(at===null){toast('Choose a valid time.');return}const action=$('manAction').value==='out'?'out':'in',site=$('manSite').value,note=$('manNote').value;closeSheet();addPunch(action,at,'manual',site,note)}
+});
+el.noteBtn.addEventListener('click',()=>{
+ openSheet('ADD NOTE','<div class="field"><label class="label">TIME</label><input id="noteTime" type="datetime-local"></div>'+
+   '<div class="field"><label class="label">SITE / JOB</label><input id="noteSite" maxlength="80"></div>'+
+   '<div class="field"><label class="label">NOTE</label><textarea id="noteText" maxlength="240" placeholder="What should future-you know?"></textarea></div>'+
+   '<div class="row"><button id="noteCancel" class="ghost" type="button">CANCEL</button><button id="noteSave" class="primary" type="button">ADD NOTE</button></div>');
+ $('noteTime').value=localInput(Date.now());$('noteSite').value=state.site;$('noteCancel').onclick=closeSheet;
+ $('noteSave').onclick=()=>{const at=parseLocalInput($('noteTime').value),text=$('noteText').value.trim();if(at===null||!text){toast('Time and note are required.');return}const n={id:id(),kind:'note',at,site:$('noteSite').value.trim().slice(0,80),text:text.slice(0,240),createdAt:Date.now()};closeSheet();commit(()=>state.events.push(n),'Note added.')}
+});
+el.weekStart.addEventListener('change',()=>commit(()=>{state.weekStart=Number(el.weekStart.value)||0},'Week start updated.'));
+el.ukgHours.addEventListener('change',()=>{
+ const raw=el.ukgHours.value.trim(),key=weekKey();
+ commit(()=>{if(raw==='')delete state.ukg[key];else{const n=Number(raw);if(Number.isFinite(n)&&n>=0)state.ukg[key]=n}},raw===''?'UKG comparison cleared.':'UKG comparison saved.')
+});
+el.exportBtn.addEventListener('click',()=>{
+ try{
+   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+   a.href=url;a.download='field-ledger-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Backup exported.')
+ }catch{toast('Export failed.')}
+});
+el.importInput.addEventListener('change',async()=>{
+ const file=el.importInput.files&&el.importInput.files[0];el.importInput.value='';if(!file)return;
+ try{
+   const incoming=validate(JSON.parse(await file.text()));if(!incoming)throw new Error('bad');
+   localStorage.setItem(BACKUP_KEY,JSON.stringify(state));state=incoming;save();render();toast('Backup imported.')
+ }catch{toast('That file is not a valid FIELD LEDGER backup.')}
+});
+document.addEventListener('contextmenu',e=>{if(!e.target.closest('input,textarea,select'))e.preventDefault()});
+
+load();el.siteInput.value=state.site;render();
+tickTimer=setInterval(()=>{renderNow();renderToday();renderWeek()},15000);
+})();
+</script>
+</body>
+</html>
