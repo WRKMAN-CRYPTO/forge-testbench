@@ -306,8 +306,8 @@ function effectivePunches(){
 }
 function punchesUntil(ts=Date.now()){return effectivePunches().filter(p=>p.at<=ts)}
 function currentStatus(now=Date.now()){
- const p=punchesUntil(now),last=p[p.length-1];
- return {on:!!last&&last.action==='in',last}
+ const paired=pairIntervals(now);
+ return {on:!!paired.open,last:paired.open}
 }
 function pairIntervals(until=Date.now()){
  const p=effectivePunches().filter(x=>x.at<=until),intervals=[],anomalies=[];let open=null;
@@ -357,7 +357,7 @@ function renderNow(now=Date.now()){
  el.punchBtn.textContent=s.on?'CLOCK OUT':'CLOCK IN';
  el.punchBtn.className='punch '+(s.on?'out':'in');
  el.elapsed.textContent=s.on&&s.last?'Open '+formatDuration(now-s.last.at)+' · since '+timeText(s.last.at):'No open shift.';
- el.siteInput.value===document.activeElement|| (el.siteInput.value=state.site);
+ if(document.activeElement!==el.siteInput)el.siteInput.value=state.site;
  const d=new Date(now);
  el.liveTime.textContent=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
  el.liveDate.textContent=d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})
