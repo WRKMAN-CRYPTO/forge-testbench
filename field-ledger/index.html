@@ -327,6 +327,9 @@ function pairIntervals(until=Date.now()){
 function startOfDay(ts){
  const d=new Date(ts);d.setHours(0,0,0,0);return d.getTime()
 }
+function addLocalDays(ts,days){
+ const d=new Date(ts);d.setDate(d.getDate()+days);return d.getTime()
+}
 function startOfWeek(ts=Date.now()){
  const d=new Date(ts);d.setHours(0,0,0,0);
  const delta=(d.getDay()-state.weekStart+7)%7;d.setDate(d.getDate()-delta);return d.getTime()
@@ -360,14 +363,14 @@ function renderNow(now=Date.now()){
  el.liveDate.textContent=d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})
 }
 function todayEntries(){
- const a=startOfDay(Date.now()),b=a+86400000;
+ const a=startOfDay(Date.now()),b=addLocalDays(a,1);
  const corr=latestCorrections();
  const punches=effectivePunches().filter(p=>p.at>=a&&p.at<b).map(p=>({kind:'punch',...p}));
  const notes=state.events.filter(e=>e.kind==='note'&&e.at>=a&&e.at<b).map(e=>({...e}));
  return [...punches,...notes].sort((x,y)=>y.at-x.at||y.createdAt-x.createdAt)
 }
 function renderToday(){
- const now=Date.now(),a=startOfDay(now),b=a+86400000,{intervals,anomalies}=pairIntervals(now);
+ const now=Date.now(),a=startOfDay(now),b=addLocalDays(a,1),{intervals,anomalies}=pairIntervals(now);
  el.todayHours.textContent=hours(overlapMinutes(intervals,a,b));
  const entries=todayEntries(),punches=entries.filter(e=>e.kind==='punch');
  el.todayPunches.textContent=String(punches.length);
@@ -381,15 +384,15 @@ function renderToday(){
  }).join('')
 }
 function renderWeek(){
- const now=Date.now(),ws=startOfWeek(now),we=ws+7*86400000,{intervals,anomalies}=pairIntervals(now);
+ const now=Date.now(),ws=startOfWeek(now),we=addLocalDays(ws,7),{intervals,anomalies}=pairIntervals(now);
  const total=overlapMinutes(intervals,ws,we),h=hours(total);
  el.weekHours.textContent=h;el.weekBadge.textContent=h+'h';
  const end=new Date(we-1);
  el.weekRange.textContent=new Date(ws).toLocaleDateString([],{month:'short',day:'numeric'})+' – '+end.toLocaleDateString([],{month:'short',day:'numeric'});
  let rows='',max=1,vals=[];
- for(let i=0;i<7;i++){const a=ws+i*86400000,b=a+86400000,m=overlapMinutes(intervals,a,b);vals.push(m);max=Math.max(max,m)}
+ for(let i=0;i<7;i++){const a=addLocalDays(ws,i),b=addLocalDays(ws,i+1),m=overlapMinutes(intervals,a,b);vals.push(m);max=Math.max(max,m)}
  for(let i=0;i<7;i++){
-   const d=new Date(ws+i*86400000),m=vals[i],pct=Math.min(100,m/max*100);
+   const d=new Date(addLocalDays(ws,i)),m=vals[i],pct=Math.min(100,m/max*100);
    rows+='<div class="day"><div class="dayName">'+DAYS[d.getDay()]+'</div><div class="dayBar"><div class="dayFill" style="width:'+pct.toFixed(1)+'%"></div></div><div class="dayHours">'+hours(m)+'</div></div>'
  }
  if(anomalies.some(x=>x.at>=ws&&x.at<we))rows+='<div class="micro anomaly" style="margin-top:9px">Week contains an unmatched punch sequence. Compare carefully.</div>';
@@ -475,7 +478,10 @@ el.noteBtn.addEventListener('click',()=>{
 el.weekStart.addEventListener('change',()=>commit(()=>{state.weekStart=Number(el.weekStart.value)||0},'Week start updated.'));
 el.ukgHours.addEventListener('change',()=>{
  const raw=el.ukgHours.value.trim(),key=weekKey();
- commit(()=>{if(raw==='')delete state.ukg[key];else{const n=Number(raw);if(Number.isFinite(n)&&n>=0)state.ukg[key]=n}},raw===''?'UKG comparison cleared.':'UKG comparison saved.')
+ if(raw===''){commit(()=>{delete state.ukg[key]},'UKG comparison cleared.');return}
+ const n=Number(raw);
+ if(!Number.isFinite(n)||n<0){toast('Enter a valid non-negative hour total.');renderWeek();return}
+ commit(()=>{state.ukg[key]=n},'UKG comparison saved.')
 });
 el.exportBtn.addEventListener('click',()=>{
  try{
