@@ -295,9 +295,14 @@
       return dsp;
     }
 
-    async function ensureAudio() {
+    async function ensureContext() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') await audioCtx.resume();
+      return audioCtx;
+    }
+
+    async function ensureAudio() {
+      await ensureContext();
       if (!workletReady) {
         const mod = await getDSP();
         await mod.SoundTouchNode.register(audioCtx, PROCESSOR_URL);
@@ -318,7 +323,7 @@
     }
 
     async function decodeArrayBuffer(arrayBuffer) {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      await ensureContext();
       return await audioCtx.decodeAudioData(arrayBuffer.slice(0));
     }
 
@@ -408,7 +413,7 @@
       try {
         await ensureAudio();
         stopPlayback(false);
-        const buffer = makeWorkingBuffer();
+        const buffer = original ? originalBuffer : makeWorkingBuffer();
         const source = audioCtx.createBufferSource();
         source.buffer = buffer;
         source.loop = loop;
@@ -536,7 +541,7 @@
 
     async function generate(kind) {
       try {
-        await ensureAudio();
+        await ensureContext();
         const spec = generatorSpec(kind);
         const sr = audioCtx.sampleRate || 48000;
         const len = Math.floor(spec.duration * sr);
