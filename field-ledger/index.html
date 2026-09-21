@@ -267,7 +267,7 @@ summary::-webkit-details-marker{display:none}
 const KEY='forge-field-ledger-v1', BACKUP_KEY=KEY+'-backup', CORRUPT_KEY=KEY+'-corrupt', VERSION=1;
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const fresh=()=>({v:VERSION,site:'',weekStart:0,events:[],ukg:{}});
-let state=fresh(), toastTimer=0, tickTimer=0;
+let state=fresh(), toastTimer=0, tickTimer=0, minuteTimer=0;
 
 const $=id=>document.getElementById(id);
 const el={
@@ -587,8 +587,27 @@ function setupPwa(){
  },650)
 }
 
+function refreshLiveState(){
+ renderNow();renderToday();renderWeek()
+}
+function scheduleMinuteClock(){
+ clearTimeout(minuteTimer);
+ renderNow();
+ const delay=60000-(Date.now()%60000)+40;
+ minuteTimer=setTimeout(scheduleMinuteClock,delay)
+}
+function wakeApp(){
+ if(document.hidden)return;
+ refreshLiveState();
+ scheduleMinuteClock()
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)wakeApp()});
+addEventListener('pageshow',wakeApp);
+addEventListener('focus',wakeApp);
+
 load();el.siteInput.value=state.site;render();setupPwa();
-tickTimer=setInterval(()=>{renderNow();renderToday();renderWeek()},15000);
+scheduleMinuteClock();
+tickTimer=setInterval(refreshLiveState,15000);
 })();
 </script>
 </body>
