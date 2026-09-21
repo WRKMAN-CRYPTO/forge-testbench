@@ -118,6 +118,48 @@
     .bottom-actions { display:grid; grid-template-columns: 1fr 1.5fr; gap:8px; margin-top:10px; }
     .bottom-actions button { min-height:56px; }
 
+    .loop-deck {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(20,24,29,.94);
+      overflow: hidden;
+    }
+    .loop-head {
+      display:flex;
+      align-items:end;
+      justify-content:space-between;
+      gap:10px;
+      padding:14px 14px 10px;
+    }
+    .loop-head strong { display:block; font-size:14px; letter-spacing:.12em; }
+    .loop-head small { display:block; margin-top:3px; color:var(--muted); font-size:10px; font-weight:650; }
+    .deck-bpm-readout { font-variant-numeric:tabular-nums; font-weight:850; font-size:16px; color:var(--hot); white-space:nowrap; }
+    .deck-tempo { display:grid; grid-template-columns:48px 1fr 48px; gap:8px; align-items:center; padding:0 12px 10px; }
+    .deck-tempo button { min-height:42px; }
+    .deck-actions { display:grid; grid-template-columns:1.15fr 1fr; gap:8px; padding:0 12px 12px; }
+    .deck-actions button { min-height:50px; }
+    .track-list { display:grid; gap:8px; padding:0 10px 12px; }
+    .track-card { border:1px solid #252c34; border-radius:14px; background:#101419; padding:9px; }
+    .track-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .track-title { min-width:0; flex:1; }
+    .track-title strong { display:block; font-size:11px; letter-spacing:.1em; }
+    .track-name { display:block; margin-top:2px; color:var(--muted); font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .track-assign { min-height:34px; padding:4px 9px; border-radius:10px; font-size:10px; flex:0 0 auto; }
+    .steps { display:grid; grid-template-columns:repeat(8,1fr); gap:5px; }
+    .step {
+      min-height:34px;
+      padding:0;
+      border-radius:8px;
+      font-size:9px;
+      color:#7f8a96;
+      background:#181e25;
+    }
+    .step.on { background:#5a4717; border-color:#9f7d26; color:#ffe3a0; box-shadow:inset 0 0 0 1px #9f7d26; }
+    .step.downbeat { border-color:#46515e; }
+    .step.playhead { outline:2px solid var(--good); outline-offset:1px; }
+    .track-card.loaded .track-title strong { color:var(--good); }
+
     .status {
       min-height: 36px;
       padding: 10px 3px 0;
@@ -241,6 +283,26 @@
       <button id="exportBtn" class="primary" disabled>↓ Export WAV</button>
     </div>
 
+    <section class="loop-deck">
+      <div class="loop-head">
+        <div>
+          <strong>LOOP DECK</strong>
+          <small>4 layers · 16 steps · one bar</small>
+        </div>
+        <span id="deckBpmReadout" class="deck-bpm-readout">120 BPM</span>
+      </div>
+      <div class="deck-tempo">
+        <button id="deckBpmDown">−</button>
+        <input id="deckBpm" type="range" min="60" max="180" value="120" step="1" />
+        <button id="deckBpmUp">+</button>
+      </div>
+      <div class="deck-actions">
+        <button id="deckPlayBtn" class="primary">▶ Loop</button>
+        <button id="deckClearBtn">Clear Pattern</button>
+      </div>
+      <div id="trackList" class="track-list"></div>
+    </section>
+
     <div id="status" class="status">Ready. Audio stays on this device.</div>
     <div class="privacy">V1 processes your sound locally in the browser.</div>
   </main>
@@ -257,7 +319,9 @@
       pitchDown: $('pitchDown'), pitchUp: $('pitchUp'), pitchChips: $('pitchChips'), tempo: $('tempo'), tempoReadout: $('tempoReadout'),
       tempoDown: $('tempoDown'), tempoUp: $('tempoUp'), tempoChips: $('tempoChips'), trimStart: $('trimStart'), trimEnd: $('trimEnd'),
       trimStartValue: $('trimStartValue'), trimEndValue: $('trimEndValue'), selectionReadout: $('selectionReadout'), reverseBtn: $('reverseBtn'),
-      fadeInBtn: $('fadeInBtn'), fadeOutBtn: $('fadeOutBtn'), resetBtn: $('resetBtn'), exportBtn: $('exportBtn'), status: $('status')
+      fadeInBtn: $('fadeInBtn'), fadeOutBtn: $('fadeOutBtn'), resetBtn: $('resetBtn'), exportBtn: $('exportBtn'), status: $('status'),
+      deckBpm: $('deckBpm'), deckBpmReadout: $('deckBpmReadout'), deckBpmDown: $('deckBpmDown'), deckBpmUp: $('deckBpmUp'),
+      deckPlayBtn: $('deckPlayBtn'), deckClearBtn: $('deckClearBtn'), trackList: $('trackList')
     };
 
     let audioCtx = null;
@@ -282,6 +346,28 @@
     let recordTicker = null;
     let busy = false;
 
+    const TRACK_NAMES = ['DRUM','BASS','MACHINE','TEXTURE'];
+    const DEFAULT_PATTERNS = [
+      [0,4,8,12],
+      [0,8],
+      [2,6,10,14],
+      [0]
+    ];
+    const deckTracks = TRACK_NAMES.map((name,index) => ({
+      name,
+      label: 'Empty',
+      buffer: null,
+      steps: Array.from({length:16},(_,step) => DEFAULT_PATTERNS[index].includes(step))
+    }));
+    let deckPlaying = false;
+    let deckTimer = null;
+    let deckStep = 0;
+    let deckNextTime = 0;
+    let deckMaster = null;
+    let deckAssignBusy = false;
+    const deckSources = new Set();
+    const deckVisualTimers = new Set();
+
     function setStatus(message, type='') {
       els.status.textContent = message;
       els.status.className = `status ${type}`.trim();
@@ -302,6 +388,7 @@
     }
 
     async function discardAudioContext() {
+      stopDeck(false);
       const old = audioCtx;
       audioCtx = null;
       workletReady = false;
@@ -466,6 +553,7 @@
       enableEditor(true);
       updateReadouts();
       drawWaveform();
+      updateDeckUI();
       setStatus('On the bench. Bend it.', 'good');
     }
 
@@ -530,6 +618,7 @@
     async function startPlayback({original=false}={}) {
       if (!originalBuffer || busy) return;
       try {
+        stopDeck(false);
         await ensureAudio();
         stopPlayback(false);
         const buffer = original ? originalBuffer : makeWorkingBuffer();
@@ -620,6 +709,7 @@
       }
       try {
         stopPlayback(false);
+        stopDeck(false);
         recordStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
         recordChunks = [];
         const mime = chooseRecorderMime();
@@ -741,6 +831,181 @@
       return specs[kind] || specs.glitch;
     }
 
+    function renderDeck() {
+      els.trackList.innerHTML = deckTracks.map((track,trackIndex) => {
+        const steps = track.steps.map((on,step) => {
+          const downbeat = step % 4 === 0 ? ' downbeat' : '';
+          return `<button class="step${on ? ' on' : ''}${downbeat}" data-track="${trackIndex}" data-step="${step}" aria-label="${track.name} step ${step+1}" aria-pressed="${on}">${step+1}</button>`;
+        }).join('');
+        return `
+          <div class="track-card" data-track-card="${trackIndex}">
+            <div class="track-head">
+              <div class="track-title">
+                <strong>${track.name}</strong>
+                <span class="track-name" data-track-name="${trackIndex}">Empty</span>
+              </div>
+              <button class="track-assign" data-assign="${trackIndex}" disabled>Use Bench</button>
+            </div>
+            <div class="steps">${steps}</div>
+          </div>`;
+      }).join('');
+      updateDeckUI();
+    }
+
+    function updateDeckUI() {
+      els.deckBpmReadout.textContent = `${Number(els.deckBpm.value)} BPM`;
+      els.deckPlayBtn.textContent = deckPlaying ? '■ Stop Loop' : '▶ Loop';
+      deckTracks.forEach((track,index) => {
+        const card = els.trackList.querySelector(`[data-track-card="${index}"]`);
+        const name = els.trackList.querySelector(`[data-track-name="${index}"]`);
+        const assign = els.trackList.querySelector(`[data-assign="${index}"]`);
+        if (name) name.textContent = track.buffer ? track.label : 'Empty';
+        if (card) card.classList.toggle('loaded',!!track.buffer);
+        if (assign) assign.disabled = !originalBuffer || busy || deckAssignBusy;
+      });
+    }
+
+    function cloneAudioBuffer(buffer) {
+      const out = new AudioBuffer({
+        length: buffer.length,
+        numberOfChannels: buffer.numberOfChannels,
+        sampleRate: buffer.sampleRate
+      });
+      for (let c=0; c<buffer.numberOfChannels; c++) out.copyToChannel(buffer.getChannelData(c),c);
+      return out;
+    }
+
+    async function assignCurrentToTrack(index) {
+      if (!originalBuffer || busy || deckAssignBusy) return;
+      const track = deckTracks[index];
+      if (!track) return;
+      deckAssignBusy = true;
+      updateDeckUI();
+      try {
+        setStatus(`Forging ${track.name} sample…`);
+        const input = makeWorkingBuffer();
+        const pitch = Number(els.pitch.value);
+        const tempo = Number(els.tempo.value);
+        let processed = input;
+        if (pitch !== 0 || tempo !== 1) {
+          const mod = await getDSP();
+          processed = await mod.processOffline({
+            input,
+            processorUrl: PROCESSOR_URL,
+            pitchSemitones: pitch,
+            playbackRate: tempo
+          });
+        }
+        track.buffer = cloneAudioBuffer(processed);
+        track.label = soundLabel || 'Bench sound';
+        setStatus(`${track.name} armed with ${track.label}.`, 'good');
+      } catch (err) {
+        console.error(err);
+        setStatus(`Could not arm ${track.name}: ${err?.message || err}`, 'error');
+      } finally {
+        deckAssignBusy = false;
+        updateDeckUI();
+      }
+    }
+
+    function setDeckPlayhead(step) {
+      els.trackList.querySelectorAll('.step.playhead').forEach(b=>b.classList.remove('playhead'));
+      if (step < 0) return;
+      els.trackList.querySelectorAll(`[data-step="${step}"]`).forEach(b=>b.classList.add('playhead'));
+    }
+
+    function scheduleDeckStep(step, when) {
+      deckTracks.forEach(track => {
+        if (!track.buffer || !track.steps[step] || !audioCtx || !deckMaster) return;
+        const source = audioCtx.createBufferSource();
+        const gain = audioCtx.createGain();
+        source.buffer = track.buffer;
+        gain.gain.value = 0.82;
+        source.connect(gain);
+        gain.connect(deckMaster);
+        deckSources.add(source);
+        source.onended = () => {
+          deckSources.delete(source);
+          try { source.disconnect(); } catch {}
+          try { gain.disconnect(); } catch {}
+        };
+        source.start(when);
+      });
+
+      const delay = Math.max(0,(when - audioCtx.currentTime) * 1000);
+      const timer = setTimeout(() => {
+        deckVisualTimers.delete(timer);
+        if (deckPlaying) setDeckPlayhead(step);
+      },delay);
+      deckVisualTimers.add(timer);
+    }
+
+    function deckStepSeconds() {
+      return 60 / Number(els.deckBpm.value) / 4;
+    }
+
+    function deckScheduler() {
+      if (!deckPlaying || !audioCtx) return;
+      while (deckNextTime < audioCtx.currentTime + 0.12) {
+        scheduleDeckStep(deckStep,deckNextTime);
+        deckNextTime += deckStepSeconds();
+        deckStep = (deckStep + 1) % 16;
+      }
+    }
+
+    async function startDeck() {
+      if (deckPlaying) {
+        stopDeck();
+        return;
+      }
+      if (!deckTracks.some(track => track.buffer)) {
+        setStatus('Forge a sound, then tap Use Bench on a loop layer.', 'error');
+        return;
+      }
+      try {
+        stopPlayback(false);
+        await ensureContext();
+        deckMaster = audioCtx.createGain();
+        deckMaster.gain.value = 0.92;
+        deckMaster.connect(audioCtx.destination);
+        deckPlaying = true;
+        deckStep = 0;
+        deckNextTime = audioCtx.currentTime + 0.055;
+        deckTimer = setInterval(deckScheduler,25);
+        deckScheduler();
+        updateDeckUI();
+        setStatus('Loop running. Tap steps while it plays.', 'good');
+      } catch (err) {
+        console.error(err);
+        stopDeck(false);
+        setStatus(`Loop failed: ${err?.message || err}`, 'error');
+      }
+    }
+
+    function stopDeck(updateStatus=true) {
+      deckPlaying = false;
+      if (deckTimer) clearInterval(deckTimer);
+      deckTimer = null;
+      deckVisualTimers.forEach(timer=>clearTimeout(timer));
+      deckVisualTimers.clear();
+      deckSources.forEach(source => { try { source.stop(); } catch {} try { source.disconnect(); } catch {} });
+      deckSources.clear();
+      try { deckMaster?.disconnect(); } catch {}
+      deckMaster = null;
+      setDeckPlayhead(-1);
+      updateDeckUI();
+      if (updateStatus && originalBuffer) setStatus('Loop stopped.');
+    }
+
+    function clearDeckPattern() {
+      deckTracks.forEach(track => track.steps.fill(false));
+      els.trackList.querySelectorAll('.step.on').forEach(b => {
+        b.classList.remove('on');
+        b.setAttribute('aria-pressed','false');
+      });
+      setStatus('Pattern cleared. The machine is quiet.');
+    }
+
     async function exportWav() {
       if (!originalBuffer || busy) return;
       busy=true; els.exportBtn.disabled=true; els.playBtn.disabled=true;
@@ -853,14 +1118,40 @@
     els.resetBtn.addEventListener('click',()=>{stopPlayback(false);resetEdits();setStatus('Back to the untouched sound.');});
     els.exportBtn.addEventListener('click',exportWav);
 
+    els.deckBpm.addEventListener('input',()=>updateDeckUI());
+    els.deckBpmDown.addEventListener('click',()=>{ els.deckBpm.value=String(Math.max(60,Number(els.deckBpm.value)-1)); updateDeckUI(); });
+    els.deckBpmUp.addEventListener('click',()=>{ els.deckBpm.value=String(Math.min(180,Number(els.deckBpm.value)+1)); updateDeckUI(); });
+    els.deckPlayBtn.addEventListener('click',startDeck);
+    els.deckClearBtn.addEventListener('click',clearDeckPattern);
+    els.trackList.addEventListener('click',e=>{
+      const assign = e.target.closest('[data-assign]');
+      if (assign) {
+        assignCurrentToTrack(Number(assign.dataset.assign));
+        return;
+      }
+      const step = e.target.closest('[data-track][data-step]');
+      if (!step) return;
+      const track = deckTracks[Number(step.dataset.track)];
+      const index = Number(step.dataset.step);
+      if (!track || index < 0 || index > 15) return;
+      track.steps[index] = !track.steps[index];
+      step.classList.toggle('on',track.steps[index]);
+      step.setAttribute('aria-pressed',String(track.steps[index]));
+    });
+
     document.addEventListener('visibilitychange',()=>{
-      if(document.hidden && playing) stopPlayback(false);
+      if(document.hidden) {
+        if (playing) stopPlayback(false);
+        if (deckPlaying) stopDeck(false);
+      }
     });
     window.addEventListener('pagehide',()=>{
       if(recorder?.state==='recording') { try{recorder.stop();}catch{} }
       recordStream?.getTracks().forEach(t=>t.stop());
+      if (deckPlaying) stopDeck(false);
     });
 
+    renderDeck();
     enableEditor(false);
     drawWaveform();
   </script>
