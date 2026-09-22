@@ -80,7 +80,9 @@ textarea{resize:none;min-height:74px;line-height:1.35}
 .clock .now{font-size:20px;font-weight:900}
 .clock .date{font-size:9px;color:var(--muted);margin-top:3px}
 .elapsed{font-size:11px;color:var(--muted);margin:4px 0 13px}
-.siteRow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:8px}
+.siteRow{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:8px}
+.locationHint{display:none;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;padding:10px 11px;border:1px solid #405047;border-radius:13px;background:#111a16;font-size:10px;color:var(--muted)}
+.locationHint.show{display:flex}.locationHint strong{color:var(--green);font-size:11px}.locationHint button{min-height:36px;padding:6px 10px}
 .siteRow button{padding:9px 11px}
 .siteSuggestions{display:flex;gap:7px;overflow:auto;padding:0 0 11px;scrollbar-width:none}
 .siteSuggestions:empty{display:none}
@@ -184,7 +186,9 @@ summary::-webkit-details-marker{display:none}
     <div class="siteRow">
       <input id="siteInput" maxlength="80" autocomplete="off" placeholder="Site / job (optional)">
       <button id="saveSiteBtn" class="ghost" type="button">SET</button>
+      <button id="locateBtn" class="ghost" type="button" aria-label="Use location">📍</button>
     </div>
+    <div id="locationHint" class="locationHint"><div id="locationCopy"></div><button id="locationUse" type="button">USE SITE</button></div>
     <div id="siteSuggestions" class="siteSuggestions" aria-label="Recent job sites"></div>
     <button id="punchBtn" class="punch in" type="button">CLOCK IN</button>
     <div class="micro" style="margin-top:9px">Your personal record only. UKG remains your employer's official system.</div>
@@ -266,13 +270,13 @@ summary::-webkit-details-marker{display:none}
 
 const KEY='forge-field-ledger-v1', BACKUP_KEY=KEY+'-backup', CORRUPT_KEY=KEY+'-corrupt', VERSION=1;
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const fresh=()=>({v:VERSION,site:'',weekStart:0,events:[],ukg:{}});
+const fresh=()=>({v:VERSION,site:'',weekStart:0,events:[],ukg:{},sites:{}});
 let state=fresh(), toastTimer=0, tickTimer=0, minuteTimer=0;
 
 const $=id=>document.getElementById(id);
 const el={
  saveStatus:$('saveStatus'),stateText:$('stateText'),liveTime:$('liveTime'),liveDate:$('liveDate'),elapsed:$('elapsed'),
- siteInput:$('siteInput'),saveSiteBtn:$('saveSiteBtn'),siteSuggestions:$('siteSuggestions'),punchBtn:$('punchBtn'),
+ siteInput:$('siteInput'),saveSiteBtn:$('saveSiteBtn'),locateBtn:$('locateBtn'),locationHint:$('locationHint'),locationCopy:$('locationCopy'),locationUse:$('locationUse'),siteSuggestions:$('siteSuggestions'),punchBtn:$('punchBtn'),
  todayHours:$('todayHours'),todayPunches:$('todayPunches'),todayWarning:$('todayWarning'),todayTimeline:$('todayTimeline'),
  weekBadge:$('weekBadge'),weekRange:$('weekRange'),weekDays:$('weekDays'),weekHours:$('weekHours'),ukgHours:$('ukgHours'),difference:$('difference'),
  manualPunchBtn:$('manualPunchBtn'),noteBtn:$('noteBtn'),auditBadge:$('auditBadge'),auditList:$('auditList'),
@@ -299,7 +303,8 @@ function validate(x){
  if(!x||typeof x!=='object'||x.v!==VERSION||typeof x.site!=='string'||!Array.isArray(x.events)||!x.events.every(eventValid))return null;
  const weekStart=Number.isInteger(x.weekStart)&&x.weekStart>=0&&x.weekStart<=6?x.weekStart:0;
  const ukg=x.ukg&&typeof x.ukg==='object'?Object.fromEntries(Object.entries(x.ukg).filter(([k,v])=>typeof k==='string'&&(typeof v==='number'||v===''))):{};
- return {v:VERSION,site:x.site.slice(0,80),weekStart,events:x.events.map(cleanEvent),ukg}
+ const sites=x.sites&&typeof x.sites==='object'?Object.fromEntries(Object.entries(x.sites).filter(([k,v])=>k&&v&&Number.isFinite(v.lat)&&Number.isFinite(v.lon)).map(([k,v])=>[k.slice(0,80),{lat:Number(v.lat),lon:Number(v.lon),accuracy:Number(v.accuracy)||0}])):{};
+ return {v:VERSION,site:x.site.slice(0,80),weekStart,events:x.events.map(cleanEvent),ukg,sites}
 }
 function parse(text){try{return validate(JSON.parse(text))}catch{return null}}
 function setSave(text,bad=false){el.saveStatus.textContent=text;el.saveStatus.classList.toggle('bad',bad)}
@@ -396,6 +401,35 @@ function siteSuggestions(){
  for(const e of state.events)if(e.kind==='note')addSite(e.site);
  return [...counts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,6)
 }
+function distanceMeters(a,b){
+ const R=6371000,p=Math.PI/180,dLat=(b.lat-a.lat)*p,dLon=(b.lon-a.lon)*p;
+ const q=Math.sin(dLat/2)**2+Math.cos(a.lat*p)*Math.cos(b.lat*p)*Math.sin(dLon/2)**2;
+ return 2*R*Math.asin(Math.sqrt(q))
+}
+let locationCandidate=null, locating=false;
+function hideLocationHint(){locationCandidate=null;el.locationHint.classList.remove('show')}
+function suggestFromPosition(pos,allowSave=false){
+ const here={lat:pos.coords.latitude,lon:pos.coords.longitude}, accuracy=Math.round(pos.coords.accuracy||0);
+ const known=Object.entries(state.sites||{}).map(([site,geo])=>({site,geo,d:distanceMeters(here,geo)})).sort((a,b)=>a.d-b.d);
+ const best=known[0], radius=Math.max(150,accuracy+75);
+ if(best&&best.d<=radius){
+   locationCandidate=best.site;
+   el.locationCopy.innerHTML='<strong>'+esc(best.site)+'</strong><br>You appear to be near this saved site · '+Math.round(best.d)+'m away.';
+   el.locationUse.textContent='USE SITE';el.locationHint.classList.add('show');return
+ }
+ const site=el.siteInput.value.trim().slice(0,80);
+ if(allowSave&&site){
+   locationCandidate={save:site,lat:here.lat,lon:here.lon,accuracy};
+   el.locationCopy.innerHTML='<strong>'+esc(site)+'</strong><br>No saved location here yet. Save this spot for future suggestions?';
+   el.locationUse.textContent='SAVE HERE';el.locationHint.classList.add('show');return
+ }
+ hideLocationHint()
+}
+function checkLocation(allowSave=false,quiet=false){
+ if(!navigator.geolocation){if(!quiet)toast('Location is not available on this device.');return}
+ if(locating)return;locating=true;
+ navigator.geolocation.getCurrentPosition(p=>{locating=false;suggestFromPosition(p,allowSave)},()=>{locating=false;if(!quiet)toast('Location permission or GPS is unavailable.')},{enableHighAccuracy:true,timeout:8000,maximumAge:60000})
+}
 function renderSiteSuggestions(){
  const sites=siteSuggestions();
  el.siteSuggestions.innerHTML=sites.map(([site,count])=>'<button class="siteChip" type="button" data-site="'+esc(site)+'">'+esc(site)+(count>1?' · '+count:'')+'</button>').join('');
@@ -483,6 +517,16 @@ el.sheet.addEventListener('click',e=>{if(e.target===el.sheet)closeSheet()});
 el.saveSiteBtn.addEventListener('click',()=>{
  const v=el.siteInput.value.trim();
  commit(()=>{state.site=v},v?'Site set. It will join suggestions after it is used in a ledger entry.':'Site cleared.')
+});
+el.locateBtn.addEventListener('click',()=>checkLocation(true,false));
+el.locationUse.addEventListener('click',()=>{
+ if(!locationCandidate)return;
+ if(typeof locationCandidate==='string'){
+   state.site=locationCandidate;el.siteInput.value=locationCandidate;save();hideLocationHint();toast('Site selected from your location.');return
+ }
+ const x=locationCandidate;
+ commit(()=>{state.sites=state.sites||{};state.sites[x.save]={lat:x.lat,lon:x.lon,accuracy:x.accuracy};state.site=x.save},'Location saved for '+x.save+'.');
+ hideLocationHint()
 });
 el.siteSuggestions.addEventListener('click',e=>{
  const chip=e.target.closest('.siteChip');if(!chip)return;
@@ -599,13 +643,14 @@ function scheduleMinuteClock(){
 function wakeApp(){
  if(document.hidden)return;
  refreshLiveState();
- scheduleMinuteClock()
+ scheduleMinuteClock();
+ if(Object.keys(state.sites||{}).length)checkLocation(false,true)
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)wakeApp()});
 addEventListener('pageshow',wakeApp);
 addEventListener('focus',wakeApp);
 
-load();el.siteInput.value=state.site;render();setupPwa();
+load();el.siteInput.value=state.site;render();setupPwa();if(Object.keys(state.sites||{}).length)setTimeout(()=>checkLocation(false,true),900);
 scheduleMinuteClock();
 tickTimer=setInterval(refreshLiveState,15000);
 })();
