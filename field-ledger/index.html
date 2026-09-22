@@ -117,6 +117,9 @@ summary::-webkit-details-marker{display:none}
 .corrected{color:var(--amber)}
 .day{display:grid;grid-template-columns:58px 1fr auto;gap:10px;align-items:center;padding:10px 2px;border-bottom:1px solid #252b2d}
 .day:last-child{border-bottom:0}.dayName{font-size:11px;font-weight:900}.dayBar{height:7px;background:#23292b;border-radius:99px;overflow:hidden}.dayFill{height:100%;background:#7fa77b;border-radius:99px}.dayHours{font-size:12px;font-weight:900}
+.weekNav{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin-bottom:10px}
+.weekNav button{min-height:38px;padding:7px 10px}.weekNav .range{text-align:center;font-size:10px;font-weight:900;color:var(--text)}
+.weekNav button:disabled{opacity:.3}
 .compare{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 .compareGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:8px}
 .diff{margin-top:9px;padding:11px 12px;border:1px solid #323a3c;border-radius:13px;font-size:12px}
@@ -207,7 +210,7 @@ summary::-webkit-details-marker{display:none}
   <details class="card" open>
     <summary><span class="label">WEEK</span><span id="weekBadge" class="badge">0.00h</span></summary>
     <div class="drawer">
-      <div id="weekRange" class="micro"></div>
+      <div class="weekNav"><button id="prevWeek" type="button">‹</button><div id="weekRange" class="range"></div><button id="nextWeek" type="button">›</button></div>
       <div id="weekDays"></div>
       <div class="compare">
         <div class="label">COMPARE WITH UKG</div>
@@ -271,14 +274,14 @@ summary::-webkit-details-marker{display:none}
 const KEY='forge-field-ledger-v1', BACKUP_KEY=KEY+'-backup', CORRUPT_KEY=KEY+'-corrupt', VERSION=1;
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const fresh=()=>({v:VERSION,site:'',weekStart:0,events:[],ukg:{},sites:{}});
-let state=fresh(), toastTimer=0, tickTimer=0, minuteTimer=0;
+let state=fresh(), toastTimer=0, tickTimer=0, minuteTimer=0, weekOffset=0;
 
 const $=id=>document.getElementById(id);
 const el={
  saveStatus:$('saveStatus'),stateText:$('stateText'),liveTime:$('liveTime'),liveDate:$('liveDate'),elapsed:$('elapsed'),
  siteInput:$('siteInput'),saveSiteBtn:$('saveSiteBtn'),locateBtn:$('locateBtn'),locationHint:$('locationHint'),locationCopy:$('locationCopy'),locationUse:$('locationUse'),siteSuggestions:$('siteSuggestions'),punchBtn:$('punchBtn'),
  todayHours:$('todayHours'),todayPunches:$('todayPunches'),todayWarning:$('todayWarning'),todayTimeline:$('todayTimeline'),
- weekBadge:$('weekBadge'),weekRange:$('weekRange'),weekDays:$('weekDays'),weekHours:$('weekHours'),ukgHours:$('ukgHours'),difference:$('difference'),
+ weekBadge:$('weekBadge'),weekRange:$('weekRange'),prevWeek:$('prevWeek'),nextWeek:$('nextWeek'),weekDays:$('weekDays'),weekHours:$('weekHours'),ukgHours:$('ukgHours'),difference:$('difference'),
  manualPunchBtn:$('manualPunchBtn'),noteBtn:$('noteBtn'),auditBadge:$('auditBadge'),auditList:$('auditList'),
  weekStart:$('weekStart'),exportBtn:$('exportBtn'),importInput:$('importInput'),
  sheet:$('sheet'),sheetTitle:$('sheetTitle'),sheetBody:$('sheetBody'),toast:$('toast')
@@ -384,7 +387,8 @@ function hours(n){return (n/60).toFixed(2)}
 function timeText(ts){return new Date(ts).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
 function dateTimeText(ts){return new Date(ts).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
 function dateKey(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
-function weekKey(){return dateKey(startOfWeek())}
+function selectedWeekStart(){return addLocalDays(startOfWeek(),weekOffset*7)}
+function weekKey(){return dateKey(selectedWeekStart())}
 function localInput(ts){
  const d=new Date(ts),pad=n=>String(n).padStart(2,'0');
  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())
@@ -467,11 +471,12 @@ function renderToday(){
  }).join('')
 }
 function renderWeek(){
- const now=Date.now(),ws=startOfWeek(now),we=addLocalDays(ws,7),{intervals,anomalies}=pairIntervals(now);
+ const now=Date.now(),ws=selectedWeekStart(),we=addLocalDays(ws,7),{intervals,anomalies}=pairIntervals(now);
  const total=overlapMinutes(intervals,ws,we),h=hours(total);
  el.weekHours.textContent=h;el.weekBadge.textContent=h+'h';
  const end=new Date(we-1);
- el.weekRange.textContent=new Date(ws).toLocaleDateString([],{month:'short',day:'numeric'})+' – '+end.toLocaleDateString([],{month:'short',day:'numeric'});
+ el.weekRange.textContent=(weekOffset===0?'THIS WEEK · ':'')+new Date(ws).toLocaleDateString([],{month:'short',day:'numeric'})+' – '+end.toLocaleDateString([],{month:'short',day:'numeric'});
+ el.nextWeek.disabled=weekOffset>=0;
  let rows='',max=1,vals=[];
  for(let i=0;i<7;i++){const a=addLocalDays(ws,i),b=addLocalDays(ws,i+1),m=overlapMinutes(intervals,a,b);vals.push(m);max=Math.max(max,m)}
  for(let i=0;i<7;i++){
@@ -575,7 +580,9 @@ el.noteBtn.addEventListener('click',()=>{
  $('noteTime').value=localInput(Date.now());$('noteSite').value=state.site;$('noteCancel').onclick=closeSheet;
  $('noteSave').onclick=()=>{const at=parseLocalInput($('noteTime').value),text=$('noteText').value.trim();if(at===null||!text){toast('Time and note are required.');return}const n={id:id(),kind:'note',at,site:$('noteSite').value.trim().slice(0,80),text:text.slice(0,240),createdAt:Date.now()};closeSheet();commit(()=>state.events.push(n),'Note added.')}
 });
-el.weekStart.addEventListener('change',()=>commit(()=>{state.weekStart=Number(el.weekStart.value)||0},'Week start updated.'));
+el.prevWeek.addEventListener('click',()=>{weekOffset--;renderWeek()});
+el.nextWeek.addEventListener('click',()=>{if(weekOffset<0){weekOffset++;renderWeek()}});
+el.weekStart.addEventListener('change',()=>commit(()=>{state.weekStart=Number(el.weekStart.value)||0;weekOffset=0},'Week start updated.'));
 el.ukgHours.addEventListener('change',()=>{
  const raw=el.ukgHours.value.trim(),key=weekKey();
  if(raw===''){commit(()=>{delete state.ukg[key]},'UKG comparison cleared.');return}
