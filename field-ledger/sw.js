@@ -1,4 +1,4 @@
-const CACHE='field-ledger-shell-v2';
+const CACHE='field-ledger-shell-v3';
 const SHELL=['./','./index.html','./manifest.json','./icon.svg','./apple-touch-icon.png'];
 
 self.addEventListener('install',event=>{
