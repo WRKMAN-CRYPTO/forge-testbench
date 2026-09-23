@@ -29,7 +29,7 @@ button:active{transform:translateY(1px)}button.sel{background:#10281c;border-col
 </style>
 </head>
 <body>
-<main id="app">
+<main id="app"><div id="booterr" style="display:none;margin:0 0 10px;padding:10px;border:1px solid #7f3b39;border-radius:10px;color:#ffd8d5;background:#2a1111;font:600 13px system-ui"></div>
 <header>
   <div><h1>W Cube</h1><div class="sub">3×3×3 tic-tac-toe · coordinates are addresses</div></div>
   <div class="badge"><span id="lines">0</span> geometric lines</div>
@@ -62,7 +62,7 @@ button:active{transform:translateY(1px)}button.sel{background:#10281c;border-col
 </div>
 </main>
 <script>
-(()=>{const root=document.getElementById('app');if(root.dataset.w==='3416')return;root.dataset.w='3416';
+(()=>{const booterr=document.getElementById('booterr');window.addEventListener('error',e=>{booterr.style.display='block';booterr.textContent='Startup error: '+(e.message||'unknown error')});const root=document.getElementById('app');if(root.dataset.w==='3416')return;root.dataset.w='3416';
 const c=document.getElementById('c'),g=c.getContext('2d'),$=id=>document.getElementById(id);
 const ui={turn:$('turn'),moves:$('moves'),addr:$('addr'),lines:$('lines'),state:$('state'),msg:$('msg'),z1:$('z1'),z2:$('z2'),z3:$('z3')};
 const W=Object.freeze({X:50001,O:50002,PLAY:51001,XWIN:51011,OWIN:51012,DRAW:51020,ALL:52000,Z1:52001,Z2:52002,Z3:52003});
@@ -109,7 +109,7 @@ function rotate(dx,dy){S.ay+=dx;S.ax=clamp(S.ax+dy,-1.2,1.2);render()}
 c.addEventListener('pointerdown',e=>{const r=c.getBoundingClientRect(),x=(e.clientX-r.left)*c.width/r.width,y=(e.clientY-r.top)*c.height/r.height,o=nearest(x,y);if(o)play(o)});
 $('left').addEventListener('click',()=>rotate(-.22,0));$('right').addEventListener('click',()=>rotate(.22,0));$('up').addEventListener('click',()=>rotate(0,-.18));$('down').addEventListener('click',()=>rotate(0,.18));$('home').addEventListener('click',()=>{S.ax=-.52;S.ay=.68;render()});$('clear').addEventListener('click',reset);
 ui.z1.addEventListener('click',()=>{S.layerW=S.layerW===W.Z1?W.ALL:W.Z1;hud();render()});ui.z2.addEventListener('click',()=>{S.layerW=S.layerW===W.Z2?W.ALL:W.Z2;hud();render()});ui.z3.addEventListener('click',()=>{S.layerW=S.layerW===W.Z3?W.ALL:W.Z3;hud();render()});
-new ResizeObserver(resize).observe(c);resize();reset();
+window.addEventListener('resize',resize,{passive:true});resize();reset();
 })();
 </script>
 </body>
