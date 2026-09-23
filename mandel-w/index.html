@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#03060a">
+<title>MANDEL//W</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#03060a;--panel:#0b1118;--panel2:#111a24;--line:#263341;
+  --text:#edf4f7;--muted:#8293a2;--accent:#75dda1;--accent2:#173b29;
+  --warn:#e7bb6c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+button,input{font:inherit}
+button{-webkit-tap-highlight-color:transparent}
+.app{
+  width:100%;height:100vh;height:100dvh;max-width:760px;margin:0 auto;
+  display:grid;grid-template-rows:auto minmax(150px,1fr) auto;background:var(--bg);
+}
+.topbar{
+  padding:max(8px,env(safe-area-inset-top)) 10px 7px;
+  display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;
+  border-bottom:1px solid var(--line);background:#05090e;
+}
+.brand{font-weight:850;font-size:14px;letter-spacing:.12em}
+.sub{margin-top:2px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wread{text-align:right;font-size:9px;line-height:1.35;color:var(--muted)}
+.wread b{color:var(--text);font-weight:700}
+.stage{position:relative;min-height:0;background:#020407;overflow:hidden}
+canvas{display:block;width:100%;height:100%;touch-action:none;background:#020407}
+.stageHud{
+  position:absolute;left:8px;right:8px;top:8px;display:flex;justify-content:space-between;gap:10px;
+  pointer-events:none;font-size:10px;color:#d6e0e6;text-shadow:0 1px 4px #000;
+}
+.stageHud span{padding:4px 6px;border:1px solid #253341;background:#03070bbb;border-radius:8px;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.zoomers{position:absolute;right:9px;bottom:9px;display:flex;gap:7px}
+.zoomers button{
+  width:46px;height:46px;border-radius:50%;border:1px solid #41505d;background:#071019dc;color:#fff;
+  font-size:25px;font-weight:500;box-shadow:0 4px 18px #0007;
+}
+.zoomers button:active{transform:scale(.96);background:#13202b}
+.drawer{
+  border-top:1px solid var(--line);background:var(--panel);
+  padding:8px 9px max(9px,env(safe-area-inset-bottom));
+}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tab,.preset,.smallbtn,.colorbtn{
+  min-height:42px;border:1px solid var(--line);border-radius:11px;background:#111923;color:var(--text);font-weight:750;
+}
+.tab.active,.preset.active,.colorbtn.active{background:var(--accent2);border-color:#3b7454;color:#d5f6df}
+.panel{display:none;padding-top:8px}
+.panel.active{display:block}
+.exploreRow{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:7px}
+.readout{
+  min-width:0;border:1px solid var(--line);border-radius:11px;background:#080e14;padding:7px 9px;
+}
+.readout b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.readout span{display:block;margin-top:2px;font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smallbtn{min-height:44px;font-size:12px}
+.presetGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.preset{min-height:40px;padding:5px;font-size:11px}
+.preset small{display:block;margin-top:2px;color:var(--muted);font-size:8px;font-weight:550}
+.formulaLine{
+  display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:7px;
+  padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:#070c12;
+}
+.formulaLine code{font:600 10px ui-monospace,SFMono-Regular,Menlo,monospace;color:#d9e5eb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.formulaLine span{font-size:9px;color:var(--muted);white-space:nowrap}
+.forgeGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+.control label{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--muted);margin-bottom:2px}
+.control label b{color:var(--text)}
+input[type=range]{width:100%;height:24px;margin:0;accent-color:var(--accent)}
+.toggleRow{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.toggle{
+  min-height:38px;border:1px solid var(--line);border-radius:10px;background:#101923;color:#cfd9df;font-size:10px;font-weight:750;
+}
+.toggle.active{background:#1f2c3a;border-color:#5c7184;color:#fff}
+.colorRow{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.colorbtn{min-height:36px;font-size:10px}
+.forgeFoot{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.micro{font-size:9px;color:var(--muted);line-height:1.25;align-self:center}
+#status[data-busy="1"]{color:var(--warn)}
+@media(max-width:350px){
+  .brand{font-size:12px}.wread{font-size:8px}.preset{font-size:10px}.forgeGrid{gap:4px 8px}
+  .drawer{padding-left:7px;padding-right:7px}.tab{font-size:12px}
+}
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <header class="topbar">
+    <div>
+      <div class="brand">MANDEL//W</div>
+      <div class="sub" id="formulaTitle">Mandelbrot · z² + c</div>
+    </div>
+    <div class="wread">
+      <div><b id="travelW">W11000</b> travel · <b id="formulaW">W21001</b> law</div>
+      <div><b id="renderW">W31001</b> render · <b id="colorW">W51001</b> color</div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage">
+    <canvas id="fractal" aria-label="Interactive fractal viewport. Drag to pan and pinch to zoom."></canvas>
+    <div class="stageHud">
+      <span id="coords">−0.600000 + 0.000000i</span>
+      <span id="status" data-busy="1">Drafting…</span>
+    </div>
+    <div class="zoomers">
+      <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+      <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+    </div>
+  </section>
+
+  <section class="drawer">
+    <nav class="tabs" aria-label="W travel">
+      <button type="button" class="tab active" data-travel="11000">Explore</button>
+      <button type="button" class="tab" data-travel="12000">Presets</button>
+      <button type="button" class="tab" data-travel="13000">Forge</button>
+    </nav>
+
+    <div class="panel active" data-panel="11000">
+      <div class="exploreRow">
+        <div class="readout">
+          <b id="exploreName">Mandelbrot</b>
+          <span id="zoomLabel">1.00× · 320 iterations</span>
+        </div>
+        <button type="button" class="smallbtn" id="homeBtn">Home</button>
+        <button type="button" class="smallbtn" id="cycleColorBtn">Color</button>
+      </div>
+    </div>
+
+    <div class="panel" data-panel="12000">
+      <div class="presetGrid" id="presetGrid">
+        <button type="button" class="preset active" data-formula="21001">Mandelbrot<small>z² + c</small></button>
+        <button type="button" class="preset" data-formula="21003">Cubic<small>z³ + c</small></button>
+        <button type="button" class="preset" data-formula="21011">Tricorn<small>conjugate</small></button>
+        <button type="button" class="preset" data-formula="21021">Burning Ship<small>|Re| + |Im|</small></button>
+        <button type="button" class="preset" data-formula="21031">Phoenix<small>memory</small></button>
+        <button type="button" class="preset" data-formula="21999">Custom<small>your law</small></button>
+      </div>
+    </div>
+
+    <div class="panel" data-panel="13000">
+      <div class="formulaLine">
+        <code id="equation">z ← z^2 + c</code>
+        <span id="customBadge">preset law</span>
+      </div>
+
+      <div class="forgeGrid">
+        <div class="control">
+          <label for="power"><span>Power p</span><b id="powerVal">2.0</b></label>
+          <input id="power" type="range" min="1.2" max="6" step="0.1" value="2">
+        </div>
+        <div class="control">
+          <label for="memory"><span>Memory α</span><b id="memoryVal">0.00</b></label>
+          <input id="memory" type="range" min="-1" max="1" step="0.05" value="0">
+        </div>
+        <div class="control">
+          <label for="escape"><span>Escape radius</span><b id="escapeVal">2.0</b></label>
+          <input id="escape" type="range" min="2" max="8" step="0.25" value="2">
+        </div>
+        <div class="control">
+          <label for="iterations"><span>Iterations</span><b id="iterVal">320</b></label>
+          <input id="iterations" type="range" min="80" max="600" step="20" value="320">
+        </div>
+      </div>
+
+      <div class="toggleRow">
+        <button type="button" class="toggle" id="conjBtn">Conjugate</button>
+        <button type="button" class="toggle" id="absReBtn">|Re|</button>
+        <button type="button" class="toggle" id="absImBtn">|Im|</button>
+      </div>
+
+      <div class="colorRow" id="colorRow">
+        <button type="button" class="colorbtn active" data-color="51001">Smooth</button>
+        <button type="button" class="colorbtn" data-color="51011">Bands</button>
+        <button type="button" class="colorbtn" data-color="51021">Orbit trap</button>
+      </div>
+
+      <div class="forgeFoot">
+        <div class="control">
+          <label for="hue"><span>Palette shift</span><b id="hueVal">0°</b></label>
+          <input id="hue" type="range" min="0" max="360" step="2" value="0">
+        </div>
+        <div class="micro">Fractional powers use the complex polar branch. Strange seams are mathematical, not filters.</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(()=>{
+'use strict';
+const root=document.getElementById('app');
+if(root.dataset.booted==='3416')return;
+root.dataset.booted='3416';
+
+const W=Object.freeze({
+  EXPLORE:11000,PRESETS:12000,FORGE:13000,
+  MANDEL:21001,CUBIC:21003,TRICORN:21011,BURNING:21021,PHOENIX:21031,CUSTOM:21999,
+  DRAFT:31001,REFINE:31011,FINAL:31021,PAUSED:31999,
+  SMOOTH:51001,BANDS:51011,TRAP:51021,
+  T_NONE:61000,T_CONJ:61001,T_ABS_RE:61002,T_ABS_IM:61003,T_ABS_BOTH:61004,
+  T_CONJ_ABS_RE:61005,T_CONJ_ABS_IM:61006,T_ALL:61007
+});
+
+const TRANSFORM=new Map([
+  [W.T_NONE,{conj:0,absRe:0,absIm:0,label:'plain'}],
+  [W.T_CONJ,{conj:1,absRe:0,absIm:0,label:'conjugate'}],
+  [W.T_ABS_RE,{conj:0,absRe:1,absIm:0,label:'|Re|'}],
+  [W.T_ABS_IM,{conj:0,absRe:0,absIm:1,label:'|Im|'}],
+  [W.T_ABS_BOTH,{conj:0,absRe:1,absIm:1,label:'|Re| + |Im|'}],
+  [W.T_CONJ_ABS_RE,{conj:1,absRe:1,absIm:0,label:'conjugate + |Re|'}],
+  [W.T_CONJ_ABS_IM,{conj:1,absRe:0,absIm:1,label:'conjugate + |Im|'}],
+  [W.T_ALL,{conj:1,absRe:1,absIm:1,label:'conjugate + |Re| + |Im|'}]
+]);
+
+const FORMULA=new Map([
+  [W.MANDEL,{name:'Mandelbrot',power:2,memory:0,transformW:W.T_NONE,homeX:-.6,homeY:0,homeScale:3.25,short:'z² + c'}],
+  [W.CUBIC,{name:'Cubic Multibrot',power:3,memory:0,transformW:W.T_NONE,homeX:0,homeY:0,homeScale:3.2,short:'z³ + c'}],
+  [W.TRICORN,{name:'Tricorn',power:2,memory:0,transformW:W.T_CONJ,homeX:0,homeY:0,homeScale:3.45,short:'conj(z)² + c'}],
+  [W.BURNING,{name:'Burning Ship',power:2,memory:0,transformW:W.T_ABS_BOTH,homeX:-.5,homeY:-.5,homeScale:3.2,short:'(|Re| + i|Im|)² + c'}],
+  [W.PHOENIX,{name:'Phoenix Memory',power:2,memory:-.5,transformW:W.T_NONE,homeX:-.45,homeY:0,homeScale:3.4,short:'z² + c − 0.5·prev'}]
+]);
+
+const COLOR=new Map([
+  [W.SMOOTH,{name:'Smooth'}],
+  [W.BANDS,{name:'Bands'}],
+  [W.TRAP,{name:'Orbit trap'}]
+]);
+
+const RENDER=new Map([
+  [W.DRAFT,{name:'Draft',dpr:.48,iterScale:.34,minIter:52}],
+  [W.REFINE,{name:'Refine',dpr:.74,iterScale:.68,minIter:96}],
+  [W.FINAL,{name:'Final',dpr:1.15,iterScale:1,minIter:120}]
+]);
+
+const $=id=>document.getElementById(id);
+const canvas=$('fractal'),ctx=canvas.getContext('2d',{alpha:false});
+const stage=$('stage');
+const ui={
+  travelW:$('travelW'),formulaW:$('formulaW'),renderW:$('renderW'),colorW:$('colorW'),
+  title:$('formulaTitle'),coords:$('coords'),status:$('status'),exploreName:$('exploreName'),
+  zoomLabel:$('zoomLabel'),equation:$('equation'),customBadge:$('customBadge'),
+  power:$('power'),powerVal:$('powerVal'),memory:$('memory'),memoryVal:$('memoryVal'),
+  escape:$('escape'),escapeVal:$('escapeVal'),iterations:$('iterations'),iterVal:$('iterVal'),
+  hue:$('hue'),hueVal:$('hueVal'),conj:$('conjBtn'),absRe:$('absReBtn'),absIm:$('absImBtn')
+};
+
+const S={
+  travelW:W.EXPLORE,formulaW:W.MANDEL,renderW:W.DRAFT,colorW:W.SMOOTH,
+  custom:{name:'Custom',power:2,memory:0,transformW:W.T_NONE,homeX:-.6,homeY:0,homeScale:3.25,short:'custom law'},
+  centerX:-.6,centerY:0,scale:3.25,escapeRadius:2,iterations:320,hue:0,
+  epoch:0,rendering:0,pointers:new Map(),gesture:null,lastPreview:0,settleTimer:0
+};
+
+function activeLaw(){return S.formulaW===W.CUSTOM?S.custom:FORMULA.get(S.formulaW)}
+function transformFor(w){return TRANSFORM.get(w)||TRANSFORM.get(W.T_NONE)}
+function transformAddress(conj,absRe,absIm){
+  for(const [w,t] of TRANSFORM)if(t.conj===conj&&t.absRe===absRe&&t.absIm===absIm)return w;
+  return W.T_NONE;
+}
+function fmt(v,d=6){return Number(v).toFixed(d).replace('-0.000000','0.000000')}
+function zoomFactor(){const h=activeLaw();return Math.max(1e-12,h.homeScale/S.scale)}
+
+function syncHud(){
+  const law=activeLaw(),t=transformFor(law.transformW);
+  ui.travelW.textContent='W'+S.travelW;
+  ui.formulaW.textContent='W'+S.formulaW;
+  ui.renderW.textContent='W'+S.renderW;
+  ui.colorW.textContent='W'+S.colorW;
+  ui.title.textContent=law.name+' · '+law.short;
+  ui.exploreName.textContent=law.name;
+  ui.coords.textContent=fmt(S.centerX)+(S.centerY>=0?' + ':' − ')+fmt(Math.abs(S.centerY))+'i';
+  ui.zoomLabel.textContent=zoomFactor().toFixed(zoomFactor()<100?2:0)+'× · '+S.iterations+' iterations';
+  ui.power.value=law.power;ui.powerVal.textContent=Number(law.power).toFixed(1);
+  ui.memory.value=law.memory;ui.memoryVal.textContent=Number(law.memory).toFixed(2);
+  ui.escape.value=S.escapeRadius;ui.escapeVal.textContent=Number(S.escapeRadius).toFixed(S.escapeRadius%1?2:1);
+  ui.iterations.value=S.iterations;ui.iterVal.textContent=S.iterations;
+  ui.hue.value=S.hue;ui.hueVal.textContent=Math.round(S.hue)+'°';
+  ui.conj.classList.toggle('active',!!t.conj);
+  ui.absRe.classList.toggle('active',!!t.absRe);
+  ui.absIm.classList.toggle('active',!!t.absIm);
+  ui.equation.textContent=equationText(law,t);
+  ui.customBadge.textContent=S.formulaW===W.CUSTOM?'custom W21999':'preset law';
+  document.querySelectorAll('[data-formula]').forEach(b=>b.classList.toggle('active',Number(b.dataset.formula)===S.formulaW));
+  document.querySelectorAll('[data-color]').forEach(b=>b.classList.toggle('active',Number(b.dataset.color)===S.colorW));
+}
+
+function equationText(law,t){
+  let z='z';
+  if(t.absRe||t.absIm){
+    const r=t.absRe?'|Re|':'Re',i=t.absIm?'|Im|':'Im';
+    z='('+r+' + i'+i+')';
+  }
+  if(t.conj)z='conj('+z+')';
+  let q='z ← '+z+'^'+Number(law.power).toFixed(law.power%1?1:0)+' + c';
+  if(Math.abs(law.memory)>.0001)q+=' '+(law.memory>=0?'+ ':'− ')+Math.abs(law.memory).toFixed(2)+'·prev';
+  return q;
+}
+
+function setBusy(label,busy){
+  ui.status.textContent=label;
+  ui.status.dataset.busy=busy?'1':'0';
+}
+function setRenderW(w,label){
+  S.renderW=w;
+  ui.renderW.textContent='W'+w;
+  setBusy(label,w!==W.FINAL);
+}
+
+function insideStandard(cr,ci){
+  const y2=ci*ci,x=cr-.25,q=x*x+y2;
+  if(q*(q+x)<=.25*y2)return 1;
+  const xp=cr+1;
+  return xp*xp+y2<=.0625?1:0;
+}
+
+function complexPower(x,y,p){
+  if(Math.abs(p-2)<1e-9)return[x*x-y*y,2*x*y];
+  if(Math.abs(p-3)<1e-9)return[x*(x*x-3*y*y),y*(3*x*x-y*y)];
+  const r=Math.hypot(x,y);
+  if(r===0)return[0,0];
+  const a=Math.atan2(y,x)*p,rp=Math.pow(r,p);
+  return[rp*Math.cos(a),rp*Math.sin(a)];
+}
+
+function iterate(cr,ci,maxIter,law){
+  const t=transformFor(law.transformW);
+  if(S.formulaW===W.MANDEL&&S.escapeRadius>=2&&insideStandard(cr,ci))return{i:maxIter,x:0,y:0,trap:1};
+  let x=0,y=0,px=0,py=0,trap=99,i=0;
+  const escape2=S.escapeRadius*S.escapeRadius;
+  for(;i<maxIter;i++){
+    let tx=t.absRe?Math.abs(x):x,ty=t.absIm?Math.abs(y):y;
+    if(t.conj)ty=-ty;
+    const p=complexPower(tx,ty,law.power);
+    const nx=p[0]+cr+law.memory*px,ny=p[1]+ci+law.memory*py;
+    px=x;py=y;x=nx;y=ny;
+    const mag2=x*x+y*y;
+    const ring=Math.abs(Math.sqrt(mag2)-.72);
+    const axes=Math.min(Math.abs(x),Math.abs(y));
+    trap=Math.min(trap,ring,axes*.85);
+    if(mag2>escape2)break;
+    if(!Number.isFinite(mag2)){i=0;break}
+  }
+  return{i,x,y,trap};
+}
+
+function byte(v){return Math.max(0,Math.min(255,v|0))}
+function colorPixel(res,maxIter,power){
+  if(res.i>=maxIter)return[2,4,7];
+  const phase=S.hue*Math.PI/180;
+  if(S.colorW===W.BANDS){
+    const t=(res.i%36)/36*6.283+phase;
+    return[byte(55+195*(.5+.5*Math.sin(t))),byte(40+175*(.5+.5*Math.sin(t+2.05))),byte(50+195*(.5+.5*Math.sin(t+4.1)))];
+  }
+  if(S.colorW===W.TRAP){
+    const q=Math.max(0,Math.min(1,1-res.trap*6));
+    const t=q*8+res.i*.025+phase;
+    return[byte(28+220*q*(.55+.45*Math.sin(t))),byte(25+205*q*(.55+.45*Math.sin(t+2.1))),byte(38+210*q*(.55+.45*Math.sin(t+4.2)))];
+  }
+  const mag=Math.max(S.escapeRadius+1e-6,Math.hypot(res.x,res.y));
+  const denom=Math.log(Math.max(1.05,Math.abs(power)));
+  let smooth=res.i+1;
+  if(Number.isFinite(mag)&&denom>.01)smooth=res.i+1-Math.log(Math.max(.0001,Math.log(mag)))/denom;
+  const t=smooth*.17+phase;
+  return[byte(30+215*(.5+.5*Math.sin(t))),byte(22+190*(.5+.5*Math.sin(t+2.05))),byte(36+215*(.5+.5*Math.sin(t+4.1)))];
+}
+
+function renderStage(phaseW,epoch){
+  return new Promise(resolve=>{
+    if(epoch!==S.epoch){resolve(0);return}
+    const spec=RENDER.get(phaseW),rect=canvas.getBoundingClientRect();
+    if(rect.width<2||rect.height<2){resolve(0);return}
+    const device=Math.min(window.devicePixelRatio||1,1.35);
+    const dpr=Math.min(device,spec.dpr);
+    const w=Math.max(180,Math.min(760,Math.round(rect.width*dpr)));
+    const h=Math.max(150,Math.min(920,Math.round(rect.height*dpr)));
+    const work=document.createElement('canvas'),wc=work.getContext('2d',{alpha:false});
+    work.width=w;work.height=h;
+    const image=wc.createImageData(w,h),data=image.data;
+    const law=Object.assign({},activeLaw());
+    const maxIter=Math.max(spec.minIter,Math.round(S.iterations*spec.iterScale));
+    const aspect=w/h,spanX=S.scale,spanY=S.scale/aspect;
+    const cx=S.centerX,cy=S.centerY;
+    let y=0;
+
+    setRenderW(phaseW,RENDER.get(phaseW).name+'…');
+
+    function chunk(){
+      if(epoch!==S.epoch){resolve(0);return}
+      const start=performance.now();
+      while(y<h&&performance.now()-start<7){
+        const ci=cy+(y/(h-1)-.5)*spanY;
+        for(let x=0;x<w;x++){
+          const cr=cx+(x/(w-1)-.5)*spanX;
+          const res=iterate(cr,ci,maxIter,law),rgb=colorPixel(res,maxIter,law.power),k=(y*w+x)*4;
+          data[k]=rgb[0];data[k+1]=rgb[1];data[k+2]=rgb[2];data[k+3]=255;
+        }
+        y++;
+      }
+      if(y<h){requestAnimationFrame(chunk);return}
+      if(epoch!==S.epoch){resolve(0);return}
+      wc.putImageData(image,0,0);
+      canvas.width=w;canvas.height=h;
+      ctx.imageSmoothingEnabled=true;
+      ctx.drawImage(work,0,0,w,h);
+      resolve(1);
+    }
+    requestAnimationFrame(chunk);
+  });
+}
+
+async function renderPipeline(finalize){
+  const epoch=++S.epoch;
+  S.rendering=1;
+  const ok=await renderStage(W.DRAFT,epoch);
+  if(!ok||epoch!==S.epoch)return;
+  if(!finalize){S.rendering=0;setBusy('Preview',0);return}
+  if(!(await renderStage(W.REFINE,epoch))||epoch!==S.epoch)return;
+  if(!(await renderStage(W.FINAL,epoch))||epoch!==S.epoch)return;
+  S.rendering=0;
+  setBusy('Final',0);
+  syncHud();
+}
+
+function requestPreview(){
+  const now=performance.now();
+  if(now-S.lastPreview<78)return;
+  S.lastPreview=now;
+  renderPipeline(0);
+}
+function requestFinal(delay=30){
+  clearTimeout(S.settleTimer);
+  S.settleTimer=setTimeout(()=>renderPipeline(1),delay);
+}
+
+function resetHome(){
+  const h=activeLaw();
+  S.centerX=h.homeX;S.centerY=h.homeY;S.scale=h.homeScale;
+  syncHud();requestFinal(10);
+}
+
+function selectFormula(w){
+  if(w===W.CUSTOM){
+    if(S.formulaW!==W.CUSTOM){
+      const a=activeLaw();
+      S.custom={name:'Custom',power:a.power,memory:a.memory,transformW:a.transformW,homeX:S.centerX,homeY:S.centerY,homeScale:S.scale,short:'custom law'};
+    }
+    S.formulaW=W.CUSTOM;
+  }else{
+    S.formulaW=w;
+    const h=activeLaw();
+    S.centerX=h.homeX;S.centerY=h.homeY;S.scale=h.homeScale;
+  }
+  syncHud();requestFinal(5);
+}
+
+function ensureCustom(){
+  if(S.formulaW===W.CUSTOM)return S.custom;
+  const a=activeLaw();
+  S.custom={name:'Custom',power:a.power,memory:a.memory,transformW:a.transformW,homeX:S.centerX,homeY:S.centerY,homeScale:S.scale,short:'custom law'};
+  S.formulaW=W.CUSTOM;
+  return S.custom;
+}
+
+function setTravel(w){
+  S.travelW=w;
+  document.querySelectorAll('[data-travel]').forEach(b=>b.classList.toggle('active',Number(b.dataset.travel)===w));
+  document.querySelectorAll('[data-panel]').forEach(p=>p.classList.toggle('active',Number(p.dataset.panel)===w));
+  syncHud();
+  requestAnimationFrame(()=>requestFinal(20));
+}
+
+function setColor(w){
+  S.colorW=w;syncHud();requestFinal(5);
+}
+function cycleColor(){
+  const order=[W.SMOOTH,W.BANDS,W.TRAP],i=order.indexOf(S.colorW);
+  setColor(order[(i+1)%order.length]);
+}
+
+function toggleTransform(part){
+  const law=ensureCustom(),t=transformFor(law.transformW);
+  let c=t.conj,r=t.absRe,i=t.absIm;
+  if(part==='conj')c=c?0:1;
+  if(part==='re')r=r?0:1;
+  if(part==='im')i=i?0:1;
+  law.transformW=transformAddress(c,r,i);
+  syncHud();requestFinal(5);
+}
+
+function changeFormulaNumber(key,value){
+  const law=ensureCustom();
+  law[key]=value;
+  syncHud();requestFinal(20);
+}
+
+function zoomAt(factor,screenX,screenY){
+  const rect=canvas.getBoundingClientRect(),aspect=rect.width/rect.height;
+  const nx=(screenX==null?.5:screenX/rect.width),ny=(screenY==null?.5:screenY/rect.height);
+  const worldX=S.centerX+(nx-.5)*S.scale;
+  const worldY=S.centerY+(ny-.5)*(S.scale/aspect);
+  const next=Math.max(1e-12,Math.min(12,S.scale*factor));
+  S.centerX=worldX-(nx-.5)*next;
+  S.centerY=worldY-(ny-.5)*(next/aspect);
+  S.scale=next;syncHud();requestFinal(10);
+}
+
+function pointerPos(e){
+  const r=canvas.getBoundingClientRect();
+  return{x:e.clientX-r.left,y:e.clientY-r.top};
+}
+function worldAt(x,y,cx,cy,scale){
+  const r=canvas.getBoundingClientRect(),aspect=r.width/r.height;
+  return{x:cx+(x/r.width-.5)*scale,y:cy+(y/r.height-.5)*(scale/aspect)};
+}
+function beginSingle(p){
+  S.gesture={kind:'pan',id:p.id,startX:p.x,startY:p.y,cx:S.centerX,cy:S.centerY,scale:S.scale};
+}
+function beginPinch(){
+  const pts=[...S.pointers.values()];
+  if(pts.length<2)return;
+  const a=pts[0],b=pts[1],mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dist=Math.max(8,Math.hypot(a.x-b.x,a.y-b.y));
+  const world=worldAt(mx,my,S.centerX,S.centerY,S.scale);
+  S.gesture={kind:'pinch',dist,scale:S.scale,worldX:world.x,worldY:world.y};
+}
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  const p=pointerPos(e);p.id=e.pointerId;S.pointers.set(e.pointerId,p);
+  canvas.setPointerCapture?.(e.pointerId);
+  if(S.pointers.size===1)beginSingle(p);else beginPinch();
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!S.pointers.has(e.pointerId))return;
+  e.preventDefault();
+  const p=pointerPos(e);p.id=e.pointerId;S.pointers.set(e.pointerId,p);
+  const rect=canvas.getBoundingClientRect(),aspect=rect.width/rect.height;
+  if(S.pointers.size>=2){
+    if(!S.gesture||S.gesture.kind!=='pinch')beginPinch();
+    const pts=[...S.pointers.values()],a=pts[0],b=pts[1],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    const dist=Math.max(8,Math.hypot(a.x-b.x,a.y-b.y));
+    const next=Math.max(1e-12,Math.min(12,S.gesture.scale*S.gesture.dist/dist));
+    S.centerX=S.gesture.worldX-(mx/rect.width-.5)*next;
+    S.centerY=S.gesture.worldY-(my/rect.height-.5)*(next/aspect);
+    S.scale=next;
+  }else if(S.gesture&&S.gesture.kind==='pan'){
+    const only=[...S.pointers.values()][0];
+    const dx=only.x-S.gesture.startX,dy=only.y-S.gesture.startY;
+    S.centerX=S.gesture.cx-dx/rect.width*S.gesture.scale;
+    S.centerY=S.gesture.cy-dy/rect.height*(S.gesture.scale/aspect);
+  }
+  syncHud();requestPreview();
+});
+function endPointer(e){
+  if(S.pointers.has(e.pointerId))S.pointers.delete(e.pointerId);
+  if(S.pointers.size===1){
+    const p=[...S.pointers.values()][0];beginSingle(p);
+  }else if(S.pointers.size===0){
+    S.gesture=null;requestFinal(35);
+  }else beginPinch();
+}
+canvas.addEventListener('pointerup',endPointer);
+canvas.addEventListener('pointercancel',endPointer);
+
+document.querySelectorAll('[data-travel]').forEach(b=>b.addEventListener('click',()=>setTravel(Number(b.dataset.travel))));
+document.querySelectorAll('[data-formula]').forEach(b=>b.addEventListener('click',()=>selectFormula(Number(b.dataset.formula))));
+document.querySelectorAll('[data-color]').forEach(b=>b.addEventListener('click',()=>setColor(Number(b.dataset.color))));
+$('homeBtn').addEventListener('click',resetHome);
+$('cycleColorBtn').addEventListener('click',cycleColor);
+$('zoomIn').addEventListener('click',()=>zoomAt(.68));
+$('zoomOut').addEventListener('click',()=>zoomAt(1.47));
+ui.conj.addEventListener('click',()=>toggleTransform('conj'));
+ui.absRe.addEventListener('click',()=>toggleTransform('re'));
+ui.absIm.addEventListener('click',()=>toggleTransform('im'));
+ui.power.addEventListener('input',e=>changeFormulaNumber('power',Number(e.target.value)));
+ui.memory.addEventListener('input',e=>changeFormulaNumber('memory',Number(e.target.value)));
+ui.escape.addEventListener('input',e=>{S.escapeRadius=Number(e.target.value);syncHud();requestFinal(45)});
+ui.iterations.addEventListener('input',e=>{S.iterations=Number(e.target.value);syncHud();requestFinal(45)});
+ui.hue.addEventListener('input',e=>{S.hue=Number(e.target.value);syncHud();requestFinal(45)});
+
+let resizeTimer=0;
+function onResize(){clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>requestFinal(10),90)}
+window.addEventListener('resize',onResize,{passive:true});
+if(window.visualViewport)window.visualViewport.addEventListener('resize',onResize,{passive:true});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){S.epoch++;S.renderW=W.PAUSED;syncHud();setBusy('Paused',0)}
+  else requestFinal(20);
+});
+
+syncHud();
+requestFinal(5);
+})();
+</script>
+</body>
+</html>
