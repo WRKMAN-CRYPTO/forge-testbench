@@ -761,7 +761,7 @@ function endPointer(e){
   if(g&&g.kind==='pick'&&g.id===e.pointerId){
     if(S.pointers.has(e.pointerId))S.pointers.delete(e.pointerId);
     S.gesture=null;
-    if(!g.moved&&S.toolW===W.TOOL_JULIA_PICK){
+    if(e.type!=='pointercancel'&&!g.moved&&S.toolW===W.TOOL_JULIA_PICK){
       const point=worldAt(g.x,g.y,S.centerX,S.centerY,S.scale);
       createJuliaFromPoint(point);
     }else{
