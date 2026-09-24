@@ -345,9 +345,12 @@ function setBusy(label,busy){
   ui.status.dataset.busy=busy?'1':'0';
 }
 function archiveItemValid(x){
-  return !!x&&Number.isFinite(x.id)&&Number.isFinite(x.formulaW)&&Number.isFinite(x.centerX)&&Number.isFinite(x.centerY)&&Number.isFinite(x.scale)&&x.scale>0&&
-    Number.isFinite(x.escapeRadius)&&Number.isFinite(x.iterations)&&Number.isFinite(x.hue)&&Number.isFinite(x.colorW)&&
-    !!x.law&&Number.isFinite(x.law.power)&&Number.isFinite(x.law.memory)&&Number.isFinite(x.law.transformW)&&typeof x.thumb==='string';
+  const formulaOK=!!x&&(FORMULA.has(x.formulaW)||x.formulaW===W.CUSTOM),colorOK=!!x&&COLOR.has(x.colorW);
+  const law=x?.law,lawOK=!!law&&Number.isFinite(law.power)&&Number.isFinite(law.memory)&&TRANSFORM.has(law.transformW)&&
+    Number.isFinite(law.homeX)&&Number.isFinite(law.homeY)&&Number.isFinite(law.homeScale)&&law.homeScale>0;
+  const thumbOK=typeof x?.thumb==='string'&&x.thumb.startsWith('data:image/jpeg;base64,');
+  return formulaOK&&colorOK&&lawOK&&thumbOK&&Number.isFinite(x.id)&&x.id>0&&Number.isFinite(x.centerX)&&Number.isFinite(x.centerY)&&
+    Number.isFinite(x.scale)&&x.scale>0&&Number.isFinite(x.escapeRadius)&&x.escapeRadius>=2&&Number.isFinite(x.iterations)&&x.iterations>0&&Number.isFinite(x.hue);
 }
 function readArchive(){
   const raw=localStorage.getItem(ARCHIVE_KEY);
