@@ -55,6 +55,24 @@ canvas{display:block;width:100%;height:100%;touch-action:none;background:#020407
 .panel{display:none;padding-top:8px}
 .panel.active{display:block}
 .exploreRow{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:7px}
+.captureRow{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}
+.archiveBackdrop{position:fixed;inset:0;z-index:20;background:#0008;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.archiveSheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:760px;margin:0 auto;max-height:min(58dvh,560px);overflow:auto;padding:10px 10px max(12px,env(safe-area-inset-bottom));background:#081019fa;border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;box-shadow:0 -18px 50px #0009;transform:translateY(105%);transition:transform .2s ease}
+.archiveSheet.open{transform:translateY(0)}
+.archiveHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.archiveHead div{min-width:0}
+.archiveHead b{display:block;font-size:13px;letter-spacing:.1em}
+.archiveHead span{display:block;margin-top:2px;font-size:9px;color:var(--muted)}
+.archiveClose{width:42px;height:42px;flex:0 0 auto;border:1px solid var(--line);border-radius:50%;background:#111923;color:#fff;font-size:23px}
+.archiveGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.captureCard{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:#0b131b;min-width:0}
+.captureRecall{display:block;width:100%;border:0;padding:0;background:transparent;color:inherit;text-align:left}
+.captureRecall img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:#020407}
+.captureMeta{display:block;padding:7px 8px}
+.captureMeta b{display:block;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.captureMeta small{display:block;margin-top:3px;font-size:8px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.captureDelete{position:absolute;right:6px;top:6px;width:30px;height:30px;border:1px solid #ffffff33;border-radius:50%;background:#02070bdd;color:#fff;font-size:18px}
+.archiveEmpty{grid-column:1/-1;padding:24px 12px;text-align:center;color:var(--muted);font-size:11px;border:1px dashed var(--line);border-radius:12px}
 .readout{
   min-width:0;border:1px solid var(--line);border-radius:11px;background:#080e14;padding:7px 9px;
 }
@@ -131,6 +149,10 @@ input[type=range]{width:100%;height:24px;margin:0;accent-color:var(--accent)}
         <button type="button" class="smallbtn" id="homeBtn">Home</button>
         <button type="button" class="smallbtn" id="cycleColorBtn">Color</button>
       </div>
+      <div class="captureRow">
+        <button type="button" class="smallbtn" id="captureBtn">Capture</button>
+        <button type="button" class="smallbtn" id="recallBtn">Recall <span id="recallCount">0</span></button>
+      </div>
     </div>
 
     <div class="panel" data-panel="12000">
@@ -190,6 +212,15 @@ input[type=range]{width:100%;height:24px;margin:0;accent-color:var(--accent)}
       </div>
     </div>
   </section>
+
+  <div class="archiveBackdrop" id="archiveBackdrop" hidden></div>
+  <section class="archiveSheet" id="archiveSheet" aria-hidden="true" aria-label="Captured fractals">
+    <div class="archiveHead">
+      <div><b>RECALL</b><span id="archiveStatus">Captured mathematical specimens</span></div>
+      <button type="button" class="archiveClose" id="archiveClose" aria-label="Close recall">×</button>
+    </div>
+    <div class="archiveGrid" id="archiveGrid"></div>
+  </section>
 </main>
 
 <script>
@@ -205,7 +236,8 @@ const W=Object.freeze({
   DRAFT:31001,REFINE:31011,FINAL:31021,PAUSED:31999,
   SMOOTH:51001,BANDS:51011,TRAP:51021,
   T_NONE:61000,T_CONJ:61001,T_ABS_RE:61002,T_ABS_IM:61003,T_ABS_BOTH:61004,
-  T_CONJ_ABS_RE:61005,T_CONJ_ABS_IM:61006,T_ALL:61007
+  T_CONJ_ABS_RE:61005,T_CONJ_ABS_IM:61006,T_ALL:61007,
+  ARCHIVE_CLOSED:71000,ARCHIVE_OPEN:71001
 });
 
 const TRANSFORM=new Map([
@@ -248,15 +280,20 @@ const ui={
   zoomLabel:$('zoomLabel'),equation:$('equation'),customBadge:$('customBadge'),
   power:$('power'),powerVal:$('powerVal'),memory:$('memory'),memoryVal:$('memoryVal'),
   escape:$('escape'),escapeVal:$('escapeVal'),iterations:$('iterations'),iterVal:$('iterVal'),
-  hue:$('hue'),hueVal:$('hueVal'),conj:$('conjBtn'),absRe:$('absReBtn'),absIm:$('absImBtn')
+  hue:$('hue'),hueVal:$('hueVal'),conj:$('conjBtn'),absRe:$('absReBtn'),absIm:$('absImBtn'),
+  recallCount:$('recallCount'),archiveBackdrop:$('archiveBackdrop'),archiveSheet:$('archiveSheet'),
+  archiveGrid:$('archiveGrid'),archiveStatus:$('archiveStatus')
 };
 
 const S={
   travelW:W.EXPLORE,formulaW:W.MANDEL,renderW:W.DRAFT,colorW:W.SMOOTH,
   custom:{name:'Custom',power:2,memory:0,transformW:W.T_NONE,homeX:-.6,homeY:0,homeScale:3.25,short:'custom law'},
   centerX:-.6,centerY:0,scale:3.25,escapeRadius:2,iterations:320,hue:0,
+  archiveW:W.ARCHIVE_CLOSED,
   epoch:0,rendering:0,pointers:new Map(),gesture:null,lastPreview:0,settleTimer:0
 };
+
+const ARCHIVE_KEY='mandel-w-captures-v1',ARCHIVE_VERSION=1,ARCHIVE_MAX=24;
 
 function activeLaw(){return S.formulaW===W.CUSTOM?S.custom:FORMULA.get(S.formulaW)}
 function transformFor(w){return TRANSFORM.get(w)||TRANSFORM.get(W.T_NONE)}
@@ -306,6 +343,99 @@ function equationText(law,t){
 function setBusy(label,busy){
   ui.status.textContent=label;
   ui.status.dataset.busy=busy?'1':'0';
+}
+function archiveItemValid(x){
+  return !!x&&Number.isFinite(x.id)&&Number.isFinite(x.formulaW)&&Number.isFinite(x.centerX)&&Number.isFinite(x.centerY)&&Number.isFinite(x.scale)&&x.scale>0&&
+    Number.isFinite(x.escapeRadius)&&Number.isFinite(x.iterations)&&Number.isFinite(x.hue)&&Number.isFinite(x.colorW)&&
+    !!x.law&&Number.isFinite(x.law.power)&&Number.isFinite(x.law.memory)&&Number.isFinite(x.law.transformW)&&typeof x.thumb==='string';
+}
+function readArchive(){
+  const raw=localStorage.getItem(ARCHIVE_KEY);
+  if(raw===null)return{ok:1,items:[]};
+  try{
+    const box=JSON.parse(raw);
+    if(!box||box.v!==ARCHIVE_VERSION||!Array.isArray(box.items)||!box.items.every(archiveItemValid))return{ok:0,items:[]};
+    return{ok:1,items:box.items};
+  }catch{return{ok:0,items:[]}}
+}
+function writeArchive(items){
+  try{
+    localStorage.setItem(ARCHIVE_KEY,JSON.stringify({v:ARCHIVE_VERSION,items}));
+    return 1;
+  }catch{return 0}
+}
+function thumb(){
+  const t=document.createElement('canvas'),tc=t.getContext('2d',{alpha:false});
+  t.width=176;t.height=110;
+  try{tc.drawImage(canvas,0,0,t.width,t.height)}catch{return''}
+  try{return t.toDataURL('image/jpeg',.64)}catch{return''}
+}
+function archiveZoom(item){return Math.max(1e-12,item.law.homeScale/item.scale)}
+function renderArchive(){
+  const box=readArchive();
+  if(!box.ok){
+    ui.recallCount.textContent='!';
+    ui.archiveStatus.textContent='Saved data is unreadable. It has not been overwritten.';
+    ui.archiveGrid.innerHTML='<div class="archiveEmpty">Recall storage could not be safely read. Existing data was left untouched.</div>';
+    return 0;
+  }
+  ui.recallCount.textContent=box.items.length;
+  ui.archiveStatus.textContent=box.items.length+'/'+ARCHIVE_MAX+' captured specimens';
+  if(!box.items.length){
+    ui.archiveGrid.innerHTML='<div class="archiveEmpty">Nothing captured yet. Find something strange and pin it here.</div>';
+    return 1;
+  }
+  ui.archiveGrid.innerHTML=box.items.slice().reverse().map((x,revIndex)=>{
+    const n=box.items.length-revIndex;
+    const z=archiveZoom(x),zoom=z<1000?z.toFixed(z<10?2:0):z.toExponential(1);
+    const title=(x.law.name||'Specimen').replace(/[<>&"]/g,'');
+    return '<article class="captureCard" data-id="'+x.id+'"><button class="captureRecall" type="button"><img src="'+x.thumb+'" alt=""><span class="captureMeta"><b>#'+String(n).padStart(2,'0')+' '+title+'</b><small>'+zoom+'× · W'+x.formulaW+' · color W'+x.colorW+'</small></span></button><button class="captureDelete" type="button" aria-label="Delete capture">×</button></article>';
+  }).join('');
+  return 1;
+}
+function captureCurrent(){
+  const box=readArchive();
+  if(!box.ok){setBusy('Recall data unreadable',0);return}
+  if(box.items.length>=ARCHIVE_MAX){setBusy('Recall full',0);return}
+  const law=Object.assign({},activeLaw()),image=thumb();
+  if(!image){setBusy('Capture failed',0);return}
+  box.items.push({
+    id:Date.now(),formulaW:S.formulaW,law,centerX:S.centerX,centerY:S.centerY,scale:S.scale,
+    escapeRadius:S.escapeRadius,iterations:S.iterations,hue:S.hue,colorW:S.colorW,thumb:image
+  });
+  if(!writeArchive(box.items)){setBusy('Capture not saved',0);return}
+  renderArchive();
+  setBusy('Captured #'+box.items.length,0);
+  navigator.vibrate?.(14);
+}
+function recallItem(item){
+  if(!archiveItemValid(item))return;
+  S.formulaW=FORMULA.has(item.formulaW)?item.formulaW:W.CUSTOM;
+  if(S.formulaW===W.CUSTOM)S.custom=Object.assign({name:'Custom',short:'custom law'},item.law);
+  else{
+    const canonical=FORMULA.get(S.formulaW);
+    if(!canonical||canonical.power!==item.law.power||canonical.memory!==item.law.memory||canonical.transformW!==item.law.transformW){
+      S.formulaW=W.CUSTOM;S.custom=Object.assign({name:'Custom',short:'custom law'},item.law);
+    }
+  }
+  S.centerX=item.centerX;S.centerY=item.centerY;S.scale=item.scale;
+  S.escapeRadius=item.escapeRadius;S.iterations=item.iterations;S.hue=item.hue;
+  S.colorW=COLOR.has(item.colorW)?item.colorW:W.SMOOTH;
+  closeArchive();
+  syncHud();requestFinal(5);setBusy('Recalled',0);
+}
+function openArchive(){
+  S.archiveW=W.ARCHIVE_OPEN;
+  renderArchive();
+  ui.archiveBackdrop.hidden=false;
+  ui.archiveSheet.setAttribute('aria-hidden','false');
+  requestAnimationFrame(()=>ui.archiveSheet.classList.add('open'));
+}
+function closeArchive(){
+  S.archiveW=W.ARCHIVE_CLOSED;
+  ui.archiveSheet.classList.remove('open');
+  ui.archiveSheet.setAttribute('aria-hidden','true');
+  setTimeout(()=>{if(S.archiveW===W.ARCHIVE_CLOSED)ui.archiveBackdrop.hidden=true},210);
 }
 function setRenderW(w,label){
   S.renderW=w;
@@ -574,6 +704,22 @@ document.querySelectorAll('[data-formula]').forEach(b=>b.addEventListener('click
 document.querySelectorAll('[data-color]').forEach(b=>b.addEventListener('click',()=>setColor(Number(b.dataset.color))));
 $('homeBtn').addEventListener('click',resetHome);
 $('cycleColorBtn').addEventListener('click',cycleColor);
+$('captureBtn').addEventListener('click',captureCurrent);
+$('recallBtn').addEventListener('click',openArchive);
+$('archiveClose').addEventListener('click',closeArchive);
+ui.archiveBackdrop.addEventListener('click',closeArchive);
+ui.archiveGrid.addEventListener('click',e=>{
+  const card=e.target.closest('.captureCard');if(!card)return;
+  const box=readArchive();if(!box.ok)return;
+  const id=Number(card.dataset.id),item=box.items.find(x=>x.id===id);if(!item)return;
+  if(e.target.closest('.captureDelete')){
+    if(!confirm('Delete this captured specimen?'))return;
+    const next=box.items.filter(x=>x.id!==id);
+    if(!writeArchive(next)){setBusy('Delete failed',0);return}
+    renderArchive();setBusy('Capture deleted',0);return;
+  }
+  if(e.target.closest('.captureRecall'))recallItem(item);
+});
 $('zoomIn').addEventListener('click',()=>zoomAt(.68));
 $('zoomOut').addEventListener('click',()=>zoomAt(1.47));
 ui.conj.addEventListener('click',()=>toggleTransform('conj'));
@@ -595,6 +741,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 syncHud();
+renderArchive();
 requestFinal(5);
 })();
 </script>
