@@ -916,8 +916,8 @@ ui.absRe.addEventListener('click',()=>toggleTransform('re'));
 ui.absIm.addEventListener('click',()=>toggleTransform('im'));
 ui.power.addEventListener('input',e=>changeFormulaNumber('power',Number(e.target.value)));
 ui.memory.addEventListener('input',e=>changeFormulaNumber('memory',Number(e.target.value)));
-ui.escape.addEventListener('input',e=>{clearOrbit();S.escapeRadius=Number(e.target.value);syncHud();requestFinal(45)});
-ui.iterations.addEventListener('input',e=>{clearOrbit();S.iterations=Number(e.target.value);syncHud();requestFinal(45)});
+ui.escape.addEventListener('input',e=>{const value=Number(e.target.value);clearOrbit();S.escapeRadius=value;syncHud();requestFinal(45)});
+ui.iterations.addEventListener('input',e=>{const value=Number(e.target.value);clearOrbit();S.iterations=value;syncHud();requestFinal(45)});
 ui.hue.addEventListener('input',e=>{S.hue=Number(e.target.value);syncHud();requestFinal(45)});
 
 let resizeTimer=0;
