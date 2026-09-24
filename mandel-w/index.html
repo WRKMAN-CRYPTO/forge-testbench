@@ -51,11 +51,11 @@ canvas{display:block;width:100%;height:100%;touch-action:none;background:#020407
 .tab,.preset,.smallbtn,.colorbtn{
   min-height:42px;border:1px solid var(--line);border-radius:11px;background:#111923;color:var(--text);font-weight:750;
 }
-.tab.active,.preset.active,.colorbtn.active{background:var(--accent2);border-color:#3b7454;color:#d5f6df}
+.tab.active,.preset.active,.colorbtn.active,.smallbtn.active{background:var(--accent2);border-color:#3b7454;color:#d5f6df}
 .panel{display:none;padding-top:8px}
 .panel.active{display:block}
 .exploreRow{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:7px}
-.captureRow{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}
+.captureRow{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:7px}
 .archiveBackdrop{position:fixed;inset:0;z-index:20;background:#0008;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
 .archiveSheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:760px;margin:0 auto;max-height:min(58dvh,560px);overflow:auto;padding:10px 10px max(12px,env(safe-area-inset-bottom));background:#081019fa;border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;box-shadow:0 -18px 50px #0009;transform:translateY(105%);transition:transform .2s ease}
 .archiveSheet.open{transform:translateY(0)}
@@ -152,6 +152,7 @@ input[type=range]{width:100%;height:24px;margin:0;accent-color:var(--accent)}
       <div class="captureRow">
         <button type="button" class="smallbtn" id="captureBtn">Capture</button>
         <button type="button" class="smallbtn" id="recallBtn">Recall <span id="recallCount">0</span></button>
+        <button type="button" class="smallbtn" id="juliaBtn">Julia</button>
       </div>
     </div>
 
@@ -232,12 +233,13 @@ root.dataset.booted='3416';
 
 const W=Object.freeze({
   EXPLORE:11000,PRESETS:12000,FORGE:13000,
-  MANDEL:21001,CUBIC:21003,TRICORN:21011,BURNING:21021,PHOENIX:21031,CUSTOM:21999,
+  MANDEL:21001,CUBIC:21003,TRICORN:21011,BURNING:21021,PHOENIX:21031,JULIA:21041,CUSTOM:21999,
   DRAFT:31001,REFINE:31011,FINAL:31021,PAUSED:31999,
   SMOOTH:51001,BANDS:51011,TRAP:51021,
   T_NONE:61000,T_CONJ:61001,T_ABS_RE:61002,T_ABS_IM:61003,T_ABS_BOTH:61004,
   T_CONJ_ABS_RE:61005,T_CONJ_ABS_IM:61006,T_ALL:61007,
-  ARCHIVE_CLOSED:71000,ARCHIVE_OPEN:71001
+  ARCHIVE_CLOSED:71000,ARCHIVE_OPEN:71001,
+  TOOL_ROAM:72000,TOOL_JULIA_PICK:72001
 });
 
 const TRANSFORM=new Map([
@@ -256,7 +258,8 @@ const FORMULA=new Map([
   [W.CUBIC,{name:'Cubic Multibrot',power:3,memory:0,transformW:W.T_NONE,homeX:0,homeY:0,homeScale:3.2,short:'z³ + c'}],
   [W.TRICORN,{name:'Tricorn',power:2,memory:0,transformW:W.T_CONJ,homeX:0,homeY:0,homeScale:3.45,short:'conj(z)² + c'}],
   [W.BURNING,{name:'Burning Ship',power:2,memory:0,transformW:W.T_ABS_BOTH,homeX:-.5,homeY:-.5,homeScale:3.2,short:'(|Re| + i|Im|)² + c'}],
-  [W.PHOENIX,{name:'Phoenix Memory',power:2,memory:-.5,transformW:W.T_NONE,homeX:-.45,homeY:0,homeScale:3.4,short:'z² + c − 0.5·prev'}]
+  [W.PHOENIX,{name:'Phoenix Memory',power:2,memory:-.5,transformW:W.T_NONE,homeX:-.45,homeY:0,homeScale:3.4,short:'z² + c − 0.5·prev'}],
+  [W.JULIA,{name:'Julia',power:2,memory:0,transformW:W.T_NONE,homeX:0,homeY:0,homeScale:3.2,short:'fixed c',kind:'julia',juliaCr:-.8,juliaCi:.156}]
 ]);
 
 const COLOR=new Map([
@@ -282,20 +285,22 @@ const ui={
   escape:$('escape'),escapeVal:$('escapeVal'),iterations:$('iterations'),iterVal:$('iterVal'),
   hue:$('hue'),hueVal:$('hueVal'),conj:$('conjBtn'),absRe:$('absReBtn'),absIm:$('absImBtn'),
   recallCount:$('recallCount'),archiveBackdrop:$('archiveBackdrop'),archiveSheet:$('archiveSheet'),
-  archiveGrid:$('archiveGrid'),archiveStatus:$('archiveStatus')
+  archiveGrid:$('archiveGrid'),archiveStatus:$('archiveStatus'),juliaBtn:$('juliaBtn')
 };
 
 const S={
   travelW:W.EXPLORE,formulaW:W.MANDEL,renderW:W.DRAFT,colorW:W.SMOOTH,
   custom:{name:'Custom',power:2,memory:0,transformW:W.T_NONE,homeX:-.6,homeY:0,homeScale:3.25,short:'custom law'},
+  julia:{name:'Julia',power:2,memory:0,transformW:W.T_NONE,homeX:0,homeY:0,homeScale:3.2,short:'fixed c',kind:'julia',juliaCr:-.8,juliaCi:.156},
+  parentView:null,
   centerX:-.6,centerY:0,scale:3.25,escapeRadius:2,iterations:320,hue:0,
-  archiveW:W.ARCHIVE_CLOSED,
+  archiveW:W.ARCHIVE_CLOSED,toolW:W.TOOL_ROAM,
   epoch:0,rendering:0,pointers:new Map(),gesture:null,lastPreview:0,settleTimer:0
 };
 
 const ARCHIVE_KEY='mandel-w-captures-v1',ARCHIVE_VERSION=1,ARCHIVE_MAX=24;
 
-function activeLaw(){return S.formulaW===W.CUSTOM?S.custom:FORMULA.get(S.formulaW)}
+function activeLaw(){return S.formulaW===W.CUSTOM?S.custom:S.formulaW===W.JULIA?S.julia:FORMULA.get(S.formulaW)}
 function transformFor(w){return TRANSFORM.get(w)||TRANSFORM.get(W.T_NONE)}
 function transformAddress(conj,absRe,absIm){
   for(const [w,t] of TRANSFORM)if(t.conj===conj&&t.absRe===absRe&&t.absIm===absIm)return w;
@@ -323,7 +328,9 @@ function syncHud(){
   ui.absRe.classList.toggle('active',!!t.absRe);
   ui.absIm.classList.toggle('active',!!t.absIm);
   ui.equation.textContent=equationText(law,t);
-  ui.customBadge.textContent=S.formulaW===W.CUSTOM?'custom W21999':'preset law';
+  ui.customBadge.textContent=S.formulaW===W.CUSTOM?'custom W21999':S.formulaW===W.JULIA?'julia W21041':'preset law';
+  ui.juliaBtn.textContent=S.formulaW===W.JULIA?(S.parentView?'Parent':'Julia'):S.toolW===W.TOOL_JULIA_PICK?'Tap fractal':'Julia';
+  ui.juliaBtn.classList.toggle('active',S.toolW===W.TOOL_JULIA_PICK||S.formulaW===W.JULIA);
   document.querySelectorAll('[data-formula]').forEach(b=>b.classList.toggle('active',Number(b.dataset.formula)===S.formulaW));
   document.querySelectorAll('[data-color]').forEach(b=>b.classList.toggle('active',Number(b.dataset.color)===S.colorW));
 }
@@ -335,7 +342,10 @@ function equationText(law,t){
     z='('+r+' + i'+i+')';
   }
   if(t.conj)z='conj('+z+')';
-  let q='z ← '+z+'^'+Number(law.power).toFixed(law.power%1?1:0)+' + c';
+  const cTerm=law.kind==='julia'
+    ? '('+fmt(law.juliaCr,4)+(law.juliaCi>=0?' + ':' − ')+fmt(Math.abs(law.juliaCi),4)+'i)'
+    : 'c';
+  let q='z ← '+z+'^'+Number(law.power).toFixed(law.power%1?1:0)+' + '+cTerm;
   if(Math.abs(law.memory)>.0001)q+=' '+(law.memory>=0?'+ ':'− ')+Math.abs(law.memory).toFixed(2)+'·prev';
   return q;
 }
@@ -346,8 +356,10 @@ function setBusy(label,busy){
 }
 function archiveItemValid(x){
   const formulaOK=!!x&&(FORMULA.has(x.formulaW)||x.formulaW===W.CUSTOM),colorOK=!!x&&COLOR.has(x.colorW);
-  const law=x?.law,lawOK=!!law&&Number.isFinite(law.power)&&Number.isFinite(law.memory)&&TRANSFORM.has(law.transformW)&&
+  const law=x?.law,baseLawOK=!!law&&Number.isFinite(law.power)&&Number.isFinite(law.memory)&&TRANSFORM.has(law.transformW)&&
     Number.isFinite(law.homeX)&&Number.isFinite(law.homeY)&&Number.isFinite(law.homeScale)&&law.homeScale>0;
+  const juliaOK=x?.formulaW!==W.JULIA||(law?.kind==='julia'&&Number.isFinite(law.juliaCr)&&Number.isFinite(law.juliaCi));
+  const lawOK=baseLawOK&&juliaOK;
   const thumbOK=typeof x?.thumb==='string'&&x.thumb.startsWith('data:image/jpeg;base64,');
   return formulaOK&&colorOK&&lawOK&&thumbOK&&Number.isFinite(x.id)&&x.id>0&&Number.isFinite(x.centerX)&&Number.isFinite(x.centerY)&&
     Number.isFinite(x.scale)&&x.scale>0&&Number.isFinite(x.escapeRadius)&&x.escapeRadius>=2&&Number.isFinite(x.iterations)&&x.iterations>0&&Number.isFinite(x.hue);
@@ -413,12 +425,17 @@ function captureCurrent(){
 }
 function recallItem(item){
   if(!archiveItemValid(item))return;
-  S.formulaW=FORMULA.has(item.formulaW)?item.formulaW:W.CUSTOM;
-  if(S.formulaW===W.CUSTOM)S.custom=Object.assign({name:'Custom',short:'custom law'},item.law);
-  else{
-    const canonical=FORMULA.get(S.formulaW);
-    if(!canonical||canonical.power!==item.law.power||canonical.memory!==item.law.memory||canonical.transformW!==item.law.transformW){
-      S.formulaW=W.CUSTOM;S.custom=Object.assign({name:'Custom',short:'custom law'},item.law);
+  S.parentView=null;S.toolW=W.TOOL_ROAM;
+  if(item.formulaW===W.JULIA){
+    S.formulaW=W.JULIA;S.julia=Object.assign({name:'Julia',short:'fixed c',kind:'julia'},item.law);
+  }else{
+    S.formulaW=FORMULA.has(item.formulaW)?item.formulaW:W.CUSTOM;
+    if(S.formulaW===W.CUSTOM)S.custom=Object.assign({name:'Custom',short:'custom law'},item.law);
+    else{
+      const canonical=FORMULA.get(S.formulaW);
+      if(!canonical||canonical.power!==item.law.power||canonical.memory!==item.law.memory||canonical.transformW!==item.law.transformW){
+        S.formulaW=W.CUSTOM;S.custom=Object.assign({name:'Custom',short:'custom law'},item.law);
+      }
     }
   }
   S.centerX=item.centerX;S.centerY=item.centerY;S.scale=item.scale;
@@ -462,10 +479,11 @@ function complexPower(x,y,p){
   return[rp*Math.cos(a),rp*Math.sin(a)];
 }
 
-function iterate(cr,ci,maxIter,law){
-  const t=transformFor(law.transformW);
-  if(S.formulaW===W.MANDEL&&S.escapeRadius>=2&&insideStandard(cr,ci))return{i:maxIter,x:0,y:0,trap:1};
-  let x=0,y=0,px=0,py=0,trap=99,i=0;
+function iterate(sampleRe,sampleIm,maxIter,law){
+  const t=transformFor(law.transformW),isJulia=law.kind==='julia';
+  const cr=isJulia?law.juliaCr:sampleRe,ci=isJulia?law.juliaCi:sampleIm;
+  if(!isJulia&&S.formulaW===W.MANDEL&&S.escapeRadius>=2&&insideStandard(cr,ci))return{i:maxIter,x:0,y:0,trap:1};
+  let x=isJulia?sampleRe:0,y=isJulia?sampleIm:0,px=0,py=0,trap=99,i=0;
   const escape2=S.escapeRadius*S.escapeRadius;
   for(;i<maxIter;i++){
     let tx=t.absRe?Math.abs(x):x,ty=t.absIm?Math.abs(y):y;
@@ -579,6 +597,7 @@ function resetHome(){
 }
 
 function selectFormula(w){
+  S.toolW=W.TOOL_ROAM;S.parentView=null;
   if(w===W.CUSTOM){
     if(S.formulaW!==W.CUSTOM){
       const a=activeLaw();
@@ -593,7 +612,43 @@ function selectFormula(w){
   syncHud();requestFinal(5);
 }
 
+function snapshotView(){
+  return{
+    formulaW:S.formulaW,law:Object.assign({},activeLaw()),centerX:S.centerX,centerY:S.centerY,scale:S.scale,
+    escapeRadius:S.escapeRadius,iterations:S.iterations,hue:S.hue,colorW:S.colorW
+  };
+}
+function applySnapshot(v){
+  if(!v)return;
+  if(v.formulaW===W.JULIA){S.formulaW=W.JULIA;S.julia=Object.assign({},v.law)}
+  else if(v.formulaW===W.CUSTOM){S.formulaW=W.CUSTOM;S.custom=Object.assign({},v.law)}
+  else{S.formulaW=v.formulaW}
+  S.centerX=v.centerX;S.centerY=v.centerY;S.scale=v.scale;
+  S.escapeRadius=v.escapeRadius;S.iterations=v.iterations;S.hue=v.hue;S.colorW=v.colorW;
+}
+function beginJuliaPick(){
+  if(S.formulaW===W.JULIA){
+    if(!S.parentView){setBusy('Parent view unavailable',0);return}
+    const parent=S.parentView;S.parentView=null;S.toolW=W.TOOL_ROAM;applySnapshot(parent);
+    syncHud();requestFinal(5);setBusy('Parent restored',0);return;
+  }
+  S.epoch++;S.rendering=0;S.toolW=S.toolW===W.TOOL_JULIA_PICK?W.TOOL_ROAM:W.TOOL_JULIA_PICK;
+  S.gesture=null;S.pointers.clear();syncHud();
+  setBusy(S.toolW===W.TOOL_JULIA_PICK?'Tap a point for Julia':'Final',0);
+}
+function createJuliaFromPoint(point){
+  const parent=snapshotView(),source=activeLaw();
+  S.parentView=parent;S.toolW=W.TOOL_ROAM;
+  S.julia={
+    name:'Julia',power:source.power,memory:source.memory,transformW:source.transformW,
+    homeX:0,homeY:0,homeScale:3.2,short:'c '+fmt(point.x,4)+(point.y>=0?' + ':' − ')+fmt(Math.abs(point.y),4)+'i',
+    kind:'julia',juliaCr:point.x,juliaCi:point.y
+  };
+  S.formulaW=W.JULIA;S.centerX=0;S.centerY=0;S.scale=3.2;
+  syncHud();requestFinal(5);setBusy('Julia born',0);
+}
 function ensureCustom(){
+  if(S.formulaW===W.JULIA)return S.julia;
   if(S.formulaW===W.CUSTOM)return S.custom;
   const a=activeLaw();
   S.custom={name:'Custom',power:a.power,memory:a.memory,transformW:a.transformW,homeX:S.centerX,homeY:S.centerY,homeScale:S.scale,short:'custom law'};
@@ -668,6 +723,11 @@ canvas.addEventListener('pointerdown',e=>{
   e.preventDefault();
   const p=pointerPos(e);p.id=e.pointerId;S.pointers.set(e.pointerId,p);
   canvas.setPointerCapture?.(e.pointerId);
+  if(S.toolW===W.TOOL_JULIA_PICK&&S.pointers.size===1){
+    S.gesture={kind:'pick',id:p.id,startX:p.x,startY:p.y,x:p.x,y:p.y,moved:0};
+    return;
+  }
+  if(S.toolW===W.TOOL_JULIA_PICK&&S.pointers.size>1)S.toolW=W.TOOL_ROAM;
   if(S.pointers.size===1)beginSingle(p);else beginPinch();
 });
 canvas.addEventListener('pointermove',e=>{
@@ -675,6 +735,11 @@ canvas.addEventListener('pointermove',e=>{
   e.preventDefault();
   const p=pointerPos(e);p.id=e.pointerId;S.pointers.set(e.pointerId,p);
   const rect=canvas.getBoundingClientRect(),aspect=rect.width/rect.height;
+  if(S.gesture&&S.gesture.kind==='pick'){
+    S.gesture.x=p.x;S.gesture.y=p.y;
+    if(Math.hypot(p.x-S.gesture.startX,p.y-S.gesture.startY)>10)S.gesture.moved=1;
+    return;
+  }
   if(S.pointers.size>=2){
     if(!S.gesture||S.gesture.kind!=='pinch')beginPinch();
     const pts=[...S.pointers.values()],a=pts[0],b=pts[1],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
@@ -692,6 +757,18 @@ canvas.addEventListener('pointermove',e=>{
   syncHud();requestPreview();
 });
 function endPointer(e){
+  const g=S.gesture;
+  if(g&&g.kind==='pick'&&g.id===e.pointerId){
+    if(S.pointers.has(e.pointerId))S.pointers.delete(e.pointerId);
+    S.gesture=null;
+    if(!g.moved&&S.toolW===W.TOOL_JULIA_PICK){
+      const point=worldAt(g.x,g.y,S.centerX,S.centerY,S.scale);
+      createJuliaFromPoint(point);
+    }else{
+      S.toolW=W.TOOL_ROAM;syncHud();setBusy('Julia pick cancelled',0);
+    }
+    return;
+  }
   if(S.pointers.has(e.pointerId))S.pointers.delete(e.pointerId);
   if(S.pointers.size===1){
     const p=[...S.pointers.values()][0];beginSingle(p);
@@ -709,6 +786,7 @@ $('homeBtn').addEventListener('click',resetHome);
 $('cycleColorBtn').addEventListener('click',cycleColor);
 $('captureBtn').addEventListener('click',captureCurrent);
 $('recallBtn').addEventListener('click',openArchive);
+ui.juliaBtn.addEventListener('click',beginJuliaPick);
 $('archiveClose').addEventListener('click',closeArchive);
 ui.archiveBackdrop.addEventListener('click',closeArchive);
 ui.archiveGrid.addEventListener('click',e=>{
