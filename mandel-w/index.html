@@ -55,7 +55,10 @@ canvas{display:block;width:100%;height:100%;touch-action:none;background:#020407
 .panel{display:none;padding-top:8px}
 .panel.active{display:block}
 .exploreRow{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:7px}
-.captureRow{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:7px}
+.captureRow{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:7px}
+#orbitOverlay{position:absolute;inset:0;z-index:2;width:100%;height:100%;pointer-events:none;background:transparent}
+.stageHud{z-index:4}
+.zoomers{z-index:5}
 .archiveBackdrop{position:fixed;inset:0;z-index:20;background:#0008;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
 .archiveSheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:760px;margin:0 auto;max-height:min(58dvh,560px);overflow:auto;padding:10px 10px max(12px,env(safe-area-inset-bottom));background:#081019fa;border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;box-shadow:0 -18px 50px #0009;transform:translateY(105%);transition:transform .2s ease}
 .archiveSheet.open{transform:translateY(0)}
@@ -123,6 +126,7 @@ input[type=range]{width:100%;height:24px;margin:0;accent-color:var(--accent)}
 
   <section class="stage" id="stage">
     <canvas id="fractal" aria-label="Interactive fractal viewport. Drag to pan and pinch to zoom."></canvas>
+    <canvas id="orbitOverlay" aria-hidden="true"></canvas>
     <div class="stageHud">
       <span id="coords">−0.600000 + 0.000000i</span>
       <span id="status" data-busy="1">Drafting…</span>
@@ -153,6 +157,7 @@ input[type=range]{width:100%;height:24px;margin:0;accent-color:var(--accent)}
         <button type="button" class="smallbtn" id="captureBtn">Capture</button>
         <button type="button" class="smallbtn" id="recallBtn">Recall <span id="recallCount">0</span></button>
         <button type="button" class="smallbtn" id="juliaBtn">Julia</button>
+        <button type="button" class="smallbtn" id="orbitBtn">Orbit</button>
       </div>
     </div>
 
@@ -239,7 +244,8 @@ const W=Object.freeze({
   T_NONE:61000,T_CONJ:61001,T_ABS_RE:61002,T_ABS_IM:61003,T_ABS_BOTH:61004,
   T_CONJ_ABS_RE:61005,T_CONJ_ABS_IM:61006,T_ALL:61007,
   ARCHIVE_CLOSED:71000,ARCHIVE_OPEN:71001,
-  TOOL_ROAM:72000,TOOL_JULIA_PICK:72001
+  TOOL_ROAM:72000,TOOL_JULIA_PICK:72001,TOOL_ORBIT_PICK:72002,
+  INSPECT_NONE:73000,INSPECT_ORBIT:73001
 });
 
 const TRANSFORM=new Map([
@@ -276,6 +282,7 @@ const RENDER=new Map([
 
 const $=id=>document.getElementById(id);
 const canvas=$('fractal'),ctx=canvas.getContext('2d',{alpha:false});
+const orbitCanvas=$('orbitOverlay'),orbitCtx=orbitCanvas.getContext('2d');
 const stage=$('stage');
 const ui={
   travelW:$('travelW'),formulaW:$('formulaW'),renderW:$('renderW'),colorW:$('colorW'),
@@ -285,7 +292,7 @@ const ui={
   escape:$('escape'),escapeVal:$('escapeVal'),iterations:$('iterations'),iterVal:$('iterVal'),
   hue:$('hue'),hueVal:$('hueVal'),conj:$('conjBtn'),absRe:$('absReBtn'),absIm:$('absImBtn'),
   recallCount:$('recallCount'),archiveBackdrop:$('archiveBackdrop'),archiveSheet:$('archiveSheet'),
-  archiveGrid:$('archiveGrid'),archiveStatus:$('archiveStatus'),juliaBtn:$('juliaBtn')
+  archiveGrid:$('archiveGrid'),archiveStatus:$('archiveStatus'),juliaBtn:$('juliaBtn'),orbitBtn:$('orbitBtn')
 };
 
 const S={
@@ -294,7 +301,7 @@ const S={
   julia:{name:'Julia',power:2,memory:0,transformW:W.T_NONE,homeX:0,homeY:0,homeScale:3.2,short:'fixed c',kind:'julia',juliaCr:-.8,juliaCi:.156},
   parentView:null,
   centerX:-.6,centerY:0,scale:3.25,escapeRadius:2,iterations:320,hue:0,
-  archiveW:W.ARCHIVE_CLOSED,toolW:W.TOOL_ROAM,
+  archiveW:W.ARCHIVE_CLOSED,toolW:W.TOOL_ROAM,inspectW:W.INSPECT_NONE,orbit:null,orbitRAF:0,
   epoch:0,rendering:0,pointers:new Map(),gesture:null,lastPreview:0,settleTimer:0
 };
 
@@ -331,6 +338,8 @@ function syncHud(){
   ui.customBadge.textContent=S.formulaW===W.CUSTOM?'custom W21999':S.formulaW===W.JULIA?'julia W21041':'preset law';
   ui.juliaBtn.textContent=S.formulaW===W.JULIA?(S.parentView?'Parent':'Julia'):S.toolW===W.TOOL_JULIA_PICK?'Tap fractal':'Julia';
   ui.juliaBtn.classList.toggle('active',S.toolW===W.TOOL_JULIA_PICK||S.formulaW===W.JULIA);
+  ui.orbitBtn.textContent=S.toolW===W.TOOL_ORBIT_PICK?'Tap fractal':'Orbit';
+  ui.orbitBtn.classList.toggle('active',S.toolW===W.TOOL_ORBIT_PICK||S.inspectW===W.INSPECT_ORBIT);
   document.querySelectorAll('[data-formula]').forEach(b=>b.classList.toggle('active',Number(b.dataset.formula)===S.formulaW));
   document.querySelectorAll('[data-color]').forEach(b=>b.classList.toggle('active',Number(b.dataset.color)===S.colorW));
 }
@@ -425,7 +434,7 @@ function captureCurrent(){
 }
 function recallItem(item){
   if(!archiveItemValid(item))return;
-  S.parentView=null;S.toolW=W.TOOL_ROAM;
+  clearOrbit();S.parentView=null;S.toolW=W.TOOL_ROAM;
   if(item.formulaW===W.JULIA){
     S.formulaW=W.JULIA;S.julia=Object.assign({name:'Julia',short:'fixed c',kind:'julia'},item.law);
   }else{
@@ -461,6 +470,88 @@ function setRenderW(w,label){
   S.renderW=w;
   ui.renderW.textContent='W'+w;
   setBusy(label,w!==W.FINAL);
+}
+function fitOrbitCanvas(){
+  const r=canvas.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,2);
+  const w=Math.max(1,Math.round(r.width*d)),h=Math.max(1,Math.round(r.height*d));
+  if(orbitCanvas.width!==w||orbitCanvas.height!==h){orbitCanvas.width=w;orbitCanvas.height=h}
+  orbitCtx.setTransform(d,0,0,d,0,0);
+  orbitCtx.lineCap='round';orbitCtx.lineJoin='round';
+  return{r,d};
+}
+function clearOrbit(){
+  if(S.orbitRAF)cancelAnimationFrame(S.orbitRAF);
+  S.orbitRAF=0;S.orbit=null;S.inspectW=W.INSPECT_NONE;
+  const r=orbitCanvas.getBoundingClientRect();
+  orbitCtx.setTransform(1,0,0,1,0,0);
+  orbitCtx.clearRect(0,0,orbitCanvas.width||Math.ceil(r.width),orbitCanvas.height||Math.ceil(r.height));
+  syncHud();
+}
+function orbitScreen(wx,wy,rect){
+  const aspect=rect.width/rect.height;
+  return{x:(wx-S.centerX)/S.scale*rect.width+rect.width*.5,y:(wy-S.centerY)/(S.scale/aspect)*rect.height+rect.height*.5};
+}
+function computeOrbit(sampleRe,sampleIm){
+  const law=Object.assign({},activeLaw()),t=transformFor(law.transformW),isJulia=law.kind==='julia';
+  const cr=isJulia?law.juliaCr:sampleRe,ci=isJulia?law.juliaCi:sampleIm;
+  let x=isJulia?sampleRe:0,y=isJulia?sampleIm:0,px=0,py=0;
+  const points=[{x,y}],escape2=S.escapeRadius*S.escapeRadius,limit=Math.min(Math.max(1,S.iterations),128);
+  let escaped=0,invalid=0;
+  for(let i=0;i<limit;i++){
+    let tx=t.absRe?Math.abs(x):x,ty=t.absIm?Math.abs(y):y;
+    if(t.conj)ty=-ty;
+    const p=complexPower(tx,ty,law.power);
+    const nx=p[0]+cr+law.memory*px,ny=p[1]+ci+law.memory*py;
+    px=x;py=y;x=nx;y=ny;
+    if(!Number.isFinite(x)||!Number.isFinite(y)){invalid=1;break}
+    points.push({x,y});
+    if(x*x+y*y>escape2){escaped=1;break}
+  }
+  return{sample:{x:sampleRe,y:sampleIm},points,escaped,invalid,limit,law};
+}
+function drawOrbitFrame(count){
+  if(!S.orbit)return;
+  const {r}=fitOrbitCanvas(),o=S.orbit,n=Math.max(1,Math.min(count,o.points.length));
+  orbitCtx.clearRect(0,0,r.width,r.height);
+  const sample=orbitScreen(o.sample.x,o.sample.y,r);
+  orbitCtx.strokeStyle='rgba(255,255,255,.9)';orbitCtx.lineWidth=1.5;
+  orbitCtx.beginPath();orbitCtx.arc(sample.x,sample.y,6,0,Math.PI*2);orbitCtx.stroke();
+  if(n>1){
+    orbitCtx.strokeStyle='rgba(117,221,161,.9)';orbitCtx.lineWidth=1.8;
+    orbitCtx.beginPath();
+    for(let i=0;i<n;i++){
+      const p=orbitScreen(o.points[i].x,o.points[i].y,r);
+      if(i===0)orbitCtx.moveTo(p.x,p.y);else orbitCtx.lineTo(p.x,p.y);
+    }
+    orbitCtx.stroke();
+  }
+  for(let i=0;i<n;i++){
+    const p=orbitScreen(o.points[i].x,o.points[i].y,r);
+    orbitCtx.fillStyle=i===n-1?'rgba(255,225,145,.98)':'rgba(235,245,248,.72)';
+    orbitCtx.beginPath();orbitCtx.arc(p.x,p.y,i===n-1?3.4:1.8,0,Math.PI*2);orbitCtx.fill();
+  }
+}
+function animateOrbit(o){
+  if(S.orbitRAF)cancelAnimationFrame(S.orbitRAF);
+  S.orbit=o;S.inspectW=W.INSPECT_ORBIT;syncHud();
+  let shown=1,last=0;
+  const step=now=>{
+    if(S.orbit!==o)return;
+    if(!last)last=now;
+    const add=Math.max(1,Math.floor((now-last)/22));
+    if(add>0){shown=Math.min(o.points.length,shown+add);last=now;drawOrbitFrame(shown)}
+    if(shown<o.points.length)S.orbitRAF=requestAnimationFrame(step);
+    else S.orbitRAF=0;
+  };
+  drawOrbitFrame(1);
+  S.orbitRAF=requestAnimationFrame(step);
+}
+function inspectOrbitAt(point){
+  S.toolW=W.TOOL_ROAM;
+  const o=computeOrbit(point.x,point.y);
+  animateOrbit(o);
+  const steps=Math.max(0,o.points.length-1);
+  setBusy(o.invalid?'Orbit diverged numerically':o.escaped?'Orbit '+steps+' · escaped':'Orbit '+steps+' · no escape yet',0);
 }
 
 function insideStandard(cr,ci){
@@ -591,13 +682,14 @@ function requestFinal(delay=30){
 }
 
 function resetHome(){
+  clearOrbit();
   const h=activeLaw();
   S.centerX=h.homeX;S.centerY=h.homeY;S.scale=h.homeScale;
   syncHud();requestFinal(10);
 }
 
 function selectFormula(w){
-  S.toolW=W.TOOL_ROAM;S.parentView=null;
+  clearOrbit();S.toolW=W.TOOL_ROAM;S.parentView=null;
   if(w===W.CUSTOM){
     if(S.formulaW!==W.CUSTOM){
       const a=activeLaw();
@@ -627,6 +719,7 @@ function applySnapshot(v){
   S.escapeRadius=v.escapeRadius;S.iterations=v.iterations;S.hue=v.hue;S.colorW=v.colorW;
 }
 function beginJuliaPick(){
+  clearOrbit();
   if(S.formulaW===W.JULIA){
     if(!S.parentView){setBusy('Parent view unavailable',0);return}
     const parent=S.parentView;S.parentView=null;S.toolW=W.TOOL_ROAM;applySnapshot(parent);
@@ -637,6 +730,7 @@ function beginJuliaPick(){
   setBusy(S.toolW===W.TOOL_JULIA_PICK?'Tap a point for Julia':'Final',0);
 }
 function createJuliaFromPoint(point){
+  clearOrbit();
   const parent=snapshotView(),source=activeLaw();
   S.parentView=parent;S.toolW=W.TOOL_ROAM;
   S.julia={
@@ -646,6 +740,12 @@ function createJuliaFromPoint(point){
   };
   S.formulaW=W.JULIA;S.centerX=0;S.centerY=0;S.scale=3.2;
   syncHud();requestFinal(5);setBusy('Julia born',0);
+}
+function beginOrbitPick(){
+  if(S.toolW===W.TOOL_ORBIT_PICK){
+    S.toolW=W.TOOL_ROAM;syncHud();setBusy(S.inspectW===W.INSPECT_ORBIT?'Orbit held':'Final',0);return;
+  }
+  S.toolW=W.TOOL_ORBIT_PICK;S.gesture=null;S.pointers.clear();syncHud();setBusy('Tap a point for orbit',0);
 }
 function ensureCustom(){
   if(S.formulaW===W.JULIA)return S.julia;
@@ -673,6 +773,7 @@ function cycleColor(){
 }
 
 function toggleTransform(part){
+  clearOrbit();
   const law=ensureCustom(),t=transformFor(law.transformW);
   let c=t.conj,r=t.absRe,i=t.absIm;
   if(part==='conj')c=c?0:1;
@@ -683,12 +784,14 @@ function toggleTransform(part){
 }
 
 function changeFormulaNumber(key,value){
+  clearOrbit();
   const law=ensureCustom();
   law[key]=value;
   syncHud();requestFinal(20);
 }
 
 function zoomAt(factor,screenX,screenY){
+  clearOrbit();
   const rect=canvas.getBoundingClientRect(),aspect=rect.width/rect.height;
   const nx=(screenX==null?.5:screenX/rect.width),ny=(screenY==null?.5:screenY/rect.height);
   const worldX=S.centerX+(nx-.5)*S.scale;
@@ -723,11 +826,14 @@ canvas.addEventListener('pointerdown',e=>{
   e.preventDefault();
   const p=pointerPos(e);p.id=e.pointerId;S.pointers.set(e.pointerId,p);
   canvas.setPointerCapture?.(e.pointerId);
-  if(S.toolW===W.TOOL_JULIA_PICK&&S.pointers.size===1){
-    S.gesture={kind:'pick',id:p.id,startX:p.x,startY:p.y,x:p.x,y:p.y,moved:0};
+  if((S.toolW===W.TOOL_JULIA_PICK||S.toolW===W.TOOL_ORBIT_PICK)&&S.pointers.size===1){
+    S.gesture={kind:'pick',toolW:S.toolW,id:p.id,startX:p.x,startY:p.y,x:p.x,y:p.y,moved:0};
     return;
   }
-  if(S.toolW===W.TOOL_JULIA_PICK&&S.pointers.size>1)S.toolW=W.TOOL_ROAM;
+  if((S.toolW===W.TOOL_JULIA_PICK||S.toolW===W.TOOL_ORBIT_PICK)&&S.pointers.size>1){
+    S.toolW=W.TOOL_ROAM;syncHud();setBusy('Pick cancelled',0);
+  }
+  clearOrbit();
   if(S.pointers.size===1)beginSingle(p);else beginPinch();
 });
 canvas.addEventListener('pointermove',e=>{
@@ -761,11 +867,12 @@ function endPointer(e){
   if(g&&g.kind==='pick'&&g.id===e.pointerId){
     if(S.pointers.has(e.pointerId))S.pointers.delete(e.pointerId);
     S.gesture=null;
-    if(e.type!=='pointercancel'&&!g.moved&&S.toolW===W.TOOL_JULIA_PICK){
+    if(e.type!=='pointercancel'&&!g.moved&&S.toolW===g.toolW){
       const point=worldAt(g.x,g.y,S.centerX,S.centerY,S.scale);
-      createJuliaFromPoint(point);
+      if(g.toolW===W.TOOL_JULIA_PICK)createJuliaFromPoint(point);
+      else if(g.toolW===W.TOOL_ORBIT_PICK)inspectOrbitAt(point);
     }else{
-      S.toolW=W.TOOL_ROAM;syncHud();setBusy('Julia pick cancelled',0);
+      S.toolW=W.TOOL_ROAM;syncHud();setBusy('Pick cancelled',0);
     }
     return;
   }
@@ -787,6 +894,7 @@ $('cycleColorBtn').addEventListener('click',cycleColor);
 $('captureBtn').addEventListener('click',captureCurrent);
 $('recallBtn').addEventListener('click',openArchive);
 ui.juliaBtn.addEventListener('click',beginJuliaPick);
+ui.orbitBtn.addEventListener('click',beginOrbitPick);
 $('archiveClose').addEventListener('click',closeArchive);
 ui.archiveBackdrop.addEventListener('click',closeArchive);
 ui.archiveGrid.addEventListener('click',e=>{
@@ -808,12 +916,12 @@ ui.absRe.addEventListener('click',()=>toggleTransform('re'));
 ui.absIm.addEventListener('click',()=>toggleTransform('im'));
 ui.power.addEventListener('input',e=>changeFormulaNumber('power',Number(e.target.value)));
 ui.memory.addEventListener('input',e=>changeFormulaNumber('memory',Number(e.target.value)));
-ui.escape.addEventListener('input',e=>{S.escapeRadius=Number(e.target.value);syncHud();requestFinal(45)});
-ui.iterations.addEventListener('input',e=>{S.iterations=Number(e.target.value);syncHud();requestFinal(45)});
+ui.escape.addEventListener('input',e=>{clearOrbit();S.escapeRadius=Number(e.target.value);syncHud();requestFinal(45)});
+ui.iterations.addEventListener('input',e=>{clearOrbit();S.iterations=Number(e.target.value);syncHud();requestFinal(45)});
 ui.hue.addEventListener('input',e=>{S.hue=Number(e.target.value);syncHud();requestFinal(45)});
 
 let resizeTimer=0;
-function onResize(){clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>requestFinal(10),90)}
+function onResize(){clearOrbit();clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>requestFinal(10),90)}
 window.addEventListener('resize',onResize,{passive:true});
 if(window.visualViewport)window.visualViewport.addEventListener('resize',onResize,{passive:true});
 document.addEventListener('visibilitychange',()=>{
