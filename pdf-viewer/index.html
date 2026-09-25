@@ -416,21 +416,25 @@ function movePinch(touches){
  );
  controls();
 }
-async function finishPinch(remainingTouch=null){
+function finishPinch(remainingTouch=null){
  pinch=null;
  flash(zoomLabel());
 
- // Quietly upgrade the navigation bitmap for the new zoom level.
- try{
-  await renderBase(false);
- }catch(e){
-  console.error(e);
- }
+ // Hand the surviving finger to pan immediately. Waiting for the
+ // navigation render here could leave a stale pan state if that finger
+ // was lifted before the render finished.
  if(remainingTouch){
   beginPan(remainingTouch);
- }else{
-  scheduleDetail(25);
  }
+
+ // Upgrade the navigation bitmap without blocking gesture state.
+ renderBase(false)
+  .catch(e=>console.error(e))
+  .finally(()=>{
+   if(!pinch&&!pan&&!inertiaRaf)scheduleDetail(25);
+  });
+
+ if(!remainingTouch)scheduleDetail(25);
 }
 
 stage.addEventListener('touchstart',e=>{
