@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#101317">
+<title>Forge PDF Bench</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#101317;color:#eef2f5;font-family:system-ui,-apple-system,sans-serif}
+body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+#app{height:100%;display:flex;flex-direction:column}
+header{height:54px;flex:none;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#171b20;border-bottom:1px solid #2a3037}
+button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border-radius:9px;min-width:40px;height:38px;padding:0 11px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center}
+.fileBtn{margin-right:auto}.fileBtn input{display:none}button:disabled{opacity:.35}
+#pageInfo{font-variant-numeric:tabular-nums;font-size:13px;min-width:54px;text-align:center}
+#stage{position:relative;flex:1;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:pan-x pan-y pinch-zoom;background:#0c0f12}
+#sheet{min-width:100%;min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:16px}
+canvas{display:block;background:white;box-shadow:0 4px 22px #0008}
+#empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:30px;color:#8f9aa6;pointer-events:none}
+#empty strong{display:block;color:#dce2e8;font-size:20px;margin-bottom:8px}
+#status{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:7px 10px;border-radius:8px;background:#171b20dd;color:#bac4ce;font-size:12px;display:none}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+<label class="fileBtn">Open PDF<input id="file" type="file" accept="application/pdf,.pdf"></label>
+<button id="prev" aria-label="Previous page">‹</button>
+<span id="pageInfo">0 / 0</span>
+<button id="next" aria-label="Next page">›</button>
+<button id="fit">Fit</button>
+<button id="full" aria-label="Fullscreen">⛶</button>
+</header>
+<div id="stage">
+<div id="sheet"><canvas id="pdf"></canvas></div>
+<div id="empty"><div><strong>Forge PDF Bench</strong>Open a PDF to begin.<br>Phase 1: render, page, zoom, pan.</div></div>
+<div id="status"></div>
+</div>
+</div>
+<script type="module">
+import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+
+const $=s=>document.querySelector(s);
+const file=$('#file'), canvas=$('#pdf'), ctx=canvas.getContext('2d',{alpha:false});
+const stage=$('#stage'), sheet=$('#sheet'), empty=$('#empty'), info=$('#pageInfo'), status=$('#status');
+const prev=$('#prev'), next=$('#next'), fit=$('#fit'), full=$('#full');
+let doc=null,pageNum=1,scale=1,baseViewport=null,renderTask=null,fitScale=1;
+
+function flash(msg){status.textContent=msg;status.style.display='block';clearTimeout(flash.t);flash.t=setTimeout(()=>status.style.display='none',1300)}
+function controls(){info.textContent=doc?pageNum+' / '+doc.numPages:'0 / 0';prev.disabled=!doc||pageNum<=1;next.disabled=!doc||pageNum>=doc.numPages;fit.disabled=!doc}
+async function render(){
+ if(!doc)return;
+ if(renderTask){try{renderTask.cancel()}catch{}}
+ const page=await doc.getPage(pageNum);
+ const raw=page.getViewport({scale:1});
+ const available=Math.max(120,stage.clientWidth-32);
+ fitScale=available/raw.width;
+ const viewport=page.getViewport({scale});
+ baseViewport=raw;
+ const dpr=Math.min(devicePixelRatio||1,2.5);
+ canvas.width=Math.floor(viewport.width*dpr);canvas.height=Math.floor(viewport.height*dpr);
+ canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';
+ renderTask=page.render({canvasContext:ctx,viewport,transform:[dpr,0,0,dpr,0,0]});
+ try{await renderTask.promise}catch(e){if(e?.name!=='RenderingCancelledException')throw e}
+ controls();
+}
+async function fitPage(){if(!doc)return;const p=await doc.getPage(pageNum);const v=p.getViewport({scale:1});scale=Math.max(.1,(stage.clientWidth-32)/v.width);await render();stage.scrollTo(0,0);flash('Fit '+Math.round(scale*100)+'%')}
+file.addEventListener('change',async()=>{
+ const f=file.files[0];if(!f)return;
+ try{
+  flash('Loading…');
+  const data=new Uint8Array(await f.arrayBuffer());
+  doc=await pdfjsLib.getDocument({data}).promise;pageNum=1;empty.style.display='none';
+  await fitPage();flash(f.name);
+ }catch(e){console.error(e);flash('Could not open PDF')}
+});
+prev.onclick=async()=>{if(pageNum>1){pageNum--;await fitPage()}};
+next.onclick=async()=>{if(doc&&pageNum<doc.numPages){pageNum++;await fitPage()}};
+fit.onclick=fitPage;
+full.onclick=async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen()}catch{flash('Fullscreen unavailable')}};
+window.addEventListener('resize',()=>{if(doc)fitPage()});
+
+// App-level two-finger pinch. Keeps the PDF sharp by rerendering after gesture.
+let pinch=null;
+const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+stage.addEventListener('touchstart',e=>{if(doc&&e.touches.length===2)pinch={d:dist(e.touches),s:scale}}, {passive:true});
+stage.addEventListener('touchmove',e=>{
+ if(!pinch||e.touches.length!==2)return;
+ e.preventDefault();
+ const candidate=pinch.s*(dist(e.touches)/pinch.d);
+ scale=Math.min(6,Math.max(.15,candidate));
+ const w=baseViewport.width*scale,h=baseViewport.height*scale;
+ canvas.style.width=w+'px';canvas.style.height=h+'px';
+}, {passive:false});
+stage.addEventListener('touchend',e=>{if(pinch&&e.touches.length<2){pinch=null;render();flash(Math.round(scale*100)+'%')}},{passive:true});
+controls();
+</script>
+</body>
+</html>
