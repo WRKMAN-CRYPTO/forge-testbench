@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#101317">
-<title>Forge PDF Bench</title>
+<title>Forge Blueprint Engine</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:#101317;color:#eef2f5;font-family:system-ui,-apple-system,sans-serif}
@@ -17,9 +17,10 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
 #fit{min-width:54px;font-variant-numeric:tabular-nums}
 #stage{position:relative;flex:1;overflow:auto;-webkit-overflow-scrolling:auto;overscroll-behavior:none;touch-action:none;background:#0c0f12;user-select:none;-webkit-user-select:none}
 #sheet{position:relative;min-width:100%;min-height:100%;padding:16px}
-#canvasWrap{position:relative;width:max-content;height:max-content;margin:0 auto}
-#pdf{display:block;background:white;box-shadow:0 4px 22px #0008}
-#detail{position:absolute;display:none;pointer-events:none;background:white;box-shadow:none;z-index:2}
+#pageWrap{position:relative;width:max-content;height:max-content;margin:0 auto;background:#fff;box-shadow:0 4px 22px #0008}
+#overview{display:block;background:white}
+#tiles{position:absolute;inset:0;pointer-events:none;z-index:2}
+.tile{position:absolute;display:block;background:white;pointer-events:none}
 #empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:30px;color:#8f9aa6;pointer-events:none}
 #empty strong{display:block;color:#dce2e8;font-size:20px;margin-bottom:8px}
 #status{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:7px 10px;border-radius:8px;background:#171b20e8;color:#d5dce3;font-size:12px;display:none;z-index:5;white-space:nowrap}
@@ -36,8 +37,13 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
 <button id="full" aria-label="Fullscreen">⛶</button>
 </header>
 <div id="stage">
-<div id="sheet"><div id="canvasWrap"><canvas id="pdf"></canvas><canvas id="detail"></canvas></div></div>
-<div id="empty"><div><strong>Forge PDF Bench</strong>Open a PDF to begin.<br>Phase 1.5: fast navigation + sharp viewport.</div></div>
+<div id="sheet">
+  <div id="pageWrap">
+    <canvas id="overview"></canvas>
+    <div id="tiles"></div>
+  </div>
+</div>
+<div id="empty"><div><strong>Forge Blueprint Engine</strong>Open a PDF to begin.<br>Tile engine prototype.</div></div>
 </div>
 <div id="status"></div>
 </div>
@@ -48,34 +54,54 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@
 
 const $=s=>document.querySelector(s);
 const file=$('#file');
-const canvas=$('#pdf'),ctx=canvas.getContext('2d',{alpha:false});
-const detail=$('#detail'),detailCtx=detail.getContext('2d',{alpha:false});
-const stage=$('#stage'),canvasWrap=$('#canvasWrap');
+const overview=$('#overview'),overviewCtx=overview.getContext('2d',{alpha:false});
+const stage=$('#stage'),pageWrap=$('#pageWrap'),tilesEl=$('#tiles');
 const empty=$('#empty'),info=$('#pageInfo'),status=$('#status');
 const prev=$('#prev'),next=$('#next'),fit=$('#fit'),full=$('#full');
 
 const MAX_ZOOM=10;
-const BASE_MAX_PIXELS=14000000;
-const BASE_MAX_SIDE=7168;
-const DETAIL_MAX_PIXELS=6500000;
-const DETAIL_MAX_SIDE=4096;
-const DETAIL_DELAY=110;
+
+// Whole-page safety net. This is never our deep-zoom source of truth.
+const OVERVIEW_MAX_PIXELS=14000000;
+const OVERVIEW_MAX_SIDE=7168;
+
+// High-resolution moving tile neighborhood.
+const TILE_SIZE=384;
+const TILE_PRELOAD_X=1.15;
+const TILE_PRELOAD_Y=.8;
+const TILE_KEEP_X=2.0;
+const TILE_KEEP_Y=1.5;
+const TILE_MAX_COUNT=30;
+const TILE_CONCURRENCY=2;
+const TILE_OUTPUT_NORMAL=2.0;
+const TILE_OUTPUT_DEEP=2.25;
+const TILE_MAX_PIXELS=900000;
+const TILE_MAX_SIDE=1024;
+
+// Pan braking retained from the previous build.
 const INERTIA_MS=670;
 const MIN_FLING_SPEED=90;
 const MAX_FLING_SPEED=4200;
 
 let doc=null,currentPage=null,pageNum=1;
 let zoom=1,scale=1,fitScale=1,baseViewport=null;
-let baseRenderTask=null,detailRenderTask=null;
-let baseGeneration=0,detailGeneration=0,detailTimer=0;
+let overviewTask=null,overviewGeneration=0;
+
 let pinch=null,pan=null,inertiaRaf=0,lastStageWidth=stage.clientWidth;
+
+// Tile state.
+const tileMap=new Map();
+let tileQueue=[];
+let tileWorkers=0;
+let tileEpoch=1;
+let tileUpdateRaf=0;
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 function flash(msg){
  status.textContent=msg;
  status.style.display='block';
  clearTimeout(flash.t);
- flash.t=setTimeout(()=>status.style.display='none',1200);
+ flash.t=setTimeout(()=>status.style.display='none',1100);
 }
 function zoomLabel(){return zoom===1?'Fit':zoom.toFixed(zoom<2?1:0)+'×'}
 function controls(){
@@ -93,21 +119,27 @@ function cssSize(){
 }
 function applyCssSize(){
  const {w,h}=cssSize();
- canvas.style.width=w+'px';
- canvas.style.height=h+'px';
- canvasWrap.style.width=w+'px';
- canvasWrap.style.height=h+'px';
+ overview.style.width=w+'px';
+ overview.style.height=h+'px';
+ pageWrap.style.width=w+'px';
+ pageWrap.style.height=h+'px';
+ tilesEl.style.width=w+'px';
+ tilesEl.style.height=h+'px';
 }
 function safeScale(viewport,maxPixels,maxSide,desired){
  const byArea=Math.sqrt(maxPixels/Math.max(1,viewport.width*viewport.height));
  const bySide=Math.min(maxSide/Math.max(1,viewport.width),maxSide/Math.max(1,viewport.height));
  return Math.max(.1,Math.min(desired,byArea,bySide));
 }
-function navOversample(){
+function overviewOversample(){
  if(zoom>=8)return 5.5;
  if(zoom>=5)return 4.75;
  if(zoom>=3)return 3.75;
  return 2.5;
+}
+function tileOutputScale(w,h){
+ const desired=Math.min(devicePixelRatio||1,zoom>=5?TILE_OUTPUT_DEEP:TILE_OUTPUT_NORMAL);
+ return safeScale({width:w,height:h},TILE_MAX_PIXELS,TILE_MAX_SIDE,desired);
 }
 function stopInertia(){
  if(inertiaRaf){
@@ -115,89 +147,20 @@ function stopInertia(){
   inertiaRaf=0;
  }
 }
-function hideDetail(cancel=false){
- clearTimeout(detailTimer);
- detailTimer=0;
- detailGeneration++;
- detail.style.display='none';
- if(cancel&&detailRenderTask){
-  try{detailRenderTask.cancel()}catch{}
-  detailRenderTask=null;
- }
+function setScroll(x,y){
+ const maxX=Math.max(0,stage.scrollWidth-stage.clientWidth);
+ const maxY=Math.max(0,stage.scrollHeight-stage.clientHeight);
+ const nx=clamp(x,0,maxX);
+ const ny=clamp(y,0,maxY);
+ stage.scrollLeft=nx;
+ stage.scrollTop=ny;
+ return {x:nx,y:ny,hitX:nx!==x,hitY:ny!==y};
 }
-function scheduleDetail(delay=DETAIL_DELAY){
- if(!doc||!currentPage||zoom<=1.02||pinch||pan||inertiaRaf)return;
- clearTimeout(detailTimer);
- detailTimer=setTimeout(()=>renderDetail(),delay);
-}
-function visiblePageRect(){
- const sr=stage.getBoundingClientRect();
- const pr=canvasWrap.getBoundingClientRect();
- const left=Math.max(sr.left,pr.left);
- const top=Math.max(sr.top,pr.top);
- const right=Math.min(sr.right,pr.right);
- const bottom=Math.min(sr.bottom,pr.bottom);
- if(right<=left||bottom<=top)return null;
 
- const pageW=pr.width,pageH=pr.height;
- const marginX=Math.min(360,stage.clientWidth*.4);
- const marginY=Math.min(420,stage.clientHeight*.35);
-
- const x0=clamp(left-pr.left-marginX,0,pageW);
- const y0=clamp(top-pr.top-marginY,0,pageH);
- const x1=clamp(right-pr.left+marginX,0,pageW);
- const y1=clamp(bottom-pr.top+marginY,0,pageH);
- return {x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0)};
-}
-async function renderDetail(){
- if(!currentPage||zoom<=1.02||pinch||pan||inertiaRaf)return;
- const rect=visiblePageRect();
- if(!rect)return;
-
- const generation=++detailGeneration;
- if(detailRenderTask){
-  try{detailRenderTask.cancel()}catch{}
- }
- detail.style.display='none';
-
- const viewport=currentPage.getViewport({scale});
- const desired=Math.min(devicePixelRatio||1,2.5);
- const out=safeScale(
-  {width:rect.w,height:rect.h},
-  DETAIL_MAX_PIXELS,
-  DETAIL_MAX_SIDE,
-  desired
- );
-
- detail.width=Math.max(1,Math.floor(rect.w*out));
- detail.height=Math.max(1,Math.floor(rect.h*out));
- detail.style.left=rect.x+'px';
- detail.style.top=rect.y+'px';
- detail.style.width=rect.w+'px';
- detail.style.height=rect.h+'px';
-
- detailRenderTask=currentPage.render({
-  canvasContext:detailCtx,
-  viewport,
-  transform:[out,0,0,out,-rect.x*out,-rect.y*out],
-  background:'#fff'
- });
-
- try{
-  await detailRenderTask.promise;
-  if(generation!==detailGeneration)return;
-  detail.style.display='block';
- }catch(e){
-  if(e?.name!=='RenderingCancelledException')console.error(e);
- }
-}
-async function renderBase(reloadPage=false){
+async function renderOverview(reloadPage=false){
  if(!doc)return;
-
- const generation=++baseGeneration;
- if(baseRenderTask){
-  try{baseRenderTask.cancel()}catch{}
- }
+ const generation=++overviewGeneration;
+ if(overviewTask){try{overviewTask.cancel()}catch{}}
 
  if(reloadPage||!currentPage)currentPage=await doc.getPage(pageNum);
  const page=currentPage;
@@ -206,18 +169,15 @@ async function renderBase(reloadPage=false){
  scale=fitScale*zoom;
  applyCssSize();
 
- // Render a higher-resolution navigation bitmap than the visible Fit size.
- // At deep zoom this keeps moving content readable without allocating a 10x full-page canvas.
- const navScale=fitScale*navOversample();
- const viewport=page.getViewport({scale:navScale});
- const out=safeScale(viewport,BASE_MAX_PIXELS,BASE_MAX_SIDE,1);
+ const viewport=page.getViewport({scale:fitScale*overviewOversample()});
+ const out=safeScale(viewport,OVERVIEW_MAX_PIXELS,OVERVIEW_MAX_SIDE,1);
 
  const temp=document.createElement('canvas');
  temp.width=Math.max(1,Math.floor(viewport.width*out));
  temp.height=Math.max(1,Math.floor(viewport.height*out));
  const tempCtx=temp.getContext('2d',{alpha:false});
 
- baseRenderTask=page.render({
+ overviewTask=page.render({
   canvasContext:tempCtx,
   viewport,
   transform:[out,0,0,out,0,0],
@@ -225,25 +185,216 @@ async function renderBase(reloadPage=false){
  });
 
  try{
-  await baseRenderTask.promise;
-  if(generation!==baseGeneration)return;
-  canvas.width=temp.width;
-  canvas.height=temp.height;
-  ctx.drawImage(temp,0,0);
+  await overviewTask.promise;
+  if(generation!==overviewGeneration)return;
+  overview.width=temp.width;
+  overview.height=temp.height;
+  overviewCtx.drawImage(temp,0,0);
   applyCssSize();
   controls();
  }catch(e){
   if(e?.name!=='RenderingCancelledException')throw e;
  }
 }
+
+/* ---------------- TILE ENGINE ---------------- */
+
+function clearTiles(){
+ tileEpoch++;
+ tileQueue=[];
+ for(const tile of tileMap.values()){
+  if(tile.task){try{tile.task.cancel()}catch{}}
+  tile.canvas.remove();
+ }
+ tileMap.clear();
+ tileWorkers=0;
+ tilesEl.style.display='block';
+}
+
+function pageVisibleRect(){
+ const sr=stage.getBoundingClientRect();
+ const pr=pageWrap.getBoundingClientRect();
+ const left=Math.max(sr.left,pr.left);
+ const top=Math.max(sr.top,pr.top);
+ const right=Math.min(sr.right,pr.right);
+ const bottom=Math.min(sr.bottom,pr.bottom);
+ if(right<=left||bottom<=top)return null;
+ return {
+  x:left-pr.left,
+  y:top-pr.top,
+  w:right-left,
+  h:bottom-top,
+  pageW:pr.width,
+  pageH:pr.height
+ };
+}
+
+function tileRange(rect,mx,my){
+ const x0=clamp(rect.x-stage.clientWidth*mx,0,rect.pageW);
+ const y0=clamp(rect.y-stage.clientHeight*my,0,rect.pageH);
+ const x1=clamp(rect.x+rect.w+stage.clientWidth*mx,0,rect.pageW);
+ const y1=clamp(rect.y+rect.h+stage.clientHeight*my,0,rect.pageH);
+ return {
+  c0:Math.max(0,Math.floor(x0/TILE_SIZE)),
+  r0:Math.max(0,Math.floor(y0/TILE_SIZE)),
+  c1:Math.max(0,Math.floor(Math.max(0,x1-1)/TILE_SIZE)),
+  r1:Math.max(0,Math.floor(Math.max(0,y1-1)/TILE_SIZE))
+ };
+}
+function inRange(c,r,range){
+ return c>=range.c0&&c<=range.c1&&r>=range.r0&&r<=range.r1;
+}
+function tileKey(c,r){return tileEpoch+':'+c+':'+r}
+
+function queueTile(c,r,priority,pageW,pageH){
+ const key=tileKey(c,r);
+ if(tileMap.has(key))return;
+
+ const x=c*TILE_SIZE,y=r*TILE_SIZE;
+ const w=Math.min(TILE_SIZE,pageW-x);
+ const h=Math.min(TILE_SIZE,pageH-y);
+ if(w<=0||h<=0)return;
+
+ const canvas=document.createElement('canvas');
+ canvas.className='tile';
+ canvas.style.left=x+'px';
+ canvas.style.top=y+'px';
+ canvas.style.width=w+'px';
+ canvas.style.height=h+'px';
+ canvas.style.visibility='hidden';
+ tilesEl.appendChild(canvas);
+
+ const tile={key,c,r,x,y,w,h,canvas,priority,state:'queued',task:null,epoch:tileEpoch,lastUse:performance.now()};
+ tileMap.set(key,tile);
+ tileQueue.push(tile);
+}
+
+function pruneTiles(keep,centerC,centerR){
+ const candidates=[];
+ for(const [key,tile] of tileMap){
+  if(tile.epoch!==tileEpoch)continue;
+  tile.lastUse=performance.now();
+  if(!inRange(tile.c,tile.r,keep)){
+   const d=Math.hypot(tile.c-centerC,tile.r-centerR);
+   candidates.push([d,key,tile]);
+  }
+ }
+ candidates.sort((a,b)=>b[0]-a[0]);
+
+ const removeTile=tile=>{
+  if(tile.task){try{tile.task.cancel()}catch{}}
+  tile.state='dead';
+  tile.canvas.remove();
+  tileMap.delete(tile.key);
+ };
+
+ for(const [,key,tile] of candidates){
+  if(tileMap.size<=TILE_MAX_COUNT && inRange(tile.c,tile.r,keep))continue;
+  if(tileMap.has(key))removeTile(tile);
+ }
+
+ if(tileMap.size>TILE_MAX_COUNT){
+  const all=[...tileMap.values()].sort((a,b)=>{
+   const da=Math.hypot(a.c-centerC,a.r-centerR);
+   const db=Math.hypot(b.c-centerC,b.r-centerR);
+   return db-da;
+  });
+  for(const tile of all){
+   if(tileMap.size<=TILE_MAX_COUNT)break;
+   removeTile(tile);
+  }
+ }
+
+ tileQueue=tileQueue.filter(t=>t.state==='queued'&&tileMap.has(t.key));
+}
+
+function scheduleTileUpdate(){
+ if(!doc||!currentPage||zoom<=1.05||pinch)return;
+ if(tileUpdateRaf)return;
+ tileUpdateRaf=requestAnimationFrame(()=>{
+  tileUpdateRaf=0;
+  updateTiles();
+ });
+}
+
+function updateTiles(){
+ if(!doc||!currentPage||zoom<=1.05||pinch)return;
+ const rect=pageVisibleRect();
+ if(!rect)return;
+
+ const need=tileRange(rect,TILE_PRELOAD_X,TILE_PRELOAD_Y);
+ const keep=tileRange(rect,TILE_KEEP_X,TILE_KEEP_Y);
+ const centerC=(rect.x+rect.w/2)/TILE_SIZE;
+ const centerR=(rect.y+rect.h/2)/TILE_SIZE;
+
+ for(let r=need.r0;r<=need.r1;r++){
+  for(let c=need.c0;c<=need.c1;c++){
+   const tileCx=(c+.5)*TILE_SIZE;
+   const tileCy=(r+.5)*TILE_SIZE;
+   const dx=(tileCx-(rect.x+rect.w/2))/Math.max(1,stage.clientWidth);
+   const dy=(tileCy-(rect.y+rect.h/2))/Math.max(1,stage.clientHeight);
+   const priority=dx*dx+dy*dy;
+   queueTile(c,r,priority,rect.pageW,rect.pageH);
+  }
+ }
+
+ pruneTiles(keep,centerC,centerR);
+ tileQueue.sort((a,b)=>a.priority-b.priority);
+ pumpTileQueue();
+}
+
+function pumpTileQueue(){
+ while(tileWorkers<TILE_CONCURRENCY && tileQueue.length){
+  const tile=tileQueue.shift();
+  if(!tile||tile.state!=='queued'||!tileMap.has(tile.key))continue;
+  renderTile(tile);
+ }
+}
+
+async function renderTile(tile){
+ tileWorkers++;
+ tile.state='rendering';
+ const epoch=tile.epoch;
+ const page=currentPage;
+ const viewport=page.getViewport({scale});
+ const out=tileOutputScale(tile.w,tile.h);
+
+ tile.canvas.width=Math.max(1,Math.ceil(tile.w*out));
+ tile.canvas.height=Math.max(1,Math.ceil(tile.h*out));
+ const tctx=tile.canvas.getContext('2d',{alpha:false});
+
+ tile.task=page.render({
+  canvasContext:tctx,
+  viewport,
+  transform:[out,0,0,out,-tile.x*out,-tile.y*out],
+  background:'#fff'
+ });
+
+ try{
+  await tile.task.promise;
+  if(epoch===tileEpoch&&tileMap.has(tile.key)){
+   tile.state='ready';
+   tile.task=null;
+   tile.canvas.style.visibility='visible';
+  }
+ }catch(e){
+  if(e?.name!=='RenderingCancelledException')console.error(e);
+ }finally{
+  tileWorkers=Math.max(0,tileWorkers-1);
+  pumpTileQueue();
+ }
+}
+
+/* ---------------- PAGE / FILE ---------------- */
+
 async function fitPage(){
  if(!doc)return;
  stopInertia();
  pan=null;
  pinch=null;
- hideDetail(true);
  zoom=1;
  scale=fitScale;
+ clearTiles();
  applyCssSize();
  stage.scrollTo(0,0);
  controls();
@@ -253,12 +404,13 @@ async function changePage(delta){
  if(!doc)return;
  const target=clamp(pageNum+delta,1,doc.numPages);
  if(target===pageNum)return;
+
  stopInertia();
- hideDetail(true);
+ clearTiles();
  pageNum=target;
  zoom=1;
  currentPage=await doc.getPage(pageNum);
- await renderBase(false);
+ await renderOverview(false);
  stage.scrollTo(0,0);
  flash('Fit · 1×');
 }
@@ -268,7 +420,7 @@ file.addEventListener('change',async()=>{
  if(!picked)return;
  try{
   stopInertia();
-  hideDetail(true);
+  clearTiles();
   flash('Loading…');
   const data=new Uint8Array(await picked.arrayBuffer());
   doc=await pdfjsLib.getDocument({data}).promise;
@@ -276,7 +428,7 @@ file.addEventListener('change',async()=>{
   zoom=1;
   currentPage=await doc.getPage(1);
   empty.style.display='none';
-  await renderBase(false);
+  await renderOverview(false);
   stage.scrollTo(0,0);
   flash(picked.name);
  }catch(e){
@@ -301,20 +453,15 @@ window.addEventListener('resize',()=>{
  const w=stage.clientWidth;
  if(doc&&Math.abs(w-lastStageWidth)>2){
   lastStageWidth=w;
-  hideDetail(true);
-  renderBase(false).then(()=>scheduleDetail(40)).catch(console.error);
+  clearTiles();
+  renderOverview(false)
+   .then(()=>scheduleTileUpdate())
+   .catch(console.error);
  }
 });
 
-function setScroll(x,y){
- const maxX=Math.max(0,stage.scrollWidth-stage.clientWidth);
- const maxY=Math.max(0,stage.scrollHeight-stage.clientHeight);
- const nx=clamp(x,0,maxX);
- const ny=clamp(y,0,maxY);
- stage.scrollLeft=nx;
- stage.scrollTop=ny;
- return {x:nx,y:ny,hitX:nx!==x,hitY:ny!==y};
-}
+/* ---------------- CUSTOM PAN PHYSICS ---------------- */
+
 function beginPan(t){
  stopInertia();
  const now=performance.now();
@@ -323,6 +470,7 @@ function beginPan(t){
   sx:stage.scrollLeft,sy:stage.scrollTop,
   samples:[{x:t.clientX,y:t.clientY,t:now}]
  };
+ scheduleTileUpdate();
 }
 function movePan(t){
  if(!pan)return;
@@ -333,6 +481,7 @@ function movePan(t){
  const now=performance.now();
  pan.samples.push({x:t.clientX,y:t.clientY,t:now});
  while(pan.samples.length>2&&now-pan.samples[0].t>110)pan.samples.shift();
+ scheduleTileUpdate();
 }
 function finishPan(){
  if(!pan)return;
@@ -349,7 +498,7 @@ function finishPan(){
 
  const speed=Math.hypot(vx,vy);
  if(speed<MIN_FLING_SPEED){
-  scheduleDetail(30);
+  scheduleTileUpdate();
   return;
  }
  const factor=Math.min(1,MAX_FLING_SPEED/speed);
@@ -364,19 +513,21 @@ function startInertia(vx,vy){
 
  const frame=now=>{
   const u=clamp((now-start)/INERTIA_MS,0,1);
-  // Constant deceleration: velocity reaches exactly zero at 0.67 seconds.
   const travel=T*(u-u*u/2);
   const pos=setScroll(sx+vx*travel,sy+vy*travel);
+  scheduleTileUpdate();
 
   if(u<1&&!(pos.hitX&&pos.hitY)){
    inertiaRaf=requestAnimationFrame(frame);
   }else{
    inertiaRaf=0;
-   scheduleDetail(25);
+   scheduleTileUpdate();
   }
  };
  inertiaRaf=requestAnimationFrame(frame);
 }
+
+/* ---------------- PINCH ---------------- */
 
 const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
 function midpoint(t){
@@ -391,9 +542,9 @@ function midpoint(t){
 function beginPinch(touches){
  stopInertia();
  pan=null;
- hideDetail(true);
+ tilesEl.style.display='none';
  const m=midpoint(touches);
- const wr=canvasWrap.getBoundingClientRect();
+ const wr=pageWrap.getBoundingClientRect();
  pinch={
   d:dist(touches),
   z:zoom,
@@ -409,8 +560,8 @@ function movePinch(touches){
  applyCssSize();
 
  const {w,h}=cssSize();
- const pageLeft=canvasWrap.offsetLeft;
- const pageTop=canvasWrap.offsetTop;
+ const pageLeft=pageWrap.offsetLeft;
+ const pageTop=pageWrap.offsetTop;
  setScroll(
   pageLeft+pinch.ax*w-m.x,
   pageTop+pinch.ay*h-m.y
@@ -421,22 +572,21 @@ function finishPinch(remainingTouch=null){
  pinch=null;
  flash(zoomLabel());
 
- // Hand the surviving finger to pan immediately. Waiting for the
- // navigation render here could leave a stale pan state if that finger
- // was lifted before the render finished.
- if(remainingTouch){
-  beginPan(remainingTouch);
- }
+ clearTiles();
+ tilesEl.style.display='block';
 
- // Upgrade the navigation bitmap without blocking gesture state.
- renderBase(false)
-  .catch(e=>console.error(e))
-  .finally(()=>{
-   if(!pinch&&!pan&&!inertiaRaf)scheduleDetail(25);
-  });
+ // Build the visible sharp neighborhood first.
+ scheduleTileUpdate();
 
- if(!remainingTouch)scheduleDetail(25);
+ // Then quietly improve the whole-page fallback beneath it.
+ renderOverview(false)
+  .then(()=>scheduleTileUpdate())
+  .catch(e=>console.error(e));
+
+ if(remainingTouch)beginPan(remainingTouch);
 }
+
+/* ---------------- TOUCH ROUTING ---------------- */
 
 stage.addEventListener('touchstart',e=>{
  if(!doc)return;
@@ -475,7 +625,8 @@ stage.addEventListener('touchcancel',()=>{
  pinch=null;
  pan=null;
  stopInertia();
- scheduleDetail(20);
+ tilesEl.style.display='block';
+ scheduleTileUpdate();
 },{passive:true});
 
 controls();
