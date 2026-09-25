@@ -14,7 +14,7 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
 .fileBtn{margin-right:auto}.fileBtn input{display:none}button:disabled{opacity:.35}
 #pageInfo{font-variant-numeric:tabular-nums;font-size:13px;min-width:54px;text-align:center}
 #stage{position:relative;flex:1;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:pan-x pan-y pinch-zoom;background:#0c0f12}
-#sheet{min-width:100%;min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:16px}
+#sheet{position:relative;min-width:100%;min-height:100%;padding:16px}\n#canvasWrap{width:max-content;height:max-content;margin:0 auto}
 canvas{display:block;background:white;box-shadow:0 4px 22px #0008}
 #empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:30px;color:#8f9aa6;pointer-events:none}
 #empty strong{display:block;color:#dce2e8;font-size:20px;margin-bottom:8px}
@@ -32,7 +32,7 @@ canvas{display:block;background:white;box-shadow:0 4px 22px #0008}
 <button id="full" aria-label="Fullscreen">⛶</button>
 </header>
 <div id="stage">
-<div id="sheet"><canvas id="pdf"></canvas></div>
+<div id="sheet"><div id="canvasWrap"><canvas id="pdf"></canvas></div></div>
 <div id="empty"><div><strong>Forge PDF Bench</strong>Open a PDF to begin.<br>Phase 1: render, page, zoom, pan.</div></div>
 <div id="status"></div>
 </div>
@@ -43,7 +43,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@
 
 const $=s=>document.querySelector(s);
 const file=$('#file'), canvas=$('#pdf'), ctx=canvas.getContext('2d',{alpha:false});
-const stage=$('#stage'), sheet=$('#sheet'), empty=$('#empty'), info=$('#pageInfo'), status=$('#status');
+const stage=$('#stage'), sheet=$('#sheet'), canvasWrap=$('#canvasWrap'), empty=$('#empty'), info=$('#pageInfo'), status=$('#status');
 const prev=$('#prev'), next=$('#next'), fit=$('#fit'), full=$('#full');
 let doc=null,pageNum=1,scale=1,baseViewport=null,renderTask=null,fitScale=1;
 
@@ -60,7 +60,7 @@ async function render(){
  baseViewport=raw;
  const dpr=Math.min(devicePixelRatio||1,2.5);
  canvas.width=Math.floor(viewport.width*dpr);canvas.height=Math.floor(viewport.height*dpr);
- canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';
+ canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';\n canvasWrap.style.width=viewport.width+'px';canvasWrap.style.height=viewport.height+'px';
  renderTask=page.render({canvasContext:ctx,viewport,transform:[dpr,0,0,dpr,0,0]});
  try{await renderTask.promise}catch(e){if(e?.name!=='RenderingCancelledException')throw e}
  controls();
@@ -91,7 +91,7 @@ stage.addEventListener('touchmove',e=>{
  const candidate=pinch.s*(dist(e.touches)/pinch.d);
  scale=Math.min(6,Math.max(.15,candidate));
  const w=baseViewport.width*scale,h=baseViewport.height*scale;
- canvas.style.width=w+'px';canvas.style.height=h+'px';
+ canvas.style.width=w+'px';canvas.style.height=h+'px';canvasWrap.style.width=w+'px';canvasWrap.style.height=h+'px';
 }, {passive:false});
 stage.addEventListener('touchend',e=>{if(pinch&&e.touches.length<2){pinch=null;render();flash(Math.round(scale*100)+'%')}},{passive:true});
 controls();
