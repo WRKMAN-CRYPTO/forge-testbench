@@ -55,8 +55,8 @@ const empty=$('#empty'),info=$('#pageInfo'),status=$('#status');
 const prev=$('#prev'),next=$('#next'),fit=$('#fit'),full=$('#full');
 
 const MAX_ZOOM=10;
-const BASE_MAX_PIXELS=10000000;
-const BASE_MAX_SIDE=6144;
+const BASE_MAX_PIXELS=14000000;
+const BASE_MAX_SIDE=7168;
 const DETAIL_MAX_PIXELS=6500000;
 const DETAIL_MAX_SIDE=4096;
 const DETAIL_DELAY=110;
@@ -104,9 +104,10 @@ function safeScale(viewport,maxPixels,maxSide,desired){
  return Math.max(.1,Math.min(desired,byArea,bySide));
 }
 function navOversample(){
- if(zoom>=6)return 4;
- if(zoom>=3)return 3;
- return 2.25;
+ if(zoom>=8)return 5.5;
+ if(zoom>=5)return 4.75;
+ if(zoom>=3)return 3.75;
+ return 2.5;
 }
 function stopInertia(){
  if(inertiaRaf){
