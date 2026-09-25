@@ -17,8 +17,9 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
 #fit{min-width:54px;font-variant-numeric:tabular-nums}
 #stage{position:relative;flex:1;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:pan-x pan-y;background:#0c0f12}
 #sheet{position:relative;min-width:100%;min-height:100%;padding:16px}
-#canvasWrap{width:max-content;height:max-content;margin:0 auto}
-canvas{display:block;background:white;box-shadow:0 4px 22px #0008}
+#canvasWrap{position:relative;width:max-content;height:max-content;margin:0 auto}
+#pdf{display:block;background:white;box-shadow:0 4px 22px #0008}
+#detail{position:absolute;display:none;pointer-events:none;background:white;box-shadow:none;z-index:2}
 #empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:30px;color:#8f9aa6;pointer-events:none}
 #empty strong{display:block;color:#dce2e8;font-size:20px;margin-bottom:8px}
 #status{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:7px 10px;border-radius:8px;background:#171b20e8;color:#d5dce3;font-size:12px;display:none;z-index:5;white-space:nowrap}
@@ -35,8 +36,8 @@ canvas{display:block;background:white;box-shadow:0 4px 22px #0008}
 <button id="full" aria-label="Fullscreen">⛶</button>
 </header>
 <div id="stage">
-<div id="sheet"><div id="canvasWrap"><canvas id="pdf"></canvas></div></div>
-<div id="empty"><div><strong>Forge PDF Bench</strong>Open a PDF to begin.<br>Phase 1: render, page, zoom, pan.</div></div>
+<div id="sheet"><div id="canvasWrap"><canvas id="pdf"></canvas><canvas id="detail"></canvas></div></div>
+<div id="empty"><div><strong>Forge PDF Bench</strong>Open a PDF to begin.<br>Phase 1.5: fast navigation + sharp viewport.</div></div>
 </div>
 <div id="status"></div>
 </div>
@@ -46,15 +47,24 @@ import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
 
 const $=s=>document.querySelector(s);
-const file=$('#file'),canvas=$('#pdf'),ctx=canvas.getContext('2d',{alpha:false});
-const stage=$('#stage'),canvasWrap=$('#canvasWrap'),empty=$('#empty'),info=$('#pageInfo'),status=$('#status');
+const file=$('#file');
+const canvas=$('#pdf'),ctx=canvas.getContext('2d',{alpha:false});
+const detail=$('#detail'),detailCtx=detail.getContext('2d',{alpha:false});
+const stage=$('#stage'),sheet=$('#sheet'),canvasWrap=$('#canvasWrap');
+const empty=$('#empty'),info=$('#pageInfo'),status=$('#status');
 const prev=$('#prev'),next=$('#next'),fit=$('#fit'),full=$('#full');
 
 const MAX_ZOOM=10;
-const MAX_BACKING_PIXELS=10000000;
-const MAX_BACKING_SIDE=8192;
+const BASE_MAX_PIXELS=10000000;
+const BASE_MAX_SIDE=8192;
+const DETAIL_MAX_PIXELS=6000000;
+const DETAIL_MAX_SIDE=4096;
+const DETAIL_MARGIN=96;
+const DETAIL_DELAY=140;
 
-let doc=null,pageNum=1,zoom=1,scale=1,fitScale=1,baseViewport=null,renderTask=null;
+let doc=null,currentPage=null,pageNum=1;
+let zoom=1,scale=1,fitScale=1,baseViewport=null;
+let baseRenderTask=null,detailRenderTask=null,detailTimer=0,detailGeneration=0;
 let pinch=null,lastStageWidth=stage.clientWidth;
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
@@ -85,67 +95,155 @@ function applyCssSize(){
  canvasWrap.style.width=w+'px';
  canvasWrap.style.height=h+'px';
 }
-function safeOutputScale(viewport){
- const desired=Math.min(devicePixelRatio||1,2);
- const byArea=Math.sqrt(MAX_BACKING_PIXELS/Math.max(1,viewport.width*viewport.height));
- const bySide=Math.min(MAX_BACKING_SIDE/Math.max(1,viewport.width),MAX_BACKING_SIDE/Math.max(1,viewport.height));
+function safeScale(viewport,maxPixels,maxSide,desired){
+ const byArea=Math.sqrt(maxPixels/Math.max(1,viewport.width*viewport.height));
+ const bySide=Math.min(maxSide/Math.max(1,viewport.width),maxSide/Math.max(1,viewport.height));
  return Math.max(.1,Math.min(desired,byArea,bySide));
 }
-async function render(){
+function hideDetail(cancel=false){
+ clearTimeout(detailTimer);
+ detailTimer=0;
+ detailGeneration++;
+ detail.style.display='none';
+ if(cancel&&detailRenderTask){
+  try{detailRenderTask.cancel()}catch{}
+  detailRenderTask=null;
+ }
+}
+function scheduleDetail(delay=DETAIL_DELAY){
+ if(!doc||!currentPage||zoom<=1.02)return;
+ clearTimeout(detailTimer);
+ detailTimer=setTimeout(()=>renderDetail(),delay);
+}
+function visiblePageRect(){
+ const sr=stage.getBoundingClientRect();
+ const pr=canvasWrap.getBoundingClientRect();
+ const left=Math.max(sr.left,pr.left);
+ const top=Math.max(sr.top,pr.top);
+ const right=Math.min(sr.right,pr.right);
+ const bottom=Math.min(sr.bottom,pr.bottom);
+ if(right<=left||bottom<=top)return null;
+
+ const pageW=pr.width,pageH=pr.height;
+ let x0=clamp(left-pr.left-DETAIL_MARGIN,0,pageW);
+ let y0=clamp(top-pr.top-DETAIL_MARGIN,0,pageH);
+ let x1=clamp(right-pr.left+DETAIL_MARGIN,0,pageW);
+ let y1=clamp(bottom-pr.top+DETAIL_MARGIN,0,pageH);
+
+ return {x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0)};
+}
+async function renderDetail(){
+ if(!currentPage||zoom<=1.02)return;
+ const rect=visiblePageRect();
+ if(!rect)return;
+
+ const generation=++detailGeneration;
+ if(detailRenderTask){
+  try{detailRenderTask.cancel()}catch{}
+ }
+ detail.style.display='none';
+
+ const viewport=currentPage.getViewport({scale});
+ const desired=Math.min(devicePixelRatio||1,2.5);
+ const pseudoViewport={width:rect.w,height:rect.h};
+ const out=safeScale(pseudoViewport,DETAIL_MAX_PIXELS,DETAIL_MAX_SIDE,desired);
+
+ detail.width=Math.max(1,Math.floor(rect.w*out));
+ detail.height=Math.max(1,Math.floor(rect.h*out));
+ detail.style.left=rect.x+'px';
+ detail.style.top=rect.y+'px';
+ detail.style.width=rect.w+'px';
+ detail.style.height=rect.h+'px';
+
+ detailRenderTask=currentPage.render({
+  canvasContext:detailCtx,
+  viewport,
+  transform:[out,0,0,out,-rect.x*out,-rect.y*out],
+  background:'#fff'
+ });
+
+ try{
+  await detailRenderTask.promise;
+  if(generation!==detailGeneration)return;
+  detail.style.display='block';
+ }catch(e){
+  if(e?.name!=='RenderingCancelledException')console.error(e);
+ }
+}
+async function renderBase(){
  if(!doc)return;
- if(renderTask){try{renderTask.cancel()}catch{}}
- const page=await doc.getPage(pageNum);
- baseViewport=page.getViewport({scale:1});
+ hideDetail(true);
+ if(baseRenderTask){
+  try{baseRenderTask.cancel()}catch{}
+ }
+
+ currentPage=await doc.getPage(pageNum);
+ baseViewport=currentPage.getViewport({scale:1});
  fitScale=Math.max(.01,(stage.clientWidth-32)/baseViewport.width);
  scale=fitScale*zoom;
 
- const viewport=page.getViewport({scale});
- const out=safeOutputScale(viewport);
- const bw=Math.max(1,Math.floor(viewport.width*out));
- const bh=Math.max(1,Math.floor(viewport.height*out));
+ // The navigation layer is always rendered at Fit resolution.
+ // Zooming stretches it instantly; the detail layer sharpens only what is visible.
+ const viewport=currentPage.getViewport({scale:fitScale});
+ const desired=Math.min(devicePixelRatio||1,2);
+ const out=safeScale(viewport,BASE_MAX_PIXELS,BASE_MAX_SIDE,desired);
 
- canvas.width=bw;
- canvas.height=bh;
+ canvas.width=Math.max(1,Math.floor(viewport.width*out));
+ canvas.height=Math.max(1,Math.floor(viewport.height*out));
  applyCssSize();
 
- renderTask=page.render({
+ baseRenderTask=currentPage.render({
   canvasContext:ctx,
   viewport,
-  transform:[out,0,0,out,0,0]
+  transform:[out,0,0,out,0,0],
+  background:'#fff'
  });
+
  try{
-  await renderTask.promise;
+  await baseRenderTask.promise;
  }catch(e){
   if(e?.name!=='RenderingCancelledException')throw e;
  }
  controls();
+ scheduleDetail(40);
+}
+function resetToFit(){
+ if(!doc)return;
+ hideDetail(true);
+ zoom=1;
+ scale=fitScale;
+ applyCssSize();
+ stage.scrollTo(0,0);
+ controls();
+ flash('Fit · 1×');
 }
 async function fitPage(){
  if(!doc)return;
- zoom=1;
- await render();
- stage.scrollTo(0,0);
- flash('Fit · 1×');
+ resetToFit();
 }
 async function changePage(delta){
  if(!doc)return;
  const target=clamp(pageNum+delta,1,doc.numPages);
  if(target===pageNum)return;
  pageNum=target;
- await fitPage();
+ zoom=1;
+ await renderBase();
+ stage.scrollTo(0,0);
+ flash('Fit · 1×');
 }
 
 file.addEventListener('change',async()=>{
  const picked=file.files[0];
  if(!picked)return;
  try{
+  hideDetail(true);
   flash('Loading…');
   const data=new Uint8Array(await picked.arrayBuffer());
   doc=await pdfjsLib.getDocument({data}).promise;
   pageNum=1;
   zoom=1;
   empty.style.display='none';
-  await render();
+  await renderBase();
   stage.scrollTo(0,0);
   flash(picked.name);
  }catch(e){
@@ -166,34 +264,44 @@ full.onclick=async()=>{
  }
 };
 
-// Mobile Safari changes viewport height as its browser chrome moves.
-// Only refit if the usable WIDTH actually changed.
+// Safari browser chrome changes viewport height while scrolling.
+// Rebuild only when the usable width actually changes.
 window.addEventListener('resize',()=>{
  const w=stage.clientWidth;
  if(doc&&Math.abs(w-lastStageWidth)>2){
   lastStageWidth=w;
-  fitPage();
+  renderBase().catch(console.error);
  }
 });
 
+let scrollTimer=0;
+stage.addEventListener('scroll',()=>{
+ if(!doc||pinch)return;
+ clearTimeout(scrollTimer);
+ scrollTimer=setTimeout(()=>scheduleDetail(0),DETAIL_DELAY);
+},{passive:true});
+
 const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
 function midpoint(t){
- const r=stage.getBoundingClientRect();
+ const sr=stage.getBoundingClientRect();
  return {
-  x:(t[0].clientX+t[1].clientX)/2-r.left,
-  y:(t[0].clientY+t[1].clientY)/2-r.top
+  clientX:(t[0].clientX+t[1].clientX)/2,
+  clientY:(t[0].clientY+t[1].clientY)/2,
+  x:(t[0].clientX+t[1].clientX)/2-sr.left,
+  y:(t[0].clientY+t[1].clientY)/2-sr.top
  };
 }
 
 stage.addEventListener('touchstart',e=>{
  if(!doc||e.touches.length!==2||!baseViewport)return;
+ hideDetail(true);
  const m=midpoint(e.touches);
- const {w,h}=cssSize();
+ const wr=canvasWrap.getBoundingClientRect();
  pinch={
   d:dist(e.touches),
   z:zoom,
-  ax:clamp((stage.scrollLeft+m.x-16)/Math.max(1,w),0,1),
-  ay:clamp((stage.scrollTop+m.y-16)/Math.max(1,h),0,1)
+  ax:clamp((m.clientX-wr.left)/Math.max(1,wr.width),0,1),
+  ay:clamp((m.clientY-wr.top)/Math.max(1,wr.height),0,1)
  };
 },{passive:true});
 
@@ -207,17 +315,18 @@ stage.addEventListener('touchmove',e=>{
  applyCssSize();
 
  const {w,h}=cssSize();
- stage.scrollLeft=16+pinch.ax*w-m.x;
- stage.scrollTop=16+pinch.ay*h-m.y;
+ const pageLeft=canvasWrap.offsetLeft;
+ const pageTop=canvasWrap.offsetTop;
+ stage.scrollLeft=pageLeft+pinch.ax*w-m.x;
+ stage.scrollTop=pageTop+pinch.ay*h-m.y;
  controls();
 },{passive:false});
 
 stage.addEventListener('touchend',e=>{
  if(!pinch||e.touches.length>=2)return;
  pinch=null;
- render()
-  .then(()=>flash(zoomLabel()))
-  .catch(err=>{console.error(err);flash('Render recovered');});
+ flash(zoomLabel());
+ scheduleDetail(60);
 },{passive:true});
 
 controls();
