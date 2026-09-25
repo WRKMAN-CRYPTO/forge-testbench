@@ -15,7 +15,7 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
 .fileBtn{margin-right:auto}.fileBtn input{display:none}button:disabled{opacity:.35}
 #pageInfo{font-variant-numeric:tabular-nums;font-size:13px;min-width:54px;text-align:center}
 #fit{min-width:54px;font-variant-numeric:tabular-nums}
-#stage{position:relative;flex:1;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:pan-x pan-y;background:#0c0f12}
+#stage{position:relative;flex:1;overflow:auto;-webkit-overflow-scrolling:auto;overscroll-behavior:none;touch-action:none;background:#0c0f12;user-select:none;-webkit-user-select:none}
 #sheet{position:relative;min-width:100%;min-height:100%;padding:16px}
 #canvasWrap{position:relative;width:max-content;height:max-content;margin:0 auto}
 #pdf{display:block;background:white;box-shadow:0 4px 22px #0008}
@@ -50,22 +50,25 @@ const $=s=>document.querySelector(s);
 const file=$('#file');
 const canvas=$('#pdf'),ctx=canvas.getContext('2d',{alpha:false});
 const detail=$('#detail'),detailCtx=detail.getContext('2d',{alpha:false});
-const stage=$('#stage'),sheet=$('#sheet'),canvasWrap=$('#canvasWrap');
+const stage=$('#stage'),canvasWrap=$('#canvasWrap');
 const empty=$('#empty'),info=$('#pageInfo'),status=$('#status');
 const prev=$('#prev'),next=$('#next'),fit=$('#fit'),full=$('#full');
 
 const MAX_ZOOM=10;
 const BASE_MAX_PIXELS=10000000;
-const BASE_MAX_SIDE=8192;
-const DETAIL_MAX_PIXELS=6000000;
+const BASE_MAX_SIDE=6144;
+const DETAIL_MAX_PIXELS=6500000;
 const DETAIL_MAX_SIDE=4096;
-const DETAIL_MARGIN=96;
-const DETAIL_DELAY=140;
+const DETAIL_DELAY=110;
+const INERTIA_MS=670;
+const MIN_FLING_SPEED=90;
+const MAX_FLING_SPEED=4200;
 
 let doc=null,currentPage=null,pageNum=1;
 let zoom=1,scale=1,fitScale=1,baseViewport=null;
-let baseRenderTask=null,detailRenderTask=null,detailTimer=0,detailGeneration=0;
-let pinch=null,lastStageWidth=stage.clientWidth;
+let baseRenderTask=null,detailRenderTask=null;
+let baseGeneration=0,detailGeneration=0,detailTimer=0;
+let pinch=null,pan=null,inertiaRaf=0,lastStageWidth=stage.clientWidth;
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 function flash(msg){
@@ -100,6 +103,17 @@ function safeScale(viewport,maxPixels,maxSide,desired){
  const bySide=Math.min(maxSide/Math.max(1,viewport.width),maxSide/Math.max(1,viewport.height));
  return Math.max(.1,Math.min(desired,byArea,bySide));
 }
+function navOversample(){
+ if(zoom>=6)return 4;
+ if(zoom>=3)return 3;
+ return 2.25;
+}
+function stopInertia(){
+ if(inertiaRaf){
+  cancelAnimationFrame(inertiaRaf);
+  inertiaRaf=0;
+ }
+}
 function hideDetail(cancel=false){
  clearTimeout(detailTimer);
  detailTimer=0;
@@ -111,7 +125,7 @@ function hideDetail(cancel=false){
  }
 }
 function scheduleDetail(delay=DETAIL_DELAY){
- if(!doc||!currentPage||zoom<=1.02)return;
+ if(!doc||!currentPage||zoom<=1.02||pinch||pan||inertiaRaf)return;
  clearTimeout(detailTimer);
  detailTimer=setTimeout(()=>renderDetail(),delay);
 }
@@ -125,15 +139,17 @@ function visiblePageRect(){
  if(right<=left||bottom<=top)return null;
 
  const pageW=pr.width,pageH=pr.height;
- let x0=clamp(left-pr.left-DETAIL_MARGIN,0,pageW);
- let y0=clamp(top-pr.top-DETAIL_MARGIN,0,pageH);
- let x1=clamp(right-pr.left+DETAIL_MARGIN,0,pageW);
- let y1=clamp(bottom-pr.top+DETAIL_MARGIN,0,pageH);
+ const marginX=Math.min(360,stage.clientWidth*.4);
+ const marginY=Math.min(420,stage.clientHeight*.35);
 
+ const x0=clamp(left-pr.left-marginX,0,pageW);
+ const y0=clamp(top-pr.top-marginY,0,pageH);
+ const x1=clamp(right-pr.left+marginX,0,pageW);
+ const y1=clamp(bottom-pr.top+marginY,0,pageH);
  return {x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0)};
 }
 async function renderDetail(){
- if(!currentPage||zoom<=1.02)return;
+ if(!currentPage||zoom<=1.02||pinch||pan||inertiaRaf)return;
  const rect=visiblePageRect();
  if(!rect)return;
 
@@ -145,8 +161,12 @@ async function renderDetail(){
 
  const viewport=currentPage.getViewport({scale});
  const desired=Math.min(devicePixelRatio||1,2.5);
- const pseudoViewport={width:rect.w,height:rect.h};
- const out=safeScale(pseudoViewport,DETAIL_MAX_PIXELS,DETAIL_MAX_SIDE,desired);
+ const out=safeScale(
+  {width:rect.w,height:rect.h},
+  DETAIL_MAX_PIXELS,
+  DETAIL_MAX_SIDE,
+  desired
+ );
 
  detail.width=Math.max(1,Math.floor(rect.w*out));
  detail.height=Math.max(1,Math.floor(rect.h*out));
@@ -170,30 +190,34 @@ async function renderDetail(){
   if(e?.name!=='RenderingCancelledException')console.error(e);
  }
 }
-async function renderBase(){
+async function renderBase(reloadPage=false){
  if(!doc)return;
- hideDetail(true);
+
+ const generation=++baseGeneration;
  if(baseRenderTask){
   try{baseRenderTask.cancel()}catch{}
  }
 
- currentPage=await doc.getPage(pageNum);
- baseViewport=currentPage.getViewport({scale:1});
+ if(reloadPage||!currentPage)currentPage=await doc.getPage(pageNum);
+ const page=currentPage;
+ baseViewport=page.getViewport({scale:1});
  fitScale=Math.max(.01,(stage.clientWidth-32)/baseViewport.width);
  scale=fitScale*zoom;
-
- // The navigation layer is always rendered at Fit resolution.
- // Zooming stretches it instantly; the detail layer sharpens only what is visible.
- const viewport=currentPage.getViewport({scale:fitScale});
- const desired=Math.min(devicePixelRatio||1,2);
- const out=safeScale(viewport,BASE_MAX_PIXELS,BASE_MAX_SIDE,desired);
-
- canvas.width=Math.max(1,Math.floor(viewport.width*out));
- canvas.height=Math.max(1,Math.floor(viewport.height*out));
  applyCssSize();
 
- baseRenderTask=currentPage.render({
-  canvasContext:ctx,
+ // Render a higher-resolution navigation bitmap than the visible Fit size.
+ // At deep zoom this keeps moving content readable without allocating a 10x full-page canvas.
+ const navScale=fitScale*navOversample();
+ const viewport=page.getViewport({scale:navScale});
+ const out=safeScale(viewport,BASE_MAX_PIXELS,BASE_MAX_SIDE,1);
+
+ const temp=document.createElement('canvas');
+ temp.width=Math.max(1,Math.floor(viewport.width*out));
+ temp.height=Math.max(1,Math.floor(viewport.height*out));
+ const tempCtx=temp.getContext('2d',{alpha:false});
+
+ baseRenderTask=page.render({
+  canvasContext:tempCtx,
   viewport,
   transform:[out,0,0,out,0,0],
   background:'#fff'
@@ -201,14 +225,21 @@ async function renderBase(){
 
  try{
   await baseRenderTask.promise;
+  if(generation!==baseGeneration)return;
+  canvas.width=temp.width;
+  canvas.height=temp.height;
+  ctx.drawImage(temp,0,0);
+  applyCssSize();
+  controls();
  }catch(e){
   if(e?.name!=='RenderingCancelledException')throw e;
  }
- controls();
- scheduleDetail(40);
 }
-function resetToFit(){
+async function fitPage(){
  if(!doc)return;
+ stopInertia();
+ pan=null;
+ pinch=null;
  hideDetail(true);
  zoom=1;
  scale=fitScale;
@@ -217,17 +248,16 @@ function resetToFit(){
  controls();
  flash('Fit · 1×');
 }
-async function fitPage(){
- if(!doc)return;
- resetToFit();
-}
 async function changePage(delta){
  if(!doc)return;
  const target=clamp(pageNum+delta,1,doc.numPages);
  if(target===pageNum)return;
+ stopInertia();
+ hideDetail(true);
  pageNum=target;
  zoom=1;
- await renderBase();
+ currentPage=await doc.getPage(pageNum);
+ await renderBase(false);
  stage.scrollTo(0,0);
  flash('Fit · 1×');
 }
@@ -236,14 +266,16 @@ file.addEventListener('change',async()=>{
  const picked=file.files[0];
  if(!picked)return;
  try{
+  stopInertia();
   hideDetail(true);
   flash('Loading…');
   const data=new Uint8Array(await picked.arrayBuffer());
   doc=await pdfjsLib.getDocument({data}).promise;
   pageNum=1;
   zoom=1;
+  currentPage=await doc.getPage(1);
   empty.style.display='none';
-  await renderBase();
+  await renderBase(false);
   stage.scrollTo(0,0);
   flash(picked.name);
  }catch(e){
@@ -264,22 +296,86 @@ full.onclick=async()=>{
  }
 };
 
-// Safari browser chrome changes viewport height while scrolling.
-// Rebuild only when the usable width actually changes.
 window.addEventListener('resize',()=>{
  const w=stage.clientWidth;
  if(doc&&Math.abs(w-lastStageWidth)>2){
   lastStageWidth=w;
-  renderBase().catch(console.error);
+  hideDetail(true);
+  renderBase(false).then(()=>scheduleDetail(40)).catch(console.error);
  }
 });
 
-let scrollTimer=0;
-stage.addEventListener('scroll',()=>{
- if(!doc||pinch)return;
- clearTimeout(scrollTimer);
- scrollTimer=setTimeout(()=>scheduleDetail(0),DETAIL_DELAY);
-},{passive:true});
+function setScroll(x,y){
+ const maxX=Math.max(0,stage.scrollWidth-stage.clientWidth);
+ const maxY=Math.max(0,stage.scrollHeight-stage.clientHeight);
+ const nx=clamp(x,0,maxX);
+ const ny=clamp(y,0,maxY);
+ stage.scrollLeft=nx;
+ stage.scrollTop=ny;
+ return {x:nx,y:ny,hitX:nx!==x,hitY:ny!==y};
+}
+function beginPan(t){
+ stopInertia();
+ const now=performance.now();
+ pan={
+  x:t.clientX,y:t.clientY,
+  sx:stage.scrollLeft,sy:stage.scrollTop,
+  samples:[{x:t.clientX,y:t.clientY,t:now}]
+ };
+}
+function movePan(t){
+ if(!pan)return;
+ const x=pan.sx+(pan.x-t.clientX);
+ const y=pan.sy+(pan.y-t.clientY);
+ setScroll(x,y);
+
+ const now=performance.now();
+ pan.samples.push({x:t.clientX,y:t.clientY,t:now});
+ while(pan.samples.length>2&&now-pan.samples[0].t>110)pan.samples.shift();
+}
+function finishPan(){
+ if(!pan)return;
+ const samples=pan.samples;
+ const last=samples[samples.length-1];
+ let first=samples[0];
+ for(const s of samples){
+  if(last.t-s.t<=90){first=s;break}
+ }
+ const dt=Math.max(16,last.t-first.t)/1000;
+ let vx=(first.x-last.x)/dt;
+ let vy=(first.y-last.y)/dt;
+ pan=null;
+
+ const speed=Math.hypot(vx,vy);
+ if(speed<MIN_FLING_SPEED){
+  scheduleDetail(30);
+  return;
+ }
+ const factor=Math.min(1,MAX_FLING_SPEED/speed);
+ vx*=factor;vy*=factor;
+ startInertia(vx,vy);
+}
+function startInertia(vx,vy){
+ stopInertia();
+ const start=performance.now();
+ const sx=stage.scrollLeft,sy=stage.scrollTop;
+ const T=INERTIA_MS/1000;
+
+ const frame=now=>{
+  const u=clamp((now-start)/INERTIA_MS,0,1);
+  // Constant deceleration: velocity reaches exactly zero at 0.67 seconds.
+  const travel=T*(u-u*u/2);
+  const pos=setScroll(sx+vx*travel,sy+vy*travel);
+
+  if(u<1&&!(pos.hitX&&pos.hitY)){
+   inertiaRaf=requestAnimationFrame(frame);
+  }else{
+   inertiaRaf=0;
+   scheduleDetail(25);
+  }
+ };
+ inertiaRaf=requestAnimationFrame(frame);
+}
 
 const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
 function midpoint(t){
@@ -291,42 +387,90 @@ function midpoint(t){
   y:(t[0].clientY+t[1].clientY)/2-sr.top
  };
 }
-
-stage.addEventListener('touchstart',e=>{
- if(!doc||e.touches.length!==2||!baseViewport)return;
+function beginPinch(touches){
+ stopInertia();
+ pan=null;
  hideDetail(true);
- const m=midpoint(e.touches);
+ const m=midpoint(touches);
  const wr=canvasWrap.getBoundingClientRect();
  pinch={
-  d:dist(e.touches),
+  d:dist(touches),
   z:zoom,
   ax:clamp((m.clientX-wr.left)/Math.max(1,wr.width),0,1),
   ay:clamp((m.clientY-wr.top)/Math.max(1,wr.height),0,1)
  };
-},{passive:true});
-
-stage.addEventListener('touchmove',e=>{
- if(!pinch||e.touches.length!==2)return;
- e.preventDefault();
-
- const m=midpoint(e.touches);
- zoom=clamp(pinch.z*(dist(e.touches)/pinch.d),1,MAX_ZOOM);
+}
+function movePinch(touches){
+ if(!pinch)return;
+ const m=midpoint(touches);
+ zoom=clamp(pinch.z*(dist(touches)/pinch.d),1,MAX_ZOOM);
  scale=fitScale*zoom;
  applyCssSize();
 
  const {w,h}=cssSize();
  const pageLeft=canvasWrap.offsetLeft;
  const pageTop=canvasWrap.offsetTop;
- stage.scrollLeft=pageLeft+pinch.ax*w-m.x;
- stage.scrollTop=pageTop+pinch.ay*h-m.y;
+ setScroll(
+  pageLeft+pinch.ax*w-m.x,
+  pageTop+pinch.ay*h-m.y
+ );
  controls();
+}
+async function finishPinch(remainingTouch=null){
+ pinch=null;
+ flash(zoomLabel());
+
+ // Quietly upgrade the navigation bitmap for the new zoom level.
+ try{
+  await renderBase(false);
+ }catch(e){
+  console.error(e);
+ }
+ if(remainingTouch){
+  beginPan(remainingTouch);
+ }else{
+  scheduleDetail(25);
+ }
+}
+
+stage.addEventListener('touchstart',e=>{
+ if(!doc)return;
+ if(e.touches.length===1&&!pinch){
+  e.preventDefault();
+  beginPan(e.touches[0]);
+ }else if(e.touches.length===2){
+  e.preventDefault();
+  beginPinch(e.touches);
+ }
+},{passive:false});
+
+stage.addEventListener('touchmove',e=>{
+ if(!doc)return;
+ if(e.touches.length===2){
+  e.preventDefault();
+  if(!pinch)beginPinch(e.touches);
+  movePinch(e.touches);
+ }else if(e.touches.length===1&&pan&&!pinch){
+  e.preventDefault();
+  movePan(e.touches[0]);
+ }
 },{passive:false});
 
 stage.addEventListener('touchend',e=>{
- if(!pinch||e.touches.length>=2)return;
+ if(!doc)return;
+ if(pinch&&e.touches.length<2){
+  const remaining=e.touches.length===1?e.touches[0]:null;
+  finishPinch(remaining);
+  return;
+ }
+ if(pan&&e.touches.length===0)finishPan();
+},{passive:true});
+
+stage.addEventListener('touchcancel',()=>{
  pinch=null;
- flash(zoomLabel());
- scheduleDetail(60);
+ pan=null;
+ stopInertia();
+ scheduleDetail(20);
 },{passive:true});
 
 controls();
