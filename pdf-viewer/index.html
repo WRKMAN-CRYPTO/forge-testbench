@@ -14,7 +14,8 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
 .fileBtn{margin-right:auto}.fileBtn input{display:none}button:disabled{opacity:.35}
 #pageInfo{font-variant-numeric:tabular-nums;font-size:13px;min-width:54px;text-align:center}
 #stage{position:relative;flex:1;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:pan-x pan-y pinch-zoom;background:#0c0f12}
-#sheet{position:relative;min-width:100%;min-height:100%;padding:16px}\n#canvasWrap{width:max-content;height:max-content;margin:0 auto}
+#sheet{position:relative;min-width:100%;min-height:100%;padding:16px}
+#canvasWrap{width:max-content;height:max-content;margin:0 auto}
 canvas{display:block;background:white;box-shadow:0 4px 22px #0008}
 #empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:30px;color:#8f9aa6;pointer-events:none}
 #empty strong{display:block;color:#dce2e8;font-size:20px;margin-bottom:8px}
@@ -60,7 +61,8 @@ async function render(){
  baseViewport=raw;
  const dpr=Math.min(devicePixelRatio||1,2.5);
  canvas.width=Math.floor(viewport.width*dpr);canvas.height=Math.floor(viewport.height*dpr);
- canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';\n canvasWrap.style.width=viewport.width+'px';canvasWrap.style.height=viewport.height+'px';
+ canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';
+ canvasWrap.style.width=viewport.width+'px';canvasWrap.style.height=viewport.height+'px';
  renderTask=page.render({canvasContext:ctx,viewport,transform:[dpr,0,0,dpr,0,0]});
  try{await renderTask.promise}catch(e){if(e?.name!=='RenderingCancelledException')throw e}
  controls();
