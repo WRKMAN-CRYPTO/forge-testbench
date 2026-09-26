@@ -83,6 +83,8 @@ const RECENT_LIMIT=6;
 const RECENT_DB='forge-blueprint-engine';
 const RECENT_STORE='recent-pdfs';
 let recentDbPromise=null;
+let currentRecentKey=null;
+let viewSaveTimer=0;
 
 // Whole-page safety net. This is never our deep-zoom source of truth.
 const OVERVIEW_MAX_PIXELS=14000000;
@@ -162,16 +164,55 @@ async function getRecents(){
  const rows=await requestResult(tx.objectStore(RECENT_STORE).getAll());
  return rows.sort((a,b)=>b.lastOpened-a.lastOpened);
 }
-async function saveRecent(blob){
+async function getRecent(id){
+ const db=await recentDb();
+ if(!db)return null;
+ const tx=db.transaction(RECENT_STORE,'readonly');
+ return (await requestResult(tx.objectStore(RECENT_STORE).get(id)))||null;
+}
+function captureViewState(){
+ if(!doc||!baseViewport)return null;
+ const sr=stage.getBoundingClientRect();
+ const pr=pageWrap.getBoundingClientRect();
+ return {
+  page:pageNum,
+  zoom,
+  cx:clamp((sr.left+sr.width/2-pr.left)/Math.max(1,pr.width),0,1),
+  cy:clamp((sr.top+sr.height/2-pr.top)/Math.max(1,pr.height),0,1)
+ };
+}
+async function persistCurrentViewState(){
+ clearTimeout(viewSaveTimer);
+ viewSaveTimer=0;
+ if(!currentRecentKey||!doc)return;
+ const row=await getRecent(currentRecentKey);
+ if(!row)return;
+ row.state=captureViewState();
  const db=await recentDb();
  if(!db)return;
+ const tx=db.transaction(RECENT_STORE,'readwrite');
+ tx.objectStore(RECENT_STORE).put(row);
+}
+function scheduleViewSave(delay=650){
+ clearTimeout(viewSaveTimer);
+ if(!currentRecentKey||!doc)return;
+ viewSaveTimer=setTimeout(()=>{
+  persistCurrentViewState().catch(err=>console.warn('View state save skipped',err));
+ },delay);
+}
+async function saveRecent(blob,state=null){
+ const db=await recentDb();
+ if(!db)return;
+ const id=recentId(blob);
+ const existing=await getRecent(id);
  const row={
-  id:recentId(blob),
+  id,
   name:blob.name||'Blueprint.pdf',
   size:blob.size||0,
   lastModified:blob.lastModified||0,
   lastOpened:Date.now(),
-  blob
+  blob,
+  state:state||existing?.state||null
  };
  const tx=db.transaction(RECENT_STORE,'readwrite');
  tx.objectStore(RECENT_STORE).put(row);
@@ -217,12 +258,18 @@ async function renderRecentList(){
   name.textContent=row.name;
   const meta=document.createElement('div');
   meta.className='recentMeta';
-  meta.textContent=formatBytes(row.size);
+  const stateText=row.state
+   ?' · Page '+row.state.page+' · '+(row.state.zoom===1?'Fit':row.state.zoom.toFixed(row.state.zoom<2?1:0)+'×')
+   :'';
+  meta.textContent=formatBytes(row.size)+stateText;
   btn.append(name,meta);
   btn.onclick=async()=>{
+   await persistCurrentViewState().catch(console.warn);
+   const fresh=(await getRecent(row.id))||row;
    closeRecent();
-   await openPdfBlob(row.blob,row.name);
-   touchRecent(row).then(renderRecentList).catch(console.warn);
+   await openPdfBlob(fresh.blob,fresh.name,fresh.state,fresh.id);
+   fresh.lastOpened=Date.now();
+   touchRecent(fresh).then(renderRecentList).catch(console.warn);
   };
   recentList.appendChild(btn);
  }
@@ -236,7 +283,11 @@ pdfMenuBtn.onclick=async()=>{
  await renderRecentList();
 };
 recentScrim.onclick=closeRecent;
-openNewBtn.onclick=()=>{closeRecent();file.click()};
+openNewBtn.onclick=()=>{
+ persistCurrentViewState().catch(console.warn);
+ closeRecent();
+ file.click();
+};
 
 function flash(msg){
  status.textContent=msg;
@@ -295,7 +346,18 @@ function setScroll(x,y){
  const ny=clamp(y,0,maxY);
  stage.scrollLeft=nx;
  stage.scrollTop=ny;
+ scheduleViewSave();
  return {x:nx,y:ny,hitX:nx!==x,hitY:ny!==y};
+}
+function restoreViewPosition(state){
+ if(!state||!baseViewport)return;
+ const {w,h}=cssSize();
+ const cx=clamp(Number.isFinite(state.cx)?state.cx:.5,0,1);
+ const cy=clamp(Number.isFinite(state.cy)?state.cy:.5,0,1);
+ setScroll(
+  pageWrap.offsetLeft+cx*w-stage.clientWidth/2,
+  pageWrap.offsetTop+cy*h-stage.clientHeight/2
+ );
 }
 
 async function renderOverview(reloadPage=false){
@@ -570,6 +632,7 @@ async function fitPage(){
  applyCssSize();
  stage.scrollTo(0,0);
  controls();
+ scheduleViewSave(100);
  flash('Fit · 1×');
 }
 async function changePage(delta){
@@ -584,10 +647,12 @@ async function changePage(delta){
  currentPage=await doc.getPage(pageNum);
  await renderOverview(false);
  stage.scrollTo(0,0);
+ scheduleViewSave(100);
  flash('Fit · 1×');
 }
 
-async function openPdfBlob(blob,name='Blueprint.pdf'){
+async function openPdfBlob(blob,name='Blueprint.pdf',savedState=null,recentKey=null){
+ await persistCurrentViewState().catch(console.warn);
  stopInertia();
  clearTiles();
  flash('Loading…');
@@ -597,21 +662,32 @@ async function openPdfBlob(blob,name='Blueprint.pdf'){
  if(doc){try{await doc.destroy()}catch{}}
 
  doc=await pdfjsLib.getDocument({data}).promise;
- pageNum=1;
- zoom=1;
- currentPage=await doc.getPage(1);
+ currentRecentKey=recentKey||recentId(blob);
+ pageNum=clamp(savedState?.page||1,1,doc.numPages);
+ zoom=clamp(savedState?.zoom||1,1,MAX_ZOOM);
+ currentPage=await doc.getPage(pageNum);
  empty.style.display='none';
  await renderOverview(false);
- stage.scrollTo(0,0);
- flash(name);
+
+ if(savedState){
+  restoreViewPosition(savedState);
+  scheduleTileUpdate();
+  flash(name+' · resumed');
+ }else{
+  stage.scrollTo(0,0);
+  flash(name);
+ }
+ scheduleViewSave(200);
 }
 
 file.addEventListener('change',async()=>{
  const picked=file.files[0];
  if(!picked)return;
  try{
-  await openPdfBlob(picked,picked.name);
-  saveRecent(picked).then(renderRecentList).catch(err=>{
+  const id=recentId(picked);
+  const existing=await getRecent(id);
+  await openPdfBlob(picked,picked.name,existing?.state||null,id);
+  saveRecent(picked,existing?.state||null).then(renderRecentList).catch(err=>{
    console.warn('Recent save skipped',err);
   });
  }catch(e){
@@ -717,6 +793,7 @@ function startInertia(vx,vy){
    inertiaRaf=0;
    motionVX=0;motionVY=0;
    scheduleTileUpdate();
+   scheduleViewSave(120);
   }
  };
  inertiaRaf=requestAnimationFrame(frame);
@@ -767,6 +844,7 @@ function movePinch(touches){
 function finishPinch(remainingTouch=null){
  pinch=null;
  flash(zoomLabel());
+ scheduleViewSave(180);
 
  clearTiles();
  tilesEl.style.display='block';
@@ -823,7 +901,15 @@ stage.addEventListener('touchcancel',()=>{
  stopInertia();
  tilesEl.style.display='block';
  scheduleTileUpdate();
+ scheduleViewSave(120);
 },{passive:true});
+
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='hidden')persistCurrentViewState().catch(console.warn);
+});
+window.addEventListener('pagehide',()=>{
+ persistCurrentViewState().catch(console.warn);
+});
 
 controls();
 </script>
