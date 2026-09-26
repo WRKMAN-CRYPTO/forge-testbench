@@ -1,0 +1,11 @@
+{
+  "name":"PANEL TRACE",
+  "short_name":"PANEL TRACE",
+  "description":"A local-first breaker panel circuit map.",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#0b0f13",
+  "theme_color":"#11161b",
+  "icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
