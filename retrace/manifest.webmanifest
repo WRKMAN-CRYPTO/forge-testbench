@@ -1,0 +1,18 @@
+{
+  "name": "RETRACE",
+  "short_name": "RETRACE",
+  "description": "Capture disassembly steps and replay them backward for reassembly.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c0f12",
+  "theme_color": "#11151a",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
