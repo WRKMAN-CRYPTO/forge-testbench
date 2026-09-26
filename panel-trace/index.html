@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#11161b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PANEL TRACE">
+  <title>PANEL TRACE</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">▥</div>
+      <div class="brand-copy"><strong>PANEL TRACE</strong><small>LOCAL CIRCUIT MAP</small></div>
+      <button id="menuBtn" class="icon-btn" type="button" aria-label="Open tools">•••</button>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">FIND THE RIGHT BREAKER FAST</p>
+        <h1>What does breaker <span id="heroNumber">17</span> actually kill?</h1>
+        <p>Build the panel map once. Search rooms, outlets, lights, appliances, or breaker numbers later.</p>
+      </section>
+
+      <section class="search-panel">
+        <label class="sr-only" for="searchInput">Search circuits</label>
+        <div class="search-wrap">
+          <span aria-hidden="true">⌕</span>
+          <input id="searchInput" type="search" inputmode="search" autocomplete="off" placeholder="Search kitchen, GFCI, 17…">
+          <button id="clearSearchBtn" class="clear-btn" type="button" aria-label="Clear search" hidden>×</button>
+        </div>
+        <div class="filter-row" role="group" aria-label="Circuit filter">
+          <button class="filter active" type="button" data-filter="all">All</button>
+          <button class="filter" type="button" data-filter="unknown">Unknown</button>
+          <button class="filter" type="button" data-filter="needs-test">Needs test</button>
+        </div>
+      </section>
+
+      <section class="section-head">
+        <div><h2>Your panel</h2><p id="summaryText">No circuits mapped yet.</p></div>
+        <button id="addBtn" class="primary compact" type="button">+ Add</button>
+      </section>
+
+      <section id="circuitList" class="circuit-list" aria-live="polite"></section>
+      <section id="emptyState" class="empty-state">
+        <div class="empty-icon">▥</div>
+        <strong>Blank panel. Good starting point.</strong>
+        <p>Add a breaker, then write down what turns off when you test it.</p>
+        <button id="emptyAddBtn" class="primary" type="button">Map first breaker</button>
+      </section>
+    </main>
+
+    <section id="toolsSheet" class="sheet" hidden aria-label="Tools">
+      <div class="sheet-card">
+        <div class="sheet-grab" aria-hidden="true"></div>
+        <div class="sheet-head">
+          <div><p class="eyebrow">TOOLS</p><h2>Panel utilities</h2></div>
+          <button id="closeToolsBtn" class="icon-btn" type="button" aria-label="Close tools">×</button>
+        </div>
+        <button id="exportBtn" class="sheet-action" type="button"><span>⇧</span><div><strong>Export backup</strong><small>Download your panel as JSON</small></div></button>
+        <label class="sheet-action" for="importInput"><span>⇩</span><div><strong>Import backup</strong><small>Restore a PANEL TRACE JSON file</small></div></label>
+        <input id="importInput" type="file" accept="application/json,.json" hidden>
+        <button id="resetBtn" class="sheet-action danger" type="button"><span>×</span><div><strong>Clear panel</strong><small>Erase all saved circuits on this device</small></div></button>
+        <p class="safety-note">PANEL TRACE is a label and memory tool. Do not remove the panel cover or work on energized equipment to use it.</p>
+      </div>
+    </section>
+
+    <section id="editorSheet" class="sheet" hidden aria-label="Circuit editor">
+      <form id="circuitForm" class="sheet-card editor-card">
+        <div class="sheet-grab" aria-hidden="true"></div>
+        <div class="sheet-head">
+          <div><p id="editorEyebrow" class="eyebrow">NEW CIRCUIT</p><h2 id="editorTitle">Map a breaker</h2></div>
+          <button id="closeEditorBtn" class="icon-btn" type="button" aria-label="Close editor">×</button>
+        </div>
+        <div class="field-grid two">
+          <label>Breaker<input id="numberInput" type="text" inputmode="numeric" maxlength="8" placeholder="17" required></label>
+          <label>Amps<input id="ampsInput" type="text" inputmode="numeric" maxlength="5" placeholder="20"></label>
+        </div>
+        <label>Panel label<input id="labelInput" type="text" maxlength="80" placeholder="Kitchen small appliance" required></label>
+        <label>What it controls<textarea id="controlsInput" rows="3" maxlength="260" placeholder="Counter outlets, island outlet, pantry light"></textarea></label>
+        <label>Locations / search words<input id="tagsInput" type="text" maxlength="160" placeholder="kitchen, island, pantry, GFCI"></label>
+        <label>Notes<textarea id="notesInput" rows="2" maxlength="220" placeholder="Anything useful next time"></textarea></label>
+        <label class="check-row"><input id="verifiedInput" type="checkbox"><span><strong>Tested and verified</strong><small>I confirmed what this breaker controls.</small></span></label>
+        <div class="editor-actions">
+          <button id="deleteBtn" class="secondary danger-text" type="button" hidden>Delete</button>
+          <button class="primary grow" type="submit">Save circuit</button>
+        </div>
+      </form>
+    </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>
