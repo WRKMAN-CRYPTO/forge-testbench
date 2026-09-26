@@ -1,0 +1,77 @@
+:root {
+      color-scheme: dark;
+      --bg: #0b0d0f;
+      --panel: #13171b;
+      --panel-2: #191f24;
+      --line: #2a3239;
+      --text: #f0f4f6;
+      --muted: #9da8b0;
+      --hot: #d8ff3e;
+      --hot-ink: #111500;
+      --danger: #ff756b;
+      --radius: 18px;
+      --safe-bottom: max(18px, env(safe-area-inset-bottom));
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    body { -webkit-tap-highlight-color: transparent; }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100dvh; max-width: 760px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 16px var(--safe-bottom); display: flex; flex-direction: column; gap: 14px; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+    .brand { letter-spacing: .08em; font-weight: 900; font-size: clamp(21px, 7vw, 30px); line-height: 1; }
+    .brand span { color: var(--hot); }
+    .sub { margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .tiny-btn { min-width: 48px; min-height: 44px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); padding: 0 12px; }
+    .status { min-height: 18px; color: var(--muted); font-size: 12px; }
+    .current { border: 1px solid var(--line); border-radius: 24px; background: linear-gradient(160deg, #171d21, #101316); overflow: hidden; min-height: 250px; display: flex; flex-direction: column; position: relative; }
+    .current.empty { justify-content: center; align-items: center; padding: 30px; text-align: center; }
+    .empty-mark { width: 72px; height: 72px; border: 2px dashed #46515a; border-radius: 24px; display: grid; place-items: center; color: var(--hot); font-size: 34px; margin-bottom: 16px; }
+    .empty h2 { margin: 0 0 8px; font-size: 20px; }
+    .empty p { margin: 0; max-width: 34ch; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .photo { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #090a0b; }
+    .card-body { padding: 17px; display: flex; flex-direction: column; gap: 14px; }
+    .eyebrow { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; }
+    .doing { font-size: 15px; line-height: 1.45; color: #d4dce1; }
+    .next-label { color: var(--hot); font-size: 11px; letter-spacing: .12em; font-weight: 900; }
+    .next { font-size: clamp(24px, 7vw, 38px); line-height: 1.08; font-weight: 900; overflow-wrap: anywhere; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--muted); font-size: 11px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 17px 17px; }
+    .btn { min-height: 50px; border: 0; border-radius: 15px; padding: 12px 14px; font-weight: 900; letter-spacing: .035em; }
+    .btn.primary { background: var(--hot); color: var(--hot-ink); }
+    .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    .btn.danger { color: var(--danger); }
+    .pin { min-height: 62px; font-size: 16px; }
+    .composer, .drawer { border: 1px solid var(--line); border-radius: 20px; background: var(--panel); padding: 15px; display: none; }
+    .composer.open, .drawer.open { display: block; }
+    .composer h2, .drawer h2 { font-size: 14px; margin: 0 0 12px; letter-spacing: .08em; }
+    label { display: block; margin: 12px 0 7px; color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+    textarea, input[type="text"], input[type="search"] { width: 100%; color: var(--text); background: #0c0f11; border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; outline: none; font-size: 16px; }
+    textarea { resize: vertical; min-height: 78px; }
+    textarea:focus, input:focus { border-color: #7e9027; box-shadow: 0 0 0 3px rgba(216,255,62,.09); }
+    .photo-row { margin-top: 12px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+    .file-label { min-height: 50px; border: 1px dashed #46515a; border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--text); font-size: 13px; padding: 10px; }
+    .file-label input { position: absolute; opacity: 0; pointer-events: none; }
+    .thumb { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; display: none; }
+    .composer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .section-row { display: flex; gap: 10px; }
+    .section-row > button { flex: 1; }
+    .history-list { display: flex; flex-direction: column; gap: 9px; margin-top: 12px; max-height: 45dvh; overflow: auto; padding-right: 2px; }
+    .hist { border: 1px solid var(--line); background: #0e1113; border-radius: 15px; padding: 12px; display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; align-items: start; }
+    .hist.done { opacity: .66; }
+    .hist-title { font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
+    .hist-sub { color: var(--muted); font-size: 11px; line-height: 1.35; margin-top: 5px; }
+    .hist-actions { display: flex; gap: 6px; }
+    .mini { min-width: 44px; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); padding: 0 10px; }
+    .settings { margin-top: 13px; border-top: 1px solid var(--line); padding-top: 13px; }
+    details summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); font-size: 12px; }
+    .backup-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; }
+    .fine { color: var(--muted); font-size: 10px; line-height: 1.45; margin-top: 9px; }
+    .toast { position: fixed; left: 50%; bottom: calc(var(--safe-bottom) + 6px); transform: translate(-50%, 18px); background: #edfcb6; color: #111500; border-radius: 999px; padding: 10px 15px; font-size: 12px; font-weight: 900; opacity: 0; pointer-events: none; transition: .18s ease; z-index: 20; max-width: calc(100vw - 30px); text-align: center; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .hidden { display: none !important; }
+    @media (min-width: 620px) {
+      .app { padding-left: 24px; padding-right: 24px; }
+      .current { min-height: 300px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
