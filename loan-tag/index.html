@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111315">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Loan Tag">
+  <title>Loan Tag</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">WRKMAN // FORGE TEST</p>
+        <h1>LOAN TAG</h1>
+      </div>
+      <div class="counter" aria-live="polite">
+        <strong id="activeCount">0</strong>
+        <span>OUT</span>
+      </div>
+    </header>
+
+    <section class="tagger" aria-labelledby="tagTitle">
+      <div class="section-head">
+        <h2 id="tagTitle">Tag a handoff</h2>
+        <span>10 seconds now beats “who has that?” later.</span>
+      </div>
+
+      <form id="loanForm" autocomplete="off">
+        <label>
+          <span>WHAT LEFT?</span>
+          <input id="itemInput" name="item" maxlength="80" required
+                 placeholder="Impact driver, book, charger…" enterkeyhint="next">
+        </label>
+
+        <label>
+          <span>WHO HAS IT?</span>
+          <input id="personInput" name="person" maxlength="80" required
+                 placeholder="Name or crew" enterkeyhint="next">
+        </label>
+
+        <label>
+          <span>NOTE <em>optional</em></span>
+          <input id="noteInput" name="note" maxlength="120"
+                 placeholder="Blue case, needs battery…"
+                 enterkeyhint="done">
+        </label>
+
+        <button class="primary" type="submit">TAG IT OUT</button>
+      </form>
+    </section>
+
+    <section class="ledger" aria-labelledby="ledgerTitle">
+      <div class="section-head ledger-head">
+        <div>
+          <h2 id="ledgerTitle">Still out</h2>
+          <span id="ledgerHint">Everything you are waiting to get back.</span>
+        </div>
+        <label class="search">
+          <span class="sr-only">Filter active loans</span>
+          <input id="searchInput" type="search" placeholder="Find item or person">
+        </label>
+      </div>
+
+      <div id="warning" class="warning" hidden></div>
+      <div id="loanList" class="loan-list"></div>
+
+      <div id="emptyState" class="empty">
+        <div class="empty-tag" aria-hidden="true">↗</div>
+        <h3>Nothing is out.</h3>
+        <p>Future-you currently owes present-you zero detective work.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden>
+    <span id="toastText"></span>
+    <button id="undoButton" type="button" hidden>UNDO</button>
+  </div>
+
+  <template id="loanTemplate">
+    <article class="loan-card">
+      <div class="loan-main">
+        <p class="loan-item"></p>
+        <p class="loan-person"></p>
+        <p class="loan-note"></p>
+        <p class="loan-date"></p>
+      </div>
+      <button class="returned" type="button">RETURNED</button>
+    </article>
+  </template>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
