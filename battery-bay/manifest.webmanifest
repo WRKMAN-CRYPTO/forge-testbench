@@ -1,0 +1,18 @@
+{
+  "name": "BATTERY//BAY",
+  "short_name": "Battery Bay",
+  "description": "Pocket triage bench for loose 1.5 V alkaline batteries.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#08090b",
+  "theme_color": "#0a0b0d",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
