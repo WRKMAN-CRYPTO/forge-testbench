@@ -12,7 +12,18 @@ body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bot
 #app{height:100%;display:flex;flex-direction:column}
 header{height:54px;flex:none;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#171b20;border-bottom:1px solid #2a3037}
 button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border-radius:9px;min-width:40px;height:38px;padding:0 11px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center}
-.fileBtn{margin-right:auto}.fileBtn input{display:none}button:disabled{opacity:.35}
+#pdfMenuBtn{margin-right:auto}.fileBtn input,#file{display:none}button:disabled{opacity:.35}
+#recentScrim{position:fixed;inset:0;background:#0007;z-index:18;display:none}
+#recentScrim.open{display:block}
+#recentPanel{position:fixed;z-index:19;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 60px);max-height:min(62vh,520px);overflow:auto;background:#171b20;border:1px solid #343b44;border-radius:14px;box-shadow:0 18px 50px #000a;padding:10px;display:none}
+#recentPanel.open{display:block}
+#recentTop{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+#recentTop strong{margin-right:auto}
+#openNewBtn{height:34px}
+#recentList{display:flex;flex-direction:column;gap:7px}
+.recentItem{width:100%;height:auto;min-height:50px;padding:8px 10px;display:block;text-align:left}
+.recentName{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recentMeta{font-size:11px;font-weight:600;color:#9ca7b2;margin-top:3px}
 #pageInfo{font-variant-numeric:tabular-nums;font-size:13px;min-width:54px;text-align:center}
 #fit{min-width:54px;font-variant-numeric:tabular-nums}
 #stage{position:relative;flex:1;overflow:auto;-webkit-overflow-scrolling:auto;overscroll-behavior:none;touch-action:none;background:#0c0f12;user-select:none;-webkit-user-select:none}
@@ -29,13 +40,19 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
 <body>
 <div id="app">
 <header>
-<label class="fileBtn">Open PDF<input id="file" type="file" accept="application/pdf,.pdf"></label>
+<button id="pdfMenuBtn" aria-label="PDF menu">PDFs</button>
+<input id="file" type="file" accept="application/pdf,.pdf">
 <button id="prev" aria-label="Previous page">‹</button>
 <span id="pageInfo">0 / 0</span>
 <button id="next" aria-label="Next page">›</button>
 <button id="fit" aria-label="Fit page">Fit</button>
 <button id="full" aria-label="Fullscreen">⛶</button>
 </header>
+<div id="recentScrim"></div>
+<div id="recentPanel" aria-hidden="true">
+  <div id="recentTop"><strong>Recent PDFs</strong><button id="openNewBtn">Open new</button></div>
+  <div id="recentList"></div>
+</div>
 <div id="stage">
 <div id="sheet">
   <div id="pageWrap">
@@ -54,12 +71,18 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@
 
 const $=s=>document.querySelector(s);
 const file=$('#file');
+const pdfMenuBtn=$('#pdfMenuBtn'),recentPanel=$('#recentPanel'),recentScrim=$('#recentScrim');
+const recentList=$('#recentList'),openNewBtn=$('#openNewBtn');
 const overview=$('#overview'),overviewCtx=overview.getContext('2d',{alpha:false});
 const stage=$('#stage'),pageWrap=$('#pageWrap'),tilesEl=$('#tiles');
 const empty=$('#empty'),info=$('#pageInfo'),status=$('#status');
 const prev=$('#prev'),next=$('#next'),fit=$('#fit'),full=$('#full');
 
 const MAX_ZOOM=50;
+const RECENT_LIMIT=6;
+const RECENT_DB='forge-blueprint-engine';
+const RECENT_STORE='recent-pdfs';
+let recentDbPromise=null;
 
 // Whole-page safety net. This is never our deep-zoom source of truth.
 const OVERVIEW_MAX_PIXELS=14000000;
@@ -98,6 +121,123 @@ let tileUpdateRaf=0;
 let motionVX=0,motionVY=0;
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+/* ---------------- RECENT PDF STORAGE ---------------- */
+
+function requestResult(req){
+ return new Promise((resolve,reject)=>{
+  req.onsuccess=()=>resolve(req.result);
+  req.onerror=()=>reject(req.error);
+ });
+}
+function recentDb(){
+ if(!('indexedDB' in window))return Promise.resolve(null);
+ if(recentDbPromise)return recentDbPromise;
+ recentDbPromise=new Promise((resolve,reject)=>{
+  const req=indexedDB.open(RECENT_DB,1);
+  req.onupgradeneeded=()=>{
+   const db=req.result;
+   if(!db.objectStoreNames.contains(RECENT_STORE))db.createObjectStore(RECENT_STORE,{keyPath:'id'});
+  };
+  req.onsuccess=()=>resolve(req.result);
+  req.onerror=()=>reject(req.error);
+ }).catch(err=>{
+  console.warn('Recent PDF storage unavailable',err);
+  return null;
+ });
+ return recentDbPromise;
+}
+function recentId(blob){
+ return [blob.name||'pdf',blob.size||0,blob.lastModified||0].join('|');
+}
+function formatBytes(n){
+ if(n<1024)return n+' B';
+ if(n<1048576)return (n/1024).toFixed(1)+' KB';
+ return (n/1048576).toFixed(n<10485760?1:0)+' MB';
+}
+async function getRecents(){
+ const db=await recentDb();
+ if(!db)return [];
+ const tx=db.transaction(RECENT_STORE,'readonly');
+ const rows=await requestResult(tx.objectStore(RECENT_STORE).getAll());
+ return rows.sort((a,b)=>b.lastOpened-a.lastOpened);
+}
+async function saveRecent(blob){
+ const db=await recentDb();
+ if(!db)return;
+ const row={
+  id:recentId(blob),
+  name:blob.name||'Blueprint.pdf',
+  size:blob.size||0,
+  lastModified:blob.lastModified||0,
+  lastOpened:Date.now(),
+  blob
+ };
+ const tx=db.transaction(RECENT_STORE,'readwrite');
+ tx.objectStore(RECENT_STORE).put(row);
+ await new Promise((resolve,reject)=>{
+  tx.oncomplete=resolve;
+  tx.onerror=()=>reject(tx.error);
+  tx.onabort=()=>reject(tx.error);
+ });
+ const rows=await getRecents();
+ if(rows.length>RECENT_LIMIT){
+  const trim=db.transaction(RECENT_STORE,'readwrite');
+  for(const stale of rows.slice(RECENT_LIMIT))trim.objectStore(RECENT_STORE).delete(stale.id);
+ }
+}
+async function touchRecent(row){
+ const db=await recentDb();
+ if(!db)return;
+ row.lastOpened=Date.now();
+ const tx=db.transaction(RECENT_STORE,'readwrite');
+ tx.objectStore(RECENT_STORE).put(row);
+}
+function closeRecent(){
+ recentPanel.classList.remove('open');
+ recentScrim.classList.remove('open');
+ recentPanel.setAttribute('aria-hidden','true');
+}
+async function renderRecentList(){
+ recentList.replaceChildren();
+ const rows=await getRecents();
+ if(!rows.length){
+  const emptyRow=document.createElement('div');
+  emptyRow.className='recentMeta';
+  emptyRow.style.padding='10px 4px';
+  emptyRow.textContent='No recent PDFs yet.';
+  recentList.appendChild(emptyRow);
+  return;
+ }
+ for(const row of rows){
+  const btn=document.createElement('button');
+  btn.className='recentItem';
+  const name=document.createElement('div');
+  name.className='recentName';
+  name.textContent=row.name;
+  const meta=document.createElement('div');
+  meta.className='recentMeta';
+  meta.textContent=formatBytes(row.size);
+  btn.append(name,meta);
+  btn.onclick=async()=>{
+   closeRecent();
+   await openPdfBlob(row.blob,row.name);
+   touchRecent(row).then(renderRecentList).catch(console.warn);
+  };
+  recentList.appendChild(btn);
+ }
+}
+pdfMenuBtn.onclick=async()=>{
+ const opening=!recentPanel.classList.contains('open');
+ if(!opening){closeRecent();return}
+ recentPanel.classList.add('open');
+ recentScrim.classList.add('open');
+ recentPanel.setAttribute('aria-hidden','false');
+ await renderRecentList();
+};
+recentScrim.onclick=closeRecent;
+openNewBtn.onclick=()=>{closeRecent();file.click()};
+
 function flash(msg){
  status.textContent=msg;
  status.style.display='block';
@@ -447,25 +587,38 @@ async function changePage(delta){
  flash('Fit · 1×');
 }
 
+async function openPdfBlob(blob,name='Blueprint.pdf'){
+ stopInertia();
+ clearTiles();
+ flash('Loading…');
+
+ const data=new Uint8Array(await blob.arrayBuffer());
+ if(overviewTask){try{overviewTask.cancel()}catch{}}
+ if(doc){try{await doc.destroy()}catch{}}
+
+ doc=await pdfjsLib.getDocument({data}).promise;
+ pageNum=1;
+ zoom=1;
+ currentPage=await doc.getPage(1);
+ empty.style.display='none';
+ await renderOverview(false);
+ stage.scrollTo(0,0);
+ flash(name);
+}
+
 file.addEventListener('change',async()=>{
  const picked=file.files[0];
  if(!picked)return;
  try{
-  stopInertia();
-  clearTiles();
-  flash('Loading…');
-  const data=new Uint8Array(await picked.arrayBuffer());
-  doc=await pdfjsLib.getDocument({data}).promise;
-  pageNum=1;
-  zoom=1;
-  currentPage=await doc.getPage(1);
-  empty.style.display='none';
-  await renderOverview(false);
-  stage.scrollTo(0,0);
-  flash(picked.name);
+  await openPdfBlob(picked,picked.name);
+  saveRecent(picked).then(renderRecentList).catch(err=>{
+   console.warn('Recent save skipped',err);
+  });
  }catch(e){
   console.error(e);
   flash('Could not open PDF');
+ }finally{
+  file.value='';
  }
 });
 
