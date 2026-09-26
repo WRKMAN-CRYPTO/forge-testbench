@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1110">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MEASURE TAG</title>
+<style>
+  :root{
+    color-scheme:dark;
+    --bg:#0d1110;
+    --panel:#151b18;
+    --panel2:#1d2521;
+    --line:#2d3933;
+    --text:#f0f5f2;
+    --muted:#93a29a;
+    --accent:#82f6a0;
+    --danger:#ff8f8f;
+    --shadow:0 18px 40px rgba(0,0,0,.26);
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg);font-family:ui-rounded,system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Rounded","Segoe UI",sans-serif}
+  body{margin:0;min-height:100svh;background:
+    radial-gradient(circle at 50% -10%,rgba(130,246,160,.10),transparent 34rem),
+    var(--bg);color:var(--text)}
+  button,input,select{font:inherit}
+  button{touch-action:manipulation}
+  .shell{width:min(100%,620px);margin:0 auto;padding:calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 28px)}
+  header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin:4px 2px 20px}
+  .eyebrow{font-size:.72rem;letter-spacing:.18em;font-weight:900;color:var(--accent);margin-bottom:5px}
+  h1{font-size:clamp(2rem,9vw,3.45rem);letter-spacing:-.055em;line-height:.92;margin:0;font-weight:950}
+  .sub{margin:9px 0 0;color:var(--muted);line-height:1.35;max-width:28rem;font-size:.94rem}
+  .health{flex:0 0 auto;border:1px solid var(--line);background:rgba(21,27,24,.82);border-radius:999px;padding:7px 10px;font-size:.72rem;font-weight:800;color:var(--muted);white-space:nowrap}
+  .health.good{color:var(--accent);border-color:rgba(130,246,160,.28)}
+  .panel{background:linear-gradient(180deg,rgba(29,37,33,.96),rgba(21,27,24,.96));border:1px solid var(--line);border-radius:22px;padding:14px;box-shadow:var(--shadow)}
+  label{display:block;color:var(--muted);font-size:.73rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase;margin:2px 2px 7px}
+  .measureRow{display:grid;grid-template-columns:1fr 88px;gap:9px}
+  input,select{width:100%;border:1px solid var(--line);background:#0f1412;color:var(--text);border-radius:15px;outline:none;min-height:58px}
+  input{padding:0 15px;font-size:1.18rem}
+  #measure{font-size:1.6rem;font-weight:900;letter-spacing:-.02em}
+  select{padding:0 10px;text-align:center;font-weight:900}
+  input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(130,246,160,.12)}
+  .field{margin-top:11px}
+  .primary{width:100%;min-height:60px;border:0;border-radius:16px;background:var(--accent);color:#07100a;font-weight:950;font-size:1rem;margin-top:13px;box-shadow:0 10px 24px rgba(130,246,160,.12)}
+  .primary:active{transform:translateY(1px)}
+  .editBar{display:none;gap:8px;margin-top:8px}
+  .editBar.show{display:flex}
+  .ghost{flex:1;min-height:46px;border:1px solid var(--line);border-radius:13px;background:transparent;color:var(--muted);font-weight:850}
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:21px 2px 10px}
+  .toolbar h2{font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;margin:0;color:var(--muted)}
+  .share{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:12px;min-height:38px;padding:0 12px;font-size:.78rem;font-weight:850}
+  .empty{border:1px dashed var(--line);border-radius:18px;padding:28px 18px;text-align:center;color:var(--muted);line-height:1.45}
+  .stack{display:grid;gap:10px}
+  .card{border:1px solid var(--line);background:rgba(21,27,24,.94);border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
+  .cardTop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  .value{font-size:1.72rem;line-height:1;font-weight:950;letter-spacing:-.045em;word-break:break-word}
+  .unit{font-size:.82rem;color:var(--accent);font-weight:900;margin-left:5px;letter-spacing:.04em}
+  .age{font-size:.72rem;color:var(--muted);white-space:nowrap;margin-top:3px}
+  .what{font-size:1rem;margin-top:9px;font-weight:780;word-break:break-word}
+  .exact{font-size:.72rem;color:var(--muted);margin-top:5px}
+  .actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:13px}
+  .actions button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:11px;min-height:42px;font-size:.74rem;font-weight:850}
+  .actions .delete{color:var(--danger)}
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 16px);transform:translate(-50%,140%);width:min(calc(100% - 28px),540px);background:#eef6f1;color:#101511;border-radius:15px;padding:10px 11px 10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 18px 50px rgba(0,0,0,.36);transition:transform .18s ease;z-index:20;font-size:.88rem;font-weight:780}
+  .toast.show{transform:translate(-50%,0)}
+  .toast button{border:0;background:#0d1110;color:white;border-radius:10px;padding:9px 12px;font-weight:900}
+  .notice{margin:10px 2px 0;color:var(--danger);font-size:.78rem;line-height:1.35;display:none}
+  .notice.show{display:block}
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header>
+    <div>
+      <div class="eyebrow">WRKMAN // FORGE</div>
+      <h1>MEASURE<br>TAG</h1>
+      <p class="sub">Catch the number <strong>with its meaning</strong> before you walk away.</p>
+    </div>
+    <div id="health" class="health">Checking storage</div>
+  </header>
+
+  <section class="panel" aria-label="Add measurement">
+    <label for="measure">Measurement</label>
+    <div class="measureRow">
+      <input id="measure" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="82 3/8">
+      <select id="unit" aria-label="Unit">
+        <option value="in">in</option>
+        <option value="ft">ft</option>
+        <option value="mm">mm</option>
+        <option value="cm">cm</option>
+        <option value="">raw</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="label">What was it?</label>
+      <input id="label" autocomplete="off" placeholder="Valve centerline">
+    </div>
+
+    <button id="save" class="primary">TAG IT</button>
+    <div id="editBar" class="editBar">
+      <button id="cancelEdit" class="ghost">Cancel edit</button>
+    </div>
+    <div id="notice" class="notice" role="status"></div>
+  </section>
+
+  <div class="toolbar">
+    <h2 id="count">Recent tags</h2>
+    <button id="share" class="share">Share all</button>
+  </div>
+
+  <section id="stack" class="stack" aria-live="polite"></section>
+</main>
+
+<div id="toast" class="toast" role="status">
+  <span id="toastText">Deleted.</span>
+  <button id="undo">UNDO</button>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const KEY = "forge.measure-tag.v1";
+  const BACKUP = "forge.measure-tag.v1.backup";
+  const VERSION = 1;
+
+  const els = {
+    measure: document.querySelector("#measure"),
+    unit: document.querySelector("#unit"),
+    label: document.querySelector("#label"),
+    save: document.querySelector("#save"),
+    editBar: document.querySelector("#editBar"),
+    cancelEdit: document.querySelector("#cancelEdit"),
+    stack: document.querySelector("#stack"),
+    count: document.querySelector("#count"),
+    share: document.querySelector("#share"),
+    health: document.querySelector("#health"),
+    notice: document.querySelector("#notice"),
+    toast: document.querySelector("#toast"),
+    toastText: document.querySelector("#toastText"),
+    undo: document.querySelector("#undo")
+  };
+
+  let state = { items: [], editingId: null };
+  let storageHealthy = true;
+  let deleted = null;
+  let toastTimer = null;
+
+  function isValidItem(x) {
+    return x && typeof x.id === "string" && typeof x.value === "string" &&
+      typeof x.unit === "string" && typeof x.label === "string" &&
+      Number.isFinite(x.createdAt);
+  }
+
+  function parsePayload(raw) {
+    if (!raw) return { version: VERSION, items: [] };
+    const data = JSON.parse(raw);
+    if (!data || data.version !== VERSION || !Array.isArray(data.items)) {
+      throw new Error("Unsupported saved data");
+    }
+    return { version: VERSION, items: data.items.filter(isValidItem) };
+  }
+
+  function load() {
+    try {
+      const primary = localStorage.getItem(KEY);
+      const data = parsePayload(primary);
+      state.items = data.items;
+      setHealth(true, "Saved on this phone");
+      return;
+    } catch (primaryError) {
+      try {
+        const backup = localStorage.getItem(BACKUP);
+        const data = parsePayload(backup);
+        state.items = data.items;
+        localStorage.setItem(KEY, JSON.stringify(data));
+        setHealth(true, "Recovered backup");
+        showNotice("The newest save was damaged, so MEASURE TAG recovered the previous copy.");
+        return;
+      } catch (backupError) {
+        storageHealthy = false;
+        state.items = [];
+        setHealth(false, "Storage needs attention");
+        showNotice("Saved data could not be read. It was left untouched, and new saves are disabled to avoid overwriting it.");
+      }
+    }
+  }
+
+  function setHealth(good, text) {
+    els.health.textContent = text;
+    els.health.classList.toggle("good", good);
+  }
+
+  function showNotice(text) {
+    els.notice.textContent = text;
+    els.notice.classList.add("show");
+  }
+
+  function clearNotice() {
+    els.notice.textContent = "";
+    els.notice.classList.remove("show");
+  }
+
+  function persist() {
+    if (!storageHealthy) return false;
+    const payload = JSON.stringify({ version: VERSION, items: state.items });
+    try {
+      const current = localStorage.getItem(KEY);
+      if (current) localStorage.setItem(BACKUP, current);
+      localStorage.setItem(KEY, payload);
+      setHealth(true, "Saved on this phone");
+      return true;
+    } catch (err) {
+      storageHealthy = false;
+      setHealth(false, "Tab only");
+      showNotice("This browser blocked storage. Your current list still works in this tab, but it may disappear when the tab closes.");
+      return false;
+    }
+  }
+
+  function makeId() {
+    if (crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    return String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+  }
+
+  function normalizeText(s, max) {
+    return String(s || "").trim().replace(/\s+/g, " ").slice(0, max);
+  }
+
+  function saveTag() {
+    clearNotice();
+    const value = normalizeText(els.measure.value, 48);
+    const label = normalizeText(els.label.value, 100);
+    const unit = els.unit.value;
+
+    if (!value) {
+      showNotice("Give the measurement a number first.");
+      els.measure.focus();
+      return;
+    }
+    if (!label) {
+      showNotice("Give the number a name so Future You knows what it belonged to.");
+      els.label.focus();
+      return;
+    }
+
+    if (state.editingId) {
+      const item = state.items.find(x => x.id === state.editingId);
+      if (item) {
+        item.value = value;
+        item.unit = unit;
+        item.label = label;
+        item.updatedAt = Date.now();
+      }
+      state.editingId = null;
+    } else {
+      state.items.unshift({
+        id: makeId(),
+        value,
+        unit,
+        label,
+        createdAt: Date.now()
+      });
+    }
+
+    persist();
+    resetForm();
+    render();
+    els.measure.focus();
+  }
+
+  function resetForm() {
+    els.measure.value = "";
+    els.label.value = "";
+    els.save.textContent = "TAG IT";
+    els.editBar.classList.remove("show");
+    state.editingId = null;
+  }
+
+  function startEdit(id) {
+    const item = state.items.find(x => x.id === id);
+    if (!item) return;
+    state.editingId = id;
+    els.measure.value = item.value;
+    els.unit.value = item.unit;
+    els.label.value = item.label;
+    els.save.textContent = "UPDATE TAG";
+    els.editBar.classList.add("show");
+    els.measure.focus();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function removeTag(id) {
+    const index = state.items.findIndex(x => x.id === id);
+    if (index < 0) return;
+    deleted = { item: state.items[index], index };
+    state.items.splice(index, 1);
+    if (state.editingId === id) resetForm();
+    persist();
+    render();
+    showToast("Tag deleted.");
+  }
+
+  function undoDelete() {
+    if (!deleted) return;
+    const at = Math.min(deleted.index, state.items.length);
+    state.items.splice(at, 0, deleted.item);
+    deleted = null;
+    persist();
+    render();
+    hideToast();
+  }
+
+  function showToast(text) {
+    els.toastText.textContent = text;
+    els.toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      deleted = null;
+      hideToast();
+    }, 7000);
+  }
+
+  function hideToast() {
+    els.toast.classList.remove("show");
+    clearTimeout(toastTimer);
+  }
+
+  function age(ts) {
+    const ms = Math.max(0, Date.now() - ts);
+    const min = Math.floor(ms / 60000);
+    if (min < 1) return "just now";
+    if (min < 60) return min + "m ago";
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return hr + "h ago";
+    const day = Math.floor(hr / 24);
+    if (day < 7) return day + "d ago";
+    return new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
+  }
+
+  function exactTime(ts) {
+    return new Date(ts).toLocaleString([], {
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+    });
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Copied.");
+      els.undo.style.display = "none";
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        hideToast();
+        els.undo.style.display = "";
+      }, 1800);
+    } catch (err) {
+      showNotice("Copy was blocked by the browser.");
+    }
+  }
+
+  function itemText(item) {
+    return item.value + (item.unit ? " " + item.unit : "") + " — " + item.label;
+  }
+
+  async function shareAll() {
+    if (!state.items.length) {
+      showNotice("There is nothing to share yet.");
+      return;
+    }
+    const text = "MEASURE TAG\n\n" + state.items.map(item =>
+      itemText(item) + "  [" + exactTime(item.createdAt) + "]"
+    ).join("\n");
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "MEASURE TAG", text });
+        return;
+      } catch (err) {
+        if (err && err.name === "AbortError") return;
+      }
+    }
+    copyText(text);
+  }
+
+  function makeButton(text, className, action) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = text;
+    if (className) b.className = className;
+    b.addEventListener("click", action);
+    return b;
+  }
+
+  function render() {
+    els.stack.replaceChildren();
+    els.count.textContent = state.items.length ? "Recent tags · " + state.items.length : "Recent tags";
+
+    if (!state.items.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No loose numbers yet. Tag the first measurement above.";
+      els.stack.appendChild(empty);
+      return;
+    }
+
+    state.items.forEach(item => {
+      const card = document.createElement("article");
+      card.className = "card";
+
+      const top = document.createElement("div");
+      top.className = "cardTop";
+
+      const value = document.createElement("div");
+      value.className = "value";
+      value.append(document.createTextNode(item.value));
+      if (item.unit) {
+        const unit = document.createElement("span");
+        unit.className = "unit";
+        unit.textContent = item.unit;
+        value.appendChild(unit);
+      }
+
+      const ageEl = document.createElement("div");
+      ageEl.className = "age";
+      ageEl.dataset.ts = item.createdAt;
+      ageEl.textContent = age(item.createdAt);
+
+      top.append(value, ageEl);
+
+      const what = document.createElement("div");
+      what.className = "what";
+      what.textContent = item.label;
+
+      const exact = document.createElement("div");
+      exact.className = "exact";
+      exact.textContent = exactTime(item.createdAt) + (item.updatedAt ? " · edited" : "");
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      actions.append(
+        makeButton("COPY", "", () => copyText(itemText(item))),
+        makeButton("EDIT", "", () => startEdit(item.id)),
+        makeButton("DELETE", "delete", () => removeTag(item.id))
+      );
+
+      card.append(top, what, exact, actions);
+      els.stack.appendChild(card);
+    });
+  }
+
+  els.save.addEventListener("click", saveTag);
+  els.cancelEdit.addEventListener("click", () => {
+    resetForm();
+    clearNotice();
+    els.measure.focus();
+  });
+  els.share.addEventListener("click", shareAll);
+  els.undo.addEventListener("click", undoDelete);
+
+  els.measure.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      els.label.focus();
+    }
+  });
+  els.label.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveTag();
+    }
+  });
+
+  setInterval(() => {
+    document.querySelectorAll("[data-ts]").forEach(el => {
+      el.textContent = age(Number(el.dataset.ts));
+    });
+  }, 30000);
+
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
