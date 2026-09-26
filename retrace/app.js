@@ -105,7 +105,7 @@
     el.recordView.hidden = name !== "record";
     el.rebuildView.hidden = name !== "rebuild";
     el.homeBtn.hidden = name === "home";
-    window.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }
 
   function clearRenderUrls() {
@@ -363,7 +363,7 @@
 
     job.steps.splice(index, 1);
     job.updatedAt = Date.now();
-    job.reassemblyDone = Math.min(job.reassemblyDone || 0, job.steps.length);
+    job.reassemblyDone = 0;
     await putJob(job);
     await renderRecord();
     toast("Step removed.");
