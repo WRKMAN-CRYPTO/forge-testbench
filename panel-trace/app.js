@@ -101,8 +101,9 @@
     const total = state.circuits.length;
     const verified = state.circuits.filter((c) => c.verified).length;
     els.clearSearch.hidden = !state.query;
-    els.empty.hidden = total !== 0 || Boolean(state.query) || state.filter !== 'all';
-    els.list.hidden = visible.length === 0;
+    const hasSearchContext = Boolean(state.query) || state.filter !== 'all';
+    els.empty.hidden = total !== 0 || hasSearchContext;
+    els.list.hidden = visible.length === 0 && total === 0 && !hasSearchContext;
     els.summary.textContent = total ? `${total} mapped • ${verified} verified` : 'No circuits mapped yet.';
 
     const firstNum = state.circuits.length ? [...state.circuits].sort((a,b)=>sortKey(a.number)-sortKey(b.number))[0].number : '17';
@@ -237,7 +238,7 @@
   async function importBackup(file) {
     try {
       const parsed = JSON.parse(await file.text());
-      if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.circuits)) throw new Error('bad-format');
+      if (!parsed || parsed.app !== 'PANEL TRACE' || parsed.version !== 1 || !Array.isArray(parsed.circuits)) throw new Error('bad-format');
       const imported = parsed.circuits.filter(isCircuit).map(normalizeCircuit);
       if (!imported.length && parsed.circuits.length) throw new Error('no-valid');
       const message = state.circuits.length ? `Replace ${state.circuits.length} saved circuit${state.circuits.length === 1 ? '' : 's'} with ${imported.length} imported?` : `Import ${imported.length} circuit${imported.length === 1 ? '' : 's'}?`;
