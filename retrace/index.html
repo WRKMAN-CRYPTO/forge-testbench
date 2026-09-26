@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#11151a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RETRACE">
+  <title>RETRACE</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <button id="homeBtn" class="icon-btn" type="button" aria-label="Back to jobs" hidden>‹</button>
+      <div class="brand">
+        <span class="brand-mark">↩</span>
+        <div>
+          <strong>RETRACE</strong>
+          <small>LOCAL • OFFLINE</small>
+        </div>
+      </div>
+      <div class="topbar-spacer"></div>
+    </header>
+
+    <main>
+      <section id="homeView" class="view">
+        <div class="hero">
+          <p class="eyebrow">DISASSEMBLE WITHOUT THE GUESSWORK</p>
+          <h1>Take it apart.<br>Leave yourself a trail home.</h1>
+          <p>Capture each step as you go. RETRACE plays the trail backward when it is time to put everything back together.</p>
+        </div>
+
+        <form id="newJobForm" class="panel new-job">
+          <label for="jobName">What are you taking apart?</label>
+          <div class="row">
+            <input id="jobName" name="jobName" type="text" maxlength="80" placeholder="e.g. mower carburetor" autocomplete="off">
+            <button class="primary" type="submit">Start</button>
+          </div>
+        </form>
+
+        <div class="section-head">
+          <h2>Saved jobs</h2>
+          <span id="jobCount" class="muted"></span>
+        </div>
+        <div id="jobsList" class="stack"></div>
+        <div id="emptyJobs" class="empty">
+          <div class="empty-icon">↩</div>
+          <strong>No trails yet.</strong>
+          <span>Your first teardown will live here on this device.</span>
+        </div>
+      </section>
+
+      <section id="recordView" class="view" hidden>
+        <div class="job-head">
+          <div>
+            <p class="eyebrow">CAPTURE TRAIL</p>
+            <h1 id="recordTitle"></h1>
+            <p id="recordMeta" class="muted"></p>
+          </div>
+          <button id="reassembleBtn" class="secondary" type="button">Reassemble</button>
+        </div>
+
+        <div class="panel capture-panel">
+          <label class="capture-button" for="photoInput">
+            <span class="camera-glyph">＋</span>
+            <span>
+              <strong>Add a photo</strong>
+              <small>Camera or photo library</small>
+            </span>
+          </label>
+          <input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
+          <div id="previewWrap" class="preview-wrap" hidden>
+            <img id="photoPreview" alt="Selected step photo">
+            <button id="clearPhotoBtn" class="chip danger" type="button">Remove photo</button>
+          </div>
+
+          <label for="stepNote">What changed?</label>
+          <textarea id="stepNote" rows="3" maxlength="240" placeholder="e.g. Unplugged the black connector from the left socket"></textarea>
+
+          <button id="saveStepBtn" class="primary full" type="button">Save next step</button>
+          <p class="hint">Tip: photograph the connection before you remove it.</p>
+        </div>
+
+        <div class="section-head">
+          <h2>Trail</h2>
+          <span id="stepCount" class="muted"></span>
+        </div>
+        <div id="stepsList" class="stack"></div>
+        <div id="emptySteps" class="empty compact">
+          <strong>No steps yet.</strong>
+          <span>Your newest step will appear first.</span>
+        </div>
+      </section>
+
+      <section id="rebuildView" class="view" hidden>
+        <div class="rebuild-head">
+          <p class="eyebrow">REASSEMBLY MODE</p>
+          <h1 id="rebuildTitle"></h1>
+          <p id="rebuildProgress" class="muted"></p>
+        </div>
+
+        <div id="rebuildCard" class="rebuild-card">
+          <div class="step-badge" id="rebuildBadge"></div>
+          <img id="rebuildImage" class="rebuild-image" alt="" hidden>
+          <div id="rebuildNoImage" class="no-image">No photo for this step</div>
+          <p id="rebuildNote" class="rebuild-note"></p>
+          <p id="rebuildTime" class="muted small"></p>
+
+          <div class="rebuild-actions">
+            <button id="undoRebuildBtn" class="secondary" type="button">Back one</button>
+            <button id="doneRebuildBtn" class="primary" type="button">Done →</button>
+          </div>
+        </div>
+
+        <div id="completeCard" class="complete-card" hidden>
+          <div class="complete-glyph">✓</div>
+          <h2>Back together.</h2>
+          <p>You followed every saved step back to the beginning.</p>
+          <button id="restartRebuildBtn" class="secondary full" type="button">Run the trail again</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="fatal" class="fatal" hidden></div>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>
