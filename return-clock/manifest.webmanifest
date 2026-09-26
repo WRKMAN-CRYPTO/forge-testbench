@@ -1,0 +1,13 @@
+{
+  "name": "RETURN CLOCK",
+  "short_name": "Return Clock",
+  "description": "Track return deadlines and refundable money still at risk.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#10110f",
+  "theme_color": "#10110f",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
