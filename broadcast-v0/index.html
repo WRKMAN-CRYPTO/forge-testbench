@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#050806">
+<title>WRKMAN Broadcast v0</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#050806;--panel:#0b110d;--line:#233529;--text:#edf5ef;--muted:#90a79a;
+  --green:#7bff9d;--amber:#ffb04d;--red:#ff675f;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);overflow:hidden}
+button,input{font:inherit}
+button{color:inherit}
+#app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:radial-gradient(circle at 50% -10%,#102016 0,#050806 46%)}
+header{display:flex;align-items:center;gap:10px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;border-bottom:1px solid var(--line);background:#060b08e8;backdrop-filter:blur(14px);z-index:5}
+.brand{font-weight:900;letter-spacing:.12em;font-size:12px;white-space:nowrap}.brand b{color:var(--green)}
+.statusStrip{display:flex;gap:6px;overflow:auto;scrollbar-width:none;flex:1;justify-content:flex-end}.statusStrip::-webkit-scrollbar{display:none}
+.pill{border:1px solid var(--line);border-radius:999px;padding:5px 8px;color:var(--muted);font-size:10px;letter-spacing:.08em;white-space:nowrap;background:#09100c}
+.pill.good{border-color:#2c7240;color:var(--green)}.pill.live{border-color:#7b2b28;color:#ff938d;background:#1a0908}.pill.warn{border-color:#6a4b21;color:var(--amber)}
+#viewport{position:relative;min-height:0;background:#000;overflow:hidden}
+#sourceFrame,#programCanvas{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+#sourceFrame{z-index:1;opacity:1;pointer-events:auto}
+#programCanvas{z-index:2;opacity:0;pointer-events:none;object-fit:contain}
+#viewport.output #sourceFrame{opacity:0;pointer-events:none}
+#viewport.output #programCanvas{opacity:1}
+.cornerBug{position:absolute;z-index:3;top:10px;left:10px;border:1px solid #ffffff22;background:#000a;border-radius:8px;padding:6px 8px;font-size:10px;letter-spacing:.12em;color:#dce8df;pointer-events:none}
+#viewport.output .cornerBug{display:none}
+#playbackSheet{position:absolute;z-index:8;inset:0;background:#000d;display:none;align-items:center;justify-content:center;padding:18px}
+#playbackSheet.open{display:flex}
+.playCard{width:min(100%,520px);background:#0a0f0c;border:1px solid var(--line);border-radius:16px;padding:12px;box-shadow:0 24px 80px #000}
+.playCard video{width:100%;max-height:68vh;border-radius:10px;background:#000}
+.playMeta{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:12px;margin:8px 2px 10px}
+#controls{border-top:1px solid var(--line);background:#07100bec;backdrop-filter:blur(18px);padding:8px 10px calc(10px + env(safe-area-inset-bottom));z-index:6}
+.row{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.row+.row{margin-top:7px}
+.btn{min-height:42px;border:1px solid var(--line);border-radius:11px;background:#0d1711;font-weight:800;font-size:11px;letter-spacing:.05em;padding:8px 6px}
+.btn:active{transform:translateY(1px);background:#132019}.btn.primary{background:#15351f;border-color:#2c7240;color:var(--green)}.btn.danger{background:#30100e;border-color:#6e2925;color:#ff938d}.btn:disabled{opacity:.38;filter:saturate(.3)}
+#liveBtn{grid-column:span 2}.meter{height:3px;background:#142018;border-radius:999px;overflow:hidden;margin:8px 2px 0}.meter>i{display:block;height:100%;width:0;background:var(--green);transition:width .08s linear}
+#drawer{position:absolute;z-index:10;left:0;right:0;bottom:0;transform:translateY(102%);transition:transform .2s ease;background:#07100b;border-top:1px solid var(--line);padding:12px 12px calc(14px + env(safe-area-inset-bottom));box-shadow:0 -20px 70px #000c;max-height:82vh;overflow:auto}
+#drawer.open{transform:translateY(0)}
+.drawerHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.drawerHead strong{font-size:13px;letter-spacing:.08em}.drawerHead button{border:1px solid var(--line);background:#101812;color:var(--muted);border-radius:8px;padding:6px 9px}
+label{display:block;color:var(--muted);font-size:10px;letter-spacing:.09em;margin:10px 2px 5px}
+input{width:100%;border:1px solid var(--line);border-radius:10px;background:#040705;color:var(--text);padding:11px 12px;outline:none}input:focus{border-color:#3c7b4e}
+.help{font-size:11px;line-height:1.45;color:#819488;margin-top:10px}.diag{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#9ab2a1;white-space:pre-wrap}
+.countdown{position:absolute;z-index:7;inset:0;display:none;place-items:center;background:#0008;pointer-events:none;font-weight:900;font-size:clamp(56px,20vw,120px);text-shadow:0 10px 40px #000}.countdown.on{display:grid}
+@media (min-width:760px){#app{max-width:620px;margin:auto;border-left:1px solid var(--line);border-right:1px solid var(--line)}body{background:#020302}.row{grid-template-columns:repeat(6,1fr)}#liveBtn{grid-column:span 2}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand"><b>WRKMAN</b> // BROADCAST v0</div>
+    <div class="statusStrip">
+      <div id="sourceStatus" class="pill">SOURCE WAIT</div>
+      <div id="relayStatus" class="pill">RELAY OFFLINE</div>
+    </div>
+  </header>
+
+  <main id="viewport">
+    <iframe id="sourceFrame" src="../mandel-w/" title="Mandel W source"></iframe>
+    <canvas id="programCanvas" width="720" height="1280"></canvas>
+    <div class="cornerBug">SOURCE // MANDEL-W</div>
+    <div id="countdown" class="countdown">10</div>
+    <section id="playbackSheet" aria-hidden="true">
+      <div class="playCard">
+        <video id="testVideo" controls playsinline></video>
+        <div class="playMeta"><span id="testMeta">Dry run complete</span><span id="testCodec"></span></div>
+        <button id="closePlayback" class="btn primary" style="width:100%">BACK TO BENCH</button>
+      </div>
+    </section>
+  </main>
+
+  <footer id="controls">
+    <div class="row">
+      <button id="viewBtn" class="btn">VIEW: SOURCE</button>
+      <button id="micBtn" class="btn">MIC: OFF</button>
+      <button id="aspectBtn" class="btn">OUT: 9:16</button>
+      <button id="settingsBtn" class="btn">SETTINGS</button>
+    </div>
+    <div class="row">
+      <button id="dryBtn" class="btn">10s DRY RUN</button>
+      <button id="liveBtn" class="btn primary">GO LIVE</button>
+      <button id="stopBtn" class="btn danger" disabled>STOP</button>
+    </div>
+    <div class="meter"><i id="levelBar"></i></div>
+  </footer>
+</div>
+
+<aside id="drawer" aria-hidden="true">
+  <div class="drawerHead"><strong>UPLINK</strong><button id="closeDrawer">CLOSE</button></div>
+  <label for="relayUrl">RELAY WEBSOCKET</label>
+  <input id="relayUrl" inputmode="url" placeholder="wss://relay.example.com/ingest" autocomplete="off" spellcheck="false">
+  <label for="ingestToken">RELAY TOKEN</label>
+  <input id="ingestToken" type="password" placeholder="one-time/private relay token" autocomplete="off" spellcheck="false">
+  <label for="rtmpUrl">PUMP RTMP URL</label>
+  <input id="rtmpUrl" inputmode="url" placeholder="rtmp://..." autocomplete="off" spellcheck="false">
+  <label for="streamKey">PUMP STREAM KEY</label>
+  <input id="streamKey" type="password" placeholder="never saved" autocomplete="off" spellcheck="false">
+  <div class="help">RTMP credentials live in memory only. This page does not put them in localStorage, the URL, or the source code.</div>
+  <div id="diag" class="diag">Booting diagnostics…</div>
+</aside>
+
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const frame=$('sourceFrame'),viewport=$('viewport'),program=$('programCanvas');
+const ctx=program.getContext('2d',{alpha:false,desynchronized:true});
+const sourceStatus=$('sourceStatus'),relayStatus=$('relayStatus'),diag=$('diag');
+const viewBtn=$('viewBtn'),micBtn=$('micBtn'),aspectBtn=$('aspectBtn');
+const dryBtn=$('dryBtn'),liveBtn=$('liveBtn'),stopBtn=$('stopBtn');
+const drawer=$('drawer'),settingsBtn=$('settingsBtn'),closeDrawer=$('closeDrawer');
+const relayUrl=$('relayUrl'),ingestToken=$('ingestToken'),rtmpUrl=$('rtmpUrl'),streamKey=$('streamKey');
+const countdown=$('countdown'),levelBar=$('levelBar');
+const playbackSheet=$('playbackSheet'),testVideo=$('testVideo'),testMeta=$('testMeta'),testCodec=$('testCodec');
+
+let sourceCanvas=null,sourceOverlay=null,viewOutput=false,portrait=true;
+let micStream=null,audioCtx=null,mixDest=null,micSource=null,micGain=null,analyser=null,levelRAF=0;
+let liveRecorder=null,liveSocket=null,liveStream=null,liveStarted=0,liveTimer=0,liveStopping=false,sendChain=Promise.resolve();
+let drawRAF=0,lastDraw=0;
+const FPS=30;
+
+function setPill(el,text,kind=''){
+  el.textContent=text;el.className='pill'+(kind?' '+kind:'');
+}
+function humanBytes(n){
+  if(!Number.isFinite(n))return '0 B';
+  if(n<1024)return n+' B';
+  if(n<1024*1024)return (n/1024).toFixed(1)+' KB';
+  return (n/1024/1024).toFixed(1)+' MB';
+}
+function chooseMime(){
+  if(!window.MediaRecorder)return '';
+  const candidates=[
+    'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+    'video/mp4',
+    'video/webm;codecs=h264,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm'
+  ];
+  return candidates.find(t=>MediaRecorder.isTypeSupported(t))||'';
+}
+function renderDiag(extra=''){
+  const mime=chooseMime()||'browser default';
+  const cap=typeof program.captureStream==='function'?'yes':'NO';
+  const rec=window.MediaRecorder?'yes':'NO';
+  const src=sourceCanvas?`${sourceCanvas.width}×${sourceCanvas.height}`:'waiting';
+  const out=`${program.width}×${program.height}`;
+  diag.textContent=[
+    `source canvas : ${src}`,
+    `program out   : ${out} @ ${FPS}fps`,
+    `captureStream : ${cap}`,
+    `MediaRecorder : ${rec}`,
+    `codec         : ${mime}`,
+    `mic           : ${micStream?'armed':'off'}`,
+    extra
+  ].filter(Boolean).join('\n');
+}
+function resolveSource(){
+  try{
+    const d=frame.contentDocument;
+    const c=d&&d.getElementById('fractal');
+    if(c&&c.width&&c.height){
+      sourceCanvas=c;
+      sourceOverlay=d.getElementById('orbitOverlay')||null;
+      setPill(sourceStatus,'SOURCE READY','good');
+      renderDiag();
+      return true;
+    }
+  }catch(err){renderDiag('source access failed: '+err.message)}
+  return false;
+}
+frame.addEventListener('load',()=>{
+  let tries=0;
+  const probe=()=>{
+    if(resolveSource())return;
+    if(++tries<80)setTimeout(probe,125);
+    else setPill(sourceStatus,'SOURCE ERROR','warn');
+  };
+  probe();
+});
+
+function setAspect(nextPortrait){
+  portrait=nextPortrait;
+  if(portrait){program.width=720;program.height=1280;aspectBtn.textContent='OUT: 9:16'}
+  else{program.width=1280;program.height=720;aspectBtn.textContent='OUT: 16:9'}
+  renderDiag();
+}
+function drawContain(image){
+  if(!image||!image.width||!image.height)return;
+  const sw=image.width,sh=image.height,dw=program.width,dh=program.height;
+  const s=Math.min(dw/sw,dh/sh),w=sw*s,h=sh*s,x=(dw-w)/2,y=(dh-h)/2;
+  ctx.drawImage(image,0,0,sw,sh,x,y,w,h);
+  if(sourceOverlay&&sourceOverlay.width&&sourceOverlay.height){
+    try{ctx.drawImage(sourceOverlay,0,0,sourceOverlay.width,sourceOverlay.height,x,y,w,h)}catch{}
+  }
+}
+function drawProgram(ts){
+  drawRAF=requestAnimationFrame(drawProgram);
+  if(ts-lastDraw<1000/FPS)return;
+  lastDraw=ts;
+  ctx.fillStyle='#020403';ctx.fillRect(0,0,program.width,program.height);
+  if(sourceCanvas){
+    try{drawContain(sourceCanvas)}catch(err){setPill(sourceStatus,'SOURCE ERROR','warn')}
+  }else{
+    ctx.fillStyle='#9db0a2';ctx.font=`700 ${Math.round(program.width*.035)}px system-ui`;
+    ctx.textAlign='center';ctx.fillText('WAITING FOR MANDEL-W',program.width/2,program.height/2);
+  }
+  const pad=Math.max(18,program.width*.026);
+  ctx.textAlign='left';ctx.font=`800 ${Math.max(15,Math.round(program.width*.021))}px system-ui`;
+  ctx.fillStyle='rgba(3,8,5,.72)';ctx.fillRect(pad,pad,Math.max(180,program.width*.34),Math.max(46,program.height*.04));
+  ctx.fillStyle='#7bff9d';ctx.fillText('WRKMAN // LIVE LAB',pad*1.45,pad+Math.max(30,program.height*.028));
+  ctx.textAlign='right';ctx.font=`700 ${Math.max(12,Math.round(program.width*.016))}px ui-monospace,monospace`;
+  ctx.fillStyle='#d9e5dc';ctx.fillText(new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}),program.width-pad,program.height-pad);
+}
+drawRAF=requestAnimationFrame(drawProgram);
+
+async function ensureAudio(){
+  if(!audioCtx){
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)throw new Error('Web Audio is unavailable');
+    audioCtx=new AC();
+    mixDest=audioCtx.createMediaStreamDestination();
+    micGain=audioCtx.createGain();micGain.gain.value=0;
+    analyser=audioCtx.createAnalyser();analyser.fftSize=256;
+    micGain.connect(analyser);analyser.connect(mixDest);
+  }
+  if(audioCtx.state==='suspended')await audioCtx.resume();
+  return mixDest.stream.getAudioTracks()[0];
+}
+async function enableMic(){
+  await ensureAudio();
+  if(!micStream){
+    micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});
+    micSource=audioCtx.createMediaStreamSource(micStream);
+    micSource.connect(micGain);
+  }
+  micGain.gain.value=1;
+  micBtn.textContent='MIC: ON';micBtn.classList.add('primary');
+  renderDiag();startLevelMeter();
+}
+function disableMic(){
+  if(micGain)micGain.gain.value=0;
+  micBtn.textContent='MIC: OFF';micBtn.classList.remove('primary');
+  levelBar.style.width='0%';
+}
+function micIsOn(){return !!micGain&&micGain.gain.value>0}
+function startLevelMeter(){
+  cancelAnimationFrame(levelRAF);
+  if(!analyser)return;
+  const data=new Uint8Array(analyser.fftSize);
+  const tick=()=>{
+    levelRAF=requestAnimationFrame(tick);
+    if(!micIsOn()){levelBar.style.width='0%';return}
+    analyser.getByteTimeDomainData(data);
+    let sum=0;for(const v of data){const n=(v-128)/128;sum+=n*n}
+    const rms=Math.sqrt(sum/data.length);
+    levelBar.style.width=Math.min(100,Math.round(rms*330))+'%';
+  };
+  levelRAF=requestAnimationFrame(tick);
+}
+async function programStream(){
+  if(typeof program.captureStream!=='function')throw new Error('canvas.captureStream is unavailable');
+  const audioTrack=await ensureAudio();
+  const stream=program.captureStream(FPS);
+  stream.addTrack(audioTrack);
+  return stream;
+}
+function makeRecorder(stream){
+  if(!window.MediaRecorder)return new Error('MediaRecorder is unavailable');
+  const mime=chooseMime();
+  const options={videoBitsPerSecond:2800000,audioBitsPerSecond:128000};
+  if(mime)options.mimeType=mime;
+  return new MediaRecorder(stream,options);
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+async function runCountdown(seconds){
+  countdown.classList.add('on');
+  for(let n=seconds;n>0;n--){countdown.textContent=n;await sleep(1000)}
+  countdown.classList.remove('on');
+}
+async function dryRun(){
+  dryBtn.disabled=true;liveBtn.disabled=true;
+  let stream=null,rec=null;
+  try{
+    stream=await programStream();rec=makeRecorder(stream);
+    const chunks=[];
+    rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+    const done=new Promise((resolve,reject)=>{rec.onstop=resolve;rec.onerror=e=>reject(e.error||new Error('Recorder failed'))});
+    rec.start(500);
+    await runCountdown(10);
+    rec.stop();await done;
+    const mime=rec.mimeType||chooseMime()||'video/webm';
+    const blob=new Blob(chunks,{type:mime});
+    if(!blob.size)throw new Error('Recorder produced an empty file');
+    if(testVideo.src)URL.revokeObjectURL(testVideo.src);
+    testVideo.src=URL.createObjectURL(blob);
+    testMeta.textContent=`10 second capture · ${humanBytes(blob.size)}`;
+    testCodec.textContent=mime.replace('video/','');
+    playbackSheet.classList.add('open');playbackSheet.setAttribute('aria-hidden','false');
+    renderDiag('dry run: PASS · '+humanBytes(blob.size));
+  }catch(err){
+    renderDiag('dry run: FAIL 2� '+err.message);alert('Dry run failed: '+err.message);
+  }finally{
+    if(stream)stream.getVideoTracks().forEach(t=>t.stop());
+    dryBtn.disabled=false;liveBtn.disabled=false;
+  }
+}
+function normalizeWsUrl(value){
+  let v=value.trim();
+  if(v.startsWith('https://'))v='wss://'+v.slice(8);
+  if(v.startsWith('http://'))v='ws://'+v.slice(7);
+  return v;
+}
+function waitForRelayReady(ws,timeoutMs=9000){
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{cleanup();reject(new Error('Relay start timed out'))},timeoutMs);
+    const onMessage=e=>{
+      if(typeof e.data!=='string')return;
+      let m;try{m=JSON.parse(e.data)}catch{return}
+      if(m.type==='relay-ready'){cleanup();resolve(m)}
+      if(m.type==='error'){cleanup();reject(new Error(m.message||'Relay rejected stream'))}
+    };
+    const onClose=()=>{cleanup();reject(new Error('Relay closed before start'))};
+    const cleanup=()=>{clearTimeout(timer);ws.removeEventListener('message',onMessage);ws.removeEventListener('close',onClose)};
+    ws.addEventListener('message',onMessage);ws.addEventListener('close',onClose);
+  });
+}
+async function startLive(){
+  const wsUrl=normalizeWsUrl(relayUrl.value);
+  const token=ingestToken.value.trim(),target=rtmpUrl.value.trim(),key=streamKey.value.trim();
+  if(!wsUrl||!token||!target||!key){drawer.classList.add('open');drawer.setAttribute('aria-hidden','false');throw new Error('Relay URL, relay token, Pump RTMP URL, and stream key are required')}
+  liveBtn.disabled=true;dryBtn.disabled=true;settingsBtn.disabled=true;liveStopping=false;
+  try{
+    const stream=await programStream();liveStream=stream;sendChain=Promise.resolve();
+    const ws=new WebSocket(wsUrl);ws.binaryType='arraybuffer';liveSocket=ws;
+    await new Promise((resolve,reject)=>{
+      const t=setTimeout(()=>reject(new Error('Could not reach relay')),8000);
+      ws.onopen=()=>{clearTimeout(t);resolve()};
+      ws.onerror=()=>{clearTimeout(t);reject(new Error('Relay WebSocket failed'))};
+    });
+    ws.send(JSON.stringify({type:'start,token,rtmpUrl:target,streamKey:key}));
+    await waitForRelayReady(ws);
+    const rec=makeRecorder(stream);liveRecorder=rec;
+    rec.ondataavailable=e=>{
+      if(!e.data||!e.data.size)return;
+      sendChain=sendChain.then(async()=>{
+        if(!liveSocket||liveSocket.readyState!==WebSocket.OPEN)return;
+        if(liveSocket.bufferedAmount>16*1024*1024){
+          renderDiag('LIVE FAIL: uplink buffer exceeded 16 MB');
+          stopLive('UPLINK STALLED');return;
+        }
+        const bytes=await e.data.arrayBuffer();
+        if(liveSocket&&liveSocket.readyState===WebSocket.OPEN)liveSocket.send(bytes);
+      }).catch(()=>stopLive('UPLINK ERROR'));
+    };
+    rec.onerror=()=>stopLive('ENCODER ERROR');
+    ws.addEventListener('message',e=>{
+      if(typeof e.data!=='string')return;
+      try{
+        const m=JSON.parse(e.data);
+        if(m.type==='relay-error')stopLive('RTMP ERROR');
+      }catch{}
+    });
+    ws.addEventListener('close',()=>{if(!liveStopping)stopLive('RELAY LOST')});
+    rec.start(500);
+    liveStarted=Date.now();
+    setPill(relayStatus,'LIVE 00:00','live');
+    stopBtn.disabled=false;
+    liveTimer=setInterval(()=>{
+      const s=Math.floor((Date.now()-liveStarted)/1000),m=Math.floor(s/60),ss=String(s%60).padStart(2,'0');
+      setPill(relayStatus,`LIVE ${String(m).padStart(2,'0')}:${ss}`,'live');
+    },1000);
+    drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true');
+    renderDiag('relay: LIVE');
+  }catch(err){
+    await stopLive('OFFLINE',false);
+    alert('Could not go live: '+err.message);
+    throw err;
+  }
+}
+async function stopLive(label='RELAY OFFLINE',tellRelay=true){
+  if(liveStopping)return;liveStopping=true;
+  clearInterval(liveTimer);liveTimer=0;
+  const rec=liveRecorder;liveRecorder=null;
+  if(rec&&rec.state!=='inactive'){
+    await new Promise(resolve=>{const old=rec.onstop;rec.onstop=e=>{try{old&&old(e)}catch{}resolve()};try{rec.stop()}catch{resolve()}});
+  }
+  if(liveSocket){
+    if(tellRelay&&liveSocket.readyState===WebSocket.OPEN){try{liveSocket.send(JSON.stringify({type:'stop'}));await sleep(180)}catch{}}
+    try{liveSocket.close()}catch{}liveSocket=null;
+  }
+  if(liveStream){liveStream.getVideoTracks().forEach(t=>t.stop());liveStream=null}
+  liveStarted=0;stopBtn.disabled=true;liveBtn.disabled=false;dryBtn.disabled=false;settingsBtn.disabled=false;
+  setPill(relayStatus,label,label==='RELAY OFFLINE'?'':'warn');
+  renderDiag(label==='RELAY OFFLINE'?'relay: stopped':'relay: '+label);
+  liveStopping=false;
+}
+
+viewBtn.onclick=()=>{viewOutput=!viewOutput;viewport.classList.toggle('output',viewOutput);viewBtn.textContent=viewOutput?'VIEW: OUTPUT':'VIEW: SOURCE'};
+aspectBtn.onclick=()=>setAspect(!portrait);
+micBtn.onclick=async()=>{try{if(micIsOn())disableMic();else await enableMic()}catch(err){alert('Mic unavailable: '+err.message)}};
+settingsBtn.onclick=()=>{drawer.classList.add('open');drawer.setAttribute('aria-hidden','false')};
+closeDrawer.onclick=()=>{drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true')};
+dryBtn.onclick=dryRun;
+liveBtn.onclick=()=>startLive().catch(()=>{});
+stopBtn.onclick=()=>stopLive();
+$('closePlayback').onclick=()=>{playbackSheet.classList.remove('open');playbackSheet.setAttribute('aria-hidden','true');testVideo.pause()};
+window.addEventListener('pagehide',()=>{if(liveRecorder||liveSocket)stopLive('PAGE CLOSED')});
+window.addEventListener('beforeunload',e=>{if(liveRecorder){e.preventDefault();e.returnValue=''}});
+setAspect(true);renderDiag();
+})();
+</script>
+</body>
+</html>
