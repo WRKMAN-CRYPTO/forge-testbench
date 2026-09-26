@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10110f">
+  <meta name="color-scheme" content="dark">
+  <title>RETURN CLOCK</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">FORGE SPECIMEN</p>
+        <h1>RETURN CLOCK</h1>
+      </div>
+      <button class="icon-button" id="settingsBtn" type="button" aria-label="Backup and data settings">•••</button>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="riskLabel">
+        <div>
+          <p class="label" id="riskLabel">REFUNDABLE MONEY AT RISK</p>
+          <p class="risk-total" id="riskTotal">$0.00</p>
+        </div>
+        <div class="hero-side">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          <span id="urgentCount">Nothing urgent</span>
+        </div>
+      </section>
+
+      <section class="next-card" id="nextCard" hidden>
+        <p class="label">NEXT DEADLINE</p>
+        <div class="next-row">
+          <div>
+            <strong id="nextItem"></strong>
+            <span id="nextStore"></span>
+          </div>
+          <div class="deadline-chip" id="nextDeadline"></div>
+        </div>
+      </section>
+
+      <section class="toolbar" aria-label="Return filters">
+        <div class="segmented" id="filters">
+          <button class="segment active" data-filter="open" type="button">Open</button>
+          <button class="segment" data-filter="returned" type="button">Returned</button>
+          <button class="segment" data-filter="kept" type="button">Kept</button>
+          <button class="segment" data-filter="all" type="button">All</button>
+        </div>
+        <button class="add-button" id="addBtn" type="button">+ Add return</button>
+      </section>
+
+      <section class="list-section" aria-live="polite">
+        <div class="list-head">
+          <p class="label" id="listLabel">OPEN RETURNS</p>
+          <span id="recordCount">0 items</span>
+        </div>
+        <div class="return-list" id="returnList"></div>
+        <div class="empty" id="emptyState">
+          <div class="empty-mark">↩</div>
+          <h2 id="emptyTitle">No return clocks running.</h2>
+          <p id="emptyCopy">Add something while the return window is still generous, not when the receipt has become archaeology.</p>
+          <button class="secondary-button" id="emptyAddBtn" type="button">Start a clock</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="sheet-backdrop" id="editorBackdrop" hidden></div>
+  <section class="sheet" id="editorSheet" role="dialog" aria-modal="true" aria-labelledby="editorTitle" hidden>
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <div>
+        <p class="eyebrow">RETURN RECORD</p>
+        <h2 id="editorTitle">Add return</h2>
+      </div>
+      <button class="icon-button" id="closeEditorBtn" type="button" aria-label="Close editor">×</button>
+    </div>
+    <form id="returnForm">
+      <input type="hidden" id="recordId">
+      <label>
+        <span>Item</span>
+        <input id="itemInput" autocomplete="off" maxlength="80" required placeholder="Cordless drill">
+      </label>
+      <div class="two-col">
+        <label>
+          <span>Store</span>
+          <input id="storeInput" autocomplete="organization" maxlength="60" placeholder="Hardware store">
+        </label>
+        <label>
+          <span>Amount</span>
+          <div class="money-input"><span>$</span><input id="amountInput" inputmode="decimal" type="number" min="0" step="0.01" placeholder="0.00"></div>
+        </label>
+      </div>
+      <label>
+        <span>Return by</span>
+        <input id="deadlineInput" type="date" required>
+      </label>
+      <label>
+        <span>Note <small>optional</small></span>
+        <textarea id="noteInput" rows="3" maxlength="220" placeholder="Wrong size, unopened, receipt in glove box..."></textarea>
+      </label>
+      <div class="form-actions">
+        <button class="secondary-button danger-text" id="deleteBtn" type="button" hidden>Delete</button>
+        <button class="primary-button" type="submit">Save clock</button>
+      </div>
+    </form>
+  </section>
+
+  <div class="sheet-backdrop" id="settingsBackdrop" hidden></div>
+  <section class="sheet compact-sheet" id="settingsSheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <div>
+        <p class="eyebrow">DATA</p>
+        <h2 id="settingsTitle">Backup & recovery</h2>
+      </div>
+      <button class="icon-button" id="closeSettingsBtn" type="button" aria-label="Close settings">×</button>
+    </div>
+    <p class="sheet-copy">Your records live on this device. Export a backup if they matter.</p>
+    <div class="settings-stack">
+      <button class="secondary-button" id="exportBtn" type="button">Export JSON backup</button>
+      <label class="secondary-button file-button" for="importInput">Import JSON backup</label>
+      <input id="importInput" type="file" accept="application/json,.json" hidden>
+      <button class="secondary-button danger-text" id="clearBtn" type="button">Clear all records</button>
+    </div>
+  </section>
+
+  <template id="returnCardTemplate">
+    <article class="return-card">
+      <div class="card-top">
+        <div class="card-title-wrap">
+          <p class="card-title"></p>
+          <p class="card-meta"></p>
+        </div>
+        <div class="urgency-badge"></div>
+      </div>
+      <div class="money-row">
+        <span class="amount"></span>
+        <span class="date"></span>
+      </div>
+      <p class="note" hidden></p>
+      <div class="card-actions open-actions">
+        <button class="mini-button returned-button" type="button">✓ Returned</button>
+        <button class="mini-button keep-button" type="button">Keep</button>
+        <button class="mini-button edit-button" type="button">Edit</button>
+      </div>
+      <div class="card-actions closed-actions" hidden>
+        <span class="closed-label"></span>
+        <button class="mini-button edit-button" type="button">Edit</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
