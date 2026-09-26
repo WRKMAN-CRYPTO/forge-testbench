@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="THREAD//PIN" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <title>THREAD//PIN</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <div class="brand">THREAD<span>//</span>PIN</div>
+        <div class="sub">Pin the thread before you set the work down.</div>
+      </div>
+      <button id="historyToggle" class="tiny-btn" type="button" aria-expanded="false" aria-controls="historyDrawer">LOG</button>
+    </header>
+
+    <div id="status" class="status" aria-live="polite"></div>
+    <section id="current" class="current empty" aria-live="polite"></section>
+
+    <button id="pinBtn" class="btn primary pin" type="button">＋ PIN MY PLACE</button>
+
+    <section id="composer" class="composer" aria-hidden="true">
+      <h2 id="composerTitle">NEW CHECKPOINT</h2>
+      <label for="doing">What were you doing?</label>
+      <textarea id="doing" maxlength="280" placeholder="Replacing the bathroom fan switch..."></textarea>
+      <label for="next">What happens next? *</label>
+      <textarea id="next" maxlength="220" placeholder="Kill the breaker, then land the black wire on the new switch."></textarea>
+      <div class="photo-row">
+        <label class="file-label" for="photoInput">📷 ADD / REPLACE PHOTO
+          <input id="photoInput" type="file" accept="image/*" capture="environment" />
+        </label>
+        <img id="photoPreview" class="thumb" alt="Selected checkpoint photo preview" />
+      </div>
+      <div class="composer-actions">
+        <button id="cancelBtn" class="btn secondary" type="button">CANCEL</button>
+        <button id="saveBtn" class="btn primary" type="button">PIN IT</button>
+      </div>
+    </section>
+
+    <section id="historyDrawer" class="drawer" aria-hidden="true">
+      <h2>OLDER THREADS</h2>
+      <input id="search" type="search" placeholder="Search old checkpoints" autocomplete="off" />
+      <div id="historyList" class="history-list"></div>
+      <div class="settings">
+        <details>
+          <summary>BACKUP / RESTORE</summary>
+          <div class="backup-row">
+            <button id="exportBtn" class="btn secondary" type="button">EXPORT</button>
+            <label class="btn secondary" style="display:flex;align-items:center;justify-content:center;position:relative;">IMPORT
+              <input id="importInput" type="file" accept="application/json,.json" style="position:absolute;opacity:0;inset:0;width:100%;height:100%;" />
+            </label>
+          </div>
+          <div class="fine">Stored on this device. Export occasionally if a checkpoint matters. Import merges by ID and keeps your current thread.</div>
+        </details>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
