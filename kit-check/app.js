@@ -237,7 +237,10 @@
       var oldByLabel = {};
       kit.items.forEach(function (item) { oldByLabel[item.label.toLowerCase()] = item; });
       var newItems = labels.map(function (label) {
-        return oldByLabel[label.toLowerCase()] || { id: makeId("item"), label: label };
+        var existing = oldByLabel[label.toLowerCase()];
+        return existing
+          ? { id: existing.id, label: label.slice(0, 120) }
+          : { id: makeId("item"), label: label.slice(0, 120) };
       });
 
       kit.name = name.slice(0, 40);
@@ -336,7 +339,7 @@
       }
     };
     downloadText("kit-check-backup-" + dateStamp() + ".json", JSON.stringify(payload, null, 2), "application/json");
-    toast("Backup exported.");
+    toast("Backup prepared.");
   }
 
   function importBackup(event) {
