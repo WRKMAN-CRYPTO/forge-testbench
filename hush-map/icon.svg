@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="WRKMAN W globe mark">
+  <rect width="128" height="128" rx="26" fill="#0b0e0d"/>
+  <circle cx="64" cy="64" r="45" fill="none" stroke="#85d36c" stroke-width="5"/>
+  <path d="M22 64h84M64 19c-14 13-21 28-21 45s7 32 21 45M64 19c14 13 21 28 21 45s-7 32-21 45M29 42h70M29 86h70" fill="none" stroke="#365843" stroke-width="3" stroke-linecap="round"/>
+  <path d="M34 42l13 45 17-29 17 29 13-45" fill="none" stroke="#f2f3ee" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
