@@ -1,4 +1,4 @@
-const CACHE = "takeback-v1";
+const CACHE = "takeback-v2";
 const ASSETS = [
   "./",
   "./index.html",
