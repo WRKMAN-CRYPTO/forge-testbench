@@ -188,7 +188,7 @@
     el.rebuildView.hidden = true;
     el.captureView.hidden = false;
     renderCapture();
-    window.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }
 
   function enterRebuild() {
@@ -198,7 +198,7 @@
     el.captureView.hidden = true;
     el.rebuildView.hidden = false;
     renderRebuild();
-    window.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }
 
   function renderRebuild() {
