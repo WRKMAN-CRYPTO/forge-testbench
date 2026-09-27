@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#0b0e0d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hush Map">
+  <title>HUSH//MAP</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="mast">
+      <div>
+        <p class="eyebrow">ROOM NOISE PLANNER</p>
+        <h1>HUSH<span>//</span>MAP</h1>
+        <p class="tagline">Place noise. Protect quiet.</p>
+      </div>
+      <div class="maker" aria-label="Forged by WRKMAN">
+        <img src="./icon.svg" alt="">
+        <span>WRKMAN</span>
+      </div>
+    </header>
+    <section class="status" aria-live="polite">
+      <div><span class="label">MODE</span><strong id="modeLabel">MOVE</strong></div>
+      <div><span class="label">QUIET IMPACT</span><strong id="impactLabel">—</strong></div>
+      <button id="aboutBtn" class="round" type="button" aria-label="About Hush Map">?</button>
+    </section>
+    <section class="room-card">
+      <canvas id="room" aria-label="Interactive room noise map"></canvas>
+      <div id="hint" class="hint">Add a quiet target, then add a noise source.</div>
+    </section>
+    <section class="tools" aria-label="Room tools">
+      <button class="tool active" data-mode="move" type="button"><b>↔</b><span>MOVE</span></button>
+      <button class="tool" data-mode="quiet" type="button"><b>Q</b><span>QUIET</span></button>
+      <button class="tool" data-mode="noise" type="button"><b>N</b><span>NOISE</span></button>
+      <button class="tool" data-mode="wall" type="button"><b>│</b><span>WALL</span></button>
+    </section>
+    <section class="actions">
+      <button id="findBtn" class="primary" type="button">FIND A QUIETER SPOT</button>
+      <button id="applyBtn" class="secondary hidden" type="button">MOVE SELECTED SOURCE HERE</button>
+      <button id="deleteBtn" class="ghost hidden" type="button">DELETE SELECTED</button>
+      <button id="clearBtn" class="ghost" type="button">CLEAR ROOM</button>
+    </section>
+    <section class="legend">
+      <span><i class="dot noise"></i> noise source</span>
+      <span><i class="dot quiet"></i> quiet target</span>
+      <span><i class="line"></i> barrier</span>
+      <span class="fine">Relative layout model, not a decibel meter.</span>
+    </section>
+  </main>
+  <dialog id="aboutDialog">
+    <div class="dialog-head">
+      <div><p class="eyebrow">WHAT IT DOES</p><h2>Useful geometry, humble acoustics.</h2></div>
+      <button id="closeAboutBtn" class="round" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body">
+      <p>Drop <b>QUIET</b> targets where sleep, work, calls, or calm matter. Drop <b>NOISE</b> sources where a TV, speaker, appliance, fan, or other noisy object might sit.</p>
+      <p>HUSH//MAP paints a relative impact field using distance and simple barrier penalties. Tap a noise source to select it, then ask the app to search the room for a lower-impact location.</p>
+      <p>Walls here are planning barriers, not material-specific acoustic simulations. Doors, reflections, low-frequency vibration, floors, ceilings, and construction details can dominate real sound.</p>
+      <p>The goal is not “this will be 42 dB.” The goal is “this corner is probably kinder to the places I care about.”</p>
+    </div>
+  </dialog>
+  <script src="./app.js"></script>
+</body>
+</html>
