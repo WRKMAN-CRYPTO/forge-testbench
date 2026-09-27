@@ -1,4 +1,4 @@
-const CACHE = "kit-check-v1";
+const CACHE = "kit-check-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -32,6 +32,10 @@ self.addEventListener("fetch", event => {
         caches.open(CACHE).then(cache => cache.put(request, copy));
         return response;
       })
-      .catch(() => caches.match(request).then(match => match || caches.match("./")))
+      .catch(() => caches.match(request).then(match => {
+        if (match) return match;
+        if (request.mode === "navigate") return caches.match("./");
+        return Response.error();
+      }))
   );
 });
