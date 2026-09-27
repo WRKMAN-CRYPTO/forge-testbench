@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Door Fit">
+  <title>DOOR//FIT</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="mast">
+      <div>
+        <p class="eyebrow">POCKET MOVE CHECK</p>
+        <h1>DOOR<span>//</span>FIT</h1>
+        <p class="tagline">Measure first. Grunt later.</p>
+      </div>
+      <button id="infoBtn" class="icon-btn" type="button" aria-label="About Door Fit">?</button>
+    </header>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <p class="step">01 / OBJECT</p>
+          <h2>What are you moving?</h2>
+        </div>
+        <div class="unit-toggle" role="group" aria-label="Units">
+          <button type="button" data-unit="in" class="active">IN</button>
+          <button type="button" data-unit="cm">CM</button>
+        </div>
+      </div>
+
+      <div class="dimension-grid three">
+        <label><span>Length</span><input id="objL" inputmode="decimal" type="number" min="0" step="0.1" placeholder="60"></label>
+        <label><span>Width</span><input id="objW" inputmode="decimal" type="number" min="0" step="0.1" placeholder="18"></label>
+        <label><span>Height</span><input id="objH" inputmode="decimal" type="number" min="0" step="0.1" placeholder="32"></label>
+      </div>
+
+      <div class="section-split">
+        <p class="step">02 / OPENING</p>
+        <h2>Clear doorway size</h2>
+      </div>
+      <div class="dimension-grid two">
+        <label><span>Width</span><input id="doorW" inputmode="decimal" type="number" min="0" step="0.1" placeholder="30"></label>
+        <label><span>Height</span><input id="doorH" inputmode="decimal" type="number" min="0" step="0.1" placeholder="80"></label>
+      </div>
+
+      <label class="reserve-row" for="reserve">
+        <span><b>Clearance reserve</b><small>Total space held back from both opening dimensions.</small></span>
+        <span class="reserve-input"><input id="reserve" inputmode="decimal" type="number" min="0" step="0.1" value="0.5"><i class="unit-mark">in</i></span>
+      </label>
+
+      <button id="checkBtn" class="check-btn" type="button">CHECK THE DOOR</button>
+      <button id="sampleBtn" class="text-btn sample-btn" type="button">LOAD A SAMPLE</button>
+      <p id="inputError" class="error" role="alert"></p>
+    </section>
+
+    <section id="resultCard" class="result-card hidden" aria-live="polite">
+      <div class="result-head">
+        <div>
+          <p id="resultKicker" class="step">RESULT</p>
+          <h2 id="resultTitle">SIMPLE FIT FOUND</h2>
+        </div>
+        <div id="resultBadge" class="result-badge">FIT</div>
+      </div>
+
+      <div class="diagram" aria-hidden="true">
+        <div class="door-frame">
+          <div id="objectFace" class="object-face"><span id="faceLabel">W × H</span></div>
+        </div>
+      </div>
+
+      <div class="instruction">
+        <p class="step">BEST APPROACH</p>
+        <p id="resultCopy"></p>
+      </div>
+
+      <div id="faceGrid" class="face-grid"></div>
+      <p id="finePrint" class="fine"></p>
+    </section>
+
+    <footer>
+      <p>Rectangular rigid objects only. Door thickness, knobs, trim, hallways, flexible cushions, and 3D corkscrew moves are outside this model.</p>
+    </footer>
+  </main>
+
+  <dialog id="infoDialog">
+    <div class="dialog-head">
+      <div>
+        <p class="step">WHAT IT KNOWS</p>
+        <h2>A useful yes, not a magical no.</h2>
+      </div>
+      <button id="closeInfoBtn" class="icon-btn" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body">
+      <p>DOOR//FIT tests each rectangular face of the object against the clear doorway opening while rotating that face from 0° to 90°.</p>
+      <p>If it finds a fit, that gives you a simple orientation that clears on paper. If it finds none, the object may still pass with a true 3D tilt, removable feet, compressed cushions, or a different route.</p>
+      <p>Measure the narrowest clear opening, not the door slab. Use the clearance reserve to keep a little breathing room for imperfect measurements and human hands.</p>
+    </div>
+  </dialog>
+
+  <script src="./app.js"></script>
+</body>
+</html>
