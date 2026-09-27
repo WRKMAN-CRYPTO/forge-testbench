@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101411">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TAKEBACK">
+  <meta name="description" content="Record teardown steps. Rebuild in reverse.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="stylesheet" href="./style.css">
+  <title>TAKEBACK · WRKMAN</title>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-mark" aria-label="WRKMAN">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="27"></circle>
+          <path d="M7 32h50M32 5c10 8 15 17 15 27S42 51 32 59M32 5C22 13 17 22 17 32s5 19 15 27M11 20h42M11 44h42"></path>
+          <path class="w" d="M16 22l8 22 8-15 8 15 8-22"></path>
+        </svg>
+      </div>
+      <div>
+        <p class="eyebrow">WRKMAN TOOL</p>
+        <h1>TAKEBACK</h1>
+      </div>
+      <div class="step-pill" id="stepPill">0 steps</div>
+    </header>
+
+    <section id="captureView" class="view" aria-labelledby="captureTitle">
+      <div class="hero">
+        <p class="kicker">TEARDOWN MODE</p>
+        <h2 id="captureTitle">Leave yourself a trail home.</h2>
+        <p class="sub">Photograph what matters before you remove it. TAKEBACK keeps the order. Rebuild mode reverses it.</p>
+      </div>
+
+      <section class="capture-card">
+        <label class="camera-pad" for="photoInput" id="cameraPad">
+          <input id="photoInput" type="file" accept="image/*" capture="environment">
+          <img id="pendingPreview" alt="Pending teardown step photo">
+          <div id="cameraPrompt" class="camera-prompt">
+            <span class="camera-icon" aria-hidden="true">◎</span>
+            <strong>TAKE PHOTO</strong>
+            <small>or choose one already on the phone</small>
+          </div>
+        </label>
+
+        <label class="note-wrap">
+          <span>What will Future You need to know?</span>
+          <textarea id="noteInput" maxlength="180" rows="2" placeholder="Example: black washer stays under the bracket"></textarea>
+        </label>
+
+        <button class="primary" id="saveStep" type="button">SAVE STEP</button>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="latest" id="latestSection" hidden>
+        <div class="section-head">
+          <div>
+            <p class="kicker">LAST CAPTURED</p>
+            <h3 id="latestTitle">Step 1</h3>
+          </div>
+          <button class="text-button danger-text" id="removeLast" type="button">Remove</button>
+        </div>
+        <div class="latest-body">
+          <img id="latestImage" alt="Most recent teardown step">
+          <p id="latestNote"></p>
+        </div>
+      </section>
+
+      <button class="rebuild-button" id="startRebuild" type="button" disabled>
+        <span>REBUILD</span>
+        <small>Walk the teardown backward</small>
+      </button>
+
+      <details class="utility">
+        <summary>Storage & reset</summary>
+        <p>Photos and notes stay in this browser on this device. Clearing website data removes them.</p>
+        <button class="danger" id="clearJournal" type="button" disabled>DELETE ALL STEPS</button>
+      </details>
+    </section>
+
+    <section id="rebuildView" class="view" hidden aria-labelledby="rebuildTitle">
+      <div class="rebuild-head">
+        <div>
+          <p class="kicker">REBUILD MODE</p>
+          <h2 id="rebuildTitle">Reverse the trail.</h2>
+        </div>
+        <button class="exit-button" id="exitRebuild" type="button">EXIT</button>
+      </div>
+
+      <section class="rebuild-card" id="rebuildCard">
+        <div class="progress-line">
+          <span id="rebuildProgress">1 of 1</span>
+          <span id="originalStep">Original step 1</span>
+        </div>
+        <div class="rebuild-photo" id="rebuildPhotoWrap">
+          <img id="rebuildImage" alt="Reassembly reference photo">
+          <div class="no-photo" id="rebuildNoPhoto">NOTE-ONLY STEP</div>
+        </div>
+        <p class="rebuild-note" id="rebuildNote"></p>
+      </section>
+
+      <section class="complete-card" id="completeCard" hidden>
+        <div class="complete-w">W</div>
+        <p class="kicker">TRAIL COMPLETE</p>
+        <h2>You made it back.</h2>
+        <p>Nothing was deleted. The teardown stays here until you choose to clear it.</p>
+      </section>
+
+      <div class="rebuild-controls">
+        <button class="secondary" id="prevRebuild" type="button">BACK</button>
+        <button class="primary" id="nextRebuild" type="button">DONE · NEXT</button>
+      </div>
+    </section>
+
+    <footer>
+      <span class="forge-dot"></span>
+      Forged by WRKMAN
+    </footer>
+  </main>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
