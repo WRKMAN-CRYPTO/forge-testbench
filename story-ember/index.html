@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#11110f">
+<meta name="description" content="Capture family stories one small question at a time.">
+<title>Story Ember</title>
+<style>
+:root{color-scheme:dark;--bg:#11110f;--panel:#1b1916;--text:#f3ecdf;--muted:#a79f91;--line:rgba(255,255,255,.09);--ember:#ff8a3d;--green:#9be36f;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{min-height:100svh;overflow:hidden;-webkit-tap-highlight-color:transparent;background:radial-gradient(circle at 50% 28%,rgba(255,138,61,.08),transparent 32%),linear-gradient(180deg,#14130f,#0d0d0c)}
+button{font:inherit;touch-action:manipulation}.app{width:min(100%,680px);height:100svh;margin:auto;padding:calc(14px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;gap:14px}
+.row,.top,.brand,.actions,.meta,.playrow,.clipactions{display:flex;align-items:center}.top,.meta{justify-content:space-between}.brand{gap:10px}.mark{width:38px;height:38px;color:var(--green);filter:drop-shadow(0 0 12px rgba(155,227,111,.16))}.eyebrow{color:var(--muted);font-size:.68rem;font-weight:800;letter-spacing:.17em}.name{font-weight:850}
+button{border:1px solid var(--line);color:var(--text);background:rgba(255,255,255,.035);min-height:44px;border-radius:14px;padding:0 14px;font-weight:780}.count{display:inline-grid;place-items:center;min-width:21px;height:21px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--green);color:#111;font-size:.72rem}
+.stage{min-height:0;border:1px solid var(--line);border-radius:26px;background:linear-gradient(180deg,rgba(255,255,255,.038),rgba(255,255,255,.018));padding:clamp(20px,5vw,34px);display:flex;flex-direction:column;justify-content:center}.row{justify-content:space-between;gap:12px}.chip{padding:8px 11px;border-radius:999px;background:rgba(255,138,61,.18);color:#ffc59e;font-size:.78rem;font-weight:850}.shuffle{width:44px;padding:0;border-radius:999px;color:var(--muted)}
+h1{margin:clamp(18px,4vh,34px) 0 14px;max-width:17ch;font-size:clamp(2rem,8.2vw,4rem);line-height:1.02;letter-spacing:-.055em;text-wrap:balance}.hint{margin:0;color:var(--muted);font-size:.93rem}
+.rec{display:grid;place-items:center;gap:9px}.timer{font-variant-numeric:tabular-nums;color:var(--muted);font-weight:800;letter-spacing:.08em}.record{position:relative;width:106px;height:106px;border-radius:999px;padding:0;border:1px solid rgba(255,255,255,.12);background:radial-gradient(circle at 35% 28%,#ffad73,#e65f24 58%,#9a3514);box-shadow:0 10px 34px rgba(255,91,24,.26);color:#190b05;font-weight:950;letter-spacing:.08em;text-transform:uppercase}.record[data-state="recording"]{background:radial-gradient(circle at 38% 30%,#ffd0b0,#ff6b37 52%,#c92920);box-shadow:0 0 0 8px rgba(255,115,108,.08),0 0 0 17px rgba(255,115,108,.045),0 14px 40px rgba(255,76,44,.34);animation:breathe 1.35s ease-in-out infinite}.record[data-state="saving"]{filter:grayscale(.35);opacity:.72}@keyframes breathe{50%{transform:scale(1.035)}}.status{max-width:34rem;text-align:center;color:var(--muted);font-size:.78rem;line-height:1.35;min-height:34px}.status.good{color:#bceca1}.status.warn{color:#ffc294}.status.bad{color:#ffaaa5}
+.actions{gap:10px}.actions button{flex:1;min-height:52px}.primary{background:var(--text);color:#12110e;border-color:transparent}
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.62);backdrop-filter:blur(4px);z-index:20}.sheet{position:fixed;z-index:21;left:50%;bottom:0;width:min(100%,680px);max-height:86svh;transform:translateX(-50%);border-radius:26px 26px 0 0;border:1px solid var(--line);border-bottom:0;background:#171511;padding:8px 16px calc(18px + env(safe-area-inset-bottom));overflow:auto;overscroll-behavior:contain}.grab{width:42px;height:5px;border-radius:999px;background:rgba(255,255,255,.17);margin:4px auto 14px}.sheethead{display:flex;align-items:center;justify-content:space-between;gap:16px}.sheet h2{margin:3px 0 0}.warning{margin:14px 0;padding:12px 13px;border-radius:15px;background:rgba(255,138,61,.08);color:#d7c5b4;font-size:.8rem;line-height:1.45;border:1px solid rgba(255,138,61,.16)}.clips{display:grid;gap:11px}.clip{border:1px solid var(--line);border-radius:18px;padding:14px;background:var(--panel)}.meta{gap:12px;color:var(--muted);font-size:.72rem}.cat{color:#ffc59e;font-weight:850}.clip h3{margin:9px 0 14px;font-size:1.03rem;line-height:1.3}.playrow{gap:10px}.dur{color:var(--muted);font-variant-numeric:tabular-nums;font-size:.8rem}.clipactions{gap:9px;margin-top:10px}.keep{flex:1;background:rgba(155,227,111,.1);color:#c9f2b0;border-color:rgba(155,227,111,.18)}.delete{color:#ffaaa5}.empty{min-height:220px;display:grid;place-items:center;align-content:center;gap:8px;color:var(--muted);text-align:center}.spark{font-size:2rem;color:var(--ember)}
+[hidden]{display:none!important}body.open .app{pointer-events:none;user-select:none;-webkit-user-select:none}body.open .sheet{pointer-events:auto}@media(max-height:690px){.app{gap:9px;padding-top:calc(9px + env(safe-area-inset-top))}.stage{padding:18px}h1{font-size:clamp(1.75rem,7.4vw,2.7rem);margin:14px 0 10px}.record{width:88px;height:88px}.actions button{min-height:46px}}@media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;animation-iteration-count:1!important}}
+</style>
+</head>
+<body>
+<main class="app">
+<header class="top">
+<div class="brand" aria-label="WRKMAN maker's mark">
+<svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="none" stroke="currentColor" stroke-width="3"/><ellipse cx="32" cy="32" rx="15" ry="27" fill="none" stroke="currentColor" stroke-width="2" opacity=".65"/><path d="M7 32h50M12 21h40M12 43h40" fill="none" stroke="currentColor" stroke-width="2" opacity=".45"/><path d="M15 20l8 25 9-19 9 19 8-25" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="6"/></svg>
+<div><div class="eyebrow">WRKMAN</div><div class="name">Story Ember</div></div>
+</div>
+<button id="library">Library <span class="count" id="count">0</span></button>
+</header>
+<section class="stage" aria-live="polite">
+<div class="row"><span class="chip" id="category">Ordinary life</span><button class="shuffle" id="shuffle" aria-label="Different question">↻</button></div>
+<h1 id="prompt">What did a normal Saturday look like when you were about twelve?</h1>
+<p class="hint">Small questions make room for big stories.</p>
+</section>
+<section class="rec">
+<div class="timer" id="timer">00:00</div>
+<button class="record" id="record" aria-pressed="false">Record</button>
+<div class="status" id="status">Nothing leaves this device unless you choose to share it.</div>
+</section>
+<footer class="actions"><button id="skip">Skip</button><button class="primary" id="next">Next ember</button></footer>
+</main>
+<div class="backdrop" id="backdrop" hidden></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheettitle" hidden>
+<div class="grab"></div>
+<div class="sheethead"><div><div class="eyebrow">LOCAL LIBRARY</div><h2 id="sheettitle">Saved embers</h2></div><button id="close">Close</button></div>
+<p class="warning">These recordings live in this browser. Browser storage can be cleared or evicted. Use <strong>Keep copy</strong> for anything you never want to lose.</p>
+<div class="clips" id="clips"></div>
+<div class="empty" id="empty"><div class="spark">✦</div><p>Your first saved story will appear here.</p></div>
+</section>
+<audio id="player" preload="metadata"></audio>
+<script>
+(function(){
+"use strict";
+var raw=[
+"Ordinary life|What did a normal Saturday look like when you were about twelve?",
+"Ordinary life|What was always in the kitchen when you were growing up?",
+"Ordinary life|What sound told you someone important had come home?",
+"Ordinary life|What did people do for fun when nobody had much money?",
+"Ordinary life|What chore did you hate, and which one did you secretly not mind?",
+"Ordinary life|What smell instantly takes you back to an old home?",
+"Ordinary life|What tiny thing felt like a huge luxury when you were a kid?",
+"Childhood|What was the first place you were allowed to go without an adult?",
+"Childhood|Who was the kid you were most likely to get in trouble with?",
+"Childhood|What game did you invent because there was nothing else to do?",
+"Childhood|What rule in your house was taken very seriously?",
+"Childhood|What was the best hiding place you knew as a kid?",
+"Childhood|What was your first real responsibility?",
+"Childhood|What did grown-ups misunderstand about you when you were young?",
+"Work|What job taught you something no classroom could have taught you?",
+"Work|Who showed you how to do a job the right way?",
+"Work|What was the hardest-earned paycheck you remember?",
+"Work|What tool, machine, or object could you use almost without thinking?",
+"Work|What mistake at work taught you a lesson you never forgot?",
+"Work|What kind of worker earned your respect immediately?",
+"Work|What was a job you were surprisingly good at?",
+"People|Who could make the whole room laugh without trying very hard?",
+"People|Who taught you a skill you still use today?",
+"People|Who had a way of making you feel safe?",
+"People|Who was stubborn in a way you can appreciate now?",
+"People|Who always seemed to know what was really going on?",
+"People|Who do you remember by the sound of their voice?",
+"People|What is a sentence someone told you that stayed with you?",
+"People|Who would you want sitting at the table for one more ordinary meal?",
+"Places|What place from your past could you still walk through with your eyes closed?",
+"Places|Where did everyone gather when something important happened?",
+"Places|What road or route do you remember turn by turn?",
+"Places|What store, restaurant, or hangout do you wish still existed?",
+"Places|Where did you go when you wanted to be alone?",
+"Places|What place seemed enormous when you were small?",
+"Places|What was the first home you remember clearly?",
+"Objects|What object did your family keep far longer than it made sense to?",
+"Objects|What piece of clothing do you remember someone wearing all the time?",
+"Objects|What vehicle do you remember more vividly than you expected?",
+"Objects|What was something you fixed instead of replacing?",
+"Objects|What possession did you save up for and finally buy yourself?",
+"Objects|What ordinary object would instantly identify a certain person in your family?",
+"Food|What meal meant somebody was celebrating?",
+"Food|What food did you dislike as a kid and change your mind about later?",
+"Food|Who made one dish nobody else could quite copy?",
+"Food|What snack disappeared fastest when it came into the house?",
+"Food|What did a cheap meal look like when money was tight?",
+"Food|What did someone cook when they wanted to take care of you?",
+"Food|What recipe lived mostly in somebody's hands instead of on paper?",
+"Turning points|When did you first realize adults did not always know what they were doing?",
+"Turning points|What decision changed more of your life than you expected?",
+"Turning points|When did you first feel genuinely independent?",
+"Turning points|What did you worry about once that turned out not to matter much?",
+"Turning points|What did you become more patient about as you got older?",
+"Turning points|What did you become less willing to tolerate as you got older?",
+"Turning points|What small choice quietly sent your life in a different direction?",
+"Funny|What family story gets funnier every time somebody tells it?",
+"Funny|What mistake became a good story once enough time passed?",
+"Funny|Who had the strangest habit everyone quietly accepted?",
+"Funny|What was the worst haircut, outfit, or fashion decision you remember?",
+"Funny|What did someone confidently get completely wrong?",
+"Funny|What was the most ridiculous thing you got in trouble for?",
+"Funny|What harmless prank still makes you laugh?",
+"Traditions|What tradition did your family do without ever calling it a tradition?",
+"Traditions|What happened every year that you could count on?",
+"Traditions|What phrase or saying belonged to your family?",
+"Traditions|What was a family rule that made sense only inside your family?",
+"Traditions|What did guests always get offered when they came over?",
+"Traditions|What did your family do when bad weather was coming?",
+"Traditions|What ordinary ritual do you miss more than the big occasions?"
+];
+var prompts=raw.map(function(x,i){var p=x.split("|");return{id:i+1,category:p[0],text:p[1]};});
+function el(id){return document.getElementById(id)}
+var E={prompt:el("prompt"),category:el("category"),record:el("record"),timer:el("timer"),status:el("status"),next:el("next"),skip:el("skip"),shuffle:el("shuffle"),library:el("library"),count:el("count"),sheet:el("sheet"),backdrop:el("backdrop"),close:el("close"),clips:el("clips"),empty:el("empty"),player:el("player")};
+var S={prompt:null,recorder:null,stream:null,chunks:[],started:0,tick:null,db:null,saving:false,playing:null,url:null};
+function seen(){try{var a=JSON.parse(localStorage.getItem("story-ember.seen")||"[]");return new Set(Array.isArray(a)?a:[])}catch(e){return new Set()}}
+function renderPrompt(){E.prompt.textContent=S.prompt.text;E.category.textContent=S.prompt.category}
+function choose(mark){var s=seen();if(mark&&S.prompt)s.add(S.prompt.id);if(s.size>=prompts.length)s.clear();var left=prompts.filter(function(p){return !s.has(p.id)});S.prompt=left[Math.floor(Math.random()*left.length)]||prompts[0];localStorage.setItem("story-ember.current",String(S.prompt.id));localStorage.setItem("story-ember.seen",JSON.stringify(Array.from(s)));renderPrompt()}
+function restore(){var id=Number(localStorage.getItem("story-ember.current"));S.prompt=prompts.find(function(p){return p.id===id})||prompts[Math.floor(Math.random()*prompts.length)];renderPrompt()}
+function status(msg,tone){E.status.textContent=msg;E.status.className="status"+(tone?" "+tone:"")}
+function visual(mode){if(mode==="recording"){E.record.dataset.state="recording";E.record.textContent="Stop";E.record.setAttribute("aria-pressed","true");E.next.disabled=E.skip.disabled=E.shuffle.disabled=true;status("Recording. Let the pauses stay in the story.","good")}else if(mode==="saving"){E.record.dataset.state="saving";E.record.textContent="Saving";E.record.disabled=true;status("Saving this ember on this device…")}else{delete E.record.dataset.state;E.record.textContent="Record";E.record.disabled=false;E.record.setAttribute("aria-pressed","false");E.next.disabled=E.skip.disabled=E.shuffle.disabled=false}}
+function fmt(ms){var sec=Math.max(0,Math.floor(ms/1000)),min=Math.floor(sec/60);return String(min).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")}
+function mime(){if(!window.MediaRecorder)return"";var a=["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];return a.find(function(t){return MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t)})||""}
+function cleanup(){if(S.tick)clearInterval(S.tick);S.tick=null;if(S.stream)S.stream.getTracks().forEach(function(t){t.stop()});S.stream=null;S.recorder=null;S.chunks=[]}
+function openDb(){return new Promise(function(resolve,reject){var r=indexedDB.open("story-ember",1);r.onupgradeneeded=function(){var d=r.result;if(!d.objectStoreNames.contains("clips")){var st=d.createObjectStore("clips",{keyPath:"id"});st.createIndex("createdAt","createdAt")}};r.onsuccess=function(){resolve(r.result)};r.onerror=function(){reject(r.error)}})}
+async function db(){if(!S.db)S.db=await openDb();return S.db}
+async function put(clip){var d=await db();return new Promise(function(resolve,reject){var tx=d.transaction("clips","readwrite");tx.objectStore("clips").put(clip);tx.oncomplete=resolve;tx.onerror=function(){reject(tx.error)}})}
+async function all(){var d=await db();return new Promise(function(resolve,reject){var tx=d.transaction("clips","readonly"),r=tx.objectStore("clips").getAll();r.onsuccess=function(){resolve((r.result||[]).sort(function(a,b){return b.createdAt-a.createdAt}))};r.onerror=function(){reject(r.error)}})}
+async function remove(id){var d=await db();return new Promise(function(resolve,reject){var tx=d.transaction("clips","readwrite");tx.objectStore("clips").delete(id);tx.oncomplete=resolve;tx.onerror=function(){reject(tx.error)}})}
+async function recount(){try{E.count.textContent=String((await all()).length)}catch(e){E.count.textContent="?"}}
+async function start(){if(S.saving||S.recorder)return;if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){status("This browser does not expose a compatible audio recorder. You can still browse the prompts.","bad");return}try{var stream=await navigator.mediaDevices.getUserMedia({audio:true}),type=mime(),r=type?new MediaRecorder(stream,{mimeType:type}):new MediaRecorder(stream);S.stream=stream;S.recorder=r;S.chunks=[];S.started=Date.now();E.timer.textContent="00:00";r.addEventListener("dataavailable",function(ev){if(ev.data&&ev.data.size)S.chunks.push(ev.data)});r.addEventListener("stop",async function(){var dur=Date.now()-S.started,actual=r.mimeType||type||"audio/webm",blob=new Blob(S.chunks,{type:actual});cleanup();if(!blob.size){visual("idle");status("That recording came back empty. Nothing was saved.","bad");return}S.saving=true;visual("saving");try{await put({id:crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random(),prompt:S.prompt.text,category:S.prompt.category,createdAt:Date.now(),durationMs:dur,mimeType:actual,blob:blob});if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(function(){});await recount();status("Saved locally. Keep a copy if this one matters forever.","good")}catch(e){console.error(e);status("The browser could not save that recording. Try again before leaving this page.","bad")}finally{S.saving=false;visual("idle")}}, {once:true});r.start(250);visual("recording");S.tick=setInterval(function(){E.timer.textContent=fmt(Date.now()-S.started)},250)}catch(e){console.error(e);cleanup();visual("idle");status((e&&e.name==="NotAllowedError")?"Microphone access was blocked. You can keep browsing prompts and try Record again later.":"I could not start the microphone on this device.","warn")}}
+function stop(){if(!S.recorder||S.recorder.state==="inactive")return;if(S.tick)clearInterval(S.tick);S.tick=null;E.timer.textContent=fmt(Date.now()-S.started);S.recorder.stop()}
+function ext(type){if(/mp4|m4a/i.test(type))return"m4a";if(/ogg/i.test(type))return"ogg";return"webm"}
+async function keep(c){var name="story-ember-"+new Date(c.createdAt).toISOString().slice(0,10)+"."+ext(c.mimeType),file=new File([c.blob],name,{type:c.mimeType||c.blob.type});try{if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"Story Ember recording"});return}}catch(e){if(e&&e.name==="AbortError")return}var u=URL.createObjectURL(c.blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},5000)}
+function stopPlay(){E.player.pause();E.player.removeAttribute("src");E.player.load();if(S.url)URL.revokeObjectURL(S.url);S.url=null;S.playing=null;document.querySelectorAll(".play").forEach(function(b){b.textContent="Play"})}
+function play(c,b){if(S.playing===c.id&&!E.player.paused){E.player.pause();b.textContent="Play";return}stopPlay();S.playing=c.id;S.url=URL.createObjectURL(c.blob);E.player.src=S.url;b.textContent="Pause";E.player.play().catch(function(){b.textContent="Play"})}
+async function renderLibrary(){stopPlay();var clips;try{clips=await all()}catch(e){E.clips.innerHTML="";E.empty.hidden=false;E.empty.querySelector("p").textContent="The local library could not be read on this device.";return}E.clips.innerHTML="";E.empty.hidden=clips.length>0;clips.forEach(function(c){var card=document.createElement("article");card.className="clip";var date=new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",year:"numeric"}).format(new Date(c.createdAt));card.innerHTML='<div class="meta"><span class="cat"></span><span class="date"></span></div><h3></h3><div class="playrow"><button class="play">Play</button><span class="dur"></span></div><div class="clipactions"><button class="keep">Keep copy</button><button class="delete">Delete</button></div>';card.querySelector(".cat").textContent=c.category;card.querySelector(".date").textContent=date;card.querySelector("h3").textContent=c.prompt;card.querySelector(".dur").textContent=fmt(c.durationMs);card.querySelector(".play").addEventListener("click",function(){play(c,this)});card.querySelector(".keep").addEventListener("click",function(){keep(c)});card.querySelector(".delete").addEventListener("click",async function(){if(!confirm("Delete this recording from this device? This cannot be undone here."))return;if(S.playing===c.id)stopPlay();await remove(c.id);await recount();await renderLibrary()});E.clips.appendChild(card)})}
+function openLibrary(){if(S.recorder)return;document.body.classList.add("open");E.backdrop.hidden=false;E.sheet.hidden=false;renderLibrary();setTimeout(function(){E.close.focus()},0)}
+function closeLibrary(){stopPlay();document.body.classList.remove("open");E.backdrop.hidden=true;E.sheet.hidden=true;E.library.focus()}
+E.record.addEventListener("click",function(){S.recorder?stop():start()});E.next.addEventListener("click",function(){choose(true)});E.skip.addEventListener("click",function(){choose(true)});E.shuffle.addEventListener("click",function(){choose(true)});E.library.addEventListener("click",openLibrary);E.close.addEventListener("click",closeLibrary);E.backdrop.addEventListener("click",closeLibrary);E.player.addEventListener("ended",stopPlay);window.addEventListener("keydown",function(e){if(e.key==="Escape"&&!E.sheet.hidden)closeLibrary()});window.addEventListener("pagehide",function(){if(S.recorder&&S.recorder.state!=="inactive")try{S.recorder.stop()}catch(e){};if(S.stream)S.stream.getTracks().forEach(function(t){t.stop()});stopPlay()});restore();recount();
+})();
+</script>
+</body>
+</html>
