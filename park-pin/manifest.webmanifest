@@ -1,0 +1,10 @@
+{
+  "name": "PARK PIN",
+  "short_name": "PARK PIN",
+  "description": "A tiny parking memory aid that saves one vehicle location and spot note.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c100d",
+  "theme_color": "#101510"
+}
