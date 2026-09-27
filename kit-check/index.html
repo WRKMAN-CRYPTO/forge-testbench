@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111419">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="KIT CHECK">
+  <title>KIT CHECK</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PRE-DEPARTURE</p>
+        <h1>KIT CHECK</h1>
+      </div>
+      <button class="icon-btn" id="dataBtn" type="button" aria-label="Data and backup">•••</button>
+    </header>
+
+    <main>
+      <section id="warningBanner" class="warning" hidden></section>
+
+      <section id="emptyState" class="empty card">
+        <div class="empty-mark">✓</div>
+        <h2>Build it once.</h2>
+        <p>Before you leave, tap every item. KIT CHECK gives you one answer: ready or not ready.</p>
+        <button class="primary" id="firstKitBtn" type="button">BUILD FIRST KIT</button>
+      </section>
+
+      <section id="workspace" hidden>
+        <div class="kit-switcher">
+          <label class="sr-only" for="kitSelect">Active kit</label>
+          <select id="kitSelect"></select>
+          <button class="square-btn" id="newKitBtn" type="button" aria-label="Create new kit">+</button>
+          <button class="square-btn" id="editKitBtn" type="button" aria-label="Edit current kit">✎</button>
+        </div>
+
+        <section class="status-card card" aria-live="polite">
+          <div class="progress-dial" id="progressDial">
+            <div class="progress-center">
+              <strong id="progressCount">0/0</strong>
+              <span>checked</span>
+            </div>
+          </div>
+          <div class="status-copy">
+            <p class="eyebrow">STATUS</p>
+            <h2 id="readyStatus">NOT READY</h2>
+            <p id="statusDetail">Tap through the kit.</p>
+            <p class="last-ready" id="lastReady"></p>
+          </div>
+        </section>
+
+        <section class="checklist" id="checklist" aria-label="Kit items"></section>
+
+        <div class="bottom-actions">
+          <button class="secondary" id="resetBtn" type="button">RESET CHECK</button>
+          <button class="primary finish" id="finishBtn" type="button" disabled>READY • RESET FOR NEXT TIME</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="kitDialog">
+    <form method="dialog" class="sheet" id="kitForm">
+      <div class="sheet-head">
+        <div>
+          <p class="eyebrow">KIT SETUP</p>
+          <h2 id="kitDialogTitle">NEW KIT</h2>
+        </div>
+        <button class="icon-btn" value="cancel" type="submit" aria-label="Close">×</button>
+      </div>
+
+      <label>
+        <span>Kit name</span>
+        <input id="kitNameInput" name="kitName" maxlength="40" autocomplete="off" placeholder="Work bag">
+      </label>
+
+      <label>
+        <span>Items <small>one per line</small></span>
+        <textarea id="itemsInput" name="items" rows="9" placeholder="Keys&#10;Wallet&#10;Charger&#10;Tape measure"></textarea>
+      </label>
+
+      <p class="form-note">Every item counts toward READY. Keep the list lean enough that you will actually use it.</p>
+
+      <div class="sheet-actions">
+        <button class="secondary" value="cancel" type="submit">CANCEL</button>
+        <button class="primary" id="saveKitBtn" value="default" type="button">SAVE KIT</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dataDialog">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div>
+          <p class="eyebrow">DATA</p>
+          <h2>BACKUP & CONTROL</h2>
+        </div>
+        <button class="icon-btn" id="closeDataBtn" type="button" aria-label="Close">×</button>
+      </div>
+
+      <div class="data-stack">
+        <button class="secondary wide" id="exportBtn" type="button">EXPORT BACKUP</button>
+        <button class="secondary wide" id="importBtn" type="button">IMPORT BACKUP</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+        <button class="danger wide" id="deleteKitBtn" type="button">DELETE CURRENT KIT</button>
+        <button class="danger ghost wide" id="clearAllBtn" type="button">CLEAR ALL KITS</button>
+        <button class="secondary wide" id="recoveryBtn" type="button" hidden>DOWNLOAD RECOVERY COPY</button>
+      </div>
+
+      <p class="form-note">Data stays in this browser unless you export it.</p>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
