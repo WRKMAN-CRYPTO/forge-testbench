@@ -3,66 +3,168 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>WRKMAN Craft — Forge Testbench</title>
+<meta name="theme-color" content="#11100d">
+<title>KITCHEN//STEP — Forge Testbench</title>
 <style>
-:root{color-scheme:dark;--ink:#f4f0df;--muted:#c6bea2;--panel:#171812e8;--accent:#d8c85c;--danger:#d76b4e}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0f120d;color:var(--ink);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}body{display:grid;place-items:center}#app{position:relative;width:100vw;height:100dvh;max-width:1200px;background:#11150e;overflow:hidden;touch-action:none}canvas{display:block;width:100%;height:100%}.hud{position:absolute;inset:0;pointer-events:none;padding:10px;display:flex;flex-direction:column;justify-content:space-between}.top,.bottom{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.bottom{align-items:flex-end}.card{background:var(--panel);border:1px solid #52563b;border-radius:10px;box-shadow:0 5px 18px #0008;padding:8px 10px}.brand{font-weight:900;letter-spacing:.12em;font-size:14px}.brand b{color:var(--accent)}.legend{font-size:11px;color:#bdb69e}.stats{display:flex;gap:10px;align-items:center;font-size:12px;white-space:nowrap;flex-wrap:wrap;justify-content:flex-end}.meter{display:inline-block;vertical-align:middle;width:92px;height:9px;border:1px solid #74775e;border-radius:99px;overflow:hidden;background:#24271d}.meter i{display:block;height:100%;background:var(--accent);width:100%}.controls{pointer-events:auto;display:grid;grid-template-columns:56px 56px 56px;grid-template-rows:56px 56px 56px;gap:5px}.btn,.build button{border:1px solid #76795d;background:#20241a;color:var(--ink);border-radius:10px;font:inherit;font-weight:800;box-shadow:0 3px 0 #0a0c08}.up{grid-column:2}.left{grid-column:1;grid-row:2}.action{grid-column:2;grid-row:2;background:#514d27}.right{grid-column:3;grid-row:2}.down{grid-column:2;grid-row:3}.build{pointer-events:auto;display:flex;flex-direction:column;gap:6px}.build button{min-width:165px;padding:9px 10px;text-align:left}.build button:disabled{opacity:.42}.toast{position:absolute;left:50%;top:18%;translate:-50% -50%;background:#13160fee;border:1px solid #7e805c;border-radius:9px;padding:8px 12px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:80%;text-align:center}.toast.show{opacity:1}.center{position:absolute;inset:0;display:grid;place-items:center;background:#080a07c9;padding:20px;z-index:5}.panel{max-width:650px;background:#171a12;border:1px solid #6f7250;border-radius:14px;padding:20px;box-shadow:0 20px 60px #000b}.panel h1{margin:0 0 6px;font-size:clamp(24px,6vw,44px)}.panel h1 b{color:var(--accent)}.panel p,.panel li{color:#d2ccb6;line-height:1.45}.panel button{width:100%;padding:13px;border-radius:9px;border:1px solid #b6ab50;background:#5d572a;color:white;font:inherit;font-weight:900}.kbd{font-size:11px;color:#bdb69e}.key{color:#efe6bf}.tiny{font-size:11px;color:#bdb69e}.zoneTag{font-weight:900;color:#efe6bf}.bullet{margin:10px 0 0;padding-left:20px}@media(max-width:540px){.stats{gap:6px;font-size:11px}.meter{width:64px}.build button{min-width:132px;font-size:11px}.controls{grid-template-columns:50px 50px 50px;grid-template-rows:50px 50px 50px}.brand{font-size:12px}}
+:root{color-scheme:dark;--bg:#11100d;--panel:#1a1813;--panel2:#242017;--ink:#f7f1df;--muted:#bfb49a;--line:#5e5541;--accent:#e3b75b;--accent2:#f7d98f;--danger:#dd7867}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overscroll-behavior:none}
+button,textarea{font:inherit}
+button{border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:12px;min-height:48px;font-weight:800}
+button:active{transform:translateY(1px)}
+#app{width:100%;height:100dvh;max-width:900px;margin:0 auto;position:relative;overflow:hidden;background:linear-gradient(180deg,#15130f,#0d0c0a)}
+.view{position:absolute;inset:0;display:none}.view.active{display:flex}
+#edit{flex-direction:column;padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));gap:12px;overflow:auto}
+.brand{letter-spacing:.12em;font-weight:950;font-size:14px}.brand b{color:var(--accent)}
+h1{margin:0;font-size:clamp(29px,8vw,52px);line-height:.96;letter-spacing:-.04em}
+.sub{color:var(--muted);line-height:1.45;font-size:13px;margin:0}
+.card{border:1px solid var(--line);background:#181610;border-radius:16px;padding:12px;box-shadow:0 16px 40px #0005}
+label{display:block;color:var(--accent2);font-size:12px;font-weight:900;margin-bottom:8px}
+textarea{display:block;width:100%;min-height:42dvh;resize:vertical;border:1px solid #6a6048;border-radius:12px;background:#0e0d0a;color:var(--ink);padding:13px;line-height:1.48;font-size:16px;outline:none;-webkit-user-select:text;user-select:text;touch-action:auto}
+textarea:focus{border-color:var(--accent)}
+.row{display:grid;grid-template-columns:1fr 1.4fr;gap:9px}.row button:last-child{background:#5a4720;border-color:#a3813c}
+.note{font-size:11px;color:#938974;line-height:1.4}
+#cook{flex-direction:column;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.cookTop{height:70px;padding:calc(9px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:end;justify-content:space-between;gap:10px;border-bottom:1px solid #3f392d;background:#12110ecc;z-index:3}
+.cookMeta{min-width:0}.cookTitle{font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.progressText{font-size:11px;color:var(--muted);margin-top:4px}.awake{font-size:10px;border:1px solid #4e4737;border-radius:99px;padding:5px 8px;color:#9d927b;white-space:nowrap}.awake.on{color:var(--accent2);border-color:#7e6734}
+.progress{height:4px;background:#29251c}.progress>i{display:block;height:100%;width:0;background:var(--accent);transition:width .18s ease}
+.stage{position:relative;flex:1;min-height:0;display:grid;grid-template-columns:min(20vw,120px) 1fr min(20vw,120px);overflow:hidden}
+.rail{border:0;border-radius:0;background:transparent;min-height:0;font-size:clamp(44px,13vw,80px);color:#766d5c;box-shadow:none;z-index:2}.rail:active{background:#ffffff0a;color:var(--accent2);transform:none}.rail[disabled]{opacity:.18}
+.stepWrap{display:grid;place-items:center;min-width:0;padding:18px 8px;overflow:auto;touch-action:pan-y}
+.step{max-width:620px;width:100%;font-family:ui-rounded,"SF Pro Rounded",system-ui,sans-serif;font-weight:750;font-size:clamp(27px,7.3vw,52px);line-height:1.1;letter-spacing:-.025em;text-align:center;text-wrap:balance}
+.step small{display:block;font:800 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);letter-spacing:.08em;margin-bottom:12px}
+.cookBottom{padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid #3f392d;background:#12110e;z-index:4}.cookBottom button{min-height:50px}.cookBottom .exit{color:#cbbda2}
+.drawer{position:absolute;left:0;right:0;bottom:0;z-index:10;background:#17140f;border-top:1px solid #756744;border-radius:18px 18px 0 0;transform:translateY(105%);transition:transform .22s ease;max-height:72dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}.drawer.open{transform:translateY(0)}
+.drawerHead{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #3d372a}.drawerHead b{color:var(--accent2)}.drawerHead button{min-width:48px}.drawerBody{overflow:auto;padding:14px 18px 24px;white-space:pre-wrap;line-height:1.55;color:#e5dcc6;-webkit-user-select:text;user-select:text;touch-action:pan-y}
+.scrim{position:absolute;inset:0;background:#0009;z-index:9;display:none}.scrim.show{display:block}
+.empty{color:var(--muted);font-style:italic}
+@media (orientation:landscape) and (max-height:520px){.cookTop{height:54px;padding-top:calc(5px + env(safe-area-inset-top))}.step{font-size:clamp(23px,5.2vw,42px)}.cookBottom{position:absolute;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));width:250px;border:0;background:transparent}.cookBottom button{background:#181610e8}.stage{padding-bottom:4px}}
 </style>
 </head>
-<body><div id="app"><canvas id="game"></canvas><div class="hud"><div class="top"><div class="card"><div class="brand"><b>WRKMAN</b> CRAFT</div><div class="legend">CLOCK IN. BUILD SOMETHING.</div></div><div class="card stats"><span>ZONE <b id="zoneName">Basin</b></span><span>WOOD <b id="wood">0</b></span><span>SCRAP <b id="scrap">0</b></span><span>GRIT <span class="meter"><i id="grit"></i></span> <b id="gritN">100</b></span><span id="clock">DAY 1 · 06:00</span><span>FORECAST <b id="forecast">BASIN CALM</b></span></div></div><div class="bottom"><div class="controls"><button class="btn up" data-key="up">▲</button><button class="btn left" data-key="left">◀</button><button class="btn action" data-key="action">E</button><button class="btn right" data-key="right">▶</button><button class="btn down" data-key="down">▼</button></div><div class="build card"><small>BUILD / MAINTAIN</small><button id="fireBtn">[1] FIRE · 3 wood + 1 scrap</button><button id="shelterBtn">[2] LEAN-TO · 6 wood + 2 scrap</button><div class="kbd">E gather / feed fire · WASD / arrows move</div></div></div></div><div id="toast" class="toast"></div><div id="intro" class="center"><div class="panel"><h1><b>WRKMAN</b> CRAFT</h1><p>Permanent headquarters are over. The night wind shifts each day, and the forecast tells you where it will be kindest.</p><ul class="bullet"><li><span class="zoneTag">Night 1</span> — the Basin is calm; West Timber is punished.</li><li><span class="zoneTag">Night 2</span> — West Timber becomes sheltered; Crossroads takes the gale.</li><li><span class="zoneTag">Night 3</span> — East Scrapyard becomes sheltered; Basin and Crossroads turn ugly.</li><li>Resources, gathering time, fire fuel, and build costs are unchanged.</li></ul><p class="tiny">Stay, relocate, or build another foothold. The forecast is known before dark.</p><button id="start">CLOCK IN</button></div></div></div>
+<body>
+<div id="app">
+  <section id="edit" class="view active" aria-label="Recipe setup">
+    <div class="brand"><b>FORGE</b> TESTBENCH / KITCHEN//STEP</div>
+    <h1>Your recipe.<br>One step at a time.</h1>
+    <p class="sub">Paste the recipe once. Cook Mode turns it into giant instructions with oversized BACK/NEXT rails, so floury fingers can use a knuckle instead of performing surgery on a scrollbar.</p>
+    <div class="card">
+      <label for="recipe">PASTE RECIPE</label>
+      <textarea id="recipe" spellcheck="false" autocapitalize="sentences" placeholder="Ingredients…
+
+Directions…"></textarea>
+      <div class="note" id="parseHint">Numbered directions work best. Plain paragraphs are accepted too.</div>
+    </div>
+    <div class="row">
+      <button id="demo">LOAD DEMO</button>
+      <button id="cookBtn">ENTER COOK MODE →</button>
+    </div>
+    <div class="note">Local-only: your pasted recipe is saved in this browser. Cook Mode will request screen-wake support when the browser provides it.</div>
+  </section>
+
+  <section id="cook" class="view" aria-label="Cook mode">
+    <div class="cookTop">
+      <div class="cookMeta">
+        <div class="cookTitle" id="title">KITCHEN//STEP</div>
+        <div class="progressText" id="progressText">STEP 1 OF 1</div>
+      </div>
+      <div id="awake" class="awake">SCREEN WAKE: AUTO</div>
+    </div>
+    <div class="progress"><i id="progressBar"></i></div>
+    <div class="stage">
+      <button id="back" class="rail" aria-label="Previous step">‹</button>
+      <div class="stepWrap"><div id="step" class="step"></div></div>
+      <button id="next" class="rail" aria-label="Next step">›</button>
+    </div>
+    <div class="cookBottom">
+      <button id="ingredientsBtn">INGREDIENTS</button>
+      <button id="exit" class="exit">EDIT RECIPE</button>
+    </div>
+    <div id="scrim" class="scrim"></div>
+    <aside id="drawer" class="drawer" aria-label="Ingredients">
+      <div class="drawerHead"><b>INGREDIENTS</b><button id="closeDrawer" aria-label="Close ingredients">×</button></div>
+      <div id="ingredients" class="drawerBody"></div>
+    </aside>
+  </section>
+</div>
 <script>
 (()=>{'use strict';
-const $=s=>document.querySelector(s),canvas=$('#game'),ctx=canvas.getContext('2d'),app=$('#app');
-const woodEl=$('#wood'),scrapEl=$('#scrap'),gritEl=$('#grit'),gritN=$('#gritN'),clockEl=$('#clock'),zoneNameEl=$('#zoneName'),forecastEl=$('#forecast'),fireBtn=$('#fireBtn'),shelterBtn=$('#shelterBtn'),toastEl=$('#toast'),intro=$('#intro');
-let W=0,H=0,last=0,running=false,toastTimer=0,worldTime=0,day=1,wood=0,scrap=0,grit=100,camX=0,camY=0;
-const DAY=72,NIGHT=.68,WIN=4,WW=2200,WH=1400,keys={up:0,down:0,left:0,right:0},player={x:360,y:360,speed:185,dir:0};
-let nodes=[],buildings=[],particles=[];
-const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const zones=[
- {id:'basin',name:'Sheltered Basin',kind:'circle',x:360,y:360,r:250,cold:.62,fireBurn:1.45,color:'rgba(190,210,220,.12)'},
- {id:'timber',name:'West Timber',kind:'rect',x:90,y:430,w:620,h:660,cold:1.28,fireBurn:1,woodTime:60,color:'rgba(86,134,80,.09)'},
- {id:'cross',name:'Crossroads',kind:'circle',x:1120,y:760,r:250,cold:.95,fireBurn:1,color:'rgba(190,170,95,.06)'},
- {id:'scrap',name:'East Scrapyard',kind:'rect',x:1500,y:260,w:580,h:800,cold:1.28,fireBurn:1,scrapTime:30,color:'rgba(150,150,160,.08)'}
- ];
-function resize(){const r=app.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;canvas.width=W*d;canvas.height=H*d;ctx.setTransform(d,0,0,d,0,0)}addEventListener('resize',resize);resize();
-function toast(t){toastEl.textContent=t;toastEl.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastEl.classList.remove('show'),1400)}
-function inside(z,x,y){return z.kind==='circle'?Math.hypot(x-z.x,y-z.y)<=z.r:x>=z.x&&x<=z.x+z.w&&y>=z.y&&y<=z.y+z.h}
-function zoneAt(x,y){for(const z of zones)if(inside(z,x,y))return z;return{id:'open',name:'Open Ground',cold:1,fireBurn:1,color:'rgba(0,0,0,0)'}}
-function spawnPoint(kind,rx,ry,rw,rh){let x,y,i=0;do{x=rand(rx,rx+rw);y=rand(ry,ry+rh);i++}while(i<50&&Math.hypot(x-player.x,y-player.y)<120);nodes.push({type:kind,x,y,hits:kind==='tree'?2:1,phase:rand(0,6.28)})}
-function spawn(){nodes=[];for(let i=0;i<16;i++)spawnPoint('tree',110,460,560,590);for(let i=0;i<10;i++)spawnPoint('scrap',1550,300,500,720);for(let i=0;i<5;i++)spawnPoint('tree',860,540,500,420);for(let i=0;i<5;i++)spawnPoint('scrap',890,560,470,380);for(let i=0;i<2;i++)spawnPoint('tree',260,560,170,180);for(let i=0;i<1;i++)spawnPoint('scrap',520,290,130,120)}
-function reset(){worldTime=0;day=1;wood=0;scrap=0;grit=100;buildings=[];particles=[];player.x=360;player.y=360;spawn();hud()}
-function nearestNode(){let best=null,d0=55;for(const n of nodes){const d=Math.hypot(n.x-player.x,n.y-player.y);if(d<d0){best=n;d0=d}}return best}
-function nearestFire(){let best=null,d0=62;for(const b of buildings)if(b.type==='fire'){const d=Math.hypot(b.x-player.x,b.y-player.y);if(d<d0){best=b;d0=d}}return best}
-function burst(x,y,type){for(let i=0;i<9;i++)particles.push({x,y,vx:rand(-45,45),vy:rand(-60,10),life:rand(.3,.7),type})}
-function advanceWork(minutes){worldTime+=DAY*(minutes/1440)}
-function gatherTime(n){const z=zoneAt(n.x,n.y);if(n.type==='tree')return z.woodTime||90;return z.scrapTime||45}
-function action(){const fire=nearestFire();if(fire&&fire.fuel<35&&wood>0){wood--;fire.fuel=Math.min(45,fire.fuel+12);advanceWork(10);burst(fire.x,fire.y,'spark');toast('FED FIRE · 10 MIN');hud();return}const n=nearestNode();if(!n){toast(fire&&wood===0?'Need wood to feed fire.':'Nothing within reach.');return}const mins=gatherTime(n);n.hits--;if(n.type==='tree'){wood+=2;toast('+2 WOOD · '+mins+' MIN')}else{scrap+=2;toast('+2 SCRAP · '+mins+' MIN')}advanceWork(mins);burst(n.x,n.y,n.type==='tree'?'leaf':'spark');if(n.hits<=0)nodes.splice(nodes.indexOf(n),1);hud()}
-function build(type){const c=type==='fire'?{w:3,s:1,time:30}:{w:6,s:2,time:120};if(wood<c.w||scrap<c.s){toast('Need more material.');return}for(const b of buildings)if(Math.hypot(b.x-player.x,b.y-player.y)<38){toast('Too close to another build.');return}wood-=c.w;scrap-=c.s;advanceWork(c.time);buildings.push({type,x:player.x,y:player.y,fuel:type==='fire'?28:0});burst(player.x,player.y,'build');toast(type==='fire'?'FIRE BUILT · 30 MIN':'LEAN-TO BUILT · 2 HR');hud()}
-function isNight(){return(worldTime%DAY)/DAY>=NIGHT}
-function shelter(){return buildings.some(b=>b.type==='shelter'&&Math.hypot(b.x-player.x,b.y-player.y)<80)}
-function warmth(){let v=0;for(const b of buildings)if(b.type==='fire'&&b.fuel>0){const d=Math.hypot(b.x-player.x,b.y-player.y);if(d<115)v=Math.max(v,1-d/115)}return v}
-function currentZone(){return zoneAt(player.x,player.y)}
-function weatherFor(d){if(d<=1)return{forecast:'BASIN CALM · WEST GALE',cold:{basin:.62,timber:1.36,cross:1.02,scrap:1.15},burn:{basin:1.45,timber:1,cross:1,scrap:1}};if(d===2)return{forecast:'WEST CALM · CROSSROADS GALE',cold:{basin:1.15,timber:.72,cross:1.42,scrap:1.10},burn:{basin:1.35,timber:.95,cross:1.25,scrap:1}};return{forecast:'EAST CALM · BASIN/CROSS GALE',cold:{basin:1.34,timber:1.12,cross:1.46,scrap:.72},burn:{basin:1.55,timber:1.05,cross:1.25,scrap:.95}}}
-function zoneCold(z){const w=weatherFor(day);return w.cold[z.id]??1}
-function zoneBurn(z){const w=weatherFor(day);return w.burn[z.id]??1}
-function update(dt){let dx=keys.right-keys.left,dy=keys.down-keys.up;if(dx||dy){const l=Math.hypot(dx,dy);dx/=l;dy/=l;player.x+=dx*player.speed*dt;player.y+=dy*player.speed*dt;player.dir=Math.atan2(dy,dx)}player.x=clamp(player.x,18,WW-18);player.y=clamp(player.y,18,WH-18);worldTime+=dt;const nd=Math.floor(worldTime/DAY)+1;if(nd!==day){day=nd;if(day>=WIN){running=false;setTimeout(()=>end(true),350)}else toast('DAY '+day+' · FORECAST: '+weatherFor(day).forecast)}for(const b of buildings)if(b.type==='fire'&&b.fuel>0){const z=zoneAt(b.x,b.y);b.fuel=Math.max(0,b.fuel-dt*z.fireBurn*zoneBurn(z))}if(isNight()){const z=currentZone(),w=warmth(),base=[0,4.2,5.9,7.5][Math.min(day,3)],dr=base*zoneCold(z);grit-=dt*(w>0?Math.max(.75,dr*(1-w)*.6):dr)}else{const rec=shelter()?0.72:0.08;grit+=dt*rec;grit=Math.min(grit,day===1?100:Math.max(72,96-(day-2)*8))}grit=clamp(grit,0,100);if(grit<=0){running=false;end(false)}for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=70*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);hud()}
-function hud(){const z=currentZone();zoneNameEl.textContent=z.name.replace('Sheltered ','').replace('West ','').replace('East ','');woodEl.textContent=wood;scrapEl.textContent=scrap;gritEl.style.width=grit+'%';gritEl.style.background=grit<30?'var(--danger)':'var(--accent)';gritN.textContent=Math.round(grit);fireBtn.disabled=wood<3||scrap<1;shelterBtn.disabled=wood<6||scrap<2;const f=(worldTime%DAY)/DAY,h=(6+f*24)%24;clockEl.textContent=(isNight()?'NIGHT ':'DAY ')+day+' · '+Math.floor(h).toString().padStart(2,'0')+':'+Math.floor(h%1*60).toString().padStart(2,'0');forecastEl.textContent=weatherFor(day).forecast}
-function drawZones(){for(const z of zones){ctx.fillStyle=z.color;ctx.strokeStyle='rgba(255,255,255,.08)';ctx.lineWidth=2;if(z.kind==='circle'){ctx.beginPath();ctx.arc(z.x-camX,z.y-camY,z.r,0,6.3);ctx.fill();ctx.stroke()}else{ctx.fillRect(z.x-camX,z.y-camY,z.w,z.h);ctx.strokeRect(z.x-camX,z.y-camY,z.w,z.h)}ctx.globalAlpha=.28;ctx.fillStyle='#f0e8c9';ctx.font='bold 28px monospace';ctx.textAlign='center';const lx=z.kind==='circle'?z.x:z.x+z.w/2,ly=z.kind==='circle'?z.y-z.r+38:z.y+34;ctx.fillText(z.name.toUpperCase(),lx-camX,ly-camY);ctx.globalAlpha=1}}
-function ground(){ctx.fillStyle='#52643c';ctx.fillRect(0,0,W,H);ctx.globalAlpha=.14;ctx.strokeStyle='#263520';for(let x=(-camX%42)-42;x<W+42;x+=42)for(let y=(-camY%42)-42;y<H+42;y+=42){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+5,y-8);ctx.stroke()}ctx.globalAlpha=1;drawZones();if(!isNight()){const f=(worldTime%DAY)/DAY,dusk=clamp((f-.5)/.18,0,1);ctx.fillStyle=`rgba(141,75,43,${dusk*.28})`;ctx.fillRect(0,0,W,H)}}
-function drawNode(n){const sx=n.x-camX,sy=n.y-camY;if(sx<-40||sy<-40||sx>W+40||sy>H+40)return;ctx.save();ctx.translate(sx,sy);if(n.type==='tree'){ctx.strokeStyle='#352d1c';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(0,12);ctx.lineTo(0,-9);ctx.stroke();ctx.fillStyle='#36583a';ctx.strokeStyle='#172519';for(const q of [[0,-18,16],[-10,-9,12],[11,-8,12]]){ctx.beginPath();ctx.arc(...q,0,6.3);ctx.fill();ctx.stroke()}}else{ctx.fillStyle='#9a9881';ctx.strokeStyle='#33352e';ctx.rotate(n.phase);for(let i=0;i<5;i++){ctx.rotate(1.25);ctx.fillRect(1,-4,17,8)}ctx.beginPath();ctx.arc(0,0,8,0,6.3);ctx.fill();ctx.stroke()}ctx.restore()}
-function drawBuilding(b){const sx=b.x-camX,sy=b.y-camY;if(sx<-60||sy<-60||sx>W+60||sy>H+60)return;ctx.save();ctx.translate(sx,sy);if(b.type==='fire'){ctx.strokeStyle='#45301d';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-13,10);ctx.lineTo(13,-4);ctx.moveTo(-13,-4);ctx.lineTo(13,10);ctx.stroke();if(b.fuel>0){const flick=Math.sin(performance.now()/90+b.x)*3;ctx.fillStyle='#edb83b';ctx.beginPath();ctx.moveTo(0,4);ctx.quadraticCurveTo(-12,-10,0,-23-flick);ctx.quadraticCurveTo(13,-8,0,4);ctx.fill()}else{ctx.fillStyle='#3c3a30';ctx.beginPath();ctx.arc(0,2,5,0,6.3);ctx.fill()}ctx.font='10px monospace';ctx.textAlign='center';ctx.fillStyle='#f4f0df';ctx.fillText(Math.ceil(b.fuel)+'s',0,27)}else{ctx.strokeStyle='#463b25';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-25,14);ctx.lineTo(0,-20);ctx.lineTo(26,14);ctx.stroke();ctx.fillStyle='#74613a';ctx.beginPath();ctx.moveTo(-23,10);ctx.lineTo(0,-17);ctx.lineTo(22,10);ctx.closePath();ctx.fill()}ctx.restore()}
-function drawPlayer(){ctx.save();ctx.translate(player.x-camX,player.y-camY);ctx.rotate(player.dir);ctx.fillStyle='#2c3028';ctx.beginPath();ctx.ellipse(0,5,12,15,0,0,6.3);ctx.fill();ctx.fillStyle='#d2bd82';ctx.beginPath();ctx.arc(0,-8,8,0,6.3);ctx.fill();ctx.fillStyle='#6e8b45';ctx.fillRect(-10,-16,20,5);ctx.fillRect(-7,-20,14,5);ctx.restore()}
-function drawParticles(){for(const p of particles){const sx=p.x-camX,sy=p.y-camY;ctx.globalAlpha=clamp(p.life*2,0,1);ctx.fillStyle=p.type==='leaf'?'#9cb45d':'#e6c45a';ctx.fillRect(sx,sy,3,3)}ctx.globalAlpha=1}
-function drawNight(){if(!isNight())return;ctx.fillStyle='rgba(5,8,13,.25)';ctx.fillRect(0,0,W,H)}
-function draw(){camX=clamp(player.x-W/2,0,WW-W);camY=clamp(player.y-H/2,0,WH-H);ground();nodes.forEach(drawNode);buildings.forEach(drawBuilding);drawPlayer();drawParticles();drawNight()}
-function loop(t){const dt=Math.min((t-last)/1000,.033)||0;last=t;if(running)update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
-function end(win){intro.innerHTML=`<div class="panel"><h1>${win?'<b>SHIFT COMPLETE</b>':'SHIFT LOST'}</h1><p>${win?'You survived a world that refused to let one camp stay optimal.':'The cold emptied your Grit. Safe place, useful place, and greedy place were not the same place.'}</p><p><b>Built:</b> ${buildings.length} · <b>Reached:</b> Day ${day} · <b>Wood:</b> ${wood} · <b>Grit:</b> ${Math.round(grit)}</p><button id="again">CLOCK IN AGAIN</button></div>`;intro.style.display='grid';$('#again').onclick=start}
-function start(){reset();intro.style.display='none';running=true;last=performance.now();toast('READ THE FORECAST. THEN COMMIT.')}
-$('#start').onclick=start;
-const map={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right'};
-addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(map[k]){keys[map[k]]=1;e.preventDefault()}if(k==='e')action();if(k==='1')build('fire');if(k==='2')build('shelter')});
-addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(map[k])keys[map[k]]=0});
-document.querySelectorAll('[data-key]').forEach(b=>{const k=b.dataset.key;b.onpointerdown=e=>{e.preventDefault();k==='action'?action():keys[k]=1};b.onpointerup=b.onpointercancel=b.onpointerleave=e=>{if(k!=='action')keys[k]=0}});
-fireBtn.onclick=()=>build('fire');shelterBtn.onclick=()=>build('shelter');document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.up=keys.down=keys.left=keys.right=0;last=performance.now()}});reset();
+const $=s=>document.querySelector(s);
+const edit=$('#edit'),cook=$('#cook'),recipe=$('#recipe'),demo=$('#demo'),cookBtn=$('#cookBtn'),parseHint=$('#parseHint');
+const titleEl=$('#title'),stepEl=$('#step'),progressText=$('#progressText'),progressBar=$('#progressBar'),back=$('#back'),next=$('#next');
+const ingredientsBtn=$('#ingredientsBtn'),ingredientsEl=$('#ingredients'),drawer=$('#drawer'),scrim=$('#scrim'),closeDrawer=$('#closeDrawer'),exit=$('#exit'),awake=$('#awake');
+const STORAGE='forge-kitchen-step-v1';
+let model={raw:'',title:'KITCHEN//STEP',ingredients:'',steps:[],index:0},wakeLock=null;
+const demoText=`Skillet Garlic Bread
+
+Ingredients
+4 slices thick bread
+2 tbsp butter, softened
+1 garlic clove, finely grated
+Pinch of salt
+2 tbsp grated parmesan
+
+Directions
+1. Mix the softened butter, garlic, salt, and parmesan.
+2. Spread the garlic butter edge to edge on one side of each slice.
+3. Put the bread butter-side down in a cold skillet.
+4. Turn the heat to medium and cook until the underside is deeply golden, about 3 to 4 minutes.
+5. Flip for 30 seconds, then move the bread to a plate and eat it while it is rude-hot.`;
+function clean(s){return s.replace(/\r/g,'').trim()}
+function looksStep(line){return /^(?:step\s*)?\d+[.)\-:]\s+/i.test(line)||/^[-•*]\s+/.test(line)}
+function stripStep(line){return line.replace(/^(?:step\s*)?\d+[.)\-:]\s*/i,'').replace(/^[-•*]\s+/,'').trim()}
+function splitSentences(text){const pieces=text.replace(/\n+/g,' ').split(/(?<=[.!?])\s+(?=[A-Z0-9])/).map(x=>x.trim()).filter(Boolean);return pieces.length>1?pieces:[text.trim()].filter(Boolean)}
+function parseRecipe(raw){
+  const text=clean(raw);if(!text)return{title:'KITCHEN//STEP',ingredients:'',steps:[]};
+  const lines=text.split('\n').map(x=>x.trim());
+  const first=lines.find(Boolean)||'KITCHEN//STEP';
+  let title='KITCHEN//STEP';
+  if(first.length<=80&&!looksStep(first)&&!/^(ingredients|directions|instructions|method|steps?)\s*:??$/i.test(first)) title=first.replace(/[:\-–—]+$/,'').trim();
+  let mode='pre',ings=[],dirLines=[];let sawDir=false,sawIng=false;
+  for(const line0 of lines){const line=line0.trim();if(!line)continue;
+    if(line===first&&title===first.replace(/[:\-–—]+$/,'').trim()) continue;
+    if(/^ingredients\s*:??$/i.test(line)){mode='ing';sawIng=true;continue}
+    if(/^(directions|instructions|method|steps?)\s*:??$/i.test(line)){mode='dir';sawDir=true;continue}
+    if(mode==='ing')ings.push(line); else if(mode==='dir')dirLines.push(line); else dirLines.push(line);
+  }
+  if(sawIng&&!sawDir){const firstStep=ings.findIndex(looksStep);if(firstStep>=0){dirLines=ings.slice(firstStep);ings=ings.slice(0,firstStep)}}
+  let steps=dirLines.filter(looksStep).map(stripStep);
+  if(steps.length<2){
+    const paragraphs=dirLines.join('\n').split(/\n{1,}/).map(stripStep).filter(Boolean);
+    steps=paragraphs.length>=2?paragraphs:splitSentences(dirLines.join(' '));
+  }
+  steps=steps.map(x=>x.replace(/\s+/g,' ').trim()).filter(x=>x.length>2);
+  if(!steps.length&&text)steps=[text.replace(/\s+/g,' ')];
+  return{title:title||'KITCHEN//STEP',ingredients:ings.join('\n'),steps};
+}
+function save(){try{localStorage.setItem(STORAGE,JSON.stringify({raw:model.raw,index:model.index}))}catch(e){parseHint.textContent='Could not save locally in this browser.'}}
+function restore(){try{const p=JSON.parse(localStorage.getItem(STORAGE)||'null');if(p&&typeof p.raw==='string'){recipe.value=p.raw;const parsed=parseRecipe(p.raw);model={...parsed,raw:p.raw,index:Math.max(0,Math.min(Number(p.index)||0,Math.max(0,parsed.steps.length-1)))};parseHint.textContent=p.raw?'Saved recipe restored.':''}}catch(e){parseHint.textContent='Saved recipe could not be restored; paste it again.'}}
+async function acquireWake(){if(!('wakeLock'in navigator)){awake.textContent='SCREEN WAKE: UNAVAILABLE';awake.classList.remove('on');return}try{wakeLock=await navigator.wakeLock.request('screen');awake.textContent='SCREEN WAKE: ON';awake.classList.add('on');wakeLock.addEventListener('release',()=>{awake.textContent='SCREEN WAKE: AUTO';awake.classList.remove('on')})}catch(e){awake.textContent='SCREEN WAKE: AUTO';awake.classList.remove('on')}}
+async function releaseWake(){try{if(wakeLock){await wakeLock.release();wakeLock=null}}catch(e){}awake.textContent='SCREEN WAKE: AUTO';awake.classList.remove('on')}
+function render(){
+  const total=model.steps.length||1;model.index=Math.max(0,Math.min(model.index,total-1));
+  titleEl.textContent=model.title||'KITCHEN//STEP';progressText.textContent=`STEP ${model.index+1} OF ${total}`;progressBar.style.width=`${((model.index+1)/total)*100}%`;
+  stepEl.innerHTML=`<small>STEP ${model.index+1}</small>${escapeHtml(model.steps[model.index]||'No step found.')}`;
+  back.disabled=model.index<=0;next.disabled=model.index>=total-1;
+  ingredientsEl.textContent=model.ingredients||'No ingredient section was detected. The cooking steps are still usable.';
+  ingredientsEl.classList.toggle('empty',!model.ingredients);save();
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function enterCook(){
+  const raw=clean(recipe.value);if(!raw){parseHint.textContent='Paste a recipe first, or load the demo.';recipe.focus();return}
+  const parsed=parseRecipe(raw);model={...parsed,raw,index:0};if(!model.steps.length){parseHint.textContent='I could not find cooking steps in that text.';return}
+  edit.classList.remove('active');cook.classList.add('active');render();acquireWake();
+}
+function leaveCook(){closeIngredients();releaseWake();cook.classList.remove('active');edit.classList.add('active');recipe.value=model.raw;save()}
+function go(delta){const n=Math.max(0,Math.min(model.index+delta,model.steps.length-1));if(n!==model.index){model.index=n;render();if(navigator.vibrate)navigator.vibrate(12)}}
+function openIngredients(){drawer.classList.add('open');scrim.classList.add('show')}
+function closeIngredients(){drawer.classList.remove('open');scrim.classList.remove('show')}
+demo.onclick=()=>{recipe.value=demoText;model.raw=demoText;save();parseHint.textContent='Demo loaded. Enter Cook Mode.';recipe.focus();recipe.setSelectionRange(0,0)};
+cookBtn.onclick=enterCook;back.onclick=()=>go(-1);next.onclick=()=>go(1);ingredientsBtn.onclick=openIngredients;closeDrawer.onclick=closeIngredients;scrim.onclick=closeIngredients;exit.onclick=leaveCook;
+addEventListener('keydown',e=>{if(!cook.classList.contains('active')||drawer.classList.contains('open'))return;if(e.key==='ArrowRight'){go(1);e.preventDefault()}if(e.key==='ArrowLeft'){go(-1);e.preventDefault()}if(e.key==='Escape'){leaveCook();e.preventDefault()}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cook.classList.contains('active'))acquireWake()});
+recipe.addEventListener('input',()=>{model.raw=recipe.value;save()});
+restore();
 })();
-</script></body></html>
+</script>
+</body>
+</html>
