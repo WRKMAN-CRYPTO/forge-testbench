@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d0c">
+<title>FORGE CHAT — WRKMAN</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0b0d0c;--panel:#121612;--panel2:#171d17;--panel3:#0e120f;
+  --ink:#eef5eb;--muted:#91a08f;--line:#29342a;--green:#72f28a;--green2:#b5ffbf;
+  --steel:#cad3cc;--danger:#ff7b72;--shadow:#0008;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overscroll-behavior:none}
+button,textarea,input{font:inherit}
+button{color:inherit}
+button:active{transform:translateY(1px)}
+#app{height:100dvh;max-width:820px;margin:0 auto;display:flex;flex-direction:column;background:radial-gradient(circle at 50% -20%,#1d2b20 0,#0b0d0c 38%);overflow:hidden;position:relative}
+header{padding:calc(10px + env(safe-area-inset-top)) 12px 9px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:#0b0d0cf2;backdrop-filter:blur(16px);z-index:4}
+.logo{width:42px;height:42px;border:1px solid #526454;border-radius:50%;display:grid;place-items:center;position:relative;background:radial-gradient(circle,#19261b,#0c100d);box-shadow:inset 0 0 0 3px #111812,0 0 30px #53ff7820}
+.logo:before,.logo:after{content:"";position:absolute;inset:6px;border:1px solid #3a4d3d;border-radius:50%}.logo:after{inset:11px 5px;border-left-color:transparent;border-right-color:transparent}
+.logo b{font:1000 22px/1 system-ui,sans-serif;color:var(--green2);z-index:2;letter-spacing:-.12em;padding-right:.1em}
+.brand{min-width:0}.brand strong{display:block;font:900 16px/1.1 system-ui,sans-serif;letter-spacing:.08em}.brand small{display:block;color:var(--muted);font-size:10px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconBtn{width:44px;height:44px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);font-size:20px;font-weight:900}
+.promptDeck{display:flex;gap:8px;overflow-x:auto;padding:10px 12px 9px;border-bottom:1px solid #1e271f;scrollbar-width:none;flex:none}.promptDeck::-webkit-scrollbar{display:none}
+.promptChip{flex:0 0 auto;max-width:190px;min-height:42px;border:1px solid #364538;border-radius:12px;background:#151b16;padding:8px 10px;text-align:left}.promptChip b{display:block;font-size:11px;color:var(--green2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.promptChip span{display:block;margin-top:3px;color:#a6b4a4;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.promptChip.manage{width:44px;padding:0;text-align:center;font-size:22px;color:var(--green)}
+.bridge{margin:8px 12px 0;border:1px solid #2c3c2e;border-radius:12px;background:#101711;padding:8px 10px;color:#aebbaa;font-size:10px;line-height:1.45;flex:none}.bridge b{color:var(--green2)}
+.feed{flex:1;min-height:0;overflow-y:auto;padding:14px 12px 110px;scroll-behavior:smooth}
+.empty{min-height:100%;display:grid;place-items:center;padding:20px}.emptyCard{max-width:440px;text-align:center;color:var(--muted);line-height:1.5}.emptyMark{font:900 52px/1 system-ui,sans-serif;color:#233226;margin-bottom:8px}.emptyCard b{color:var(--ink)}
+.msg{margin:0 0 10px auto;max-width:92%;border:1px solid #38503c;border-radius:16px 16px 4px 16px;background:#142018;padding:11px 12px;box-shadow:0 8px 25px #0003}.msg .meta{display:flex;justify-content:space-between;gap:8px;color:#7f927f;font-size:9px;margin-bottom:6px}.msg .text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font-size:14px}.msg .actions{display:flex;gap:7px;margin-top:9px}.msg .actions button{min-height:34px;border:1px solid #324234;border-radius:9px;background:#0f1510;padding:0 10px;font-size:10px;color:#b8c6b5}
+.composer{position:absolute;left:0;right:0;bottom:0;padding:9px 10px calc(9px + env(safe-area-inset-bottom));border-top:1px solid #273229;background:#0c0f0ded;backdrop-filter:blur(18px);z-index:5}
+.composeBox{display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:end;border:1px solid #344337;border-radius:15px;background:#121713;padding:7px;box-shadow:0 -12px 38px #0005}
+textarea{width:100%;min-height:44px;max-height:144px;resize:none;border:0;background:transparent;color:var(--ink);outline:0;padding:10px 5px;font-size:16px;line-height:1.35}
+.composeBtn{height:44px;min-width:44px;border:1px solid #334236;border-radius:11px;background:#171e18;font-weight:900}.send{padding:0 15px;background:#224c2b;border-color:#4c8d58;color:#d8ffdd}
+.scrim{position:absolute;inset:0;background:#000a;z-index:9;display:none}.scrim.on{display:block}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:10;background:#111611;border:1px solid #3b4b3d;border-bottom:0;border-radius:20px 20px 0 0;max-height:82dvh;transform:translateY(105%);transition:transform .2s ease;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -20px 60px #000a}.sheet.on{transform:translateY(0)}
+.sheetHead{padding:12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.sheetHead strong{font:900 16px system-ui,sans-serif}.sheetHead button{width:44px;height:40px;border:1px solid var(--line);border-radius:10px;background:#171d17}
+.sheetBody{overflow:auto;padding:10px 12px 22px}
+.sessionRow,.promptRow{border:1px solid #29352b;border-radius:13px;background:#141a15;padding:10px;margin-bottom:8px}.sessionRow.active{border-color:#4c7f54;background:#18221a}.sessionTop,.promptTop{display:flex;justify-content:space-between;gap:8px;align-items:center}.sessionTitle,.promptTitle{font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sessionMeta{font-size:9px;color:var(--muted);margin-top:5px}.rowBtns{display:flex;gap:6px;flex:none}.mini{min-height:34px;border:1px solid #344137;border-radius:9px;background:#0f1410;padding:0 9px;font-size:10px}.danger{color:#ff9b93;border-color:#613a37}.newBtn{width:100%;min-height:46px;border:1px solid #456049;border-radius:11px;background:#18301d;color:#c9ffd1;font-weight:900;margin-bottom:10px}
+.field{margin-bottom:10px}.field label{display:block;color:#a9b7a6;font-size:10px;font-weight:900;margin:0 0 5px}.field input,.field textarea{width:100%;border:1px solid #344137;border-radius:10px;background:#0d110e;color:var(--ink);padding:10px;font-size:16px;outline:none}.field textarea{min-height:105px;max-height:none;resize:vertical}.saveRow{display:grid;grid-template-columns:1fr 1fr;gap:8px}.saveRow button{min-height:44px;border:1px solid #3a4a3d;border-radius:10px;background:#171e18}.saveRow .primary{background:#224c2b;border-color:#4c8d58;color:#d8ffdd}
+.toast{position:absolute;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#18221a;border:1px solid #415745;border-radius:99px;padding:8px 12px;color:#d7e5d3;font-size:10px;z-index:20;transition:.18s ease;white-space:nowrap}.toast.on{opacity:1;transform:translate(-50%,0)}
+@media(min-width:700px){.feed{padding-left:36px;padding-right:36px}.composer{padding-left:30px;padding-right:30px}.promptDeck{padding-left:30px;padding-right:30px}.bridge{margin-left:30px;margin-right:30px}}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <div class="logo" aria-label="WRKMAN maker's mark"><b>W</b></div>
+  <div class="brand"><strong>FORGE CHAT</strong><small id="sessionName">Persistent command deck</small></div>
+  <button class="iconBtn" id="sessionsBtn" aria-label="Open sessions">☰</button>
+</header>
+<div class="promptDeck" id="promptDeck"></div>
+<div class="bridge"><b>FORGE BRIDGE</b> keeps the real conversation in ChatGPT, so your Forge tools and continuity stay attached. Send copies the prompt, logs it here, then opens ChatGPT.</div>
+<main class="feed" id="feed"></main>
+<div class="composer">
+  <div class="composeBox">
+    <button class="composeBtn" id="clearBtn" aria-label="Clear draft">×</button>
+    <textarea id="draft" rows="1" placeholder="Type, or tap a favorite prompt…" autocomplete="off" autocapitalize="sentences"></textarea>
+    <button class="composeBtn send" id="sendBtn">SEND</button>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+<section class="sheet" id="sessionsSheet" aria-hidden="true">
+  <div class="sheetHead"><strong>Sessions</strong><button data-close>×</button></div>
+  <div class="sheetBody" id="sessionsBody"></div>
+</section>
+<section class="sheet" id="promptsSheet" aria-hidden="true">
+  <div class="sheetHead"><strong>Favorite prompts</strong><button data-close>×</button></div>
+  <div class="sheetBody" id="promptsBody"></div>
+</section>
+<section class="sheet" id="editPromptSheet" aria-hidden="true">
+  <div class="sheetHead"><strong id="editPromptHeading">Add prompt</strong><button data-close>×</button></div>
+  <div class="sheetBody">
+    <div class="field"><label>BUTTON NAME</label><input id="promptTitleInput" maxlength="28" placeholder="Example: Random Problem"></div>
+    <div class="field"><label>PROMPT</label><textarea id="promptTextInput" placeholder="What should this button send?"></textarea></div>
+    <div class="saveRow"><button id="cancelPromptBtn">Cancel</button><button class="primary" id="savePromptBtn">Save prompt</button></div>
+  </div>
+</section>
+<div class="toast" id="toast"></div>
+</div>
+<script>
+(()=>{
+'use strict';
+const KEY='wrkman-forge-chat-v1';
+const defaults=[
+ {id:'random',title:'Random Problem',text:'Find a random problem and build a solution with forge-context.'},
+ {id:'outside',title:'Outside Pattern',text:'Find a random problem outside the kinds of problems you usually choose and build a solution with forge-context.'},
+ {id:'play',title:'Go Play',text:'Go play.'},
+ {id:'clock',title:'Clock In',text:'Clock in.'}
+];
+const $=s=>document.querySelector(s);
+const feed=$('#feed'),draft=$('#draft'),promptDeck=$('#promptDeck'),sessionName=$('#sessionName'),scrim=$('#scrim');
+let editPromptId=null;
+let toastTimer=null;
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function load(){
+  try{
+    const parsed=JSON.parse(localStorage.getItem(KEY));
+    if(parsed&&Array.isArray(parsed.prompts)&&Array.isArray(parsed.sessions)) return parsed;
+  }catch(e){}
+  const id=uid();
+  return {prompts:defaults,sessions:[{id,title:'Fresh forge',createdAt:Date.now(),updatedAt:Date.now(),items:[]}],activeId:id,draft:''};
+}
+let state=load();
+if(!state.sessions.length){const id=uid();state.sessions=[{id,title:'Fresh forge',createdAt:Date.now(),updatedAt:Date.now(),items:[]}];state.activeId=id}
+if(!state.sessions.some(s=>s.id===state.activeId)) state.activeId=state.sessions[0].id;
+function save(){state.draft=draft.value;localStorage.setItem(KEY,JSON.stringify(state))}
+function active(){return state.sessions.find(s=>s.id===state.activeId)}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function shortTitle(text){const s=text.trim().replace(/\s+/g,' ');return s.length>34?s.slice(0,34)+'…':s||'Fresh forge'}
+function fmt(ts){try{return new Date(ts).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}catch(e){return ''}}
+function renderPrompts(){
+  promptDeck.innerHTML=state.prompts.map(p=>`<button class="promptChip" data-prompt="${esc(p.id)}"><b>${esc(p.title)}</b><span>${esc(p.text)}</span></button>`).join('')+`<button class="promptChip manage" id="managePromptsBtn" aria-label="Manage favorite prompts">+</button>`;
+  promptDeck.querySelectorAll('[data-prompt]').forEach(btn=>btn.addEventListener('click',()=>{
+    const p=state.prompts.find(x=>x.id===btn.dataset.prompt);if(!p)return;draft.value=p.text;resizeDraft();save();draft.focus();
+  }));
+  $('#managePromptsBtn').addEventListener('click',()=>{renderPromptManager();openSheet($('#promptsSheet'))});
+}
+function renderFeed(){
+  const s=active();sessionName.textContent=s?s.title:'Persistent command deck';
+  if(!s||!s.items.length){feed.innerHTML=`<div class="empty"><div class="emptyCard"><div class="emptyMark">W</div><b>Your command deck is ready.</b><br>Tap a favorite prompt above, tweak it if you want, then SEND. This app remembers your prompts, drafts, sessions, and launch history on this device.</div></div>`;return}
+  feed.innerHTML=s.items.map((m,i)=>`<article class="msg"><div class="meta"><span>SENT TO CHATGPT</span><span>${esc(fmt(m.ts))}</span></div><div class="text">${esc(m.text)}</div><div class="actions"><button data-copy="${i}">COPY</button><button data-reuse="${i}">REUSE</button></div></article>`).join('');
+  feed.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copyText(s.items[+b.dataset.copy].text,'Prompt copied'));
+  feed.querySelectorAll('[data-reuse]').forEach(b=>{b.onclick=()=>{draft.value=s.items[+b.dataset.reuse].text;resizeDraft();save();draft.focus()}});
+  requestAnimationFrame(()=>feed.scrollTop=feed.scrollHeight);
+}
+function renderSessions(){
+  const body=$('#sessionsBody');
+  body.innerHTML=`<button class="newBtn" id="newSessionBtn">+ NEW SESSION</button>`+state.sessions.slice().sort((a,b)=>b.updatedAt-a.updatedAt).map(s=>`<div class="sessionRow ${s.id===state.activeId?'active':''}"><div class="sessionTop"><div class="sessionTitle">${esc(s.title)}</div><div class="rowBtns"><button class="mini" data-open="${esc(s.id)}">OPEN</button><button class="mini danger" data-delete-session="${esc(s.id)}">DELETE</button></div></div><div class="sessionMeta">${s.items.length} launch${s.items.length===1?'':'es'} · ${esc(fmt(s.updatedAt))}</div></div>`).join('');
+  $('#newSessionBtn').onclick=()=>{newSession();closeSheets()};
+  body.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{state.activeId=b.dataset.open;save();renderFeed();closeSheets()});
+  body.querySelectorAll('[data-delete-session]').forEach(b=>b.onclick=()=>deleteSession(b.dataset.deleteSession));
+}
+function renderPromptManager(){
+  const body=$('#promptsBody');
+  body.innerHTML=`<button class="newBtn" id="addPromptBtn">+ ADD FAVORITE</button>`+state.prompts.map(p=>`<div class="promptRow"><div class="promptTop"><div class="promptTitle">${esc(p.title)}</div><div class="rowBtns"><button class="mini" data-edit-prompt="${esc(p.id)}">EDIT</button><button class="mini danger" data-delete-prompt="${esc(p.id)}">DELETE</button></div></div><div class="sessionMeta">${esc(p.text)}</div></div>`).join('');
+  $('#addPromptBtn').onclick=()=>openPromptEditor();
+  body.querySelectorAll('[data-edit-prompt]').forEach(b=>b.onclick=()=>openPromptEditor(b.dataset.editPrompt));
+  body.querySelectorAll('[data-delete-prompt]').forEach(b=>b.onclick=()=>{
+    const p=state.prompts.find(x=>x.id===b.dataset.deletePrompt);if(!p)return;
+    if(confirm(`Delete “${p.title}”?`)){state.prompts=state.prompts.filter(x=>x.id!==p.id);save();renderPrompts();renderPromptManager()}
+  });
+}
+function openPromptEditor(id=null){
+  editPromptId=id;const p=state.prompts.find(x=>x.id===id);
+  $('#editPromptHeading').textContent=p?'Edit prompt':'Add prompt';
+  $('#promptTitleInput').value=p?p.title:'';$('#promptTextInput').value=p?p.text:'';
+  openSheet($('#editPromptSheet'));
+  setTimeout(()=>$('#promptTitleInput').focus(),220);
+}
+function savePrompt(){
+  const title=$('#promptTitleInput').value.trim(),text=$('#promptTextInput').value.trim();
+  if(!title||!text){showToast('Name and prompt are both needed');return}
+  if(editPromptId){const p=state.prompts.find(x=>x.id===editPromptId);if(p){p.title=title;p.text=text}}
+  else state.prompts.push({id:uid(),title,text});
+  save();renderPrompts();renderPromptManager();openSheet($('#promptsSheet'));
+}
+function newSession(){const id=uid();state.sessions.unshift({id,title:'Fresh forge',createdAt:Date.now(),updatedAt:Date.now(),items:[]});state.activeId=id;save();renderFeed();renderSessions()}
+function deleteSession(id){
+  if(state.sessions.length===1){showToast('Keep at least one session');return}
+  const s=state.sessions.find(x=>x.id===id);if(!s)return;
+  if(!confirm(`Delete “${s.title}” and its launch history?`))return;
+  state.sessions=state.sessions.filter(x=>x.id!==id);if(state.activeId===id)state.activeId=state.sessions[0].id;save();renderFeed();renderSessions();
+}
+function openSheet(el){document.querySelectorAll('.sheet').forEach(s=>{s.classList.remove('on');s.setAttribute('aria-hidden','true')});el.classList.add('on');el.setAttribute('aria-hidden','false');scrim.classList.add('on')}
+function closeSheets(){document.querySelectorAll('.sheet').forEach(s=>{s.classList.remove('on');s.setAttribute('aria-hidden','true')});scrim.classList.remove('on')}
+function resizeDraft(){draft.style.height='auto';draft.style.height=Math.min(draft.scrollHeight,144)+'px'}
+async function copyText(text,msg='Copied'){
+  try{await navigator.clipboard.writeText(text);showToast(msg);return true}catch(e){
+    const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();if(ok)showToast(msg);return ok;
+  }
+}
+function showToast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('on'),1800)}
+async function send(){
+  const text=draft.value.trim();if(!text){showToast('Pick or type a prompt first');return}
+  const s=active();if(!s)return;
+  s.items.push({text,ts:Date.now()});s.updatedAt=Date.now();if(s.items.length===1)s.title=shortTitle(text);
+  draft.value='';resizeDraft();save();renderFeed();
+  const copied=await copyText(text,'Prompt copied · opening ChatGPT');
+  const w=window.open('https://chatgpt.com/','_blank','noopener,noreferrer');
+  if(!w){showToast((copied?'Prompt copied · ':'')+'open ChatGPT manually')}
+}
+$('#sessionsBtn').onclick=()=>{renderSessions();openSheet($('#sessionsSheet'))};
+$('#sendBtn').onclick=send;
+$('#clearBtn').onclick=()=>{draft.value='';resizeDraft();save();draft.focus()};
+draft.addEventListener('input',()=>{resizeDraft();save()});
+draft.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();send()}});
+scrim.onclick=closeSheets;document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeSheets);
+$('#cancelPromptBtn').onclick=()=>openSheet($('#promptsSheet'));$('#savePromptBtn').onclick=savePrompt;
+window.addEventListener('storage',e=>{if(e.key===KEY){state=load();draft.value=state.draft||'';resizeDraft();renderPrompts();renderFeed()}});
+draft.value=state.draft||'';resizeDraft();renderPrompts();renderFeed();
+})();
+</script>
+</body>
+</html>
