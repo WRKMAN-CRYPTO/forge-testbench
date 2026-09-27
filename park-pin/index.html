@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101510">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PARK PIN">
+  <title>PARK PIN</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <style>
+    :root{
+      color-scheme:dark;
+      --bg:#0c100d;
+      --panel:#151b16;
+      --panel2:#1b231d;
+      --line:#2a372d;
+      --text:#f0f4f1;
+      --muted:#9cab9f;
+      --accent:#8df59d;
+      --warn:#ffd27a;
+      --danger:#ff8e86;
+      --shadow:0 18px 45px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{min-height:100svh;background:radial-gradient(circle at 50% -20%,#213326 0,#0c100d 48%)}
+    button,input{font:inherit}
+    button{min-height:48px;border:0;border-radius:14px;font-weight:800;letter-spacing:.02em;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    button:disabled{opacity:.55;cursor:default}
+    .app{width:min(100%,560px);margin:0 auto;min-height:100svh;padding:calc(18px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}
+    header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+    .eyebrow{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-weight:900}
+    h1{font-size:clamp(2rem,12vw,4rem);line-height:.88;margin:.25rem 0 .35rem;letter-spacing:-.055em}
+    .sub{margin:0;color:var(--muted);max-width:34ch;line-height:1.35}
+    .pin-dot{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#0a120c;font-weight:1000;box-shadow:0 0 0 8px rgba(141,245,157,.08)}
+    .card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+    .card-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .card-title h2{font-size:1rem;margin:0;letter-spacing:.04em;text-transform:uppercase}
+    .badge{font-size:.74rem;padding:6px 9px;border-radius:999px;background:#101611;color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+    label{display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800;margin:0 0 7px}
+    input{width:100%;min-height:50px;border:1px solid var(--line);border-radius:14px;background:#0f1511;color:var(--text);padding:0 14px;outline:none}
+    input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(141,245,157,.12)}
+    .hint{color:var(--muted);font-size:.82rem;line-height:1.35;margin:8px 0 0}
+    .primary{width:100%;margin-top:12px;background:var(--accent);color:#081109}
+    .secondary{width:100%;background:#253128;color:var(--text);border:1px solid #344238}
+    .danger{width:100%;background:transparent;color:var(--danger);border:1px solid rgba(255,142,134,.35)}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+    .empty{padding:22px 8px;text-align:center;color:var(--muted)}
+    .saved-note{font-size:1.3rem;font-weight:900;line-height:1.2;margin:4px 0 10px;overflow-wrap:anywhere}
+    .saved-note.muted{color:var(--muted);font-weight:700}
+    .meta{display:grid;gap:7px;color:var(--muted);font-size:.87rem}
+    .meta strong{color:var(--text)}
+    .finder{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+    .metric{background:#0e1410;border:1px solid var(--line);border-radius:16px;padding:14px}
+    .metric .label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800}
+    .metric .value{font-size:1.45rem;font-weight:950;margin-top:4px}
+    .accuracy{color:var(--muted);font-size:.8rem;margin:10px 0 0}
+    .status{min-height:24px;padding:2px 2px 0;color:var(--muted);font-size:.85rem;line-height:1.35}
+    .status[data-kind="ok"]{color:var(--accent)}
+    .status[data-kind="warn"]{color:var(--warn)}
+    .status[data-kind="error"]{color:var(--danger)}
+    .tiny{font-size:.75rem;color:#758279;text-align:center;margin:16px 8px 0;line-height:1.35}
+    @media (max-width:380px){.row,.finder{grid-template-columns:1fr}.pin-dot{width:48px;height:48px}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <div class="eyebrow">One car. One pin.</div>
+        <h1>PARK<br>PIN</h1>
+        <p class="sub">Save where you left the car before the garage turns into a concrete copy machine.</p>
+      </div>
+      <div class="pin-dot" aria-hidden="true">P</div>
+    </header>
+
+    <section class="card" aria-labelledby="save-title">
+      <div class="card-title">
+        <h2 id="save-title">Parked here</h2>
+        <span class="badge" id="gpsBadge">GPS on tap</span>
+      </div>
+      <label for="spotNote">Spot note</label>
+      <input id="spotNote" type="text" maxlength="120" autocomplete="off" placeholder="Level 3 · Row D · blue elevator">
+      <p class="hint">Optional, but especially useful in garages where GPS can get fuzzy.</p>
+      <button class="primary" id="saveBtn" type="button">SAVE THIS SPOT</button>
+    </section>
+
+    <section class="card" aria-labelledby="pin-title">
+      <div class="card-title">
+        <h2 id="pin-title">Saved pin</h2>
+        <span class="badge" id="ageBadge">None</span>
+      </div>
+      <div id="emptyState" class="empty">No car pinned yet.</div>
+      <div id="pinState" hidden>
+        <div id="savedNote" class="saved-note"></div>
+        <div class="meta">
+          <div>Saved <strong id="savedWhen"></strong></div>
+          <div id="savedAccuracyRow">Saved GPS accuracy <strong id="savedAccuracy"></strong></div>
+        </div>
+        <div id="finder" class="finder" hidden>
+          <div class="metric">
+            <div class="label">Straight line</div>
+            <div class="value" id="distanceValue">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Direction</div>
+            <div class="value" id="directionValue">—</div>
+          </div>
+        </div>
+        <p id="currentAccuracy" class="accuracy" hidden></p>
+        <div class="row">
+          <button class="secondary" id="locateBtn" type="button">WHERE'S MY CAR?</button>
+          <button class="danger" id="clearBtn" type="button">CLEAR PIN</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <p class="tiny">PARK PIN only uses location when you press a location button. It does not track in the background.</p>
+  </main>
+  <script src="./app.js" defer></script>
+</body>
+</html>
