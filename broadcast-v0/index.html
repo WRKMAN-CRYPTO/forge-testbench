@@ -61,9 +61,9 @@ input{width:100%;border:1px solid var(--line);border-radius:10px;background:#040
   </header>
 
   <main id="viewport">
-    <iframe id="sourceFrame" src="../mandel-w/" title="Mandel W source"></iframe>
+    <iframe id="sourceFrame" src="../agent-language-demo/?broadcast=1" title="WRKMAN broadcast source"></iframe>
     <canvas id="programCanvas" width="720" height="1280"></canvas>
-    <div class="cornerBug">SOURCE // MANDEL-W</div>
+    <div id="cornerBug" class="cornerBug">SOURCE // AGENT-LANGUAGE DEMO</div>
     <div id="countdown" class="countdown">10</div>
     <section id="playbackSheet" aria-hidden="true">
       <div class="playCard">
@@ -92,6 +92,10 @@ input{width:100%;border:1px solid var(--line);border-radius:10px;background:#040
 
 <aside id="drawer" aria-hidden="true">
   <div class="drawerHead"><strong>UPLINK</strong><button id="closeDrawer">CLOSE</button></div>
+  <label for="sourcePath">PROGRAM SOURCE</label>
+  <input id="sourcePath" inputmode="url" value="../agent-language-demo/?broadcast=1" placeholder="../agent-language-demo/?broadcast=1" autocomplete="off" spellcheck="false">
+  <button id="loadSource" class="btn primary" style="width:100%;margin-top:7px">LOAD SOURCE</button>
+  <div class="help">Same-origin sources can expose <code>window.WRKMAN_BROADCAST_SOURCE</code>. Legacy canvas sources still fall back automatically.</div>
   <label for="relayUrl">RELAY WEBSOCKET</label>
   <input id="relayUrl" inputmode="url" placeholder="wss://relay.example.com/ingest" autocomplete="off" spellcheck="false">
   <label for="ingestToken">RELAY TOKEN</label>
@@ -114,15 +118,23 @@ const sourceStatus=$('sourceStatus'),relayStatus=$('relayStatus'),diag=$('diag')
 const viewBtn=$('viewBtn'),micBtn=$('micBtn'),aspectBtn=$('aspectBtn');
 const dryBtn=$('dryBtn'),liveBtn=$('liveBtn'),stopBtn=$('stopBtn');
 const drawer=$('drawer'),settingsBtn=$('settingsBtn'),closeDrawer=$('closeDrawer');
+const cornerBug=$('cornerBug'),sourcePath=$('sourcePath'),loadSource=$('loadSource');
 const relayUrl=$('relayUrl'),ingestToken=$('ingestToken'),rtmpUrl=$('rtmpUrl'),streamKey=$('streamKey');
 const countdown=$('countdown'),levelBar=$('levelBar');
 const playbackSheet=$('playbackSheet'),testVideo=$('testVideo'),testMeta=$('testMeta'),testCodec=$('testCodec');
 
-let sourceCanvas=null,sourceOverlay=null,viewOutput=false,portrait=true;
+let sourceCanvas=null,sourceOverlays=[],sourceContract=null,sourceCueId=0,sourceLabel='PROGRAM',viewOutput=false,portrait=true;
 let micStream=null,audioCtx=null,mixDest=null,micSource=null,micGain=null,analyser=null,levelRAF=0;
 let liveRecorder=null,liveSocket=null,liveStream=null,liveStarted=0,liveTimer=0,liveStopping=false,sendChain=Promise.resolve();
 let drawRAF=0,lastDraw=0;
 const FPS=30;
+const SOURCE_STORE='wrkman-broadcast-source';
+const DEFAULT_SOURCE='../agent-language-demo/?broadcast=1';
+const CUE_URLS={
+ confirm:'https://raw.githubusercontent.com/WRKMAN-CRYPTO/eleven-labs/main/assets/audio/wrkman-confirm.wav',
+ forge:'https://raw.githubusercontent.com/WRKMAN-CRYPTO/eleven-labs/main/assets/audio/wrkman-forge.wav'
+};
+const cueBuffers=new Map(),cueLoads=new Map();
 
 function setPill(el,text,kind=''){
   el.textContent=text;el.className='pill'+(kind?' '+kind:'');
@@ -162,19 +174,30 @@ function renderDiag(extra=''){
 }
 function resolveSource(){
   try{
-    const d=frame.contentDocument;
-    const c=d&&d.getElementById('fractal');
+    const d=frame.contentDocument,w=frame.contentWindow;
+    const contract=w&&w.WRKMAN_BROADCAST_SOURCE;
+    let c=null,overlays=[],label='';
+    if(contract&&typeof contract.getCanvas==='function'){
+      c=contract.getCanvas();
+      overlays=typeof contract.getOverlays==='function'?(contract.getOverlays()||[]):[];
+      label=contract.label||'PROGRAM';
+    }
+    if(!c&&d){
+      c=d.querySelector('[data-broadcast-source]')||d.getElementById('fractal')||d.getElementById('dish');
+      const legacy=d.getElementById('orbitOverlay');if(legacy)overlays=[legacy]
+    }
     if(c&&c.width&&c.height){
-      sourceCanvas=c;
-      sourceOverlay=d.getElementById('orbitOverlay')||null;
+      sourceCanvas=c;sourceOverlays=overlays.filter(Boolean);sourceContract=contract||null;sourceCueId=0;sourceLabel=label||c.id||'PROGRAM';
+      cornerBug.textContent='SOURCE // '+sourceLabel;
       setPill(sourceStatus,'SOURCE READY','good');
-      renderDiag();
+      renderDiag('program: '+sourceLabel);
       return true;
     }
   }catch(err){renderDiag('source access failed: '+err.message)}
   return false;
 }
 frame.addEventListener('load',()=>{
+  sourceCanvas=null;sourceOverlays=[];sourceContract=null;sourceCueId=0;
   let tries=0;
   const probe=()=>{
     if(resolveSource())return;
@@ -183,6 +206,15 @@ frame.addEventListener('load',()=>{
   };
   probe();
 });
+function loadProgramSource(){
+ const value=sourcePath.value.trim()||DEFAULT_SOURCE;
+ try{localStorage.setItem(SOURCE_STORE,value)}catch{}
+ setPill(sourceStatus,'SOURCE WAIT');
+ frame.src=value
+}
+loadSource.addEventListener('click',loadProgramSource);
+try{sourcePath.value=localStorage.getItem(SOURCE_STORE)||DEFAULT_SOURCE}catch{sourcePath.value=DEFAULT_SOURCE}
+if(frame.getAttribute('src')!==sourcePath.value)frame.src=sourcePath.value;
 
 function setAspect(nextPortrait){
   portrait=nextPortrait;
@@ -195,8 +227,10 @@ function drawContain(image){
   const sw=image.width,sh=image.height,dw=program.width,dh=program.height;
   const s=Math.min(dw/sw,dh/sh),w=sw*s,h=sh*s,x=(dw-w)/2,y=(dh-h)/2;
   ctx.drawImage(image,0,0,sw,sh,x,y,w,h);
-  if(sourceOverlay&&sourceOverlay.width&&sourceOverlay.height){
-    try{ctx.drawImage(sourceOverlay,0,0,sourceOverlay.width,sourceOverlay.height,x,y,w,h)}catch{}
+  for(const overlay of sourceOverlays){
+    if(overlay&&overlay.width&&overlay.height){
+      try{ctx.drawImage(overlay,0,0,overlay.width,overlay.height,x,y,w,h)}catch{}
+    }
   }
 }
 function drawProgram(ts){
@@ -208,7 +242,7 @@ function drawProgram(ts){
     try{drawContain(sourceCanvas)}catch(err){setPill(sourceStatus,'SOURCE ERROR','warn')}
   }else{
     ctx.fillStyle='#9db0a2';ctx.font=`700 ${Math.round(program.width*.035)}px system-ui`;
-    ctx.textAlign='center';ctx.fillText('WAITING FOR MANDEL-W',program.width/2,program.height/2);
+    ctx.textAlign='center';ctx.fillText('WAITING FOR PROGRAM SOURCE',program.width/2,program.height/2);
   }
   const pad=Math.max(18,program.width*.026);
   ctx.textAlign='left';ctx.font=`800 ${Math.max(15,Math.round(program.width*.021))}px system-ui`;
@@ -216,8 +250,32 @@ function drawProgram(ts){
   ctx.fillStyle='#7bff9d';ctx.fillText('WRKMAN // LIVE LAB',pad*1.45,pad+Math.max(30,program.height*.028));
   ctx.textAlign='right';ctx.font=`700 ${Math.max(12,Math.round(program.width*.016))}px ui-monospace,monospace`;
   ctx.fillStyle='#d9e5dc';ctx.fillText(new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}),program.width-pad,program.height-pad);
+  pollSourceCues();
 }
 drawRAF=requestAnimationFrame(drawProgram);
+
+
+async function loadCueBuffer(name){
+ if(cueBuffers.has(name))return cueBuffers.get(name);
+ if(cueLoads.has(name))return cueLoads.get(name);
+ const url=CUE_URLS[name];if(!url||!audioCtx)return null;
+ const p=fetch(url,{cache:'force-cache'}).then(r=>{if(!r.ok)throw new Error('cue fetch '+r.status);return r.arrayBuffer()}).then(buf=>audioCtx.decodeAudioData(buf)).then(decoded=>{cueBuffers.set(name,decoded);cueLoads.delete(name);return decoded}).catch(err=>{cueLoads.delete(name);renderDiag('SFX load failed: '+err.message);return null});
+ cueLoads.set(name,p);return p
+}
+async function playSourceCue(name){
+ if(!audioCtx||!mixDest||audioCtx.state!=='running')return;
+ const buffer=await loadCueBuffer(name);if(!buffer)return;
+ const src=audioCtx.createBufferSource(),gain=audioCtx.createGain();src.buffer=buffer;gain.gain.value=name==='forge'?.72:.56;src.connect(gain);gain.connect(mixDest);src.start()
+}
+function pollSourceCues(){
+ if(!sourceContract||typeof sourceContract.pullCues!=='function')return;
+ let cues=[];try{cues=sourceContract.pullCues(sourceCueId)||[]}catch{return}
+ for(const cue of cues){
+  if(!cue||!Number.isFinite(cue.id)||cue.id<=sourceCueId)continue;
+  sourceCueId=cue.id;
+  if(cue.sound)void playSourceCue(cue.sound)
+ }
+}
 
 async function ensureAudio(){
   if(!audioCtx){
@@ -228,6 +286,7 @@ async function ensureAudio(){
     micGain=audioCtx.createGain();micGain.gain.value=0;
     analyser=audioCtx.createAnalyser();analyser.fftSize=256;
     micGain.connect(analyser);analyser.connect(mixDest);
+    void loadCueBuffer('confirm');void loadCueBuffer('forge');
   }
   if(audioCtx.state==='suspended')await audioCtx.resume();
   return mixDest.stream.getAudioTracks()[0];
