@@ -224,7 +224,30 @@ function render(){
  $('tick').textContent=S.tick.toLocaleString();$('pop').textContent=S.seeds.length.toLocaleString();$('gen').textContent=S.stats.maxGeneration;$('activeBlocks').textContent=cfg.blocks.filter(b=>b.present).length+'/'+cfg.blocks.length;$('crossings').textContent=S.stats.crossings.toLocaleString();$('experimentId').textContent='AL55 · '+GEN+' · '+cfg.dims.join('×')+' · '+cfgHash()+' · founder '+(cfg.founderSeed>>>0);renderBlocks();renderLineages();renderColorLegend();renderInspect();renderMessageCensus();renderPhraseCensus();renderMouth();draw()
 }
 function save(){try{localStorage.setItem(STORE,JSON.stringify({cfg,S:{tick:S.tick,nextId:S.nextId,rng:S.rng,seeds:S.seeds,registry:S.registry,stats:S.stats,maxPop:S.maxPop}}))}catch{}}
-function restore(){try{const q=JSON.parse(localStorage.getItem(STORE));if(!q?.cfg||!q?.S)return false;cfg=q.cfg;const world=buildWorld();S={...q.S,world};S.output=S.output||[];S.stats.emits=S.stats.emits||0;messageBook=new Map();openMessages=new Map();completedMessages=0;censusDirty=true;censusRenderedAt=0;phraseBook=new Map();openPhrases=new Map();completedPhrases=0;phraseRenderedAt=0;for(const s of S.seeds)if(s.birthBlock==null)s.birthBlock=blockOf(s.x,s.y,s.z);const g=globalDims();motionHeat=new Float32Array(g.W*g.H*g.D);motionStamp=new Uint32Array(g.W*g.H*g.D);motionCells=new Set();selectedBlock=Math.min(cfg.spawn,cfg.blocks.length-1);return true}catch{return false}}
+function restore(){
+ try{
+  const q=JSON.parse(localStorage.getItem(STORE));
+  if(!q?.cfg||!q?.S)throw Error('missing saved state');
+  const d=q.cfg.dims;
+  if(!Array.isArray(d)||d.length!==3||d.some(n=>!Number.isInteger(n)||n<1))throw Error('invalid lattice dimensions');
+  const expected=d[0]*d[1]*d[2];
+  if(!Array.isArray(q.cfg.blocks)||q.cfg.blocks.length!==expected)throw Error('invalid block lattice');
+  if(!Number.isInteger(q.cfg.spawn)||q.cfg.spawn<0||q.cfg.spawn>=expected)throw Error('invalid spawn block');
+  if(!Array.isArray(q.S.seeds)||!Array.isArray(q.S.registry)||!q.S.stats)throw Error('invalid simulation state');
+  cfg=q.cfg;
+  const world=buildWorld(),stats={births:0,deaths:0,mutations:0,recombinations:0,maxGeneration:0,crossings:0,emits:0,...q.S.stats};
+  S={...q.S,world,registry:q.S.registry,stats,output:[]};
+  messageBook=new Map();openMessages=new Map();completedMessages=0;censusDirty=true;censusRenderedAt=0;
+  phraseBook=new Map();openPhrases=new Map();completedPhrases=0;phraseRenderedAt=0;
+  for(const s of S.seeds)if(s.birthBlock==null)s.birthBlock=blockOf(s.x,s.y,s.z);
+  const g=globalDims();motionHeat=new Float32Array(g.W*g.H*g.D);motionStamp=new Uint32Array(g.W*g.H*g.D);motionCells=new Set();
+  selectedBlock=Math.min(cfg.spawn,cfg.blocks.length-1);return true
+ }catch{
+  cfg=defaultCfg();S=null;
+  try{localStorage.removeItem(STORE)}catch{}
+  return false
+ }
+}
 function preset(kind){
  const seed=(cfg.blocks[selectedBlock]?.seed>>>0)||37037;let d,blocks,spawn=0;
  if(kind==='cube'){d=[3,3,3];blocks=Array.from({length:27},()=>({seed,rot:0,present:true}));spawn=13}
