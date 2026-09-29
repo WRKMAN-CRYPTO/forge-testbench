@@ -31,7 +31,7 @@ body.broadcast #broadcastCanvas{display:block}
 <div class="foot"><span class="warn">Observer-only milestones:</span> conserved words, conserved external-action words, and the first lineage that becomes established are recorded but never feed back into survival or reproduction. Different worlds change starting conditions, not the laws.</div>
 </div><script>
 (()=>{'use strict';
-const VERSION=3801,STORE='forge-agent-language-demo-v1',W=32,H=24,N=W*H,FOUNDERS=1,POP_CAP=180,MAX_AGE=8000,BIRTH_THRESHOLD=18,BIRTH_COST=6;
+const VERSION=3801,STORE='forge-agent-language-demo-v1',W=32,H=24,N=W*H,FOUNDERS=1,MAX_AGE=8000,BIRTH_THRESHOLD=18,BIRTH_COST=6;
 const BASE_LEAK=.015,ACTION_COST=.005,RECOMB=.16,WORLD_SEEDS=[37037,37117,37223,37337,37447,37561,37673,37783];
 const $=id=>document.getElementById(id),canvas=$('dish'),ctx=canvas.getContext('2d'),spark=$('spark'),sctx=spark.getContext('2d');
 let running=false,busy=false,raf=0,selectedId=null,saveCounter=0,liveSpeed=5;
@@ -123,7 +123,7 @@ function executeToken(s,occ){if(!s.genome.length)return;const tok=s.genome[s.pc%
 
 function nearbyMate(s){const mates=[];for(const q of S.seeds){if(q.id!==s.id&&q.energy>0&&Math.abs(q.x-s.x)<=1&&Math.abs(q.y-s.y)<=1)mates.push(q)}return mates.length?mates[ri(mates.length)]:null}
 function birth(s,occ){
- if(S.seeds.length>=POP_CAP||s.energy<BIRTH_THRESHOLD||s.cool>0)return null;
+ if(s.energy<BIRTH_THRESHOLD||s.cool>0)return null;
  const spots=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const x=s.x+dx,y=s.y+dy;if(inside(x,y)&&occ[idx(x,y)]<0)spots.push([x,y])}
  if(!spots.length)return null;
  const [x,y]=spots[ri(spots.length)],mate=chance(RECOMB)?nearbyMate(s):null;
