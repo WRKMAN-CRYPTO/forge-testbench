@@ -34,7 +34,7 @@
 </section>
 
 <section class="panel span2"><h2>3D OBSERVATORY</h2><div class="viewer"><canvas id="space" width="760" height="760"></canvas></div>
-<div class="controls" style="margin-top:8px"><button id="motion" class="on">MOTION ON</button><button id="blocks" class="on">BLOCKS ON</button><button id="auto">AUTO OFF</button><select id="colorMode" aria-label="Agent color mode"><option value="lineage">COLOR · LINEAGE</option><option value="birth" selected>COLOR · BIRTH BLOCK</option><option value="current">COLOR · CURRENT BLOCK</option></select><button id="resetView">RESET VIEW</button></div>
+<div class="controls" style="margin-top:8px"><button id="motion" class="on">MOTION ON</button><button id="blocks" class="on">BLOCKS ON</button><button id="auto">AUTO OFF</button><select id="colorMode" aria-label="Agent color mode"><option value="lineage">COLOR · LINEAGE</option><option value="birth" selected>COLOR · BIRTH BLOCK</option><option value="current">COLOR · CURRENT BLOCK</option><option value="age">COLOR · AGE</option></select><button id="resetView">RESET VIEW</button></div>
 <div class="sub" style="margin-top:7px">Drag to rotate · pinch to zoom · cyan is recent motion · color modes are observer-only.</div><div id="colorLegend" class="sub" style="margin-top:7px"></div></section>
 
 <section class="panel"><h2>LATTICE PRESETS</h2>
@@ -227,8 +227,19 @@ function draw(){
 }
 function lineageColor(n,a=1){return'hsla('+((n*137.508)%360)+',65%,62%,'+a+')'}
 function blockColor(n,a=1){if(n==null||n<0)return'hsla(0,0%,70%,'+a+')';return'hsla('+(((n+1)*137.508+23)%360)+',72%,62%,'+a+')'}
-function agentColor(s,a=.92){if(colorMode==='birth')return blockColor(s.birthBlock,a);if(colorMode==='current')return blockColor(blockOf(s.x,s.y,s.z),a);return lineageColor(s.lineage,a)}
-function renderColorLegend(){const box=$('colorLegend');if(colorMode==='lineage'){box.innerHTML='<b>LINEAGE</b> · color follows ancestry.';return}const label=colorMode==='birth'?'<b>BIRTH BLOCK</b> · permanent color stamped where each individual was born.':'<b>CURRENT BLOCK</b> · control view; color follows physical location.';const active=cfg.blocks.map((b,i)=>b.present?i:null).filter(i=>i!==null);box.innerHTML=label+'<div class="originLegend">'+active.map(i=>'<span class="originChip"><span class="originDot" style="background:'+blockColor(i,1)+'"></span>#'+i+'</span>').join('')+'</div>'}
+const AGE_PALETTE=Array.from({length:64},(_,i)=>{const t=i/63,h=190*(1-t),l=64-8*t;return'hsl('+h.toFixed(1)+' 88% '+l.toFixed(1)+'%)'});
+function ageColor(age){const max=cfg?.rules?.ageDeath?Math.max(1,cfg.rules.maxAge):8000,t=Math.max(0,Math.min(1,age/max)),i=Math.min(63,Math.floor(t*64));return AGE_PALETTE[i]}
+function agentColor(s,a=.92){if(colorMode==='age')return ageColor(s.age);if(colorMode==='birth')return blockColor(s.birthBlock,a);if(colorMode==='current')return blockColor(blockOf(s.x,s.y,s.z),a);return lineageColor(s.lineage,a)}
+function renderColorLegend(){
+ const box=$('colorLegend');
+ if(colorMode==='lineage'){box.innerHTML='<b>LINEAGE</b> · color follows ancestry.';return}
+ if(colorMode==='age'){
+  const max=cfg?.rules?.ageDeath?Math.max(1,cfg.rules.maxAge):8000,q=[0,.25,.5,.75,.98];
+  box.innerHTML='<b>AGE</b> · observer-only. Cool colors are young; warm colors approach '+(cfg?.rules?.ageDeath?'age death at '+max.toLocaleString()+' ticks.':'the 8,000-tick reference scale.')+'<div class="originLegend">'+q.map((t,i)=>'<span class="originChip"><span class="originDot" style="background:'+AGE_PALETTE[Math.min(63,Math.floor(t*63))]+'"></span>'+(i===0?'NEW':i===1?'25%':i===2?'50%':i===3?'75%':'OLD')+'</span>').join('')+'</div>';return
+ }
+ const label=colorMode==='birth'?'<b>BIRTH BLOCK</b> · permanent color stamped where each individual was born.':'<b>CURRENT BLOCK</b> · control view; color follows physical location.';
+ const active=cfg.blocks.map((b,i)=>b.present?i:null).filter(i=>i!==null);box.innerHTML=label+'<div class="originLegend">'+active.map(i=>'<span class="originChip"><span class="originDot" style="background:'+blockColor(i,1)+'"></span>#'+i+'</span>').join('')+'</div>'
+}
 function renderBlocks(){
  const q=dims();$('layers').innerHTML='';for(let z=0;z<q.lz;z++){const sec=document.createElement('div');sec.className='layer';sec.innerHTML='<div class="layerTitle">Z BLOCK LAYER '+(z+1)+' / '+q.lz+'</div>';const grid=document.createElement('div');grid.className='blockGrid';grid.style.gridTemplateColumns='repeat('+q.lx+',1fr)';for(let y=0;y<q.ly;y++)for(let x=0;x<q.lx;x++){const i=blockIndex(x,y,z),b=cfg.blocks[i],btn=document.createElement('button');btn.className='block '+(i===selectedBlock?'sel ':'')+(i===cfg.spawn?'spawn ':'')+(b.present?'':'off');btn.innerHTML='<b>'+(b.present?'G2:'+String(b.seed>>>0).slice(-6):'VOID')+'</b><span>#'+i+' · R'+b.rot+(i===cfg.spawn?' · SPAWN':'')+'</span>';btn.onclick=()=>{selectedBlock=i;render()};grid.appendChild(btn)}sec.appendChild(grid);$('layers').appendChild(sec)}
  const b=cfg.blocks[selectedBlock];$('selectedLabel').textContent='block #'+selectedBlock+' · '+(b.present?'G2:'+String(b.seed>>>0)+' · rotation '+b.rot:'VOID')+(selectedBlock===cfg.spawn?' · SPAWN':'');$('blockSeed').value=String(b.seed>>>0);$('toggleBlock').textContent=b.present?'REMOVE':'RESTORE'
