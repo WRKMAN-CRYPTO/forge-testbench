@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090a0c">
+<title>WRKMAN BLACK BOX</title>
+<style>
+:root{color-scheme:dark;--bg:#090a0c;--p:#12151a;--p2:#181c22;--line:#2c333d;--text:#f4f6f8;--muted:#929ba8;--w:#dbff57;--red:#ff6258;--amber:#ffc45c;--blue:#70c7ff;--green:#75e7a0}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% -10%,#222a33,#090a0c 38%);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;min-height:100vh}button,input,select{font:inherit}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#090a0cd9;backdrop-filter:blur(14px);border-bottom:1px solid #ffffff12}
+.brand{display:flex;gap:10px;align-items:center}.mark{width:40px;height:40px;display:grid;place-items:center;border:2px solid var(--w);color:var(--w);font-weight:1000;font-size:23px;transform:skew(-7deg)}.eyebrow{font-size:9px;letter-spacing:.18em;color:var(--muted)}h1{font-size:16px;letter-spacing:.12em;margin:2px 0 0}
+main{width:min(900px,100%);margin:auto;padding:0 16px 64px}.hero{padding:46px 0 20px}.hero h2{font-family:system-ui,sans-serif;font-size:clamp(40px,10vw,72px);letter-spacing:-.06em;line-height:.95;margin:12px 0 16px}.hero h2 span{color:var(--w)}.lead{max-width:700px;color:#bdc4ce;font-family:system-ui,sans-serif;line-height:1.55}
+.panel,.section{border:1px solid var(--line);background:#111419ee;border-radius:16px;padding:15px;margin-top:14px}.scan{background:linear-gradient(145deg,#181c22,#0e1013);box-shadow:0 18px 70px #0006}.row{display:flex;gap:8px}.row input{min-width:0;flex:1;background:#08090b;border:1px solid #343c48;border-radius:11px;color:#fff;padding:14px}.primary{border:0;border-radius:11px;background:var(--w);color:#080907;padding:0 17px;font-weight:1000;cursor:pointer}.primary:disabled{opacity:.45}.ghost{border:1px solid #343c48;background:#171b20;color:#d9dde3;border-radius:10px;padding:9px 11px;font-size:10px;font-weight:900;cursor:pointer}.opts{display:flex;gap:8px;margin-top:10px}.opts label{border:1px solid #343c48;border-radius:10px;padding:7px 9px;color:var(--muted);font-size:10px}.opts select{background:transparent;color:white;border:0}.micro{font-size:10px;color:#7f8996;line-height:1.5}.trust{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;border:1px solid var(--line);background:var(--line);border-radius:10px;overflow:hidden;margin:14px 0}.trust div{background:#0d0f12;padding:9px 3px;text-align:center;font-size:8px;color:#8993a0}
+.hidden{display:none}.progress{height:5px;background:#252b33;border-radius:30px;overflow:hidden;margin-top:10px}.bar{height:100%;background:var(--w);width:0}.reportHero{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:linear-gradient(135deg,#171b21,#0e1013)}.reportHero h3{font-family:system-ui,sans-serif;font-size:29px;letter-spacing:-.04em;margin:5px 0}.badge{border:1px solid #3b4450;border-radius:999px;padding:8px 10px;font-size:9px}.badge.high{color:var(--green);border-color:#75e7a077}.badge.medium{color:var(--amber);border-color:#ffc45c77}.badge.low{color:var(--blue);border-color:#70c7ff77}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.stat{border:1px solid var(--line);border-radius:12px;background:#0e1013;padding:12px}.stat span{display:block;font-size:8px;color:var(--muted)}.stat b{display:block;font-family:system-ui,sans-serif;font-size:24px;margin-top:5px}
+.domino{border:1px solid #353d48;border-left:4px solid var(--amber);background:#0b0d10;border-radius:10px;padding:13px;font-family:system-ui,sans-serif;line-height:1.5}.domino.critical{border-left-color:var(--red)}.domino.clean{border-left-color:var(--green)}
+.timeline{display:grid;gap:8px}.event{position:relative;border:1px solid #2b323b;border-radius:12px;background:#0c0e11;padding:12px 12px 12px 16px}.event:before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;background:#4b5664;border-radius:2px}.event.critical:before{background:var(--red)}.event.warning:before{background:var(--amber)}.event.info:before{background:var(--blue)}.event.safe:before{background:var(--green)}.eventTop{display:flex;justify-content:space-between;gap:8px;font-size:9px;color:#7f8996}.eventTitle{font-family:system-ui,sans-serif;font-weight:850;margin:7px 0 4px}.eventDetail{font-family:system-ui,sans-serif;font-size:13px;line-height:1.45;color:#aeb6c0}.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.chip{font-size:8px;border:1px solid #35404b;border-radius:99px;padding:4px 6px;color:#aab2bd}.chip.hot{color:#ff9992;border-color:#ff625866}.chip.warn{color:#ffd588;border-color:#ffc45c66}.chip.ok{color:#a0efbd;border-color:#75e7a066}
+.proof{display:grid;grid-template-columns:1fr 1fr;gap:8px}.card{border:1px solid #2b323b;border-radius:10px;background:#0b0d10;padding:11px}.card b{font-size:10px}.card p{font-family:system-ui,sans-serif;font-size:12px;line-height:1.42;color:#929ba8;margin:5px 0 0}.moves{display:grid;gap:8px}.move{display:flex;gap:10px;border:1px solid #2b323b;border-radius:10px;background:#0b0d10;padding:11px;font-family:system-ui,sans-serif;font-size:13px;line-height:1.45}.move b{color:var(--w)}summary{cursor:pointer;font-size:10px;font-weight:900}pre{white-space:pre-wrap;word-break:break-word;font-size:9px;color:#8e98a5;max-height:420px;overflow:auto}.error{border-color:#ff625866;background:#35131388}a{color:#9ca7b4}footer{text-align:center;color:#68717e;font-size:9px;letter-spacing:.1em;padding:18px}
+@media(max-width:620px){.hero h2{font-size:48px}.stats{grid-template-columns:1fr 1fr}.proof{grid-template-columns:1fr}.reportHero{display:block}.badge{display:inline-block;margin-top:7px}.row{display:grid;grid-template-columns:1fr auto}}
+</style>
+</head>
+<body>
+<header><div class="brand"><div class="mark">W</div><div><div class="eyebrow">WRKMAN FORENSICS</div><h1>BLACK BOX</h1></div></div><button class="ghost" id="demo">RUN DEMO</button></header>
+<main>
+<section class="hero"><div class="eyebrow">SOLANA · READ ONLY · NO WALLET CONNECTION</div><h2>Money moved.<br><span>Find the first domino.</span></h2><p class="lead">Paste a public Solana address. BLACK BOX reconstructs recent transaction evidence and separates what the chain proves from what it merely suggests.</p></section>
+<section class="panel scan"><form id="form"><div class="row"><input id="wallet" autocomplete="off" spellcheck="false" placeholder="Solana wallet address"><button class="primary" id="scanBtn">SCAN</button></div><div class="opts"><label>Depth <select id="depth"><option>20</option><option selected>40</option><option>75</option></select></label></div></form><p class="micro">Never enter a seed phrase or private key. This tool accepts public addresses only.</p></section>
+<div class="trust"><div>NO WALLET CONNECT</div><div>NO SIGNATURES</div><div>NO CUSTODY</div><div>PUBLIC RPC ONLY</div></div>
+<section class="section hidden" id="progressBox"><b id="progressText">Loading…</b><div class="progress"><div class="bar" id="bar"></div></div></section>
+<section class="section error hidden" id="errorBox"><b>SCAN STOPPED</b><p class="micro" id="errorText"></p></section>
+<div id="report" class="hidden">
+<section class="section reportHero"><div><div class="eyebrow">INCIDENT CLASSIFICATION</div><h3 id="verdict"></h3><p class="micro" id="detail"></p></div><div class="badge" id="confidence"></div></section>
+<section class="stats"><div class="stat"><span>TRANSACTIONS</span><b id="txCount">0</b></div><div class="stat"><span>WALLET-SIGNED</span><b id="signedCount">0</b></div><div class="stat"><span>HIGH-RISK SIGNALS</span><b id="riskCount">0</b></div><div class="stat"><span>NET SOL</span><b id="solDelta">0</b></div></section>
+<section class="section"><div class="eyebrow">FIRST DOMINO</div><div class="domino" id="domino" style="margin-top:10px"></div></section>
+<section class="section"><div class="eyebrow">EVIDENCE TIMELINE</div><div class="timeline" id="timeline" style="margin-top:10px"></div></section>
+<section class="section"><div class="eyebrow">PROOF BOUNDARY</div><div class="proof" id="proof" style="margin-top:10px"></div></section>
+<section class="section"><div class="eyebrow">NEXT MOVES</div><div class="moves" id="moves" style="margin-top:10px"></div></section>
+<section class="section"><details><summary>TECHNICAL TRACE</summary><pre id="trace"></pre></details></section>
+</div>
+</main>
+<footer>WRKMAN BLACK BOX · CLOCK IN. FIND THE FAILURE.</footer>
+<script>
+(function(){
+"use strict";
+var RPC="https://api.mainnet-beta.solana.com";
+var $=function(id){return document.getElementById(id)};
+var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]})};
+var short=function(s,n){s=String(s||"");n=n||6;return s.length>n*2?s.slice(0,n)+"…"+s.slice(-n):s};
+var fmt=function(n){return Number(n||0).toFixed(Math.abs(n)<.01?4:2)};
+var when=function(t){return t?new Date(t*1000).toLocaleString():"unknown time"};
+var signal=function(code,level,score,title,detail,extra){return Object.assign({code:code,level:level,score:score,title:title,detail:detail},extra||{})};
+async function rpc(method,params){
+ var r=await fetch(RPC,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:method,params:params})});
+ if(!r.ok)throw new Error("RPC HTTP "+r.status);
+ var j=await r.json();if(j.error)throw new Error(j.error.message||"RPC error");return j.result
+}
+function setProgress(done,total,label){$("progressBox").classList.remove("hidden");$("progressText").textContent=label+" "+done+"/"+total;$("bar").style.width=(total?Math.round(done/total*100):0)+"%"}
+async function history(wallet,limit){
+ var sigs=await rpc("getSignaturesForAddress",[wallet,{limit:limit,commitment:"confirmed"}]);
+ var out=[];
+ for(var i=0;i<sigs.length;i++){
+   setProgress(i,sigs.length,"Reading transactions");
+   try{var tx=await rpc("getTransaction",[sigs[i].signature,{encoding:"jsonParsed",maxSupportedTransactionVersion:0,commitment:"confirmed"}]);if(tx){tx.__sig=sigs[i];out.push(tx)}}catch(e){}
+ }
+ setProgress(sigs.length,sigs.length,"Building incident graph");
+ return out
+}
+function keys(tx){return((tx.transaction||{}).message||{}).accountKeys||[]}
+function pubkey(k){return typeof k==="string"?k:(k&&k.pubkey)||""}
+function instructions(tx){
+ var a=((((tx.transaction||{}).message||{}).instructions)||[]).slice();
+ var inner=((tx.meta||{}).innerInstructions)||[];
+ inner.forEach(function(g){(g.instructions||[]).forEach(function(i){a.push(i)})});return a
+}
+function tokenMap(list){
+ var m={};(list||[]).forEach(function(x){m[x.accountIndex]={mint:x.mint,owner:x.owner,amt:Number((x.uiTokenAmount||{}).uiAmountString||0),decimals:(x.uiTokenAmount||{}).decimals}});return m
+}
+function analyzeTx(tx,wallet){
+ var ks=keys(tx),idx=ks.findIndex(function(k){return pubkey(k)===wallet});
+ var pre=(tx.meta||{}).preBalances||[],post=(tx.meta||{}).postBalances||[];
+ var signed=ks.some(function(k){return pubkey(k)===wallet&&!!k.signer});
+ var solDelta=idx>=0&&pre[idx]!=null&&post[idx]!=null?(post[idx]-pre[idx])/1e9:0;
+ var fee=((tx.meta||{}).fee||0)/1e9;
+ var preTok=tokenMap((tx.meta||{}).preTokenBalances),postTok=tokenMap((tx.meta||{}).postTokenBalances),deltas=[];
+ Object.keys(Object.assign({},preTok,postTok)).forEach(function(k){
+   var a=preTok[k]||{amt:0},b=postTok[k]||{amt:0};var owner=b.owner||a.owner;
+   if(owner===wallet){var d=(b.amt||0)-(a.amt||0);if(Math.abs(d)>1e-12)deltas.push({mint:b.mint||a.mint,delta:d})}
+ });
+ var sigs=[],ins=instructions(tx);
+ ins.forEach(function(ix){
+   var p=ix&&ix.parsed,typ=p&&p.type,info=p&&p.info||{};if(!typ)return;
+   if(typ==="approve"||typ==="approveChecked")sigs.push(signal("approval","warning",65,"Token delegate approved","A token account granted "+short(info.delegate,7)+" spending authority.",{delegate:info.delegate}));
+   if(typ==="revoke")sigs.push(signal("revoke","safe",10,"Token delegate revoked","A token delegate permission was removed."));
+   if(typ==="setAuthority")sigs.push(signal("authority","critical",85,"Token authority changed","An SPL token authority was changed.",{newAuthority:info.newAuthority||info.authority}));
+   if(typ==="assign")sigs.push(signal("assign","critical",95,"System account reassigned","A system account owner/program assignment changed."));
+   if(typ==="closeAccount")sigs.push(signal("close","warning",55,"Token account closed","A token account was closed; inspect destination and authority."));
+   if(typ==="burn"||typ==="burnChecked")sigs.push(signal("burn","warning",45,"Tokens burned","Tokens were destroyed in this transaction."));
+   if((typ==="transfer"||typ==="transferChecked")&&info.source&&info.destination){
+     var auth=info.authority||info.owner;
+     var walletOwnedSource=false;
+     Object.keys(preTok).forEach(function(k){if(preTok[k].owner===wallet&&pubkey(ks[Number(k)])===info.source)walletOwnedSource=true});
+     if(walletOwnedSource&&auth&&auth!==wallet&&!signed)sigs.push(signal("delegate-outflow","critical",100,"Delegate-authorized token outflow","Tokens left a wallet-owned token account while the wallet itself was not a signer. Authority: "+short(auth,8),{authority:auth}));
+   }
+ });
+ var tokenOut=deltas.reduce(function(n,d){return n+(d.delta<0?Math.abs(d.delta):0)},0);
+ if(signed&&(solDelta<-.00001||tokenOut>0))sigs.push(signal("signed-outflow","warning",60,"Wallet-signed value outflow","The wallet is a transaction signer and value left its accounts."));
+ if(!deltas.length&&signed&&solDelta<0&&Math.abs(solDelta+fee)<.00002)sigs.push(signal("fee-only","safe",5,"Fee-only SOL loss","The observed SOL decrease is consistent with the transaction fee."));
+ return {sig:(tx.__sig||{}).signature||((tx.transaction||{}).signatures||[])[0]||"unknown",blockTime:tx.blockTime||((tx.__sig||{}).blockTime),slot:tx.slot,signed:signed,failed:!!((tx.meta||{}).err),fee:fee,solDelta:solDelta,tokenDeltas:deltas,signals:sigs}
+}
+function addCrossSignals(txs){
+ for(var i=0;i<txs.length;i++){
+   var a=txs[i];if(a.signed||a.solDelta<=0||a.solDelta>.05)continue;
+   for(var j=i+1;j<txs.length;j++){var b=txs[j];if(!b.blockTime||!a.blockTime)continue;var dt=Math.abs(b.blockTime-a.blockTime);if(dt>7200)continue;
+     if((b.signed&&b.solDelta<-.0001)||b.signals.some(function(s){return s.code==="delegate-outflow"})){a.signals.push(signal("gas-topup","warning",75,"Small SOL top-up before outflow","A small inbound SOL transfer arrived shortly before suspicious outbound activity."));break}
+   }
+ }
+}
+function classify(txs){
+ var all=[];txs.forEach(function(t){(t.signals||[]).forEach(function(s){all.push({s:s,t:t})})});
+ var has=function(c){return all.some(function(x){return x.s.code===c})};
+ var hi=all.filter(function(x){return x.s.score>=65});
+ if(has("delegate-outflow"))return{verdict:"DELEGATE DRAIN PATTERN",confidence:"high",detail:"The wallet was not a signer on a token outflow from a wallet-owned token account, and a different authority was used."};
+ if(has("assign")||has("authority"))return{verdict:"AUTHORITY CHANGE DETECTED",confidence:"high",detail:"The scan found a control/authority change that can alter who may move assets."};
+ if(has("signed-outflow")&&has("gas-topup"))return{verdict:"SIGNED SWEEP PATTERN",confidence:"medium",detail:"A small inbound SOL top-up was followed by wallet-signed outbound value. The chain proves the signature, not who controlled the key."};
+ if(has("signed-outflow"))return{verdict:"WALLET-SIGNED OUTFLOW",confidence:"medium",detail:"Value left in transactions signed by the wallet. On-chain data cannot determine intent or physical key control."};
+ if(has("approval"))return{verdict:"DELEGATE APPROVAL FOUND",confidence:"medium",detail:"The wallet granted token spending authority. That is a permission event, not proof that a drain occurred."};
+ if(all.length&&all.every(function(x){return x.s.code==="fee-only"||x.s.code==="revoke"}))return{verdict:"NO DRAIN DETECTED",confidence:"medium",detail:"The selected history mainly shows fees or safe revocations."};
+ return{verdict:"INCONCLUSIVE",confidence:hi.length?"medium":"low",detail:"The selected history does not expose one decisive mechanism. Increase history depth or inspect the technical trace."}
+}
+function severity(t){if(t.signals.some(function(s){return s.level==="critical"}))return"critical";if(t.signals.some(function(s){return s.level==="warning"}))return"warning";if(t.signals.some(function(s){return s.level==="safe"}))return"safe";return"info"}
+function headline(t){var s=t.signals.slice().sort(function(a,b){return b.score-a.score})[0];return s?s.title:(t.failed?"Failed transaction":"Transaction")}
+function detail(t){var s=t.signals.slice().sort(function(a,b){return b.score-a.score})[0];if(s)return s.detail;var parts=[];if(Math.abs(t.solDelta)>.0000001)parts.push("SOL "+(t.solDelta>0?"+":"")+fmt(t.solDelta));if(t.tokenDeltas.length)parts.push(t.tokenDeltas.map(function(d){return short(d.mint,5)+" "+(d.delta>0?"+":"")+fmt(d.delta)}).join(", "));return parts.join(" · ")||"No wallet balance delta classified."}
+function render(wallet,raw){
+ var txs=raw.map(function(t){return analyzeTx(t,wallet)}).sort(function(a,b){return(a.blockTime||0)-(b.blockTime||0)});addCrossSignals(txs);var c=classify(txs);
+ $("report").classList.remove("hidden");$("progressBox").classList.add("hidden");$("verdict").textContent=c.verdict;$("detail").textContent=c.detail;$("confidence").textContent=c.confidence.toUpperCase()+" CONFIDENCE";$("confidence").className="badge "+c.confidence;
+ $("txCount").textContent=txs.length;$("signedCount").textContent=txs.filter(function(t){return t.signed}).length;$("riskCount").textContent=txs.reduce(function(n,t){return n+t.signals.filter(function(s){return s.score>=65}).length},0);$("solDelta").textContent=fmt(txs.reduce(function(n,t){return n+t.solDelta},0));
+ var candidates=[];txs.forEach(function(t){t.signals.forEach(function(s){if(s.score>=65)candidates.push({t:t,s:s})})});candidates.sort(function(a,b){var ta=a.t.blockTime||0,tb=b.t.blockTime||0;return ta-tb||b.s.score-a.s.score});var d=candidates[0];
+ var dom=$("domino");if(d){dom.className="domino "+(d.s.level==="critical"?"critical":"");dom.innerHTML="<b>"+esc(d.s.title)+"</b><br>"+esc(d.s.detail)+"<br><span class='micro'>"+esc(when(d.t.blockTime))+" · "+esc(short(d.t.sig,8))+"</span>"}else{dom.className="domino clean";dom.innerHTML="<b>No decisive first domino found.</b><br>The selected history window does not expose one high-confidence causal event."}
+ $("timeline").innerHTML=txs.map(function(t){var chips=[t.signed?"<span class='chip ok'>wallet signer</span>":"<span class='chip'>wallet not signer</span>"];t.signals.filter(function(s){return s.score>=35}).slice(0,2).forEach(function(s){chips.push("<span class='chip "+(s.level==="critical"?"hot":"warn")+"'>"+esc(s.code)+"</span>")});var u=t.sig!=="unknown"?"https://solscan.io/tx/"+encodeURIComponent(t.sig):"#";return"<article class='event "+severity(t)+"'><div class='eventTop'><span>"+esc(when(t.blockTime))+"</span><a target='_blank' rel='noopener' href='"+u+"'>"+esc(short(t.sig,7))+"</a></div><div class='eventTitle'>"+esc(headline(t))+"</div><div class='eventDetail'>"+esc(detail(t))+"</div><div class='chips'>"+chips.join("")+"</div></article>"}).join("");
+ $("proof").innerHTML="<div class='card'><b>CAN PROVE</b><p>Which public keys signed, account balance changes, fees, and many parsed outer/inner instructions.</p></div><div class='card'><b>CAN PROVE</b><p>Whether a different authority moved tokens from a wallet-owned token account.</p></div><div class='card'><b>CANNOT PROVE</b><p>Who physically controlled a valid private key when a transaction was signed.</p></div><div class='card'><b>CANNOT PROVE</b><p>Intent. A signature may be deliberate, stolen, or obtained through deception.</p></div>";
+ var codes={};txs.forEach(function(t){t.signals.forEach(function(s){codes[s.code]=1})});var moves=[];
+ if(codes["delegate-outflow"]||codes.approval)moves.push("Review active token delegates in a trusted wallet and revoke permissions you do not recognize.");
+ if(codes.assign||codes.authority)moves.push("Do not send new funds to the affected account until its current owner/authority state is verified.");
+ if(codes["signed-outflow"])moves.push("If you did not intentionally authorize the signed outflow, move remaining assets to a wallet created from a new seed on a clean device and retire the old seed.");
+ moves.push("Preserve transaction signatures and timestamps before contacting wallet or exchange support.");
+ $("moves").innerHTML=moves.map(function(m,i){return"<div class='move'><b>"+(i+1)+"</b><span>"+esc(m)+"</span></div>"}).join("");
+ $("trace").textContent=JSON.stringify({wallet:wallet,classification:c,transactions:txs},null,2);window.scrollTo({top:$("report").offsetTop-65,behavior:"smooth"})
+}
+function demo(){
+ var w="DemoWallet111111111111111111111111111111111",d="DrnDelegate111111111111111111111111111111111",m="USDCdemo11111111111111111111111111111111111",a="DemoToken1111111111111111111111111111111111",o="OtherToken111111111111111111111111111111111",now=Math.floor(Date.now()/1000);
+ function tok(i,owner,amt){return{accountIndex:i,mint:m,owner:owner,uiTokenAmount:{uiAmountString:String(amt),decimals:6,amount:String(Math.round(amt*1e6))}}}
+ function make(sig,time,signed,pre,post,ins,preTok,postTok){return{slot:999,blockTime:time,meta:{err:null,fee:5000,preBalances:pre,postBalances:post,preTokenBalances:preTok,postTokenBalances:postTok,innerInstructions:[]},transaction:{signatures:[sig],message:{accountKeys:[{pubkey:w,signer:signed,writable:true},{pubkey:a,signer:false,writable:true},{pubkey:o,signer:false,writable:true},{pubkey:d,signer:!signed,writable:false}],instructions:ins}},__sig:{signature:sig,blockTime:time}}}
+ var raw=[
+ make("DemoApprove111111111111111111111111111111111111111111111111",now-7200,true,[2e8,2e6,2e6,0],[199995000,2e6,2e6,0],[{program:"spl-token",parsed:{type:"approveChecked",info:{source:a,mint:m,delegate:d,owner:w,tokenAmount:{uiAmountString:"500"}}}}],[tok(1,w,500)],[tok(1,w,500)]),
+ make("DemoGas1111111111111111111111111111111111111111111111111111",now-3500,false,[199995000,2e6,2e6,1e7],[204995000,2e6,2e6,4995000],[{program:"system",parsed:{type:"transfer",info:{source:d,destination:w,lamports:5000000}}}],[tok(1,w,500)],[tok(1,w,500)]),
+ make("DemoDrain11111111111111111111111111111111111111111111111111",now-3000,false,[204995000,2e6,2e6,5e6],[204995000,2e6,2e6,4995000],[{program:"spl-token",parsed:{type:"transferChecked",info:{source:a,destination:o,authority:d,mint:m,tokenAmount:{uiAmountString:"500"}}}}],[tok(1,w,500),tok(2,"OtherOwner",0)],[tok(1,w,0),tok(2,"OtherOwner",500)])
+ ];render(w,raw)
+}
+$("form").addEventListener("submit",async function(e){e.preventDefault();var w=$("wallet").value.trim();if(!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(w)){$("errorBox").classList.remove("hidden");$("errorText").textContent="That does not look like a Solana public address.";return}$("errorBox").classList.add("hidden");$("scanBtn").disabled=true;$("report").classList.add("hidden");try{var raw=await history(w,Number($("depth").value)||40);if(!raw.length)throw new Error("No confirmed transactions found in this window.");render(w,raw)}catch(err){$("progressBox").classList.add("hidden");$("errorBox").classList.remove("hidden");$("errorText").textContent=err&&err.message?err.message:String(err)}finally{$("scanBtn").disabled=false}});
+$("demo").addEventListener("click",demo);
+})();
+</script>
+</body>
+</html>
