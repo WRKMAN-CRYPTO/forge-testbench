@@ -12,7 +12,7 @@
 .layers{display:grid;gap:8px}.layer{border-top:1px solid #223128;padding-top:8px}.layer:first-child{border-top:0;padding-top:0}.layerTitle{font-size:9px;color:var(--cyan);margin-bottom:6px}.blockGrid{display:grid;gap:5px}.block{min-height:58px;padding:6px;border-radius:9px;text-align:left;background:#0d120f}.block.sel{border-color:#fff}.block.spawn{box-shadow:inset 0 0 0 1px var(--cyan)}.block.off{opacity:.4}.block b{display:block;font-size:11px}.block span{font-size:8px;color:var(--muted)}
 .row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.triple{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.editor{display:grid;gap:8px}.codebox{width:100%;min-height:74px;resize:vertical;font-size:9px}.settingsGrid{display:grid;gap:8px}.setting{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:10px}.setting label{display:block;font-size:9px;color:var(--muted);letter-spacing:.08em;margin-bottom:6px}.setting .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}.setting input,.setting select{width:100%}.rulesSummary{color:var(--cyan)}
 .lineages{display:grid;gap:6px}.line{display:grid;grid-template-columns:70px 1fr auto;gap:7px;align-items:center;background:#0d120f;border:1px solid #223128;border-radius:9px;padding:7px;font-size:9px}.track{height:7px;background:#080b09;border-radius:999px;overflow:hidden}.fill{height:100%;background:var(--hot)}
-.originLegend{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.originChip{display:inline-flex;align-items:center;gap:5px;border:1px solid #2a3a31;border-radius:999px;padding:4px 7px;background:#0d120f;font-size:9px}.originDot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto}.messageList{display:grid;gap:6px;max-height:390px;overflow:auto}.messageRow{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;background:#0d120f;border:1px solid #223128;border-radius:10px;padding:8px}.messageCount{min-width:64px;color:var(--hot);font-size:10px;font-weight:700}.messageBits{font-size:10px;line-height:1.45;word-break:break-all;color:#d9e8df}.messageMeta{font-size:8px;color:var(--muted);margin-top:4px;line-height:1.45}.mouth{margin:0;max-height:290px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:#050806;border:1px solid #223128;border-radius:12px;padding:10px;font-size:10px;line-height:1.55;color:#d9e8df}.mouthMeta{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}.mouthTag{border:1px solid #2a3a31;border-radius:999px;padding:4px 7px;background:#0d120f;font-size:9px;color:var(--muted)}.foot{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 2px}
+.originLegend{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.originChip{display:inline-flex;align-items:center;gap:5px;border:1px solid #2a3a31;border-radius:999px;padding:4px 7px;background:#0d120f;font-size:9px}.originDot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto}.vaultHead{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.vaultLists{display:grid;gap:10px}.vaultList{display:grid;gap:7px}.vaultCard{background:#0d120f;border:1px solid #223128;border-radius:11px;padding:9px;min-width:0}.vaultTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.vaultId{font-size:10px;color:var(--cyan);font-weight:700;word-break:break-word}.vaultTime{font-size:8px;color:var(--muted);white-space:nowrap}.vaultMeta{font-size:8px;color:var(--muted);line-height:1.5;margin-top:5px}.vaultNote{font-size:10px;color:var(--ink);line-height:1.45;margin-top:6px;word-break:break-word}.vaultActions{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}.vaultActions button{min-height:38px;padding:6px;font-size:9px}.vaultEmpty{font-size:9px;color:var(--muted);padding:8px 2px}.messageList{display:grid;gap:6px;max-height:390px;overflow:auto}.messageRow{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;background:#0d120f;border:1px solid #223128;border-radius:10px;padding:8px}.messageCount{min-width:64px;color:var(--hot);font-size:10px;font-weight:700}.messageBits{font-size:10px;line-height:1.45;word-break:break-all;color:#d9e8df}.messageMeta{font-size:8px;color:var(--muted);margin-top:4px;line-height:1.45}.mouth{margin:0;max-height:290px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:#050806;border:1px solid #223128;border-radius:12px;padding:10px;font-size:10px;line-height:1.55;color:#d9e8df}.mouthMeta{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}.mouthTag{border:1px solid #2a3a31;border-radius:999px;padding:4px 7px;background:#0d120f;font-size:9px;color:var(--muted)}.foot{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 2px}
 @media(min-width:780px){.grid{grid-template-columns:1.25fr .75fr}.span2{grid-column:1/-1}.stats{grid-template-columns:repeat(6,1fr)}.controls{grid-template-columns:repeat(6,1fr)}}
 </style></head>
 <body><div class="app">
@@ -60,6 +60,15 @@
 <div id="experimentId" class="sub">—</div>
 <textarea id="shareCode" class="codebox" spellcheck="false" aria-label="Shareable experiment code"></textarea>
 <div class="triple" style="margin-top:8px"><button id="makeCode">REFRESH CODE</button><button id="copyCode">COPY CODE</button><button id="loadCode">LOAD CODE</button></div>
+<div class="row" style="margin-top:8px"><input id="vaultNote" maxlength="160" placeholder="optional specimen note" aria-label="Specimen note"><button id="saveSpecimen">SAVE TO VAULT</button></div>
+</section>
+
+<section class="panel span2"><h2>SPECIMEN VAULT</h2>
+<div class="vaultHead"><div class="sub">Experiment configurations are stored on this device. LOAD CONFIG recreates the specimen from tick 0; saved tick/pop/gen are observation metadata, not a live-state snapshot.</div><button id="clearRecent">CLEAR RECENT</button></div>
+<div class="vaultLists" style="margin-top:10px">
+ <div><div class="sub" style="color:var(--hot);margin-bottom:6px">SAVED</div><div id="vaultSavedList" class="vaultList"></div></div>
+ <div><div class="sub" style="color:var(--cyan);margin-bottom:6px">RECENT SAFETY NET · LAST 10</div><div id="vaultRecentList" class="vaultList"></div></div>
+</div>
 </section>
 
 <section class="panel"><h2>LINEAGES</h2><div id="lineages" class="lineages"><div class="sub">Waiting for life.</div></div></section>
@@ -99,7 +108,7 @@ The founder RNG is separate from habitat RNG. New Build 055 share codes store la
 
 <script>
 (()=>{'use strict';
-const VERSION=55,GEN='G2',B=16,FOUNDERS=32,BIRTH_THRESHOLD=18,BIRTH_COST=6,BASE_LEAK=.015,ACTION_COST=.005,RECOMB=.16,WORD_BASE=9,EMIT=8,OUTPUT_CAP=4096,PHRASE_GAP=64,STORE='forge-agent-language-055-phrase-census';
+const VERSION=55,GEN='G2',B=16,FOUNDERS=32,BIRTH_THRESHOLD=18,BIRTH_COST=6,BASE_LEAK=.015,ACTION_COST=.005,RECOMB=.16,WORD_BASE=9,EMIT=8,OUTPUT_CAP=4096,PHRASE_GAP=64,STORE='forge-agent-language-055-phrase-census',VAULT_STORE='forge-agent-language-055-specimen-vault-v1';
 const $=id=>document.getElementById(id),canvas=$('space'),ctx=canvas.getContext('2d');
 let cfg=null,S=null,running=false,busy=false,raf=0,liveSpeed=1,selectedBlock=0,selectedId=null,clipboardBlock=null;
 let showMotion=true,showBlocks=true,autoRotate=false,colorMode='birth',view={yaw:-.72,pitch:.46,zoom:1.0},pointers=new Map(),gesture=null,pickPoints=[];
@@ -251,6 +260,51 @@ function renderMessageCensus(){const now=performance.now();if(now-censusRendered
 function renderPhraseCensus(){const now=performance.now();if(now-phraseRenderedAt<250)return;phraseRenderedAt=now;const meta=$('phraseCensusMeta'),box=$('phraseList'),rows=[...phraseBook.values()].sort((a,b)=>b.count-a.count||b.bits.length-a.bits.length||b.last-a.last).slice(0,80);meta.innerHTML='<span class="mouthTag">'+phraseBook.size.toLocaleString()+' UNIQUE</span><span class="mouthTag">'+completedPhrases.toLocaleString()+' COMPLETED</span><span class="mouthTag">'+openPhrases.size.toLocaleString()+' OPEN</span><span class="mouthTag">GAP '+PHRASE_GAP+' TICKS</span>';if(!rows.length){box.innerHTML='<div class="sub">No completed phrases yet. A phrase closes after '+PHRASE_GAP+' silent ticks or speaker death.</div>';return}box.innerHTML=rows.map(r=>'<div class="messageRow"><div class="messageCount">× '+r.count.toLocaleString()+(r.count===1?' · NEW':'')+'</div><div><div class="messageBits">'+messagePreview(r.bits)+'</div><div class="messageMeta">'+r.bits.length.toLocaleString()+' bits · '+r.speakers.size.toLocaleString()+' speaker'+(r.speakers.size===1?'':'s')+' · first t'+r.first.toLocaleString()+' · last t'+r.last.toLocaleString()+'</div></div></div>').join('')}
 function renderMouth(){const out=S.output||[],meta=$('mouthMeta'),box=$('mouth'),total=S.stats.emits||out.length;if(!out.length){meta.innerHTML='<span class="mouthTag">0 EMITS</span><span class="mouthTag">0 SPEAKERS</span>';box.textContent='No emissions yet. P8 must first arise through mutation.';return}const recent=out.slice(-1200),m=new Map();for(const e of recent){const [tick,id,generation,lineage,birth,now,bit]=e;let q=m.get(id);if(!q)q={id,generation,lineage,birth,now,last:tick,bits:''};q.generation=generation;q.lineage=lineage;q.birth=birth;q.now=now;q.last=tick;q.bits=(q.bits+String(bit)).slice(-64);m.set(id,q)}const rows=[...m.values()].sort((a,b)=>b.last-a.last).slice(0,18);meta.innerHTML='<span class="mouthTag">'+total.toLocaleString()+' EMITS</span><span class="mouthTag">'+m.size.toLocaleString()+' RECENT SPEAKERS</span><span class="mouthTag">LAST '+Math.min(out.length,1200).toLocaleString()+' EVENTS</span>';box.textContent=rows.map(q=>'t'+String(q.last).padStart(7,'0')+'  #'+String(q.id).padStart(5,'0')+'  g'+q.generation+' L'+q.lineage+'  b'+q.birth+'→'+q.now+'  '+q.bits).join('\n')}
 function experimentCode(){const r=cfg.rules,obj={v:VERSION,g:GEN,d:cfg.dims,a:cfg.arrangementSeed,f:cfg.founderSeed,s:cfg.spawn,b:cfg.blocks.map(x=>[x.seed>>>0,x.rot,x.present?1:0]),r:[r.ageDeath?1:0,r.maxAge,r.popCapEnabled?1:0,r.popCap]};return btoa(unescape(encodeURIComponent(JSON.stringify(obj))))}
+function currentExperimentId(){return'AL55 · '+GEN+' · '+cfg.dims.join('×')+' · '+cfgHash()+' · founder '+(cfg.founderSeed>>>0)}
+function escHtml(s){return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+function worldSummary(){
+ const active=cfg.blocks.filter(b=>b.present),seeds=[...new Set(active.map(b=>b.seed>>>0))],rots=[...new Set(active.map(b=>b.rot))];
+ if(seeds.length===1)return'G2:'+seeds[0]+' ×'+active.length+(rots.length===1?' · R'+rots[0]:' · mixed rotations');
+ return active.length+' active blocks · '+seeds.length+' G2 seeds'
+}
+function ruleSummary(){const r=cfg.rules;return'age '+(r.ageDeath?r.maxAge:'off')+' · cap '+(r.popCapEnabled?r.popCap+'/block':'off')}
+function vaultState(){
+ try{const q=JSON.parse(localStorage.getItem(VAULT_STORE));return{saved:Array.isArray(q?.saved)?q.saved:[],recent:Array.isArray(q?.recent)?q.recent:[]}}catch{return{saved:[],recent:[]}}
+}
+function writeVault(v){try{localStorage.setItem(VAULT_STORE,JSON.stringify({saved:v.saved||[],recent:(v.recent||[]).slice(0,10)}))}catch{}}
+function specimenEntry(note='',reason='manual save'){
+ const lineages=S?new Set(S.seeds.map(s=>s.lineage)).size:0;
+ return{uid:Date.now().toString(36)+Math.random().toString(36).slice(2,7),id:currentExperimentId(),code:experimentCode(),note:String(note||'').trim().slice(0,160),reason,ts:Date.now(),tick:S?.tick||0,pop:S?.seeds?.length||0,gen:S?.stats?.maxGeneration||0,lineages,crossings:S?.stats?.crossings||0,dims:cfg.dims.join('×'),blocks:cfg.blocks.filter(b=>b.present).length+'/'+cfg.blocks.length,founder:cfg.founderSeed>>>0,world:worldSummary(),rules:ruleSummary()}
+}
+function upsertSpecimen(list,e,max=0){
+ const i=list.findIndex(x=>x.code===e.code);if(i>=0){const old=list[i];e.uid=old.uid;e.note=e.note||old.note||'';list.splice(i,1)}
+ list.unshift(e);if(max&&list.length>max)list.length=max
+}
+function stashRecent(reason='experiment changed'){
+ if(!cfg||!S)return;const v=vaultState(),e=specimenEntry('',reason);upsertSpecimen(v.recent,e,10);writeVault(v);renderVault()
+}
+function saveCurrentSpecimen(note=''){
+ if(!cfg||!S)return;const v=vaultState(),e=specimenEntry(note,'manual save');upsertSpecimen(v.saved,e);writeVault(v);$('vaultNote').value='';renderVault();$('status').textContent='specimen saved to vault · '+e.id
+}
+function vaultCard(e,scope){
+ const saved=scope==='saved',note=e.note?'<div class="vaultNote">'+escHtml(e.note)+'</div>':'',when=new Date(e.ts||0).toLocaleString();
+ return'<div class="vaultCard"><div class="vaultTop"><div class="vaultId">'+escHtml(e.id||'UNKNOWN')+'</div><div class="vaultTime">'+escHtml(when)+'</div></div><div class="vaultMeta">t'+Number(e.tick||0).toLocaleString()+' · pop '+Number(e.pop||0).toLocaleString()+' · gen '+Number(e.gen||0).toLocaleString()+' · '+Number(e.lineages||0).toLocaleString()+' lineage'+(Number(e.lineages||0)===1?'':'s')+'<br>'+escHtml(e.dims||'')+' · blocks '+escHtml(e.blocks||'')+' · '+escHtml(e.world||'')+'<br>'+escHtml(e.rules||'')+(saved?'':' · '+escHtml(e.reason||'recent'))+'</div>'+note+'<div class="vaultActions"><button data-vault="'+scope+'" data-action="load" data-uid="'+escHtml(e.uid)+'">LOAD CONFIG</button><button data-vault="'+scope+'" data-action="copy" data-uid="'+escHtml(e.uid)+'">COPY CODE</button>'+(saved?'<button data-vault="'+scope+'" data-action="note" data-uid="'+escHtml(e.uid)+'">NOTE</button><button class="danger" data-vault="'+scope+'" data-action="delete" data-uid="'+escHtml(e.uid)+'">DELETE</button>':'<button data-vault="'+scope+'" data-action="save" data-uid="'+escHtml(e.uid)+'">SAVE</button>')+'</div></div>'
+}
+function renderVault(){
+ const v=vaultState(),saved=$('vaultSavedList'),recent=$('vaultRecentList');
+ if(!saved||!recent)return;
+ saved.innerHTML=v.saved.length?v.saved.map(e=>vaultCard(e,'saved')).join(''):'<div class="vaultEmpty">No saved specimens yet.</div>';
+ recent.innerHTML=v.recent.length?v.recent.map(e=>vaultCard(e,'recent')).join(''):'<div class="vaultEmpty">No recent experiments yet.</div>'
+}
+async function vaultAction(e){
+ const btn=e.target.closest?.('button[data-action][data-uid]');if(!btn)return;
+ const v=vaultState(),scope=btn.dataset.vault==='saved'?'saved':'recent',list=v[scope],i=list.findIndex(x=>x.uid===btn.dataset.uid);if(i<0)return;const item=list[i],action=btn.dataset.action;
+ if(action==='load'){stashRecent('before vault load');try{loadExperimentCode(item.code);$('shareCode').value=item.code;$('status').textContent='vault config loaded from tick 0 · saved observation was t'+Number(item.tick||0).toLocaleString();renderVault()}catch(err){$('status').textContent='vault load failed · '+err.message}return}
+ if(action==='copy'){try{await navigator.clipboard.writeText(item.code);$('status').textContent='specimen share code copied'}catch{$('shareCode').value=item.code;$('status').textContent='share code placed in box'}return}
+ if(action==='save'){const copy={...item,uid:Date.now().toString(36)+Math.random().toString(36).slice(2,7),reason:'saved from recent',ts:Date.now()};upsertSpecimen(v.saved,copy);writeVault(v);renderVault();$('status').textContent='recent specimen promoted to saved';return}
+ if(action==='note'){const note=prompt('Specimen note',item.note||'');if(note===null)return;item.note=String(note).trim().slice(0,160);writeVault(v);renderVault();return}
+ if(action==='delete'){if(!confirm('Delete this saved specimen?'))return;list.splice(i,1);writeVault(v);renderVault();$('status').textContent='saved specimen deleted'}
+}
 function loadExperimentCode(code){
  const o=JSON.parse(decodeURIComponent(escape(atob(code.trim()))));if(![51,52,53,54,55].includes(o.v)||o.g!==GEN)throw Error('This code is not a Build 051/052/053/054/055 G2 specimen.');
  const rules=Array.isArray(o.r)?{ageDeath:!!o.r[0],maxAge:o.r[1],popCapEnabled:!!o.r[2],popCap:o.r[3]}:legacyRules();
@@ -259,7 +313,7 @@ function loadExperimentCode(code){
 }
 function renderRulesSummary(){const r=cfg.rules;$('rulesSummary').textContent='AGE DEATH '+(r.ageDeath?r.maxAge.toLocaleString()+' TICKS':'OFF')+' · BIRTH CAP '+(r.popCapEnabled?r.popCap.toLocaleString()+' / BLOCK':'OFF')}
 function render(){
- $('tick').textContent=S.tick.toLocaleString();$('pop').textContent=S.seeds.length.toLocaleString();$('gen').textContent=S.stats.maxGeneration;$('activeBlocks').textContent=cfg.blocks.filter(b=>b.present).length+'/'+cfg.blocks.length;$('crossings').textContent=S.stats.crossings.toLocaleString();$('experimentId').textContent='AL55 · '+GEN+' · '+cfg.dims.join('×')+' · '+cfgHash()+' · founder '+(cfg.founderSeed>>>0);renderRulesSummary();renderBlocks();renderLineages();renderColorLegend();renderInspect();renderMessageCensus();renderPhraseCensus();renderMouth();draw()
+ $('tick').textContent=S.tick.toLocaleString();$('pop').textContent=S.seeds.length.toLocaleString();$('gen').textContent=S.stats.maxGeneration;$('activeBlocks').textContent=cfg.blocks.filter(b=>b.present).length+'/'+cfg.blocks.length;$('crossings').textContent=S.stats.crossings.toLocaleString();$('experimentId').textContent=currentExperimentId();renderRulesSummary();renderBlocks();renderLineages();renderColorLegend();renderInspect();renderMessageCensus();renderPhraseCensus();renderMouth();draw()
 }
 function save(){try{localStorage.setItem(STORE,JSON.stringify({cfg,S:{tick:S.tick,nextId:S.nextId,rng:S.rng,seeds:S.seeds,registry:S.registry,stats:S.stats,maxPop:S.maxPop}}))}catch{}}
 function restore(){
@@ -287,6 +341,7 @@ function restore(){
  }
 }
 function preset(kind){
+ stashRecent('before lattice preset');
  const seed=(cfg.blocks[selectedBlock]?.seed>>>0)||37037;let d,blocks,spawn=0;
  if(kind==='cube'){d=[3,3,3];blocks=Array.from({length:27},()=>({seed,rot:0,present:true}));spawn=13}
  if(kind==='tower'){d=[1,1,10];blocks=Array.from({length:10},()=>({seed,rot:0,present:true}));spawn=0}
@@ -295,6 +350,7 @@ function preset(kind){
  cfg.dims=d;cfg.blocks=blocks;cfg.spawn=spawn;selectedBlock=spawn;fresh();$('status').textContent='preset built · '+kind+' · repeated G2:'+seed
 }
 function randomize(){
+ stashRecent('before arrangement randomize');
  const seed=(+$('arrSeed').value>>>0)||1,r=seeded(seed);cfg.arrangementSeed=seed;for(const b of cfg.blocks)if(b.present){b.seed=r.ri(0x100000000)>>>0;b.rot=r.ri(24)}fresh();$('status').textContent='deterministic arrangement generated from '+seed
 }
 function populateSettings(){
@@ -303,6 +359,7 @@ function populateSettings(){
 }
 function clampInt(value,min,max,fallback){const n=Math.floor(Number(value));return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback}
 function applySettings(){
+ stashRecent('before settings change');
  const r=cfg.rules;
  cfg.rules={
   ageDeath:$('ageDeathSetting').value==='on',
@@ -319,23 +376,26 @@ $('closeSettings').onclick=()=>{$('settingsPanel').hidden=true};
 $('ageDeathSetting').onchange=()=>{$('maxAgeSetting').disabled=$('ageDeathSetting').value!=='on'};
 $('popCapSetting').onchange=()=>{$('popCapValueSetting').disabled=$('popCapSetting').value!=='on'};
 $('applySettings').onclick=applySettings;
-$('resetSettings').onclick=()=>{cfg.rules=defaultRules();populateSettings();save();renderRulesSummary();$('shareCode').value=experimentCode();$('status').textContent='simulation rules reset · age death 8,000 · birth cap off'};
-$('replay').onclick=()=>{fresh();$('status').textContent='replayed from tick 0'};$('newFounders').onclick=()=>{cfg.founderSeed=hash32('founders-'+cfg.founderSeed);fresh();$('status').textContent='new deterministic founder seed '+cfg.founderSeed};
+$('resetSettings').onclick=()=>{stashRecent('before settings reset');cfg.rules=defaultRules();populateSettings();save();renderRulesSummary();$('shareCode').value=experimentCode();$('status').textContent='simulation rules reset · age death 8,000 · birth cap off'};
+$('replay').onclick=()=>{stashRecent('before replay');fresh();$('status').textContent='replayed from tick 0'};$('newFounders').onclick=()=>{stashRecent('before new founder seed');cfg.founderSeed=hash32('founders-'+cfg.founderSeed);fresh();$('status').textContent='new deterministic founder seed '+cfg.founderSeed};
 $('presetCube').onclick=()=>preset('cube');$('presetTower').onclick=()=>preset('tower');$('presetRow').onclick=()=>preset('row');$('presetRing').onclick=()=>preset('ring');$('randomize').onclick=randomize;
-$('applySeed').onclick=()=>{cfg.blocks[selectedBlock].seed=(+$('blockSeed').value>>>0);cfg.blocks[selectedBlock].present=true;fresh();$('status').textContent='block #'+selectedBlock+' now G2:'+cfg.blocks[selectedBlock].seed};
-$('rotateBlock').onclick=()=>{cfg.blocks[selectedBlock].rot=(cfg.blocks[selectedBlock].rot+1)%24;fresh();$('status').textContent='block #'+selectedBlock+' rotated to R'+cfg.blocks[selectedBlock].rot};
-$('toggleBlock').onclick=()=>{cfg.blocks[selectedBlock].present=!cfg.blocks[selectedBlock].present;if(selectedBlock===cfg.spawn&&!cfg.blocks[selectedBlock].present){const n=cfg.blocks.findIndex(b=>b.present);if(n>=0)cfg.spawn=n}fresh()};
-$('setSpawn').onclick=()=>{if(!cfg.blocks[selectedBlock].present){$('status').textContent='restore this block before making it the spawn.';return}cfg.spawn=selectedBlock;fresh();$('status').textContent='founders now spawn in block #'+cfg.spawn};
-$('cloneAll').onclick=()=>{const src={...cfg.blocks[selectedBlock],present:true};cfg.blocks=cfg.blocks.map(b=>b.present?{...src}:{...b});fresh();$('status').textContent='all present blocks cloned from G2:'+src.seed+' R'+src.rot};
-$('copyBlock').onclick=()=>{clipboardBlock={...cfg.blocks[selectedBlock]};$('status').textContent='block copied'};$('pasteBlock').onclick=()=>{if(!clipboardBlock)return;cfg.blocks[selectedBlock]={...clipboardBlock};fresh();$('status').textContent='block pasted'};
+$('applySeed').onclick=()=>{stashRecent('before block seed change');cfg.blocks[selectedBlock].seed=(+$('blockSeed').value>>>0);cfg.blocks[selectedBlock].present=true;fresh();$('status').textContent='block #'+selectedBlock+' now G2:'+cfg.blocks[selectedBlock].seed};
+$('rotateBlock').onclick=()=>{stashRecent('before block rotation');cfg.blocks[selectedBlock].rot=(cfg.blocks[selectedBlock].rot+1)%24;fresh();$('status').textContent='block #'+selectedBlock+' rotated to R'+cfg.blocks[selectedBlock].rot};
+$('toggleBlock').onclick=()=>{stashRecent('before block presence change');cfg.blocks[selectedBlock].present=!cfg.blocks[selectedBlock].present;if(selectedBlock===cfg.spawn&&!cfg.blocks[selectedBlock].present){const n=cfg.blocks.findIndex(b=>b.present);if(n>=0)cfg.spawn=n}fresh()};
+$('setSpawn').onclick=()=>{if(!cfg.blocks[selectedBlock].present){$('status').textContent='restore this block before making it the spawn.';return}stashRecent('before spawn change');cfg.spawn=selectedBlock;fresh();$('status').textContent='founders now spawn in block #'+cfg.spawn};
+$('cloneAll').onclick=()=>{stashRecent('before clone all');const src={...cfg.blocks[selectedBlock],present:true};cfg.blocks=cfg.blocks.map(b=>b.present?{...src}:{...b});fresh();$('status').textContent='all present blocks cloned from G2:'+src.seed+' R'+src.rot};
+$('copyBlock').onclick=()=>{clipboardBlock={...cfg.blocks[selectedBlock]};$('status').textContent='block copied'};$('pasteBlock').onclick=()=>{if(!clipboardBlock)return;stashRecent('before block paste');cfg.blocks[selectedBlock]={...clipboardBlock};fresh();$('status').textContent='block pasted'};
 $('makeCode').onclick=()=>{$('shareCode').value=experimentCode();$('status').textContent='share code refreshed'};$('copyCode').onclick=async()=>{const code=experimentCode();$('shareCode').value=code;try{await navigator.clipboard.writeText(code);$('status').textContent='share code copied'}catch{$('status').textContent='share code ready below'}};
-$('loadCode').onclick=()=>{try{loadExperimentCode($('shareCode').value);$('status').textContent='shared specimen loaded exactly'}catch(e){$('status').textContent='could not load code · '+e.message}};
+$('saveSpecimen').onclick=()=>saveCurrentSpecimen($('vaultNote').value);
+$('vaultSavedList').onclick=vaultAction;$('vaultRecentList').onclick=vaultAction;
+$('clearRecent').onclick=()=>{if(!confirm('Clear the recent experiment safety net?'))return;const v=vaultState();v.recent=[];writeVault(v);renderVault();$('status').textContent='recent safety net cleared'};
+$('loadCode').onclick=()=>{stashRecent('before share-code load');try{loadExperimentCode($('shareCode').value);$('status').textContent='shared specimen config loaded from tick 0';renderVault()}catch(e){$('status').textContent='could not load code · '+e.message}};
 $('motion').onclick=()=>{showMotion=!showMotion;$('motion').textContent=showMotion?'MOTION ON':'MOTION OFF';$('motion').classList.toggle('on',showMotion);draw()};$('blocks').onclick=()=>{showBlocks=!showBlocks;$('blocks').textContent=showBlocks?'BLOCKS ON':'BLOCKS OFF';$('blocks').classList.toggle('on',showBlocks);draw()};$('auto').onclick=()=>{autoRotate=!autoRotate;$('auto').textContent=autoRotate?'AUTO ON':'AUTO OFF';$('auto').classList.toggle('on',autoRotate)};$('colorMode').value=colorMode;$('colorMode').onchange=()=>{colorMode=$('colorMode').value;renderColorLegend();draw()};$('resetView').onclick=()=>{view={yaw:-.72,pitch:.46,zoom:1};draw()};
 canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1)gesture={x:e.clientX,y:e.clientY,yaw:view.yaw,pitch:view.pitch,moved:false};else if(pointers.size===2){const a=[...pointers.values()];gesture={pinch:true,dist:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),zoom:view.zoom,moved:true}}});
 canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1&&!gesture?.pinch){const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;if(Math.hypot(dx,dy)>4)gesture.moved=true;view.yaw=gesture.yaw+dx*.012;view.pitch=Math.max(-1.45,Math.min(1.45,gesture.pitch+dy*.012));draw()}else if(pointers.size===2&&gesture?.pinch){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);view.zoom=Math.max(.35,Math.min(4,gesture.zoom*d/gesture.dist));draw()}});
 function endPointer(e){const click=pointers.size===1&&!gesture?.moved&&!gesture?.pinch;pointers.delete(e.pointerId);if(click){const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=24;for(const p of pickPoints){const d=Math.hypot(p.x-x,p.y-y);if(d<bd){bd=d;best=p}}if(best){selectedId=best.id;renderInspect();draw()}}if(!pointers.size)gesture=null}
 canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointercancel',endPointer);
 function animate(){if(autoRotate){view.yaw+=.003;draw()}requestAnimationFrame(animate)}
-cfg=defaultCfg();if(!restore())fresh();else render();$('arrSeed').value=String(cfg.arrangementSeed);$('shareCode').value=experimentCode();requestAnimationFrame(animate)
+cfg=defaultCfg();if(!restore())fresh();else render();$('arrSeed').value=String(cfg.arrangementSeed);$('shareCode').value=experimentCode();renderVault();window.addEventListener('pagehide',()=>stashRecent('page exit'));requestAnimationFrame(animate)
 })();
 </script></body></html>
