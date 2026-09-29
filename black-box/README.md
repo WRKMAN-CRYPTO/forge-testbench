@@ -1,59 +1,39 @@
 # WRKMAN BLACK BOX
 
-**Read-only Solana wallet incident reconstruction.**
+Read-only Solana wallet incident reconstruction.
 
-When crypto disappears, the hardest first question is often not recovery. It is: **what actually happened?**
+## Problem
 
-BLACK BOX takes a public Solana address and reconstructs recent on-chain evidence into an incident timeline.
+When funds disappear, users often cannot tell whether they paid fees, signed a malicious transaction, left a token delegate active, changed an authority, or had a signing key compromised. The chain contains pieces of the answer, but transaction explorers are optimized for inspection one transaction at a time rather than causal reconstruction.
 
-## What it looks for
+## Approach
+
+BLACK BOX accepts only a public Solana address. It uses `getSignaturesForAddress` and `getTransaction` with `jsonParsed` encoding to reconstruct a recent timeline, including inner instructions, SOL changes, token balance changes, signer status, delegates, revocations, authority changes, burns, closes, and network fees.
+
+The classifier intentionally separates **what the chain proves** from inference. A valid wallet signature proves the key authorized the transaction, but it does not prove whether the owner intended it, was tricked, or whether another party controlled the key.
+
+## Current classifiers
 
 - Fee-only activity
 - Wallet-signed value outflow
-- SPL token delegate approvals and revocations
-- Delegate-authorized token outflow where the wallet itself did not sign
-- SPL token authority changes
+- Token delegate approvals/revocations
+- Delegate-authorized token outflow without the wallet signing
 - System account reassignment
-- Token-account closure and burns
-- Small SOL gas top-ups followed by suspicious outbound activity
-- A likely "first domino" in the selected history window
+- SPL token authority changes
+- Token account closure and burns
+- Small SOL gas top-up followed by rapid outflow
+- Basic address-poisoning lookalike heuristic
 
 ## Safety model
-
-BLACK BOX is deliberately walletless:
 
 - No wallet connection
 - No signatures
 - No custody
-- No seed phrases or private keys
-- Public Solana RPC reads only
+- No secret material
+- Public RPC reads only
 
-Never paste secret material into this or any other wallet-forensics page.
-
-## Epistemic rule
-
-The classifier separates **what the chain proves** from inference.
-
-A valid signature proves that the private key authorized a transaction. It does **not** prove who physically held the key, whether the owner intended the transaction, or whether the signature was obtained through deception.
-
-## Data
-
-The prototype uses Solana JSON-RPC:
-
-- \`getSignaturesForAddress\`
-- \`getTransaction\` with \`jsonParsed\`
-- outer and inner parsed instructions
-- pre/post SOL balances
-- pre/post token balances
-- signer metadata
+Never paste a seed phrase or private key into this or any other wallet-forensics page.
 
 ## Limits
 
-Public RPC endpoints may rate-limit deeper scans. \`jsonParsed\` cannot decode every custom program. Relevant causal events may be older than the selected history window. Token-2022 extensions and custom programs can create behavior that this prototype does not yet understand.
-
-When evidence is incomplete, BLACK BOX should say **inconclusive**, not invent a cause.
-
----
-
-**WRKMAN**  
-*Clock In. Find the Failure.*
+Public RPC endpoints may rate-limit deeper scans. `jsonParsed` cannot decode every custom program. Some causal instructions may be older than the selected history depth. Token-2022 extensions can create authority behavior that differs from classic SPL Token. BLACK BOX should report uncertainty rather than inventing a cause.
