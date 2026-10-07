@@ -31,6 +31,16 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
 #pageWrap{position:relative;width:max-content;height:max-content;margin:0 auto;background:#fff;box-shadow:0 4px 22px #0008}
 #overview{display:block;background:white}
 #tiles{position:absolute;inset:0;pointer-events:none;z-index:2}
+#shadowCanvas{position:absolute;inset:0;z-index:3;pointer-events:none}
+#shadowBtn.active{background:#173d2b;border-color:#35d07f;color:#dcffeb}
+#shadowHud{position:fixed;right:10px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:7;display:none;align-items:center;gap:7px;padding:8px;background:#171b20ed;border:1px solid #343b44;border-radius:12px;box-shadow:0 10px 30px #0008}
+#shadowHud.open{display:flex}
+#shadowMeta{min-width:92px;line-height:1.1}
+#shadowMeta strong{display:block;font-size:10px;letter-spacing:.12em;color:#7ce5a9}
+#shadowCount{display:block;margin-top:4px;font-size:11px;color:#b8c2cb;font-variant-numeric:tabular-nums}
+#shadowUndo,#shadowClear{height:34px;min-width:42px;padding:0 9px}
+#shadowClear{color:#ffb0a8}
+#stage.shadow-mode{cursor:crosshair}
 .tile{position:absolute;display:block;background:white;pointer-events:none}
 #empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:30px;color:#8f9aa6;pointer-events:none}
 #empty strong{display:block;color:#dce2e8;font-size:20px;margin-bottom:8px}
@@ -46,6 +56,7 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
 <span id="pageInfo">0 / 0</span>
 <button id="next" aria-label="Next page">›</button>
 <button id="fit" aria-label="Fit page">Fit</button>
+<button id="shadowBtn" aria-label="Shadow Sheet progress mode" title="Shadow Sheet">✓</button>
 <button id="full" aria-label="Fullscreen">⛶</button>
 </header>
 <div id="recentScrim"></div>
@@ -58,11 +69,17 @@ button,.fileBtn{border:1px solid #343b44;background:#222830;color:#f4f6f8;border
   <div id="pageWrap">
     <canvas id="overview"></canvas>
     <div id="tiles"></div>
+    <canvas id="shadowCanvas"></canvas>
   </div>
 </div>
 <div id="empty"><div><strong>Forge Blueprint Engine</strong>Open a PDF to begin.<br>Tile engine prototype.</div></div>
 </div>
 <div id="status"></div>
+<div id="shadowHud" aria-hidden="true">
+  <div id="shadowMeta"><strong>SHADOW SHEET</strong><span id="shadowCount">0 installed</span></div>
+  <button id="shadowUndo" aria-label="Undo last progress mark">Undo</button>
+  <button id="shadowClear" aria-label="Clear progress marks on this page">Clear</button>
+</div>
 </div>
 
 <script type="module">
@@ -75,16 +92,25 @@ const pdfMenuBtn=$('#pdfMenuBtn'),recentPanel=$('#recentPanel'),recentScrim=$('#
 const recentList=$('#recentList'),openNewBtn=$('#openNewBtn');
 const overview=$('#overview'),overviewCtx=overview.getContext('2d',{alpha:false});
 const stage=$('#stage'),pageWrap=$('#pageWrap'),tilesEl=$('#tiles');
+const shadowCanvas=$('#shadowCanvas'),shadowCtx=shadowCanvas.getContext('2d');
 const empty=$('#empty'),info=$('#pageInfo'),status=$('#status');
 const prev=$('#prev'),next=$('#next'),fit=$('#fit'),full=$('#full');
+const shadowBtn=$('#shadowBtn'),shadowHud=$('#shadowHud'),shadowCount=$('#shadowCount');
+const shadowUndo=$('#shadowUndo'),shadowClear=$('#shadowClear');
 
 const MAX_ZOOM=50;
 const RECENT_LIMIT=6;
 const RECENT_DB='forge-blueprint-engine';
 const RECENT_STORE='recent-pdfs';
+const SHADOW_STORE='shadow-sheets';
+const SHADOW_VERSION=1;
 let recentDbPromise=null;
 let currentRecentKey=null;
 let viewSaveTimer=0;
+let currentShadowSheet=null;
+let shadowMode=false;
+let shadowGesture=null;
+let shadowPreview=null;
 
 // Whole-page safety net. This is never our deep-zoom source of truth.
 const OVERVIEW_MAX_PIXELS=14000000;
@@ -136,10 +162,11 @@ function recentDb(){
  if(!('indexedDB' in window))return Promise.resolve(null);
  if(recentDbPromise)return recentDbPromise;
  recentDbPromise=new Promise((resolve,reject)=>{
-  const req=indexedDB.open(RECENT_DB,1);
+  const req=indexedDB.open(RECENT_DB,2);
   req.onupgradeneeded=()=>{
    const db=req.result;
    if(!db.objectStoreNames.contains(RECENT_STORE))db.createObjectStore(RECENT_STORE,{keyPath:'id'});
+   if(!db.objectStoreNames.contains(SHADOW_STORE))db.createObjectStore(SHADOW_STORE,{keyPath:'id'});
   };
   req.onsuccess=()=>resolve(req.result);
   req.onerror=()=>reject(req.error);
@@ -169,6 +196,52 @@ async function getRecent(id){
  if(!db)return null;
  const tx=db.transaction(RECENT_STORE,'readonly');
  return (await requestResult(tx.objectStore(RECENT_STORE).get(id)))||null;
+}
+function blankShadowSheet(id){
+ return {id,version:SHADOW_VERSION,updatedAt:Date.now(),pages:{}};
+}
+async function getShadowSheet(id){
+ const db=await recentDb();
+ if(!db||!id)return null;
+ const tx=db.transaction(SHADOW_STORE,'readonly');
+ return (await requestResult(tx.objectStore(SHADOW_STORE).get(id)))||null;
+}
+async function persistShadowSheet(){
+ if(!currentRecentKey||!currentShadowSheet)return;
+ currentShadowSheet.id=currentRecentKey;
+ currentShadowSheet.version=SHADOW_VERSION;
+ currentShadowSheet.updatedAt=Date.now();
+ const db=await recentDb();
+ if(!db)return;
+ const tx=db.transaction(SHADOW_STORE,'readwrite');
+ tx.objectStore(SHADOW_STORE).put(currentShadowSheet);
+ await new Promise((resolve,reject)=>{
+  tx.oncomplete=resolve;
+  tx.onerror=()=>reject(tx.error);
+  tx.onabort=()=>reject(tx.error);
+ });
+}
+function pageShadowSegments(){
+ if(!currentShadowSheet)return [];
+ const key=String(pageNum);
+ if(!Array.isArray(currentShadowSheet.pages[key]))currentShadowSheet.pages[key]=[];
+ return currentShadowSheet.pages[key];
+}
+function shadowStats(){
+ if(!currentShadowSheet)return {page:0,total:0};
+ let total=0;
+ for(const segs of Object.values(currentShadowSheet.pages||{}))if(Array.isArray(segs))total+=segs.length;
+ return {page:pageShadowSegments().length,total};
+}
+function updateShadowHud(){
+ const stats=shadowStats();
+ shadowCount.textContent=stats.page+' this page · '+stats.total+' total';
+ shadowUndo.disabled=!stats.page;
+ shadowClear.disabled=!stats.page;
+ shadowHud.classList.toggle('open',shadowMode&&!!doc);
+ shadowHud.setAttribute('aria-hidden',shadowMode&&doc?'false':'true');
+ shadowBtn.classList.toggle('active',shadowMode&&!!doc);
+ stage.classList.toggle('shadow-mode',shadowMode&&!!doc);
 }
 function captureViewState(){
  if(!doc||!baseViewport)return null;
@@ -301,7 +374,9 @@ function controls(){
  prev.disabled=!doc||pageNum<=1;
  next.disabled=!doc||pageNum>=doc.numPages;
  fit.disabled=!doc;
+ shadowBtn.disabled=!doc;
  fit.textContent=doc?zoomLabel():'Fit';
+ updateShadowHud();
 }
 function cssSize(){
  return {
@@ -317,6 +392,154 @@ function applyCssSize(){
  pageWrap.style.height=h+'px';
  tilesEl.style.width=w+'px';
  tilesEl.style.height=h+'px';
+ syncShadowCanvas();
+}
+function syncShadowCanvas(){
+ const {w,h}=cssSize();
+ if(!w||!h){
+  shadowCanvas.width=1;shadowCanvas.height=1;
+  shadowCanvas.style.width='1px';shadowCanvas.style.height='1px';
+  return;
+ }
+ const dpr=Math.min(2,window.devicePixelRatio||1);
+ shadowCanvas.style.width=w+'px';
+ shadowCanvas.style.height=h+'px';
+ shadowCanvas.width=Math.max(1,Math.ceil(w*dpr));
+ shadowCanvas.height=Math.max(1,Math.ceil(h*dpr));
+ shadowCtx.setTransform(dpr,0,0,dpr,0,0);
+ drawShadow();
+}
+function drawShadowSegment(seg,w,h,preview=false){
+ const x1=seg.x1*w,y1=seg.y1*h,x2=seg.x2*w,y2=seg.y2*h;
+ shadowCtx.save();
+ shadowCtx.lineCap='round';
+ shadowCtx.lineJoin='round';
+ shadowCtx.strokeStyle=preview?'rgba(110,255,168,.42)':'rgba(9,70,39,.58)';
+ shadowCtx.lineWidth=preview?9:9;
+ shadowCtx.beginPath();
+ shadowCtx.moveTo(x1,y1);shadowCtx.lineTo(x2,y2);shadowCtx.stroke();
+ shadowCtx.strokeStyle=preview?'rgba(174,255,205,.96)':'rgba(53,208,127,.92)';
+ shadowCtx.lineWidth=preview?4:4.5;
+ shadowCtx.beginPath();
+ shadowCtx.moveTo(x1,y1);shadowCtx.lineTo(x2,y2);shadowCtx.stroke();
+ shadowCtx.restore();
+}
+function drawShadow(preview=shadowPreview){
+ const {w,h}=cssSize();
+ if(!w||!h)return;
+ const dpr=Math.min(2,window.devicePixelRatio||1);
+ shadowCtx.setTransform(dpr,0,0,dpr,0,0);
+ shadowCtx.clearRect(0,0,w,h);
+ if(currentShadowSheet){
+  for(const seg of pageShadowSegments())drawShadowSegment(seg,w,h,false);
+ }
+ if(preview)drawShadowSegment(preview,w,h,true);
+}
+function pagePoint(clientX,clientY){
+ if(!doc||!baseViewport)return null;
+ const r=pageWrap.getBoundingClientRect();
+ if(clientX<r.left||clientX>r.right||clientY<r.top||clientY>r.bottom)return null;
+ return {
+  x:clientX-r.left,
+  y:clientY-r.top,
+  nx:clamp((clientX-r.left)/Math.max(1,r.width),0,1),
+  ny:clamp((clientY-r.top)/Math.max(1,r.height),0,1),
+  w:r.width,h:r.height
+ };
+}
+function snappedShadowEnd(start,end){
+ const dx=end.x-start.x,dy=end.y-start.y;
+ const len=Math.hypot(dx,dy);
+ if(len<1)return end;
+ let angle=Math.atan2(dy,dx);
+ const step=Math.PI/4;
+ const snapped=Math.round(angle/step)*step;
+ let delta=Math.abs(angle-snapped);
+ delta=Math.min(delta,Math.PI*2-delta);
+ if(delta>Math.PI/24)return end;
+ const x=start.x+Math.cos(snapped)*len;
+ const y=start.y+Math.sin(snapped)*len;
+ return {
+  ...end,
+  x,y,
+  nx:clamp(x/Math.max(1,start.w),0,1),
+  ny:clamp(y/Math.max(1,start.h),0,1)
+ };
+}
+function beginShadowGesture(t,source='touch'){
+ stopInertia();
+ pan=null;
+ const p=pagePoint(t.clientX,t.clientY);
+ if(!p)return false;
+ shadowGesture={source,start:p,last:p,moved:false};
+ shadowPreview=null;
+ drawShadow();
+ return true;
+}
+function moveShadowGesture(t){
+ if(!shadowGesture)return;
+ const raw=pagePoint(t.clientX,t.clientY);
+ if(!raw)return;
+ const end=snappedShadowEnd(shadowGesture.start,raw);
+ shadowGesture.last=end;
+ shadowGesture.moved=shadowGesture.moved||Math.hypot(end.x-shadowGesture.start.x,end.y-shadowGesture.start.y)>=8;
+ shadowPreview={
+  x1:shadowGesture.start.nx,y1:shadowGesture.start.ny,
+  x2:end.nx,y2:end.ny,status:'installed'
+ };
+ drawShadow(shadowPreview);
+}
+function finishShadowGesture(){
+ if(!shadowGesture)return;
+ const g=shadowGesture;
+ shadowGesture=null;
+ if(!g.moved||!shadowPreview){
+  shadowPreview=null;
+  drawShadow();
+  flash('Drag along a pipe to mark it done');
+  return;
+ }
+ const seg={
+  id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(16).slice(2)),
+  x1:shadowPreview.x1,y1:shadowPreview.y1,x2:shadowPreview.x2,y2:shadowPreview.y2,
+  status:'installed',createdAt:Date.now()
+ };
+ pageShadowSegments().push(seg);
+ shadowPreview=null;
+ drawShadow();
+ updateShadowHud();
+ persistShadowSheet().catch(err=>console.warn('Shadow Sheet save skipped',err));
+ try{navigator.vibrate&&navigator.vibrate(18)}catch{}
+ flash('Installed · marked');
+}
+function toggleShadowMode(force){
+ if(!doc)return;
+ shadowMode=typeof force==='boolean'?force:!shadowMode;
+ shadowGesture=null;
+ shadowPreview=null;
+ stopInertia();
+ drawShadow();
+ updateShadowHud();
+ flash(shadowMode?'Shadow Sheet · drag along installed pipe':'Shadow Sheet off');
+}
+async function undoShadow(){
+ const segs=pageShadowSegments();
+ if(!segs.length)return;
+ segs.pop();
+ drawShadow();
+ updateShadowHud();
+ await persistShadowSheet().catch(console.warn);
+ flash('Last mark undone');
+}
+async function clearShadowPage(){
+ const segs=pageShadowSegments();
+ if(!segs.length)return;
+ if(!confirm('Clear all Shadow Sheet marks from this page?'))return;
+ currentShadowSheet.pages[String(pageNum)]=[];
+ drawShadow();
+ updateShadowHud();
+ await persistShadowSheet().catch(console.warn);
+ flash('Page progress cleared');
 }
 function safeScale(viewport,maxPixels,maxSide,desired){
  const byArea=Math.sqrt(maxPixels/Math.max(1,viewport.width*viewport.height));
@@ -633,6 +856,7 @@ async function fitPage(){
  stage.scrollTo(0,0);
  controls();
  scheduleViewSave(100);
+ drawShadow();
  flash('Fit · 1×');
 }
 async function changePage(delta){
@@ -647,6 +871,8 @@ async function changePage(delta){
  currentPage=await doc.getPage(pageNum);
  await renderOverview(false);
  stage.scrollTo(0,0);
+ drawShadow();
+ updateShadowHud();
  scheduleViewSave(100);
  flash('Fit · 1×');
 }
@@ -663,6 +889,9 @@ async function openPdfBlob(blob,name='Blueprint.pdf',savedState=null,recentKey=n
 
  doc=await pdfjsLib.getDocument({data}).promise;
  currentRecentKey=recentKey||recentId(blob);
+ currentShadowSheet=(await getShadowSheet(currentRecentKey))||blankShadowSheet(currentRecentKey);
+ shadowGesture=null;
+ shadowPreview=null;
  pageNum=clamp(savedState?.page||1,1,doc.numPages);
  zoom=clamp(savedState?.zoom||1,1,MAX_ZOOM);
  currentPage=await doc.getPage(pageNum);
@@ -701,6 +930,9 @@ file.addEventListener('change',async()=>{
 prev.onclick=()=>changePage(-1);
 next.onclick=()=>changePage(1);
 fit.onclick=fitPage;
+shadowBtn.onclick=()=>toggleShadowMode();
+shadowUndo.onclick=undoShadow;
+shadowClear.onclick=clearShadowPage;
 full.onclick=async()=>{
  try{
   if(!document.fullscreenElement)await document.documentElement.requestFullscreen();
@@ -857,7 +1089,10 @@ function finishPinch(remainingTouch=null){
   .then(()=>scheduleTileUpdate())
   .catch(e=>console.error(e));
 
- if(remainingTouch)beginPan(remainingTouch);
+ if(remainingTouch){
+  if(shadowMode)beginShadowGesture(remainingTouch);
+  else beginPan(remainingTouch);
+ }
 }
 
 /* ---------------- TOUCH ROUTING ---------------- */
@@ -866,9 +1101,13 @@ stage.addEventListener('touchstart',e=>{
  if(!doc)return;
  if(e.touches.length===1&&!pinch){
   e.preventDefault();
-  beginPan(e.touches[0]);
+  if(shadowMode)beginShadowGesture(e.touches[0]);
+  else beginPan(e.touches[0]);
  }else if(e.touches.length===2){
   e.preventDefault();
+  shadowGesture=null;
+  shadowPreview=null;
+  drawShadow();
   beginPinch(e.touches);
  }
 },{passive:false});
@@ -877,11 +1116,19 @@ stage.addEventListener('touchmove',e=>{
  if(!doc)return;
  if(e.touches.length===2){
   e.preventDefault();
+  shadowGesture=null;
+  shadowPreview=null;
+  drawShadow();
   if(!pinch)beginPinch(e.touches);
   movePinch(e.touches);
- }else if(e.touches.length===1&&pan&&!pinch){
-  e.preventDefault();
-  movePan(e.touches[0]);
+ }else if(e.touches.length===1&&!pinch){
+  if(shadowMode&&shadowGesture){
+   e.preventDefault();
+   moveShadowGesture(e.touches[0]);
+  }else if(pan){
+   e.preventDefault();
+   movePan(e.touches[0]);
+  }
  }
 },{passive:false});
 
@@ -892,23 +1139,46 @@ stage.addEventListener('touchend',e=>{
   finishPinch(remaining);
   return;
  }
+ if(shadowMode&&shadowGesture&&e.touches.length===0){
+  finishShadowGesture();
+  return;
+ }
  if(pan&&e.touches.length===0)finishPan();
 },{passive:true});
 
 stage.addEventListener('touchcancel',()=>{
  pinch=null;
  pan=null;
+ shadowGesture=null;
+ shadowPreview=null;
  stopInertia();
  tilesEl.style.display='block';
+ drawShadow();
  scheduleTileUpdate();
  scheduleViewSave(120);
 },{passive:true});
 
+stage.addEventListener('mousedown',e=>{
+ if(!doc||!shadowMode||e.button!==0)return;
+ e.preventDefault();
+ beginShadowGesture(e,'mouse');
+});
+window.addEventListener('mousemove',e=>{
+ if(shadowMode&&shadowGesture?.source==='mouse')moveShadowGesture(e);
+});
+window.addEventListener('mouseup',e=>{
+ if(shadowMode&&shadowGesture?.source==='mouse')finishShadowGesture();
+});
+
 document.addEventListener('visibilitychange',()=>{
- if(document.visibilityState==='hidden')persistCurrentViewState().catch(console.warn);
+ if(document.visibilityState==='hidden'){
+  persistCurrentViewState().catch(console.warn);
+  persistShadowSheet().catch(console.warn);
+ }
 });
 window.addEventListener('pagehide',()=>{
  persistCurrentViewState().catch(console.warn);
+ persistShadowSheet().catch(console.warn);
 });
 
 controls();
