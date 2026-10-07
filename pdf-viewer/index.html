@@ -104,6 +104,10 @@ const RECENT_DB='forge-blueprint-engine';
 const RECENT_STORE='recent-pdfs';
 const SHADOW_STORE='shadow-sheets';
 const SHADOW_VERSION=1;
+// Shadow overlay must stay cheap even when the PDF is zoomed to 50×.
+// The CSS layer can become enormous; the backing bitmap may not.
+const SHADOW_MAX_PIXELS=3000000;
+const SHADOW_MAX_SIDE=4096;
 let recentDbPromise=null;
 let currentRecentKey=null;
 let viewSaveTimer=0;
@@ -111,6 +115,7 @@ let currentShadowSheet=null;
 let shadowMode=false;
 let shadowGesture=null;
 let shadowPreview=null;
+let shadowBackingScale=1;
 
 // Whole-page safety net. This is never our deep-zoom source of truth.
 const OVERVIEW_MAX_PIXELS=14000000;
@@ -394,19 +399,37 @@ function applyCssSize(){
  tilesEl.style.height=h+'px';
  syncShadowCanvas();
 }
-function syncShadowCanvas(){
+function shadowBitmapScale(w,h){
+ const desired=Math.min(2,window.devicePixelRatio||1);
+ const byArea=Math.sqrt(SHADOW_MAX_PIXELS/Math.max(1,w*h));
+ const bySide=Math.min(SHADOW_MAX_SIDE/Math.max(1,w),SHADOW_MAX_SIDE/Math.max(1,h));
+ return Math.max(.02,Math.min(desired,byArea,bySide));
+}
+function syncShadowCanvas(force=false){
  const {w,h}=cssSize();
  if(!w||!h){
   shadowCanvas.width=1;shadowCanvas.height=1;
   shadowCanvas.style.width='1px';shadowCanvas.style.height='1px';
+  shadowBackingScale=1;
   return;
  }
- const dpr=Math.min(2,window.devicePixelRatio||1);
+
+ // During a pinch, only stretch the existing overlay with CSS.
+ // Reallocating a canvas on every touchmove was the crash source.
  shadowCanvas.style.width=w+'px';
  shadowCanvas.style.height=h+'px';
- shadowCanvas.width=Math.max(1,Math.ceil(w*dpr));
- shadowCanvas.height=Math.max(1,Math.ceil(h*dpr));
- shadowCtx.setTransform(dpr,0,0,dpr,0,0);
+ if(pinch&&!force)return;
+
+ const backing=shadowBitmapScale(w,h);
+ const bw=Math.max(1,Math.ceil(w*backing));
+ const bh=Math.max(1,Math.ceil(h*backing));
+ shadowBackingScale=backing;
+
+ // Avoid throwing away and reallocating the bitmap if nothing changed.
+ if(shadowCanvas.width!==bw||shadowCanvas.height!==bh){
+  shadowCanvas.width=bw;
+  shadowCanvas.height=bh;
+ }
  drawShadow();
 }
 function drawShadowSegment(seg,w,h,preview=false){
@@ -427,8 +450,7 @@ function drawShadowSegment(seg,w,h,preview=false){
 function drawShadow(preview=shadowPreview){
  const {w,h}=cssSize();
  if(!w||!h)return;
- const dpr=Math.min(2,window.devicePixelRatio||1);
- shadowCtx.setTransform(dpr,0,0,dpr,0,0);
+ shadowCtx.setTransform(shadowBackingScale,0,0,shadowBackingScale,0,0);
  shadowCtx.clearRect(0,0,w,h);
  if(currentShadowSheet){
   for(const seg of pageShadowSegments())drawShadowSegment(seg,w,h,false);
@@ -1075,6 +1097,7 @@ function movePinch(touches){
 }
 function finishPinch(remainingTouch=null){
  pinch=null;
+ syncShadowCanvas(true);
  flash(zoomLabel());
  scheduleViewSave(180);
 
