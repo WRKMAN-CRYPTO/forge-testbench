@@ -154,11 +154,13 @@ function blast(s,x,y,options={}){
   if(b.gameTag==="enemy"){
    const foe=b.enemyRef;
    const dmg=(chain?11:31)*falloff*(energy/100);
-   hitEnemy(s,foe,dmg,chain?"burn-expire":"detonation");
-   if(chain&&foe.alive){
+   // Ignite first: if the blast immediately defeats the target,
+   // its Burn can still fuel a later, attenuated explosion.
+   if(chain){
     const nextEnergy=energy*CHAIN_FRACTION;
     if(nextEnergy>=CHAIN_THRESHOLD)addBurn(s,foe,nextEnergy,chainId,depth+1);
    }
+   hitEnemy(s,foe,dmg,chain?"burn-expire":"detonation");
   }else if(b.gameTag==="dummy"){
    s.dummyHP=Math.max(0,s.dummyHP-(chain?8:25)*falloff);
    if(s.dummyHP<=0)s.dummyHP=400;
@@ -266,7 +268,7 @@ function step(s,time,delta){
      e.phase="windup";e.until=time+620;
      e.face={x:dx/d,y:dy/d};
     }else if(d>80&&d<480){
-     const accel=.00008*b.mass;
+     const accel=.00036*b.mass;
      Body.applyForce(b,pos,{x:dx/d*accel,y:dy/d*accel});
     }
    }
@@ -274,7 +276,7 @@ function step(s,time,delta){
    // Wisp prefers to orbit the wizard at range; forced movement remains real.
    const desired=210,approach=(d>desired+35?1:d<desired-40?-1:0);
    const tx=(-dy/d)*e.orbit,ty=(dx/d)*e.orbit;
-   const strength=.000084*b.mass;
+   const strength=.00034*b.mass;
    Body.applyForce(b,pos,{x:(dx/d*approach*.95+tx*.6)*strength,y:(dy/d*approach*.95+ty*.6)*strength});
    if(d<390&&time>=e.nextAttack){
     ember(s,e);
