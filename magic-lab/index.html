@@ -401,7 +401,23 @@ class Lab extends Phaser.Scene{
      this.setSkin(activeSkin);
      refreshSkinUI();
      refreshHueUI();
-     if(!this.textures.exists(maskKey))announce("WIZARD ART READY • Dye masks unavailable; combat remains online.");
+     if(!this.textures.exists(maskKey)){
+      // A missing new dye mask shouldn't close the Hue Forge either.
+      // Last working mask is usable with the art, although 03's new face
+      // will have its older trim coverage until the 013 mask is available.
+      this.load.once("complete",()=>{
+       if(this.textures.exists("wizardHueMasks012")){
+        activeMaskKey="wizardHueMasks012";
+        this.setSkin(activeSkin);
+        refreshSkinUI();refreshHueUI();
+        announce("LAB ONLINE • Using previous dye masks. New 03 mask may need a reload.");
+       }else{
+        announce("LAB ONLINE • Dye assets unavailable; fighting and movement are unaffected.");
+       }
+      });
+      this.load.image("wizardHueMasks012","./skins/wizard-hue-masks-012.png?v=012");
+      this.load.start();
+     }
      return;
     }
     if(fallback){
