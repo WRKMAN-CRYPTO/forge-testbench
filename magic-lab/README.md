@@ -182,6 +182,12 @@ The logic tests are synthetic. Real iPhone performance, layout, and the feel of 
 * Gravity deflections and dummy impacts are counted in the top HUD.
 * Field power persists locally; COPY BUILD copies a **lab recipe**, not a production-ready Spell Designer ability.
 
+## Dormant Spell-Language design
+
+The [Spell-Language v0.1 design](./spell-language/README.md) is stored in a separate folder as an **offline, draft-only experiment**. It defines bounded spell procedures, observation waits, deterministic action-intent planning, repetition-based *suggestions* and explicit parent/child lineages. The sample Stormglass recipe and Node tests live alongside it.
+
+**Spell-Language is NOT loaded by this game.** No recording, automatic spell-casting, unlocked shortcut, learning system, UI change or multiplayer feature has been activated. Connecting it later requires an explicit user-approved integration task.
+
 ## Prototype boundary
 This version is **solo and local only**. No Colyseus server, online co-op, account system, shared spellbook, or imported Spell Designer schema is connected yet. The live room server will need hosting outside GitHub Pages. GitHub Pages can serve the client, not the authoritative WebSocket server.
 
