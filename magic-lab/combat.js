@@ -20,7 +20,7 @@ function spawn(s,type,x,y){
   id:++enemyCounter,body,r,type,alive:true,
   hp:heavy?165:80,maxHP:heavy?165:80,
   phase:"stalk",until:0,nextAttack:now(s)+1000+Math.random()*800,
-  face:{x:-1,y:0},burn:null,hitAt:0,
+  face:{x:-1,y:0},burn:null,hitAt:0,staggerUntil:0,
   orbit:Math.random()<.5?-1:1
  };
  body.gameTag="enemy";
@@ -34,7 +34,7 @@ function reset(s){
  s.combat={
   hp:100,kills:0,invulnUntil:0,enemyShots:0,
   enemies:[],fields:[],pending:[],seen:new Map(),
-  relic:true,damageEvents:0,pairCollisions:new Map()
+  relic:true,damageEvents:0,pairCollisions:new Map(),impactFX:[],blastFX:[],lastShake:-1000,wallHits:0,collisionHits:0
  };
  spawn(s,"charger",585,205);
  spawn(s,"charger",620,410);
@@ -133,6 +133,16 @@ function hitEnemy(s,e,amount,kind){
  heads(s);
  return true;
 }
+function impactFeedback(s,x,y,energy,nx,ny,wall=false){
+ const c=s.combat;
+ c.impactFX.push({x,y,energy:clamp(energy,4,65),nx,ny,born:now(s),life:380,wall});
+ if(c.impactFX.length>24)c.impactFX.shift();
+ s.burst(x,y,energy>19?0xffd1a0:0x80daff,clamp(Math.round(energy*.45),7,24),Math.min(8,2+energy*.12));
+ if(energy>18&&now(s)-c.lastShake>220){
+  s.cameras.main.shake(65+Math.min(90,energy*2),.0014+Math.min(.003,energy*.000025));
+  c.lastShake=now(s);
+ }
+}
 function blast(s,x,y,options={}){
  const radius=options.radius||140;
  const energy=options.energy??100;
@@ -140,8 +150,16 @@ function blast(s,x,y,options={}){
  const chainId=options.chainId||(++chainCounter);
  const chain=Boolean(options.chain);
  const c=s.combat;
+ // Blast visuals are independent of damage, so even weak descendant bursts
+ // remain legible without inflating their actual damage or chain range.
+ c.blastFX.push({x,y,born:now(s),life:530,energy,chain});
+ if(c.blastFX.length>24)c.blastFX.shift();
  s.rings.push({x,y,r:12,life:480,born:now(s),c:chain?0xffd47e:0xff8d43});
- s.burst(x,y,chain?0xffd37a:0xff8758,Math.min(35,12+Math.floor(energy/5)),7);
+ s.burst(x,y,chain?0xffd37a:0xff8758,Math.min(48,18+Math.floor(energy/3)),8);
+ if(energy>=45&&now(s)-c.lastShake>235){
+  s.cameras.main.shake(chain?70:130,chain?.0018:.003);
+  c.lastShake=now(s);
+ }
  if(s.rings.length>36)s.rings.splice(0,s.rings.length-36);
  const origin={x,y};
  for(const a of [...s.actors,...s.projectiles]){
@@ -149,7 +167,9 @@ function blast(s,x,y,options={}){
   const d=Math.max(18,distance(b.position,origin));
   if(d>radius)continue;
   const falloff=Math.max(.08,1-d/radius);
-  const impulse=(.020+energy*.00013)*b.mass*falloff*(b.gameTag==="enemy"&&b.enemyRef.type==="charger"?.55:1);
+  const resistance=b.gameTag==="enemy"?(b.enemyRef.type==="charger"?.38:1.28):1;
+  // Equal impulses must not accelerate our massive charger like a wisp.
+  const impulse=(.014+energy*.00030)*b.mass*falloff*resistance*(chain?.88:1);
   Body.applyForce(b,b.position,{x:(b.position.x-x)/d*impulse,y:(b.position.y-y)/d*impulse});
   if(b.gameTag==="enemy"){
    const foe=b.enemyRef;
@@ -193,38 +213,60 @@ function ember(s,e){
  s.projectiles.push({body:b,born:now(s),trail:[]});
  s.burst(b.position.x,b.position.y,0xff7a4a,5,2);
 }
-function bodyCollision(s,a,b){
+function bodyCollision(s,a,b,collisionNormal){
  const aEnemy=a.gameTag==="enemy"?a.enemyRef:null;
  const bEnemy=b.gameTag==="enemy"?b.enemyRef:null;
- if((!aEnemy&&!bEnemy)||a.gameTag==="bolt"||b.gameTag==="bolt"||a.gameTag==="ember"||b.gameTag==="ember")return;
+ if((!aEnemy&&!bEnemy)||["bolt","ember"].includes(a.gameTag)||["bolt","ember"].includes(b.gameTag))return;
  if(aEnemy&&!aEnemy.alive||bEnemy&&!bEnemy.alive)return;
- // A thrown body retains real momentum. Damage and Burn transfer happen only
- // after a meaningful impact, not when entities gently touch each other.
+ if(!a.position||!b.position)return;
  const av=a.velocity||{x:0,y:0},bv=b.velocity||{x:0,y:0};
- const speed=Math.hypot(av.x-bv.x,av.y-bv.y);
- if(speed<4.4)return;
- const idA=Math.min(a.id||0,b.id||0),idB=Math.max(a.id||0,b.id||0);
- const key=idA+":"+idB;
- const recent=s.combat.pairCollisions.get(key)||0;
- if(now(s)-recent<460)return;
- s.combat.pairCollisions.set(key,now(s));
- if(s.combat.pairCollisions.size>180)s.combat.pairCollisions.clear();
- const force=clamp((speed-3.5)*2.9,2,32);
- // Transfer the original Burn states before damage. A fatal impact can
- // therefore still leave an ignited body that explodes on death.
+ const x=b.position.x-a.position.x,y=b.position.y-a.position.y;
+ const d=Math.max(.01,Math.hypot(x,y));
+ const normal=collisionNormal&&Number.isFinite(collisionNormal.x)&&Number.isFinite(collisionNormal.y)
+  ?collisionNormal:{x:x/d,y:y/d};
+ const nl=Math.max(.001,Math.hypot(normal.x,normal.y));
+ const nx=normal.x/nl,ny=normal.y/nl;
+ // The component of relative motion through the collision normal matters,
+ // not sideways sliding. |.| also handles velocities after solver reflection.
+ const closing=Math.abs((av.x-bv.x)*nx+(av.y-bv.y)*ny);
+ if(closing<3.65)return;
+ const ia=a.id??0,ib=b.id??0;
+ const key=Math.min(ia,ib)+":"+Math.max(ia,ib);
+ const c=s.combat;
+ if(now(s)-(c.pairCollisions.get(key)??-Infinity)<430)return;
+ c.pairCollisions.set(key,now(s));
+ if(c.pairCollisions.size>180)c.pairCollisions.clear();
+ c.collisionHits++;
+ const staticA=Boolean(a.isStatic),staticB=Boolean(b.isStatic);
+ const ma=staticA?Infinity:Math.max(.05,a.mass||1);
+ const mb=staticB?Infinity:Math.max(.05,b.mass||1);
+ const kinetic=clamp((closing-3.2)*5.1,2,62);
+ const atWall=staticA||staticB;
+ // Mass is a real advantage. A massive Charger delivers far more damage
+ // to a light Wisp than it receives at identical relative impact velocity.
+ const shareA=staticB?1:staticA?0:mb/(ma+mb);
+ const shareB=staticA?1:staticB?0:ma/(ma+mb);
+ const dmgA=kinetic*shareA*(aEnemy?.type==="charger"?.56:1);
+ const dmgB=kinetic*shareB*(bEnemy?.type==="charger"?.56:1);
+ // Snapshot statuses BEFORE applying impact damage so lethal hits can
+ // produce the correct death-triggered combustion, once per chain.
  if(aEnemy&&bEnemy&&aEnemy.alive&&bEnemy.alive){
-  const burnA=aEnemy.burn&&{...aEnemy.burn},burnB=bEnemy.burn&&{...bEnemy.burn};
-  if(burnA&&burnA.depth<MAX_DEPTH)
-   addBurn(s,bEnemy,burnA.energy*.68,burnA.chainId,burnA.depth+1);
-  if(burnB&&burnB.depth<MAX_DEPTH)
-   addBurn(s,aEnemy,burnB.energy*.68,burnB.chainId,burnB.depth+1);
+  const oldA=aEnemy.burn&&{...aEnemy.burn},oldB=bEnemy.burn&&{...bEnemy.burn};
+  if(oldA&&oldA.depth<MAX_DEPTH)addBurn(s,bEnemy,oldA.energy*.68,oldA.chainId,oldA.depth+1);
+  if(oldB&&oldB.depth<MAX_DEPTH)addBurn(s,aEnemy,oldB.energy*.68,oldB.chainId,oldB.depth+1);
  }
- if(aEnemy)hitEnemy(s,aEnemy,force*(aEnemy.type==="charger"?.48:1),"impact");
- if(bEnemy)hitEnemy(s,bEnemy,force*(bEnemy.type==="charger"?.48:1),"impact");
- if(aEnemy||bEnemy){
-  const ax=a.position?.x??0,ay=a.position?.y??0,bx=b.position?.x??0,by=b.position?.y??0;
-  s.burst((ax+bx)/2,(ay+by)/2,0xffc387,7,Math.min(6,speed*.5));
+ if(aEnemy){
+  if(kinetic>8)aEnemy.staggerUntil=Math.max(aEnemy.staggerUntil,now(s)+Math.min(aEnemy.type==="charger"?175:480,kinetic*(aEnemy.type==="charger"?3:10)));
+  hitEnemy(s,aEnemy,dmgA,"kinetic-impact");
  }
+ if(bEnemy){
+  if(kinetic>8)bEnemy.staggerUntil=Math.max(bEnemy.staggerUntil,now(s)+Math.min(bEnemy.type==="charger"?175:480,kinetic*(bEnemy.type==="charger"?3:10)));
+  hitEnemy(s,bEnemy,dmgB,"kinetic-impact");
+ }
+ const px=(a.position.x+b.position.x)*.5,py=(a.position.y+b.position.y)*.5;
+ impactFeedback(s,px,py,kinetic,nx,ny,atWall);
+ if(atWall)c.wallHits++;
+ if(kinetic>24)s.announceCombat(atWall?"WALL SLAM • Impact energy transferred.":"BODY COLLISION • Mass and velocity determine the damage.");
 }
 
 function collision(s,projectile,other){
@@ -253,6 +295,8 @@ function step(s,time,delta){
  const c=s.combat;if(!c)return;
  const dt=Math.min(delta,48)/16.667;
  c.fields=c.fields.filter(f=>time-f.born<f.life);
+ c.impactFX=c.impactFX.filter(f=>time-f.born<f.life);
+ c.blastFX=c.blastFX.filter(f=>time-f.born<f.life);
  for(const f of c.fields){
   if(time<f.nextTick)continue;
   f.nextTick=time+260;
@@ -276,6 +320,9 @@ function step(s,time,delta){
    }
   }
   if(!e.alive)continue;
+  // Stagger suspends intent, not physics: sliding bodies continue to move
+  // under their actual velocity, gravity and impacts.
+  if(time<e.staggerUntil)continue;
   const dx=s.player.x-pos.x,dy=s.player.y-pos.y;
   const d=Math.max(1,Math.hypot(dx,dy));
   if(e.type==="charger"){
@@ -350,6 +397,37 @@ function step(s,time,delta){
 }
 function paint(s,g,time){
  const c=s.combat;if(!c)return;
+ // Shock fronts + bright core flash provide visual mass without persistent
+ // particles or a heavy post-processing pipeline on the iPhone.
+ for(const fx of c.blastFX){
+  const p=clamp((time-fx.born)/fx.life,0,1),fade=1-p;
+  const radius=(fx.chain?84:116)*Math.sqrt(Math.max(.15,fx.energy/100));
+  g.fillStyle(0xffe5ab,(fx.chain?.26:.38)*fade*fade);
+  g.fillCircle(fx.x,fx.y,8+radius*p*.78);
+  g.fillStyle(0xff8249,.13*fade);
+  g.fillCircle(fx.x,fx.y,18+radius*p);
+  g.lineStyle((fx.chain?4:6)*(1-p)+1,0xffd489,.92*fade);
+  g.strokeCircle(fx.x,fx.y,8+radius*p);
+  for(let i=0;i<8;i++){
+   const angle=i*Math.PI/4+fx.x*.001,inner=8+radius*p*.57,outer=14+radius*p;
+   g.lineStyle(1.8+2.4*fade,i%2?0xff7e4e:0xffeeac,.63*fade);
+   g.lineBetween(fx.x+Math.cos(angle)*inner,fx.y+Math.sin(angle)*inner,
+    fx.x+Math.cos(angle)*outer,fx.y+Math.sin(angle)*outer);
+  }
+ }
+ for(const fx of c.impactFX){
+  const p=clamp((time-fx.born)/fx.life,0,1),fade=1-p,extent=6+fx.energy*(.42+p*.67);
+  g.lineStyle(2+3*fade,fx.wall?0xffb875:0xffe0a5,.9*fade);
+  // Two short, opposing shock lines make the collision direction legible.
+  const px=-fx.ny,py=fx.nx;
+  for(const sign of [-1,1]){
+   g.lineBetween(fx.x+px*sign*extent*.2,fx.y+py*sign*extent*.2,
+    fx.x+px*sign*extent,fx.y+py*sign*extent);
+  }
+  g.lineStyle(3*fade+1,0xffffff,.48*fade);
+  g.strokeCircle(fx.x,fx.y,3+extent*.55);
+ }
+
  for(const f of c.fields){
   const life=clamp((f.life-(time-f.born))/450,0,1);
   const pulse=.5+Math.sin(time*.006)*.5;
