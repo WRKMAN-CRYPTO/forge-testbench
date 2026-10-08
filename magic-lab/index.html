@@ -309,6 +309,10 @@ try{
  if(Array.isArray(saved))keepers=new Set(saved.filter(n=>Number.isInteger(n)&&n>=1&&n<=20));
 }catch(_){}
 const skinLabel=n=>String(n).padStart(2,"0");
+const Hue=window.WRKMAN_HUE_FORGE||null;
+let lookPalettes=Hue?Hue.read(localStorage):{};
+let hueSkin=Hue?.validSkin(activeSkin)?activeSkin:8;
+let hueChannel="robe";
 const spells=["bolt","well","pulse","frost","flame","detonate"];
 // Cast semantics are explicit for each ability, ready to become spell metadata.
 const spellInfo={
@@ -343,6 +347,7 @@ class Lab extends Phaser.Scene{
  preload(){
   this.load.spritesheet("wizardSkins010","./skins/wizard-skins-20.webp?v=010",
    {frameWidth:SKIN_W,frameHeight:SKIN_H});
+  this.load.image("wizardHueMasks011","./skins/wizard-hue-masks-011.png?v=011");
  }
  constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];}
  create(){
@@ -376,10 +381,26 @@ class Lab extends Phaser.Scene{
   this.matter.world.setBounds(MINX,MINY,MAXX-MINX,MAXY-MINY,34,true,true,true,true);
   this.matter.world.on("collisionstart",ev=>this.collisions(ev));
   this.resetLab();
+  this.setSkin(activeSkin);
   refreshSkinUI();
+  refreshHueUI();
  }
  setSkin(id){
-  if(this.playerSkinSprite)this.playerSkinSprite.setFrame(id-1);
+  if(!this.playerSkinSprite)return;
+  // Always detach from old dyed canvas before modifying that texture.
+  this.playerSkinSprite.setTexture("wizardSkins010",id-1);
+  if(!Hue||!Hue.validSkin(id)||!Hue.hasDye(lookPalettes[id]))return;
+  if(!this.textures.exists("wizardHueMasks011"))return;
+  try{
+   const atlas=this.textures.get("wizardSkins010").getSourceImage();
+   const mask=this.textures.get("wizardHueMasks011").getSourceImage();
+   const canvas=Hue.makeCanvas(id,lookPalettes[id],atlas,mask,document);
+   if(this.textures.exists("wizardDyed011"))this.textures.remove("wizardDyed011");
+   this.textures.addCanvas("wizardDyed011",canvas);
+   this.playerSkinSprite.setTexture("wizardDyed011");
+  }catch(error){
+   announce("HUE FORGE • Material preview unavailable; using original art.");
+  }
  }
  announceCombat(msg){announce(msg);}
  drawFloor(){
@@ -739,8 +760,7 @@ const skinOverlay=$("skinOverlay"),skinGrid=$("skinGrid");
 function refreshSkinUI(){
  $("skinActiveNo").textContent=skinLabel(activeSkin);
  $("skinBigNo").textContent=skinLabel(activeSkin);
- $("skinLarge").style.backgroundPosition="-"+((activeSkin-1)%5*SKIN_W)+"px -"+
-  (Math.floor((activeSkin-1)/5)*SKIN_H)+"px";
+ applySkinThumb($("skinLarge"),activeSkin);
  $("skinStatus").textContent=keepers.has(activeSkin)?"★ MARKED KEEPER":"CURRENT LOOK";
  $("skinKeeper").classList.toggle("is-keeper",keepers.has(activeSkin));
  $("skinKeeper").setAttribute("aria-pressed",String(keepers.has(activeSkin)));
@@ -749,6 +769,7 @@ function refreshSkinUI(){
  skinGrid.querySelectorAll(".skinSlot").forEach(slot=>{
   const n=Number(slot.dataset.skin);
   const choice=slot.querySelector(".skinChoice"),star=slot.querySelector(".skinChoiceStar");
+  applySkinThumb(slot.querySelector(".skinThumb"),n);
   choice.classList.toggle("chosen",n===activeSkin);
   choice.setAttribute("aria-pressed",String(n===activeSkin));
   star.textContent=keepers.has(n)?"★":"☆";
@@ -806,6 +827,165 @@ skinOverlay.addEventListener("keydown",e=>{
  if(e.key==="ArrowRight"){e.preventDefault();equipSkin(activeSkin+1);}
 });
 refreshSkinUI();
+
+/* DYE PREVIEW: produce just the requested 56×68 frame; never mutate source
+   assets. A per-skin cache is cleared whenever the user changes that look. */
+const huePreviewCache=new Map();
+function tintedPreview(n){
+ if(!Hue||!Hue.validSkin(n)||!Hue.hasDye(lookPalettes[n]))return null;
+ if(huePreviewCache.has(n))return huePreviewCache.get(n);
+ if(!scene?.textures?.exists("wizardHueMasks011"))return null;
+ try{
+  const atlas=scene.textures.get("wizardSkins010").getSourceImage();
+  const masks=scene.textures.get("wizardHueMasks011").getSourceImage();
+  const canvas=Hue.makeCanvas(n,lookPalettes[n],atlas,masks,document);
+  const data=canvas.toDataURL("image/png");
+  huePreviewCache.set(n,data);
+  return data;
+ }catch(_){return null;}
+}
+function applySkinThumb(el,n){
+ const preview=tintedPreview(n);
+ if(preview){
+  el.style.backgroundImage='url("'+preview+'")';
+  el.style.backgroundPosition="0 0";
+ }else{
+  el.style.backgroundImage='url("./skins/wizard-skins-20.webp?v=010")';
+  el.style.backgroundPosition="-"+((n-1)%5*SKIN_W)+"px -"+
+   (Math.floor((n-1)/5)*SKIN_H)+"px";
+ }
+}
+const hueOverlay=$("hueOverlay"),hueCharacters=$("hueCharacters"),huePalette=$("huePalette");
+const hueChoices=new Map();
+function refreshHueUI(){
+ if(!Hue)return;
+ $("hueDesignNo").textContent=skinLabel(hueSkin);
+ const p=lookPalettes[hueSkin]||{};
+ const selected=p[hueChannel];
+ const name=selected?Hue.color(selected)?.name||"UNKNOWN":"ORIGINAL FABRIC";
+ $("hueCurrentName").textContent=name.toUpperCase();
+ $("hueLayerStatus").textContent=hueChannel.toUpperCase()+" • "+name.toUpperCase();
+ document.querySelectorAll(".hueChannel").forEach(el=>el.classList.toggle("active",el.dataset.channel===hueChannel));
+ for(const [n,parts] of hueChoices){
+  parts.button.classList.toggle("active",n===hueSkin);
+  parts.button.setAttribute("aria-pressed",String(n===hueSkin));
+  const dyed=tintedPreview(n);
+  parts.image.src=dyed||"./skins/wizard-skins-20.webp?v=010";
+  if(dyed){
+   parts.image.style.objectPosition="center";
+   parts.image.style.objectFit="contain";
+   parts.image.style.width="56px";parts.image.style.height="68px";
+  }else{
+   // CSS object-position alone cannot crop atlas cells. Use background
+   // on the already created image container for undyed preview.
+   parts.image.style.display="none";
+   parts.thumbnail.style.display="block";
+   applySkinThumb(parts.thumbnail,n);
+  }
+  if(dyed){parts.image.style.display="block";parts.thumbnail.style.display="none";}
+ }
+ const photo=tintedPreview(hueSkin);
+ const hero=$("hueHeroImg");
+ if(photo){
+  hero.src=photo;hero.style.display="block";
+  $("hueHeroFallback").style.display="none";
+ }else{
+  hero.removeAttribute("src");hero.style.display="none";
+  $("hueHeroFallback").style.display="block";
+  applySkinThumb($("hueHeroFallback"),hueSkin);
+ }
+ for(const [id,el] of hueSwatches){
+  const yes=id===selected;
+  el.classList.toggle("selected",yes);
+  el.setAttribute("aria-pressed",String(yes));
+ }
+}
+const hueSwatches=new Map();
+if(Hue){
+ for(const n of Hue.FINALISTS){
+  const button=document.createElement("button");
+  button.type="button";button.className="hueCharacter";
+  button.setAttribute("aria-label","Dye wizard "+skinLabel(n));
+  const thumb=document.createElement("span");thumb.className="skinThumb";thumb.setAttribute("aria-hidden","true");
+  const image=document.createElement("img");image.alt="";image.width=56;image.height=68;
+  const num=document.createElement("span");num.textContent=skinLabel(n);
+  button.append(thumb,image,num);
+  button.addEventListener("click",()=>{
+   hueSkin=n;equipSkin(n);refreshHueUI();
+  });
+  hueCharacters.append(button);hueChoices.set(n,{button,thumbnail:thumb,image});
+ }
+ const fallback=document.createElement("div");fallback.id="hueHeroFallback";
+ fallback.className="skinThumb";fallback.style.display="none";
+ $("hueHeroImg").insertAdjacentElement("beforebegin",fallback);
+ for(const hue of Hue.HUES){
+  const button=document.createElement("button");button.type="button";button.className="hueSwatch";
+  button.setAttribute("aria-label",hue.name+" "+hue.hex);
+  const face=document.createElement("span");face.className="hueColor";face.style.background=hue.hex;
+  const label=document.createElement("span");label.textContent=hue.name;
+  button.append(face,label);button.title=hue.name+" • "+hue.hex;
+  button.addEventListener("click",()=>applyHue(hue.id));
+  huePalette.append(button);hueSwatches.set(hue.id,button);
+ }
+ for(const key of Hue.FUTURE){
+  const button=document.createElement("button");button.type="button";
+  button.className="hueSwatch locked";button.disabled=true;
+  button.title="Undiscovered hue. Collectible mechanics are not enabled yet.";
+  const face=document.createElement("span");face.className="hueColor";face.textContent="✦";
+  const label=document.createElement("span");label.textContent=key;
+  button.append(face,label);huePalette.append(button);
+ }
+ document.querySelectorAll(".hueChannel").forEach(el=>{
+  el.addEventListener("click",()=>{hueChannel=el.dataset.channel;refreshHueUI();});
+ });
+ $("hueOriginal").addEventListener("click",()=>applyHue(null));
+ $("hueOpen").addEventListener("click",openHueForge);
+ $("hueDone").addEventListener("click",closeHueForge);
+ $("hueCopy").addEventListener("click",async()=>{
+  const code=Hue.shareCode(hueSkin,lookPalettes[hueSkin]);
+  try{
+   await navigator.clipboard.writeText(code);
+   $("hueInfo").textContent="LOOK COPIED • "+code;
+  }catch(_){
+   $("hueInfo").textContent=code; // Visible even if clipboard permission is denied
+  }
+ });
+ hueOverlay.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){e.stopPropagation();closeHueForge();}
+ });
+}else{
+ $("hueOpen").disabled=true;
+ $("hueOpen").title="Hue Forge module failed to load";
+}
+function applyHue(id){
+ if(!Hue||id!==null&&!Hue.color(id))return;
+ lookPalettes[hueSkin][hueChannel]=id;
+ const stored=Hue.write(localStorage,lookPalettes);
+ huePreviewCache.delete(hueSkin);
+ if(hueSkin===activeSkin)scene?.setSkin(activeSkin);
+ refreshHueUI();refreshSkinUI();
+ $("hueInfo").textContent=(id?Hue.color(id).name+" applied to ":"Original material restored on ")+hueChannel+
+  (stored?" • SAVED":" • Storage unavailable");
+}
+function openHueForge(){
+ if(!Hue)return;
+ if(!scene?.textures?.exists("wizardHueMasks011")){
+  announce("HUE FORGE • Dye mask failed to load. Try reloading online.");
+  return;
+ }
+ hueSkin=Hue.validSkin(activeSkin)?activeSkin:hueSkin;
+ hueOverlay.hidden=false;
+ scene.scene.pause();
+ neutralStick();joyPointer=null;joyTouchId=null;
+ refreshHueUI();
+ $("hueDone").focus({preventScroll:true});
+}
+function closeHueForge(){
+ hueOverlay.hidden=true;
+ scene?.scene.resume();
+ $("hueOpen").focus({preventScroll:true});
+}
+
 const joy=$("joystick"),stick=$("stick");
 let joyPointer=null,joyTouchId=null;
 function neutralStick(){
