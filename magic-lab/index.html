@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 014</title>
+<title>WRKMAN | Magic Physics Laboratory 015</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -224,8 +224,8 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 014 • SAFE BOOT</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
-<div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 015 • BOOT ORDER FIX</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">LAB <b id="labState">BOOT</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
 <div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
 <button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span class="spell-name">1 • ARC BOLT</span></button>
@@ -383,9 +383,17 @@ class Lab extends Phaser.Scene{
   this.matter.world.setBounds(MINX,MINY,MAXX-MINX,MAXY-MINY,34,true,true,true,true);
   this.matter.world.on("collisionstart",ev=>this.collisions(ev));
   this.resetLab();
-  refreshSkinUI();
-  refreshHueUI();
-  this.loadCosmetics();
+  // The world is live BEFORE any optional wardrobe/dye operations.
+  $("labState").textContent="READY";
+  try{refreshSkinUI();refreshHueUI();}
+  catch(e){announce("WARDROBE PREVIEW ERROR • Combat remains usable.");}
+  // Do not start another loader during the Scene.create lifecycle.
+  // Let the first playable frame render before requesting cosmetics.
+  setTimeout(()=>{
+   if(!this.sys.isActive())return;
+   try{this.loadCosmetics();}
+   catch(e){announce("COSMETICS UNAVAILABLE • Gameplay remains live.");}
+  },120);
  }
  loadCosmetics(){
   const startLoad=(atlasKey,maskKey,atlasURL,maskURL,fallback)=>{
@@ -706,7 +714,7 @@ class Lab extends Phaser.Scene{
   }
  }
 }
-const game=new Phaser.Game({type:Phaser.AUTO,parent:"stage",width:W,height:H,backgroundColor:"#091825",render:{antialias:true,pixelArt:false},scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},physics:{default:"matter",matter:{gravity:{x:0,y:0},debug:false,enableSleeping:false}},scene:[Lab],fps:{target:60,forceSetTimeOut:false}});
+let game=null; // Phaser boots only after every UI binding has been initialized.
 // Phaser 3.90 can keep stale parent dimensions after a mobile rotation.
 // See phaserjs/phaser#7213 (fixed upstream after our pinned version).
 // Re-measure the actual canvas parent BEFORE refreshing Phaser's FIT scale.
@@ -715,7 +723,7 @@ const fitStage=$("stage");
 const fitShell=$("stageWrap");
 let resizeTimers=[];
 function refreshGameFit(){
- if(!game.scale||!game.canvas||!game.canvas.isConnected)return;
+ if(!game||!game.scale||!game.canvas||!game.canvas.isConnected)return;
  const box=fitStage.getBoundingClientRect();
  if(box.width<2||box.height<2)return;
  game.scale.getParentBounds();
@@ -744,8 +752,7 @@ if(typeof ResizeObserver!=="undefined"){
  const fitObserver=new ResizeObserver(()=>scheduleGameFit());
  fitObserver.observe(fitShell);
 }
-// Catch initial Phaser boot and first layout in both portrait and landscape.
-scheduleGameFit();
+// Initial FIT scheduling occurs after boot at the bottom of this script.
 function quickCast(type){
  if(!scene||!started)return;
  // Quick-cast is for aim-based and self-centered abilities only.
@@ -1109,6 +1116,20 @@ $("stage").addEventListener("touchstart",e=>{
  e.preventDefault();
 },{passive:false,capture:true});
 $("stage").addEventListener("pointerdown",e=>{if(scene&&started&&e.pointerType!=="touch"){scene.manualAim=scene.time.now;}});
+// ALL bindings, touch controls and hue menus now exist before Phaser starts.
+// With no mandatory preload, Phaser can call Lab.create synchronously.
+window.addEventListener("error",e=>{
+ const el=$("labState");
+ if(el)el.textContent="ERROR";
+ const msg=(e?.message||"unknown error").slice(0,140);
+ announce("LAB ERROR • "+msg);
+});
+game=new Phaser.Game({type:Phaser.AUTO,parent:"stage",width:W,height:H,
+ backgroundColor:"#091825",render:{antialias:true,pixelArt:false},
+ scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
+ physics:{default:"matter",matter:{gravity:{x:0,y:0},debug:false,enableSleeping:false}},
+ scene:[Lab],fps:{target:60,forceSetTimeOut:false}});
+scheduleGameFit();
 })();
 </script>
 </body>
