@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 001</title>
+<title>WRKMAN | Magic Physics Laboratory 010</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -116,13 +116,60 @@ header .actions{display:flex;gap:6px}
   #spellRow{top:48%}
 }
 
+
+/* Build 010: sprite atlas consists of 5 × 4 transparent 56 × 68 frames. */
+#skinOverlay[hidden]{display:none!important}
+#skinOverlay{position:fixed;inset:0;z-index:30;background:#040b13ee;display:flex;align-items:center;justify-content:center;padding:max(7px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+.skinPanel{width:min(790px,100%);max-height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:7px;background:linear-gradient(145deg,#172a3c,#0c1926);border:1px solid #7892a6;border-radius:15px;box-shadow:0 20px 85px #000c;padding:12px}
+.skinTop{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.skinTop strong{font:900 13px/1.1 ui-monospace,monospace;color:#f8d899;letter-spacing:.08em}
+.skinTop small{display:block;color:#abc9d9;font-size:10px}
+.skinControls{display:flex;gap:9px;align-items:center;justify-content:center;min-height:77px;background:#0c1b2b;border:1px solid #30485d;border-radius:12px;padding:4px 10px}
+.skinPreview{display:flex;align-items:center;justify-content:center;gap:9px;min-width:125px;flex:1}
+.skinLarge,.skinThumb{background-image:url("./skins/wizard-skins-20.webp?v=010");background-repeat:no-repeat;flex:none}
+.skinLarge{width:56px;height:68px;transform:scale(1.03)}
+.skinIdentity{display:flex;flex-direction:column;gap:1px;color:#b0d0e2;font:bold 10px ui-monospace,monospace;letter-spacing:.11em}
+.skinIdentity b{color:#ffe1a6;font-size:23px}
+.skinIdentity small{font-size:9px;letter-spacing:0;color:#9dc6d9}
+.skinNav{border:1px solid #52738e;background:#223952;color:#e8e5d5;min-width:42px;height:42px;border-radius:12px;font-size:21px;font-weight:900}
+.skinKeeperBtn{border:1px solid #c18e54;background:#463320;color:#ffe2b5;padding:10px 11px;border-radius:11px;font-size:11px;font-weight:900;white-space:nowrap}
+.skinKeeperBtn.is-keeper{background:#66502a;border-color:#f2cf79;color:#fff0aa}
+.skinGrid{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px;padding:2px 2px 5px;align-content:start}
+.skinSlot{position:relative;min-width:0}
+.skinChoice{width:100%;position:relative;min-height:90px;border:1px solid #36516a;background:#102235;border-radius:10px;color:#cddce3;display:flex;align-items:center;justify-content:center;padding:1px;touch-action:manipulation}
+.skinChoice.chosen{border:2px solid #ffd58d;box-shadow:inset 0 0 0 1px #9a734b,0 0 10px #f6bf6f2a;background:#233448}
+.skinThumb{width:56px;height:68px;max-width:100%;pointer-events:none}
+.skinChoiceNumber{font:800 10px/1.2 ui-monospace,monospace;color:#e8ebf4;position:absolute;top:3px;left:5px;text-shadow:0 1px 4px #000}
+.skinChoiceStar{position:absolute;right:1px;top:1px;z-index:1;border:0;border-radius:5px;background:#172b3a;color:#8296aa;font:900 19px/1 monospace;padding:1px;min-width:24px;min-height:25px}
+.skinChoiceStar.is-keeper{color:#ffd77b;text-shadow:0 0 7px #eea63d}
+.skinChoice:focus-visible,.skinNav:focus-visible,.skinKeeperBtn:focus-visible,.skinChoiceStar:focus-visible{outline:2px solid #c9e9ff;outline-offset:2px}
+.skinFoot{display:flex;justify-content:space-between;gap:6px;color:#9fb8c8;font:bold 9px ui-monospace,monospace}
+#skinsOpen{border-color:#bf9963;color:#ffe0a4;white-space:nowrap}
+@media (max-width:790px){.skinPanel{padding:8px;gap:4px}.skinGrid{gap:3px}.skinChoice{min-height:78px}.skinThumb{transform:scale(.80)}.skinControls{min-height:60px}.skinTop strong{font-size:11px}.skinTop small{font-size:9px}}
+@media (max-width:600px){.skinGrid{grid-template-columns:repeat(5,minmax(0,1fr))}.skinChoice{min-height:84px}}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:440px){
+ #skinOverlay{padding:3px max(8px,env(safe-area-inset-right)) 3px max(8px,env(safe-area-inset-left))}
+ .skinPanel{padding:6px;gap:3px}
+ .skinTop strong{font-size:11px}.skinTop small{font-size:8px}
+ .skinControls{min-height:52px;padding:1px 7px;gap:5px}
+ .skinLarge{transform:scale(.77);margin:-8px -5px}
+ .skinNav{min-width:37px;height:33px}
+ .skinKeeperBtn{padding:7px 6px;font-size:10px}
+ .skinGrid{grid-template-columns:repeat(10,minmax(0,1fr));gap:3px}
+ .skinChoice{min-height:76px;border-radius:8px}
+ .skinChoiceNumber{font-size:9px}
+ .skinChoiceStar{font-size:16px;min-width:21px;min-height:23px}
+ .skinThumb{transform:scale(.76);margin:-8px 0}
+ .skinIdentity b{font-size:18px}
+ .skinFoot{font-size:8px}
+}
 </style>
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 009 • FRACTURE PHYSICS</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 010 • WIZARD WARDROBE</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
-<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
 <button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span class="spell-name">1 • ARC BOLT</span></button>
 <button class="spell" data-spell="well"><span class="glyph">◉</span><span class="spell-name">2 • GRAVITY</span></button>
@@ -132,6 +179,26 @@ header .actions{display:flex;gap:6px}
 <button class="spell" data-spell="detonate"><span class="glyph">✹</span><span class="spell-name">6 • BOOM</span></button></div>
 <div class="bottomRow"><div class="controls"><label for="force">FIELD POWER</label><input type="range" id="force" min="1" max="10" value="5"><span id="forceValue">5</span></div><button class="minibtn relic on" id="relic" type="button" aria-pressed="true">✹ CINDERHEART ON</button><button class="minibtn" id="dash">DASH</button><button class="minibtn" id="crate">+ OBJECT</button></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div></div>
+</div>
+<!-- The wardrobe is a separate presentation layer, never a gameplay control. -->
+<div id="skinOverlay" role="dialog" aria-modal="true" aria-labelledby="skinTitle" hidden>
+ <div class="skinPanel">
+  <div class="skinTop">
+   <div><strong id="skinTitle">W / WIZARD WARDROBE</strong><small>20 choices • tap to equip • star the keepers</small></div>
+   <button class="minibtn" type="button" id="skinDone">BACK TO LAB ✕</button>
+  </div>
+  <div class="skinControls">
+   <button type="button" class="skinNav" id="skinPrev" aria-label="Previous skin">◀</button>
+   <div class="skinPreview">
+    <div id="skinLarge" class="skinLarge" aria-hidden="true"></div>
+    <div class="skinIdentity">DESIGN <b id="skinBigNo">01</b><small id="skinStatus">CURRENT LOOK</small></div>
+   </div>
+   <button type="button" class="skinNav" id="skinNext" aria-label="Next skin">▶</button>
+   <button type="button" id="skinKeeper" class="skinKeeperBtn" aria-pressed="false">☆ KEEPER</button>
+  </div>
+  <div class="skinGrid" id="skinGrid" aria-label="Twenty numbered wizard designs"></div>
+  <div class="skinFoot"><span id="skinCount">0 KEEPERS</span><span>Saved on this device</span></div>
+ </div>
 </div>
 <div id="rotationGate" role="status" aria-label="Rotate your phone to landscape">
   <div class="rotBrand">W / ARCANE LAB</div>
