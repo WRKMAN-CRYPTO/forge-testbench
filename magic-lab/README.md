@@ -62,6 +62,50 @@ Mobile test: start the lab in landscape, rotate to portrait, then back to landsc
 
 Why this exists: Phaser 3.90.0 can reuse outdated container dimensions after rotation (Phaser issue #7213, fixed on the upstream master branch after 3.90). Build 005 explicitly calls `game.scale.getParentBounds()` before `refresh()` and `updateBounds()`, after the parent layout settles. It listens to orientation, browser/window/visualViewport resize, and the stage container ResizeObserver. The game world remains 960x600, with FIT scaling and no camera zoom change.
 
+## Living targets + combustion (build 006)
+
+This remains a **solo local prototype**, not the final roguelike and not multiplayer. GitHub Pages serves the client; no Colyseus server or cloud persistence has been wired.
+
+### New physical enemies
+
+- **Charger**: a dense, heavy enemy that pursues, telegraphs its attack, commits to a directional dash, and recovers afterward. It is harder to move with gravity than lighter enemies, and high-speed impacts cause collision damage.
+- **Ember Wisp**: a lighter enemy that keeps its distance and releases slow, physical ember bolts. Wells, frost and other matter interactions affect them.
+- Enemy health, player health, enemies remaining, and kills appear in the HUD.
+- The original dummy and crates remain for repeatable physics tests. Use **RESET** to replay the encounter.
+
+### Six-spell loadout
+
+1. **Arc Bolt**: precise projectile, physical collisions and enemy damage.
+2. **Gravity Well**: tap location; pulls enemies, crates, and both kinds of projectile.
+3. **Kinetic Pulse**: self-centered force impulse.
+4. **Frost Field**: self-centered area that damps velocity.
+5. **Flame Field**: tap location; periodic area damage plus lingering Burn.
+6. **Detonation**: tap location; immediate radial damage and impulse, so burning enemies become moving hazards.
+
+Selecting a different spell equips without casting. Tapping an already-equipped Bolt/Pulse/Frost quick-casts; targeted Gravity/Flame/Detonation require an arena tap. Keyboard 1–6 selects on desktop, mouse click positions casts. Movement, dash, and tap-to-aim remain simultaneous on iPhone.
+
+### Cinderheart relic (ON by default)
+
+- **✹ CINDERHEART ON/OFF** enables a small explosion when Burn expires or a burning enemy dies.
+- A Cinderheart explosion can ignite a nearby enemy at **60%** of its parent's ignition strength, but not below **15%**.
+- At most **5** descendant depths; each enemy detonates no more than once for the same chain; explosive work is limited to **8 events per update**, with a queue cap of **64**.
+- Fast enemy-on-enemy impacts deal kinetic damage and can transmit attenuated Burn as well.
+- Burn effects and chain information are runtime-only. This is not yet an item-inventory or persistent Spell Designer integration.
+
+### Suggested playtest sequence
+
+1. Hold movement and swap among all six spells: selection must not auto-fire.
+2. Redirect a charging enemy with a Gravity Well; confirm its wind-up and strong momentum remain readable.
+3. Bend a Wisp's ember bolt with gravity and use Frost to slow it.
+4. Place Flame Field under two or more enemies. Detonate from the side to launch burning bodies into other enemies.
+5. With Cinderheart ON, wait for Burn to expire: watch chained smaller explosions. Toggle OFF and repeat to compare.
+6. Clear the chamber and press RESET. Rotate portrait/landscape and confirm the arena framing remains stable.
+
+### Technical boundary
+
+Combat logic is separated into `combat.js` and invokes the existing Matter world via `WRKMAN_COMBAT`. Render effects are lightweight procedural graphics. No external enemy art was introduced, and no matchmaking or accounts exist yet.
+
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
