@@ -92,4 +92,17 @@ ok(!SL.validate(tooLong).ok,"instruction count bound enforced");
 const src=JSON.stringify(result.actions);
 ok(!src.includes("execute")&&!src.includes("authorized"),
  "no game execution included in intents");
+const missingFocus=clone(sample);
+missingFocus.id="target-guard";missingFocus.lineage.rootId="target-guard";
+missingFocus.program=[
+ {op:"IF",test:"vapor.present",skip:1},
+ {op:"FOCUS",selector:"self"},
+ {op:"CAST",spell:"arc.bolt"},
+ {op:"END"}
+];
+const guard=SL.step(missingFocus,SL.createState(missingFocus),{});
+ok(guard.state.status==="failed"&&guard.state.failure==="target_not_selected"&&
+ guard.intents.length===0,"skipped focus fails closed");
+const twice=simulate(sample,observations);
+ok(same(result,twice),"same observations give identical replay");
 console.log("Spell-Language dormant tests: "+passed+" passed");
