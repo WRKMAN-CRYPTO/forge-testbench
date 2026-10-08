@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 010</title>
+<title>WRKMAN | Magic Physics Laboratory 011</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -163,13 +163,66 @@ header .actions{display:flex;gap:6px}
  .skinIdentity b{font-size:18px}
  .skinFoot{font-size:8px}
 }
+/* 011 HUE FORGE: dye preview & selectable material swatches, mobile landscape first. */
+#hueOverlay[hidden]{display:none!important}
+#hueOverlay{position:fixed;inset:0;z-index:35;background:#050b13ed;display:flex;align-items:center;justify-content:center;padding:max(7px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+.huePanel{width:min(850px,100%);max-height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:7px;padding:11px;background:linear-gradient(130deg,#142333,#0c1a29);border:1px solid #8194a5;border-radius:15px;box-shadow:0 20px 80px #000b}
+.hueTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hueTop strong{font:900 15px/1.1 ui-monospace,monospace;color:#ffdb96;letter-spacing:.12em}
+.hueTop small{display:block;font-size:10px;color:#aac3ce}
+.hueTopRow{display:flex;align-items:stretch;gap:7px;min-height:86px}
+.hueCharacters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;flex:1;min-width:0}
+.hueCharacter{position:relative;background:#112839;border:1px solid #456077;border-radius:10px;color:#d4e2e6;display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;padding:3px 1px}
+.hueCharacter.active{border:2px solid #ffcb80;background:#354359}
+.hueCharacter img{width:56px;height:68px;object-fit:contain;max-width:65%;flex:none}
+.hueCharacter span{font:900 11px ui-monospace,monospace}
+.hueHero{display:flex;gap:7px;align-items:center;justify-content:center;background:#0d2130;border:1px solid #37526b;border-radius:9px;padding:3px 8px;min-width:116px}
+.hueHero img{width:56px;height:68px;object-fit:contain}
+.hueHero div{display:flex;flex-direction:column}
+.hueHero small,.hueHero span{font:700 9px ui-monospace,monospace;color:#9dbfce}
+.hueHero b{font:950 22px ui-monospace,monospace;color:#ffdc98}
+.hueControls{display:flex;gap:6px;align-items:center;justify-content:space-between}
+.hueChannels{display:flex;gap:5px;flex:1}
+.hueChannel,.hueSecondary{font:850 11px ui-monospace,monospace;color:#c6d5e0;background:#1d3449;border:1px solid #496681;border-radius:9px;padding:8px 12px}
+.hueChannel.active{background:#59432c;border-color:#ffca78;color:#ffe6b9;box-shadow:0 0 12px #dc995627}
+.hueSecondary{background:#26313d}
+.huePaletteLabel{display:flex;justify-content:space-between;gap:6px;font:800 10px ui-monospace,monospace;letter-spacing:.045em;color:#f1c782}
+.huePaletteLabel span:last-child{color:#9aaebe;font-weight:600}
+.huePalette{min-height:0;flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;align-content:start;padding:2px}
+.hueSwatch{position:relative;min-width:0;min-height:80px;border:1px solid #3c5568;background:#101e2d;border-radius:9px;padding:5px 3px;color:#b9ccda;display:flex;align-items:center;gap:4px;flex-direction:column;justify-content:space-between}
+.hueSwatch.selected{border:2px solid #f5d48f;box-shadow:0 0 13px #f5b97945}
+.hueColor{display:block;width:100%;height:35px;border-radius:6px;box-shadow:inset 0 0 7px #0003;border:1px solid #ffffff22}
+.hueSwatch span:last-child{font:700 9px/1.15 ui-monospace,monospace;max-width:100%;text-align:center;overflow:hidden;text-overflow:ellipsis}
+.hueSwatch.locked{color:#718695;border-style:dashed;background:#101b25}
+.hueSwatch.locked .hueColor{background:repeating-linear-gradient(135deg,#172536,#172536 7px,#273544 7px,#273544 12px);display:flex;align-items:center;justify-content:center;color:#8695a5;font-size:19px}
+.hueBottom{display:flex;align-items:center;justify-content:space-between;gap:7px;color:#b4ced8;font-size:10px}
+.hueInfo{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hueCopy{white-space:nowrap;background:#39442f;border-color:#798c58;color:#e2f1c3}
+#hueOpen{border-color:#82a39e;color:#bdf3e6}
+@media (max-width:850px){.huePanel{padding:7px;gap:4px}.hueSwatch{min-height:70px}.hueColor{height:28px}.hueCharacter img{max-width:60%}}
+@media (max-width:580px){.huePalette{grid-template-columns:repeat(4,minmax(0,1fr))}.hueHero{display:none}.hueSwatch{min-height:75px}}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:440px){
+ #hueOverlay{padding:3px max(6px,env(safe-area-inset-right)) 3px max(6px,env(safe-area-inset-left))}
+ .huePanel{width:min(900px,100%);padding:5px;gap:3px}
+ .hueTop strong{font-size:12px}.hueTop small{font-size:8px}
+ .hueTopRow{min-height:54px}
+ .hueCharacter img{width:36px;height:43px;max-width:50%}.hueCharacter span{font-size:10px}
+ .hueHero{min-width:95px}.hueHero img{width:36px;height:44px}.hueHero b{font-size:16px}
+ .hueChannel,.hueSecondary{font-size:9px;padding:5px 9px}
+ .huePaletteLabel{font-size:9px}
+ .huePalette{grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
+ .hueSwatch{min-height:65px;padding:3px 2px}.hueColor{height:24px}
+ .hueSwatch span:last-child{font-size:8px}
+ .hueBottom{font-size:9px}
+}
+
 </style>
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 010 • WIZARD WARDROBE</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 011 • HUE FORGE</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
-<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
 <button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span class="spell-name">1 • ARC BOLT</span></button>
 <button class="spell" data-spell="well"><span class="glyph">◉</span><span class="spell-name">2 • GRAVITY</span></button>
@@ -200,6 +253,36 @@ header .actions{display:flex;gap:6px}
   <div class="skinFoot"><span id="skinCount">0 KEEPERS</span><span>Saved on this device</span></div>
  </div>
 </div>
+<!-- HUE FORGE 011: isolated dye interface. No changes to the game world. -->
+<div id="hueOverlay" role="dialog" aria-modal="true" aria-labelledby="hueTitle" hidden>
+ <div class="huePanel">
+  <div class="hueTop">
+   <div><strong id="hueTitle">W / HUE FORGE</strong><small>Dye cloth, not magic. Four finalist silhouettes.</small></div>
+   <button type="button" class="minibtn" id="hueDone">BACK TO LAB ✕</button>
+  </div>
+  <div class="hueTopRow">
+   <div class="hueCharacters" id="hueCharacters" aria-label="Choose wizard base design"></div>
+   <div class="hueHero">
+    <img id="hueHeroImg" alt="Current dyed wizard preview" width="56" height="68">
+    <div><small>DESIGN</small><b id="hueDesignNo">08</b><span id="hueCurrentName">ORIGINAL FABRIC</span></div>
+   </div>
+  </div>
+  <div class="hueControls">
+   <div class="hueChannels" id="hueChannels" role="group" aria-label="Material to dye">
+    <button type="button" class="hueChannel" data-channel="robe">ROBE</button>
+    <button type="button" class="hueChannel" data-channel="scarf">SCARF</button>
+    <button type="button" class="hueChannel" data-channel="trim">TRIM</button>
+   </div>
+   <button type="button" id="hueOriginal" class="hueSecondary">RESET LAYER</button>
+  </div>
+  <div class="huePaletteLabel"><span id="hueLayerStatus">ROBE • ORIGINAL</span><span>HUE BOOK / STARTER COLLECTION</span></div>
+  <div class="huePalette" id="huePalette" aria-label="Hues and undiscovered dye entries"></div>
+  <div class="hueBottom">
+   <div class="hueInfo" id="hueInfo">Pick a hue to recolor the chosen fabric.</div>
+   <button type="button" class="hueSecondary hueCopy" id="hueCopy">COPY LOOK</button>
+  </div>
+ </div>
+</div>
 <div id="rotationGate" role="status" aria-label="Rotate your phone to landscape">
   <div class="rotBrand">W / ARCANE LAB</div>
   <div class="rotPhone" aria-hidden="true">▭</div>
@@ -209,6 +292,7 @@ header .actions{display:flex;gap:6px}
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
 <script src="./combat.js?v=009"></script>
+<script src="./hue-forge.js?v=011"></script>
 <script>
 (()=>{
 "use strict";
