@@ -215,6 +215,16 @@ header .actions{display:flex;gap:6px}
 const $=id=>document.getElementById(id);
 const W=960,H=600,MINX=64,MAXX=896,MINY=68,MAXY=532;
 const recipeKey="wrkman-arcane-lab001";
+const skinKey="wrkman-arcane-lab010-skin";
+const SKIN_COUNT=20,SKIN_W=56,SKIN_H=68;
+const storedSkin=Number(localStorage.getItem(skinKey+"-selected"));
+let activeSkin=Number.isInteger(storedSkin)&&storedSkin>=1&&storedSkin<=20?storedSkin:1;
+let keepers=new Set();
+try{
+ const saved=JSON.parse(localStorage.getItem(skinKey+"-keepers")||"[]");
+ if(Array.isArray(saved))keepers=new Set(saved.filter(n=>Number.isInteger(n)&&n>=1&&n<=20));
+}catch(_){}
+const skinLabel=n=>String(n).padStart(2,"0");
 const spells=["bolt","well","pulse","frost","flame","detonate"];
 // Cast semantics are explicit for each ability, ready to become spell metadata.
 const spellInfo={
@@ -246,10 +256,22 @@ if(!window.Phaser||!window.WRKMAN_COMBAT){$("missing").style.display="block";$("
 const Combat=window.WRKMAN_COMBAT;
 const MatterBody=Phaser.Physics.Matter.Matter.Body;
 class Lab extends Phaser.Scene{
+ preload(){
+  this.load.spritesheet("wizardSkins010","./skins/wizard-skins-20.webp?v=010",
+   {frameWidth:SKIN_W,frameHeight:SKIN_H});
+ }
  constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];}
  create(){
   scene=this;
-  this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show"))return;
+  // Visual only: no hitbox or movement geometry changes when you equip.
+  if(this.textures.exists("wizardSkins010")){
+   this.playerSkinSprite=this.add.sprite(this.player.x,this.player.y-12,"wizardSkins010",activeSkin-1)
+     .setScale(1.16).setDepth(6);
+  }else{
+   this.playerSkinSprite=null;
+   announce("WIZARD ART UNAVAILABLE • Using classic laboratory mage.");
+  }
+  this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show")||!$("skinOverlay").hidden)return;
    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
    if(["1","2","3","4","5","6"].includes(e.key))selectSpell(spells[Number(e.key)-1]);
    if(e.key.toLowerCase()==="e")this.addCrate();
@@ -270,6 +292,10 @@ class Lab extends Phaser.Scene{
   this.matter.world.setBounds(MINX,MINY,MAXX-MINX,MAXY-MINY,34,true,true,true,true);
   this.matter.world.on("collisionstart",ev=>this.collisions(ev));
   this.resetLab();
+  refreshSkinUI();
+ }
+ setSkin(id){
+  if(this.playerSkinSprite)this.playerSkinSprite.setFrame(id-1);
  }
  announceCombat(msg){announce(msg);}
  drawFloor(){
@@ -488,6 +514,12 @@ class Lab extends Phaser.Scene{
   }
   for(const p of this.fx){const q=Math.min(1,p.life/p.max);g.fillStyle(p.c,q*.8);g.fillCircle(p.x,p.y,p.size*q);}
   const p=this.player;
+  if(this.playerSkinSprite){
+   this.playerSkinSprite.setPosition(p.x,p.y-12);
+   const isHurt=this.combat&&time-this.combat.playerHurtAt<180;
+   this.playerSkinSprite.setRotation(isHurt?Math.sin(time*.045)*.09:0);
+   this.playerSkinSprite.setAlpha(isHurt?.94:1);
+  }
   const hurt=this.combat&&time-this.combat.playerHurtAt<240;
   const fade=hurt?Math.max(0,1-(time-this.combat.playerHurtAt)/240):0;
   if(fade){
@@ -502,6 +534,7 @@ class Lab extends Phaser.Scene{
    g.lineStyle(3+3*fade,0xffbe97,.78*fade);
    g.strokeCircle(p.x,p.y,24+(1-fade)*24);
   }
+  if(!this.playerSkinSprite){
   g.fillStyle(0x01080e,.6);g.fillEllipse(p.x,p.y+22,44,14);
   g.fillStyle(hurt?0x914e56:0x1b4d67,.98);g.fillCircle(p.x,p.y+4,19);
   g.lineStyle(3,hurt?0xffbd96:0x6fd7f2,.87);g.strokeCircle(p.x,p.y+3,19);
@@ -511,6 +544,7 @@ class Lab extends Phaser.Scene{
   g.lineStyle(3,0xf9ca74,.9);g.lineBetween(p.x-14,p.y-19,p.x+14,p.y-19);
   g.lineStyle(3,0x82ddff,.45);g.lineBetween(p.x,p.y,p.x+this.aim.x*37,p.y+this.aim.y*37);
   g.fillStyle(0xfbd27e);g.fillCircle(p.x+this.aim.x*35,p.y+this.aim.y*35,4);
+  }
  }
 }
 const game=new Phaser.Game({type:Phaser.AUTO,parent:"stage",width:W,height:H,backgroundColor:"#091825",render:{antialias:true,pixelArt:false},scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},physics:{default:"matter",matter:{gravity:{x:0,y:0},debug:false,enableSleeping:false}},scene:[Lab],fps:{target:60,forceSetTimeOut:false}});
@@ -613,6 +647,75 @@ $("copy").onclick=async()=>{
  try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
  catch(_){announce("Clipboard unavailable; open this page in a secure browser context.");}
 };
+// Wardrobe: state is presentation-only; user picks and favorites are local.
+const skinOverlay=$("skinOverlay"),skinGrid=$("skinGrid");
+function refreshSkinUI(){
+ $("skinActiveNo").textContent=skinLabel(activeSkin);
+ $("skinBigNo").textContent=skinLabel(activeSkin);
+ $("skinLarge").style.backgroundPosition="-"+((activeSkin-1)%5*SKIN_W)+"px -"+
+  (Math.floor((activeSkin-1)/5)*SKIN_H)+"px";
+ $("skinStatus").textContent=keepers.has(activeSkin)?"★ MARKED KEEPER":"CURRENT LOOK";
+ $("skinKeeper").classList.toggle("is-keeper",keepers.has(activeSkin));
+ $("skinKeeper").setAttribute("aria-pressed",String(keepers.has(activeSkin)));
+ $("skinKeeper").textContent=(keepers.has(activeSkin)?"★":"☆")+" KEEPER";
+ $("skinCount").textContent=keepers.size+" KEEPER"+(keepers.size===1?"":"S");
+ skinGrid.querySelectorAll(".skinSlot").forEach(slot=>{
+  const n=Number(slot.dataset.skin);
+  const choice=slot.querySelector(".skinChoice"),star=slot.querySelector(".skinChoiceStar");
+  choice.classList.toggle("chosen",n===activeSkin);
+  choice.setAttribute("aria-pressed",String(n===activeSkin));
+  star.textContent=keepers.has(n)?"★":"☆";
+  star.classList.toggle("is-keeper",keepers.has(n));
+  star.setAttribute("aria-pressed",String(keepers.has(n)));
+  star.setAttribute("aria-label",(keepers.has(n)?"Unmark":"Mark")+" skin "+skinLabel(n)+" as keeper");
+ });
+}
+function equipSkin(n){
+ activeSkin=((n-1+SKIN_COUNT)%SKIN_COUNT)+1;
+ localStorage.setItem(skinKey+"-selected",String(activeSkin));
+ scene?.setSkin(activeSkin);
+ refreshSkinUI();
+ announce("WIZARD DESIGN "+skinLabel(activeSkin)+" EQUIPPED.");
+}
+function toggleSkinKeeper(n){
+ if(keepers.has(n))keepers.delete(n);else keepers.add(n);
+ localStorage.setItem(skinKey+"-keepers",JSON.stringify([...keepers].sort((a,b)=>a-b)));
+ refreshSkinUI();
+}
+function openSkinOverlay(){
+ skinOverlay.hidden=false;
+ neutralStick();
+ joyTouchId=null;joyPointer=null;
+ refreshSkinUI();
+ $("skinDone").focus({preventScroll:true});
+}
+function closeSkinOverlay(){
+ skinOverlay.hidden=true;
+ $("skinsOpen").focus({preventScroll:true});
+}
+for(let n=1;n<=SKIN_COUNT;n++){
+ const slot=document.createElement("div");slot.className="skinSlot";slot.dataset.skin=String(n);
+ const button=document.createElement("button");button.type="button";button.className="skinChoice";
+ button.setAttribute("aria-label","Equip wizard skin "+skinLabel(n));
+ const thumb=document.createElement("span");thumb.className="skinThumb";thumb.setAttribute("aria-hidden","true");
+ thumb.style.backgroundPosition="-"+((n-1)%5*SKIN_W)+"px -"+(Math.floor((n-1)/5)*SKIN_H)+"px";
+ const label=document.createElement("span");label.className="skinChoiceNumber";label.textContent=skinLabel(n);
+ button.append(thumb,label);button.addEventListener("click",()=>equipSkin(n));
+ const star=document.createElement("button");star.type="button";star.className="skinChoiceStar";star.textContent="☆";
+ star.addEventListener("click",()=>toggleSkinKeeper(n));
+ slot.append(button,star);skinGrid.append(slot);
+}
+$("skinsOpen").addEventListener("click",openSkinOverlay);
+$("skinDone").addEventListener("click",closeSkinOverlay);
+$("skinPrev").addEventListener("click",()=>equipSkin(activeSkin-1));
+$("skinNext").addEventListener("click",()=>equipSkin(activeSkin+1));
+$("skinKeeper").addEventListener("click",()=>toggleSkinKeeper(activeSkin));
+skinOverlay.addEventListener("keydown",e=>{
+ if(e.key==="Escape"){e.stopPropagation();closeSkinOverlay();}
+ if(e.key==="ArrowLeft"){e.preventDefault();equipSkin(activeSkin-1);}
+ if(e.key==="ArrowRight"){e.preventDefault();equipSkin(activeSkin+1);}
+});
+refreshSkinUI();
 const joy=$("joystick"),stick=$("stick");
 let joyPointer=null,joyTouchId=null;
 function neutralStick(){
@@ -664,7 +767,7 @@ addEventListener("blur",()=>{joyPointer=null;joyTouchId=null;neutralStick();});
 // Capture canvas touches directly so Phaser's pointer management cannot
 // eat the second thumb while the first is held on the external joystick.
 $("stage").addEventListener("touchstart",e=>{
- if(!started||!scene||$("instructions").classList.contains("show"))return;
+ if(!started||!scene||$("instructions").classList.contains("show")||!$("skinOverlay").hidden)return;
  const canvas=$("stage").querySelector("canvas");
  if(!canvas)return;
  const r=canvas.getBoundingClientRect();
