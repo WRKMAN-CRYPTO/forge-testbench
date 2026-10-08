@@ -138,6 +138,7 @@ Field feedback on 007: hits felt like the wizard teleported and Detonation barel
 - **Readable player recoil**: a stronger shake, directional afterimage, a short hit-color flash, and an impact ring. The wizard doesn't snap to a new position except for the existing explicit respawn at zero HP.
 - **Detonation physically redirects bodies** using one immediate Matter velocity impulse, instead of a weak single-frame `applyForce`. Heavy Chargers are given lower knockback than lightweight Wisps, but are visibly displaced even when moving toward the explosion.
 - **Explosion interrupts enemy steering for a short stagger** so their inertia continues carrying them instead of AI acceleration immediately canceling the launch. Chain depth, ignition decay and bounded FX from previous builds are unchanged.
+- **Gravity Well center fix**: if a body is at exactly the blast center, a deterministic per-body direction is used instead of a zero outward vector. Even tightly clustered enemies launch apart.
 
 **On-device checks**
 1. Let a Charger hit you while standing still, then while holding the joystick. Your wizard should travel *over time* with visible feedback instead of moving one frame by a fixed distance.
