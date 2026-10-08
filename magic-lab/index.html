@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 013</title>
+<title>WRKMAN | Magic Physics Laboratory 014</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -224,7 +224,7 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 013 • DUAL-MASK MAGE</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 014 • SAFE BOOT</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
 <div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
@@ -305,6 +305,10 @@ const W=960,H=600,MINX=64,MAXX=896,MINY=68,MAXY=532;
 const recipeKey="wrkman-arcane-lab001";
 const skinKey="wrkman-arcane-lab010-skin";
 const SKIN_COUNT=20,SKIN_W=56,SKIN_H=68;
+// Rendering assets never block the Matter world, input, or enemies.
+let activeAtlasKey="wizardSkins013",activeMaskKey="wizardHueMasks013";
+let activeAtlasURL="./skins/wizard-skins-20-013.webp?v=013";
+let skinArtReady=false;
 const storedSkin=Number(localStorage.getItem(skinKey+"-selected"));
 let activeSkin=Number.isInteger(storedSkin)&&storedSkin>=1&&storedSkin<=20?storedSkin:1;
 let keepers=new Set();
@@ -349,21 +353,15 @@ const Combat=window.WRKMAN_COMBAT;
 const MatterBody=Phaser.Physics.Matter.Matter.Body;
 class Lab extends Phaser.Scene{
  preload(){
-  this.load.spritesheet("wizardSkins010","./skins/wizard-skins-20-013.webp?v=013",
-   {frameWidth:SKIN_W,frameHeight:SKIN_H});
-  this.load.image("wizardHueMasks013","./skins/wizard-hue-masks-013.png?v=013");
+  // CRITICAL: the level must never wait on optional character cosmetics.
+  // Asset downloads begin only AFTER the playable world exists.
  }
  constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];}
  create(){
   scene=this;
-  // Visual only: no hitbox or movement geometry changes when you equip.
-  if(this.textures.exists("wizardSkins010")){
-   this.playerSkinSprite=this.add.sprite(this.player.x,this.player.y-12,"wizardSkins010",activeSkin-1)
-     .setScale(1.16).setDepth(6);
-  }else{
-   this.playerSkinSprite=null;
-   announce("WIZARD ART UNAVAILABLE • Using classic laboratory mage.");
-  }
+  // Start with our built-in vector wizard. Art upgrades asynchronously;
+  // failure cannot interrupt enemy spawning, input, or combat setup.
+  this.playerSkinSprite=null;
   this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show")||!$("skinOverlay").hidden)return;
    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
    if(["1","2","3","4","5","6"].includes(e.key))selectSpell(spells[Number(e.key)-1]);
@@ -385,19 +383,55 @@ class Lab extends Phaser.Scene{
   this.matter.world.setBounds(MINX,MINY,MAXX-MINX,MAXY-MINY,34,true,true,true,true);
   this.matter.world.on("collisionstart",ev=>this.collisions(ev));
   this.resetLab();
-  this.setSkin(activeSkin);
   refreshSkinUI();
   refreshHueUI();
+  this.loadCosmetics();
+ }
+ loadCosmetics(){
+  const startLoad=(atlasKey,maskKey,atlasURL,maskURL,fallback)=>{
+   const finish=()=>{
+    if(this.textures.exists(atlasKey)){
+     activeAtlasKey=atlasKey;
+     activeAtlasURL=atlasURL;
+     activeMaskKey=maskKey;
+     skinArtReady=true;
+     if(this.playerSkinSprite)this.playerSkinSprite.destroy();
+     this.playerSkinSprite=this.add.sprite(this.player.x,this.player.y-12,activeAtlasKey,activeSkin-1)
+       .setScale(1.16).setDepth(6);
+     this.setSkin(activeSkin);
+     refreshSkinUI();
+     refreshHueUI();
+     if(!this.textures.exists(maskKey))announce("WIZARD ART READY • Dye masks unavailable; combat remains online.");
+     return;
+    }
+    if(fallback){
+     // Previously working atlas, still optional. No failed image can stall play.
+     startLoad("wizardSkins012","wizardHueMasks012",
+      "./skins/wizard-skins-20.webp?v=010",
+      "./skins/wizard-hue-masks-012.png?v=012",false);
+    }else{
+     announce("LAB ONLINE • Character art unavailable; using classic wizard.");
+    }
+   };
+   if(this.textures.exists(atlasKey)){finish();return;}
+   this.load.once("complete",finish);
+   this.load.spritesheet(atlasKey,atlasURL,{frameWidth:SKIN_W,frameHeight:SKIN_H});
+   this.load.image(maskKey,maskURL);
+   this.load.start();
+  };
+  startLoad("wizardSkins013","wizardHueMasks013",
+   "./skins/wizard-skins-20-013.webp?v=013",
+   "./skins/wizard-hue-masks-013.png?v=013",true);
  }
  setSkin(id){
-  if(!this.playerSkinSprite)return;
+  if(!this.playerSkinSprite||!skinArtReady)return;
   // Always detach from old dyed canvas before modifying that texture.
-  this.playerSkinSprite.setTexture("wizardSkins010",id-1);
+  this.playerSkinSprite.setTexture(activeAtlasKey,id-1);
   if(!Hue||!Hue.validSkin(id)||!Hue.hasDye(lookPalettes[id]))return;
-  if(!this.textures.exists("wizardHueMasks013"))return;
+  if(!this.textures.exists(activeMaskKey))return;
   try{
-   const atlas=this.textures.get("wizardSkins010").getSourceImage();
-   const mask=this.textures.get("wizardHueMasks013").getSourceImage();
+   const atlas=this.textures.get(activeAtlasKey).getSourceImage();
+   const mask=this.textures.get(activeMaskKey).getSourceImage();
    const canvas=Hue.makeCanvas(id,lookPalettes[id],atlas,mask,document);
    if(this.textures.exists("wizardDyed011"))this.textures.remove("wizardDyed011");
    this.textures.addCanvas("wizardDyed011",canvas);
@@ -840,10 +874,10 @@ const huePreviewCache=new Map();
 function tintedPreview(n){
  if(!Hue||!Hue.validSkin(n)||!Hue.hasDye(lookPalettes[n]))return null;
  if(huePreviewCache.has(n))return huePreviewCache.get(n);
- if(!scene?.textures?.exists("wizardHueMasks013"))return null;
+ if(!skinArtReady||!scene?.textures?.exists(activeMaskKey))return null;
  try{
-  const atlas=scene.textures.get("wizardSkins010").getSourceImage();
-  const masks=scene.textures.get("wizardHueMasks013").getSourceImage();
+  const atlas=scene.textures.get(activeAtlasKey).getSourceImage();
+  const masks=scene.textures.get(activeMaskKey).getSourceImage();
   const canvas=Hue.makeCanvas(n,lookPalettes[n],atlas,masks,document);
   const data=canvas.toDataURL("image/png");
   huePreviewCache.set(n,data);
@@ -856,7 +890,7 @@ function applySkinThumb(el,n){
   el.style.backgroundImage='url("'+preview+'")';
   el.style.backgroundPosition="0 0";
  }else{
-  el.style.backgroundImage='url("./skins/wizard-skins-20-013.webp?v=013")';
+  el.style.backgroundImage='url("'+activeAtlasURL+'")';
   el.style.backgroundPosition="-"+((n-1)%5*SKIN_W)+"px -"+
    (Math.floor((n-1)/5)*SKIN_H)+"px";
  }
@@ -877,7 +911,7 @@ function refreshHueUI(){
   parts.button.classList.toggle("active",n===hueSkin);
   parts.button.setAttribute("aria-pressed",String(n===hueSkin));
   const dyed=tintedPreview(n);
-  parts.image.src=dyed||"./skins/wizard-skins-20-013.webp?v=013";
+  parts.image.src=dyed||activeAtlasURL;
   if(dyed){
    parts.image.style.objectPosition="center";
    parts.image.style.objectFit="contain";
@@ -977,7 +1011,7 @@ function applyHue(id){
 }
 function openHueForge(){
  if(!Hue)return;
- if(!scene?.textures?.exists("wizardHueMasks013")){
+ if(!skinArtReady||!scene?.textures?.exists(activeMaskKey)){
   announce("HUE FORGE • Dye mask failed to load. Try reloading online.");
   return;
  }
