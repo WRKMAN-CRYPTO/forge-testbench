@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#080e16">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>WRKMAN | Magic Physics Laboratory 012</title>
+<style>
+:root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;overscroll-behavior:none}
+button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}
+#shell{width:100%;height:100dvh;display:flex;flex-direction:column;max-width:1300px;margin:auto;overflow:hidden;background:radial-gradient(ellipse at top,#15263a 0,#080e16 75%)}
+header{padding:calc(9px + env(safe-area-inset-top)) 12px 9px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{font-size:clamp(12px,3.1vw,18px);font-weight:950;letter-spacing:.13em;white-space:nowrap}
+.brand strong{color:var(--gold);font-size:1.26em} .brand span{color:var(--muted);font-size:.66em;display:block;letter-spacing:.19em;font-weight:750}
+header .actions{display:flex;gap:6px}
+.minibtn{min-height:36px;padding:6px 9px;background:#1a2939;color:#e9e4d8;border:1px solid #3c5267;border-radius:9px;font-size:11px;font-weight:850}
+#heads{display:flex;gap:7px;align-items:center;padding:0 12px 8px;overflow:hidden}
+.pill{border:1px solid #394c60;background:#0c1725;border-radius:20px;padding:5px 9px;min-width:0;font-size:10px;color:#b9cedc;white-space:nowrap}
+.pill b{color:#fce2a8;font-variant-numeric:tabular-nums}
+#stageWrap{position:relative;flex:1;min-height:185px;margin:0 9px;border:1px solid #426078;border-radius:14px;overflow:hidden;touch-action:none;background:#0b1925;box-shadow:inset 0 0 40px #0008}
+#stage{height:100%;width:100%;touch-action:none}#stage canvas{display:block;touch-action:none}
+#joystick{position:absolute;left:18px;bottom:17px;width:110px;height:110px;border:1px solid #b2cbdd45;border-radius:50%;background:#9cc2d00c;display:none;touch-action:none;z-index:5}
+#stick{position:absolute;left:29px;top:29px;width:50px;height:50px;border:2px solid #9ecde5aa;border-radius:50%;background:#72b7de38;box-shadow:0 0 20px #3fbbf144;pointer-events:none}
+#castHint{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:6;max-width:65%;pointer-events:none;padding:5px 9px;border:1px solid #7e9caf88;background:#0b2138d9;color:#f9dfad;border-radius:18px;font:800 10px/1.3 ui-monospace,monospace;letter-spacing:.065em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cross{position:absolute;right:12px;bottom:10px;color:#b1d7e1;font-size:10px;letter-spacing:.06em;text-shadow:0 1px 4px #000;pointer-events:none}
+#toolbar{padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:#0e1825;border-top:1px solid #2c435a;display:flex;flex-direction:column;gap:8px}
+#spellRow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
+.spell{position:relative;min-height:59px;background:linear-gradient(180deg,#1e2a3d,#121c2c);color:#eff1e9;border:1px solid #496075;border-radius:12px;font-size:10px;font-weight:850;letter-spacing:.015em;padding:7px 3px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px}
+.spell .glyph{font-size:22px;line-height:1.1}.spell.sel{border:2px solid var(--gold);background:linear-gradient(180deg,#3a342a,#1c242a);box-shadow:0 0 14px #f7c56d20}
+.spell:active{transform:translateY(1px)}
+.relic{color:#d6dce7;border-color:#56647a;background:#222633;white-space:nowrap}
+.relic.on{color:#ffe0ac;border-color:#c48655;background:#443125}
+.bottomRow{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.controls{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.controls label{font-size:10px;color:#bbd0df;white-space:nowrap;font-weight:850}
+#force{width:min(170px,25vw);accent-color:#ffd280}
+#forceValue{font:800 12px monospace;color:var(--gold);width:20px}
+.note{font-size:10px;color:#98b4c7;max-width:65%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#log{font:11px/1.35 ui-monospace,Menlo,monospace;color:#b4d2c5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#instructions{display:none;position:absolute;inset:0;background:#07121fdb;z-index:12;align-items:center;justify-content:center;padding:20px}
+#instructions.show{display:flex}
+#modal{border:1px solid #59738b;border-radius:18px;background:#142237;padding:22px;max-width:410px;width:100%;box-shadow:0 18px 80px #000a}
+#modal h1{margin:0 0 8px;color:#f8d68d;font-size:25px;line-height:1.1}#modal p{color:#bad2df;font-size:13px;margin:10px 0}
+#modal button{border:1px solid #f4bd66;background:#4a3823;color:#ffedc9;padding:12px;border-radius:10px;font-weight:900;width:100%;margin-top:9px}
+#modal b{color:white}
+#missing{display:none;position:absolute;inset:0;padding:25px;background:#07121f;color:#fff;z-index:15}
+@media (pointer:coarse){#joystick{display:block}.spell{min-height:64px}.note{display:none}}
+@media (min-width:900px){#shell{max-height:950px;padding:0 12px}#stageWrap{margin:0 8px}#toolbar{padding-bottom:12px}.spell{min-height:62px}.pill{font-size:12px}}
+@media (max-height:680px){header{padding-top:5px;padding-bottom:5px}#heads{padding-bottom:4px}#toolbar{gap:5px;padding-top:5px}.spell{min-height:49px}.spell .glyph{font-size:18px}#joystick{width:88px;height:88px}#stick{width:40px;height:40px;left:23px;top:23px}}
+
+/* 003: Phone is a sideways handheld: left thumb locomotion, right thumb magic.
+   Portrait phone sessions are intentionally blocked by the rotate cue; desktops
+   and larger tablets retain the original layout. */
+/* Separate touch identifiers own the joystick and spell/canvas inputs.
+   Prevent OS gestures without consuming the second finger's action. */
+#joystick,#stage,#stage canvas,.spell,#dash,#crate{touch-action:none;-webkit-user-select:none;user-select:none}
+#rotationGate{display:none}
+@media (pointer:coarse) and (orientation:portrait) and (max-width:690px){
+  #rotationGate{display:flex;position:fixed;inset:0;z-index:10000;background:radial-gradient(circle at 50% 44%,#243c4e 0%,#0b1724 63%,#07111c 100%);color:#f9e7c4;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:25px 28px calc(25px + env(safe-area-inset-bottom))}
+  #rotationGate .rotBrand{font:950 16px/1.2 ui-monospace,monospace;letter-spacing:.2em;color:#f4c978;margin-bottom:clamp(22px,5vh,48px)}
+  #rotationGate .rotPhone{font-size:72px;line-height:1;transform:rotate(-90deg);filter:drop-shadow(0 0 17px #78c6ec6b);margin:12px}
+  #rotationGate h1{font-size:clamp(24px,6.5vw,34px);margin:24px 0 8px;line-height:1.1}
+  #rotationGate p{margin:0;max-width:330px;font-size:14px;line-height:1.55;color:#afc9d6}
+  #rotationGate small{margin-top:18px;font-size:12px;color:#f5c77b;opacity:.9}
+}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:600px){
+  html,body{width:100%;height:100%;overflow:hidden}
+  #shell{position:relative;max-width:none;max-height:none;width:100%;height:100dvh;padding:0 max(6px,env(safe-area-inset-right)) 0 max(6px,env(safe-area-inset-left))}
+  header{padding:3px 7px 2px;flex:none;min-height:26px}
+  .brand{font-size:12px;letter-spacing:.1em;line-height:1.02}
+  .brand strong{font-size:14px}
+  .brand span{font-size:8px;letter-spacing:.1em}
+  .actions{gap:4px}
+  .minibtn{min-height:29px;padding:3px 8px;font-size:10px;border-radius:8px}
+  #heads{flex:none;padding:1px 7px 5px;gap:5px}
+  .pill{padding:2px 8px;font-size:9px}
+  #heads .pill:last-child{display:none}
+  #heads .pill:nth-child(4),#heads .pill:nth-child(6){display:none}
+  #stageWrap{flex:1;min-height:0;margin:0 4px;border-radius:19px;border:2px solid #65839a;background:#101e2b}
+  #stage{height:100%;width:100%}
+  #joystick{display:block;left:clamp(12px,2.6vw,30px);bottom:clamp(12px,4vh,20px);width:clamp(86px,27dvh,124px);height:clamp(86px,27dvh,124px);border:2px solid #83b5d07c;box-shadow:0 0 0 6px #0c1e2b57,0 0 23px #8ed2f51d;background:#21445c4a}
+  #joystick:after{content:"MOVE";position:absolute;left:0;right:0;top:-20px;font:bold 10px monospace;letter-spacing:.12em;text-align:center;color:#b7d9eb;pointer-events:none}
+  #stick{width:46%;height:46%;left:27%;top:27%;border:2px solid #e2f0f6a8;background:#88bce35c;box-shadow:inset 0 1px 12px #ffffff1c,0 0 16px #5c9cb65f}
+  #toolbar{position:relative;z-index:7;flex:none;padding:3px 6px calc(3px + env(safe-area-inset-bottom));border-top:0;background:transparent;gap:2px;min-height:37px}
+  #spellRow{position:fixed;z-index:8;right:calc(13px + env(safe-area-inset-right));top:49%;transform:translateY(-39%);width:clamp(191px,31vw,258px);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;pointer-events:auto}
+  #spellRow:before{content:"EQUIP / CAST";position:absolute;right:2px;top:-19px;font:bold 10px monospace;letter-spacing:.18em;color:#c9e3ec}
+  .spell{min-width:0;min-height:clamp(45px,15dvh,68px);border:1px solid #648299;border-radius:17px;padding:4px 2px;gap:2px;background:linear-gradient(145deg,#304963dd,#192b41ed);box-shadow:0 3px 0 #0b1827,0 0 18px #69b9e01c;line-height:1.02;user-select:none}
+  .spell .glyph{font-size:22px;line-height:1}
+  .spell .spell-name{font-size:clamp(7.5px,1.1vw,9px);letter-spacing:0;white-space:nowrap}
+  .spell.sel{border:2px solid #ffd084;background:linear-gradient(145deg,#695133,#2b3440);box-shadow:0 0 18px #ffc06b3c}
+  #castHint{top:4px;left:50%;max-width:54%;font-size:9px;padding:3px 9px}
+  #cross{display:none}
+  .bottomRow{justify-content:center;gap:8px;min-height:30px}
+  .controls{flex:0 1 200px;gap:4px}
+  .controls label{font-size:9px}
+  #force{width:clamp(50px,12vw,110px)}
+  #forceValue{font-size:10px;width:15px}
+  #relic{max-width:148px;font-size:9px;min-height:28px;padding:3px 5px}
+  #dash{font-weight:950;letter-spacing:.06em;color:#ffe7b6;background:#59472e;border-color:#b1895a}
+  #log{display:none}
+  #instructions{padding:9px}
+  #modal{width:min(480px,90vw);max-height:calc(100% - 12px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:13px 15px;border-radius:12px}
+  #modal h1{font-size:19px;margin:0 0 3px}
+  #modal p{font-size:11px;line-height:1.32;margin:5px 0}
+  #modal button{padding:7px;min-height:32px;margin-top:5px}
+}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:380px){
+  #toolbar{min-height:32px;padding-top:0}
+  .pill{padding:1px 6px}
+  .spell{min-height:47px}
+  #joystick{bottom:8px}
+  #spellRow{top:48%}
+}
+
+
+/* Build 010: sprite atlas consists of 5 × 4 transparent 56 × 68 frames. */
+#skinOverlay[hidden]{display:none!important}
+#skinOverlay{position:fixed;inset:0;z-index:30;background:#040b13ee;display:flex;align-items:center;justify-content:center;padding:max(7px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+.skinPanel{width:min(790px,100%);max-height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:7px;background:linear-gradient(145deg,#172a3c,#0c1926);border:1px solid #7892a6;border-radius:15px;box-shadow:0 20px 85px #000c;padding:12px}
+.skinTop{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.skinTop strong{font:900 13px/1.1 ui-monospace,monospace;color:#f8d899;letter-spacing:.08em}
+.skinTop small{display:block;color:#abc9d9;font-size:10px}
+.skinControls{display:flex;gap:9px;align-items:center;justify-content:center;min-height:77px;background:#0c1b2b;border:1px solid #30485d;border-radius:12px;padding:4px 10px}
+.skinPreview{display:flex;align-items:center;justify-content:center;gap:9px;min-width:125px;flex:1}
+.skinLarge,.skinThumb{background-image:url("./skins/wizard-skins-20.webp?v=010");background-repeat:no-repeat;flex:none}
+.skinLarge{width:56px;height:68px;transform:scale(1.03)}
+.skinIdentity{display:flex;flex-direction:column;gap:1px;color:#b0d0e2;font:bold 10px ui-monospace,monospace;letter-spacing:.11em}
+.skinIdentity b{color:#ffe1a6;font-size:23px}
+.skinIdentity small{font-size:9px;letter-spacing:0;color:#9dc6d9}
+.skinNav{border:1px solid #52738e;background:#223952;color:#e8e5d5;min-width:42px;height:42px;border-radius:12px;font-size:21px;font-weight:900}
+.skinKeeperBtn{border:1px solid #c18e54;background:#463320;color:#ffe2b5;padding:10px 11px;border-radius:11px;font-size:11px;font-weight:900;white-space:nowrap}
+.skinKeeperBtn.is-keeper{background:#66502a;border-color:#f2cf79;color:#fff0aa}
+.skinGrid{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px;padding:2px 2px 5px;align-content:start}
+.skinSlot{position:relative;min-width:0}
+.skinChoice{width:100%;position:relative;min-height:90px;border:1px solid #36516a;background:#102235;border-radius:10px;color:#cddce3;display:flex;align-items:center;justify-content:center;padding:1px;touch-action:manipulation}
+.skinChoice.chosen{border:2px solid #ffd58d;box-shadow:inset 0 0 0 1px #9a734b,0 0 10px #f6bf6f2a;background:#233448}
+.skinThumb{width:56px;height:68px;max-width:100%;pointer-events:none}
+.skinChoiceNumber{font:800 10px/1.2 ui-monospace,monospace;color:#e8ebf4;position:absolute;top:3px;left:5px;text-shadow:0 1px 4px #000}
+.skinChoiceStar{position:absolute;right:1px;top:1px;z-index:1;border:0;border-radius:5px;background:#172b3a;color:#8296aa;font:900 19px/1 monospace;padding:1px;min-width:24px;min-height:25px}
+.skinChoiceStar.is-keeper{color:#ffd77b;text-shadow:0 0 7px #eea63d}
+.skinChoice:focus-visible,.skinNav:focus-visible,.skinKeeperBtn:focus-visible,.skinChoiceStar:focus-visible{outline:2px solid #c9e9ff;outline-offset:2px}
+.skinFoot{display:flex;justify-content:space-between;gap:6px;color:#9fb8c8;font:bold 9px ui-monospace,monospace}
+#skinsOpen{border-color:#bf9963;color:#ffe0a4;white-space:nowrap}
+@media (max-width:790px){.skinPanel{padding:8px;gap:4px}.skinGrid{gap:3px}.skinChoice{min-height:78px}.skinThumb{transform:scale(.80)}.skinControls{min-height:60px}.skinTop strong{font-size:11px}.skinTop small{font-size:9px}}
+@media (max-width:600px){.skinGrid{grid-template-columns:repeat(5,minmax(0,1fr))}.skinChoice{min-height:84px}}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:440px){
+ #skinOverlay{padding:3px max(8px,env(safe-area-inset-right)) 3px max(8px,env(safe-area-inset-left))}
+ .skinPanel{padding:6px;gap:3px}
+ .skinTop strong{font-size:11px}.skinTop small{font-size:8px}
+ .skinControls{min-height:52px;padding:1px 7px;gap:5px}
+ .skinLarge{transform:scale(.77);margin:-8px -5px}
+ .skinNav{min-width:37px;height:33px}
+ .skinKeeperBtn{padding:7px 6px;font-size:10px}
+ .skinGrid{grid-template-columns:repeat(10,minmax(0,1fr));gap:3px}
+ .skinChoice{min-height:76px;border-radius:8px}
+ .skinChoiceNumber{font-size:9px}
+ .skinChoiceStar{font-size:16px;min-width:21px;min-height:23px}
+ .skinThumb{transform:scale(.76);margin:-8px 0}
+ .skinIdentity b{font-size:18px}
+ .skinFoot{font-size:8px}
+}
+/* 011 HUE FORGE: dye preview & selectable material swatches, mobile landscape first. */
+#hueOverlay[hidden]{display:none!important}
+#hueOverlay{position:fixed;inset:0;z-index:35;background:#050b13ed;display:flex;align-items:center;justify-content:center;padding:max(7px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+.huePanel{width:min(850px,100%);max-height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:7px;padding:11px;background:linear-gradient(130deg,#142333,#0c1a29);border:1px solid #8194a5;border-radius:15px;box-shadow:0 20px 80px #000b}
+.hueTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hueTop strong{font:900 15px/1.1 ui-monospace,monospace;color:#ffdb96;letter-spacing:.12em}
+.hueTop small{display:block;font-size:10px;color:#aac3ce}
+.hueTopRow{display:flex;align-items:stretch;gap:7px;min-height:0;height:78px;flex:0 0 78px;overflow:hidden;position:relative;isolation:isolate}
+.hueCharacters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;flex:1;min-width:0;min-height:0;height:100%}
+.hueCharacter{position:relative;background:#112839;border:1px solid #456077;border-radius:10px;color:#d4e2e6;display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:0;height:100%;max-height:100%;overflow:hidden;padding:2px 1px}
+.hueCharacter.active{border:2px solid #ffcb80;background:#354359}
+.hueCharacter img{width:auto;height:60px;max-width:65%;max-height:100%;object-fit:contain;flex:0 1 auto}
+.hueCharacter span{font:900 11px ui-monospace,monospace}
+.hueHero{display:flex;gap:7px;align-items:center;justify-content:center;background:#0d2130;border:1px solid #37526b;border-radius:9px;padding:3px 8px;min-width:116px;max-height:100%;overflow:hidden}
+.hueHero img{width:56px;height:68px;object-fit:contain}
+.hueHero div{display:flex;flex-direction:column}
+.hueHero small,.hueHero span{font:700 9px ui-monospace,monospace;color:#9dbfce}
+.hueHero b{font:950 22px ui-monospace,monospace;color:#ffdc98}
+.hueControls{display:flex;gap:8px;align-items:center;justify-content:space-between;min-height:56px;flex:0 0 auto;position:relative;z-index:2;background:#112437;border-top:1px solid #345169;border-bottom:1px solid #345169;border-radius:10px;padding:4px 6px}
+.hueChannels{display:flex;gap:8px;flex:1;min-width:0;align-items:stretch}
+.hueChannel,.hueSecondary{font:850 11px ui-monospace,monospace;color:#c6d5e0;background:#1d3449;border:1px solid #496681;border-radius:9px;padding:8px 12px;min-height:44px;touch-action:manipulation}.hueChannel{flex:1;min-width:0;font-size:12px;white-space:nowrap}
+.hueChannel.active{background:#59432c;border-color:#ffca78;color:#ffe6b9;box-shadow:0 0 12px #dc995627}
+.hueSecondary{background:#26313d}
+.huePaletteLabel{display:flex;justify-content:space-between;gap:6px;font:800 10px ui-monospace,monospace;letter-spacing:.045em;color:#f1c782}
+.huePaletteLabel span:last-child{color:#9aaebe;font-weight:600}
+.huePalette{min-height:0;flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;align-content:start;padding:2px}
+.hueSwatch{position:relative;min-width:0;min-height:80px;border:1px solid #3c5568;background:#101e2d;border-radius:9px;padding:5px 3px;color:#b9ccda;display:flex;align-items:center;gap:4px;flex-direction:column;justify-content:space-between}
+.hueSwatch.selected{border:2px solid #f5d48f;box-shadow:0 0 13px #f5b97945}
+.hueColor{display:block;width:100%;height:35px;border-radius:6px;box-shadow:inset 0 0 7px #0003;border:1px solid #ffffff22}
+.hueSwatch span:last-child{font:700 9px/1.15 ui-monospace,monospace;max-width:100%;text-align:center;overflow:hidden;text-overflow:ellipsis}
+.hueSwatch.locked{color:#718695;border-style:dashed;background:#101b25}
+.hueSwatch.locked .hueColor{background:repeating-linear-gradient(135deg,#172536,#172536 7px,#273544 7px,#273544 12px);display:flex;align-items:center;justify-content:center;color:#8695a5;font-size:19px}
+.hueBottom{display:flex;align-items:center;justify-content:space-between;gap:7px;color:#b4ced8;font-size:10px}
+.hueInfo{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hueCopy{white-space:nowrap;background:#39442f;border-color:#798c58;color:#e2f1c3}
+#hueOpen{border-color:#82a39e;color:#bdf3e6}
+@media (max-width:850px){.huePanel{padding:7px;gap:4px}.hueSwatch{min-height:70px}.hueColor{height:28px}.hueCharacter img{max-width:60%;max-height:100%}}
+@media (max-width:580px){.huePalette{grid-template-columns:repeat(4,minmax(0,1fr))}.hueHero{display:none}.hueSwatch{min-height:75px}}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:440px){
+ #hueOverlay{padding:3px max(6px,env(safe-area-inset-right)) 3px max(6px,env(safe-area-inset-left))}
+ .huePanel{width:min(900px,100%);padding:5px;gap:3px}
+ .hueTop strong{font-size:12px}.hueTop small{font-size:8px}
+ .hueTopRow{height:65px;flex:0 0 65px;min-height:0}
+ .hueCharacter{height:100%;min-height:0;overflow:hidden}
+ .hueCharacter img{width:auto;height:55px;max-height:100%;max-width:50%}.hueCharacter .skinThumb{transform:scale(.73);margin:-8px -5px}.hueCharacter span{font-size:10px}
+ .hueHero{min-width:95px}.hueHero img{width:36px;height:44px}.hueHero b{font-size:16px}
+ .hueControls{min-height:51px;padding:2px 5px;gap:5px}
+ .hueChannels{gap:5px}
+ .hueChannel{min-height:46px;font-size:12px;padding:6px 10px}
+ .hueSecondary{min-height:44px;font-size:10px;padding:6px 9px}
+ .huePaletteLabel{font-size:9px}
+ .huePalette{grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
+ .hueSwatch{min-height:65px;padding:3px 2px}.hueColor{height:24px}
+ .hueSwatch span:last-child{font-size:8px}
+ .hueBottom{font-size:9px}
+}
+
+</style>
+</head>
+<body>
+<div id="shell">
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 012 • HUE REFINEMENT</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
+<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+<div id="toolbar"><div id="spellRow">
+<button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span class="spell-name">1 • ARC BOLT</span></button>
+<button class="spell" data-spell="well"><span class="glyph">◉</span><span class="spell-name">2 • GRAVITY</span></button>
+<button class="spell" data-spell="pulse"><span class="glyph">◎</span><span class="spell-name">3 • PULSE</span></button>
+<button class="spell" data-spell="frost"><span class="glyph">❄</span><span class="spell-name">4 • FROST</span></button>
+<button class="spell" data-spell="flame"><span class="glyph">♨</span><span class="spell-name">5 • FLAME</span></button>
+<button class="spell" data-spell="detonate"><span class="glyph">✹</span><span class="spell-name">6 • BOOM</span></button></div>
+<div class="bottomRow"><div class="controls"><label for="force">FIELD POWER</label><input type="range" id="force" min="1" max="10" value="5"><span id="forceValue">5</span></div><button class="minibtn relic on" id="relic" type="button" aria-pressed="true">✹ CINDERHEART ON</button><button class="minibtn" id="dash">DASH</button><button class="minibtn" id="crate">+ OBJECT</button></div>
+<div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div></div>
+</div>
+<!-- The wardrobe is a separate presentation layer, never a gameplay control. -->
+<div id="skinOverlay" role="dialog" aria-modal="true" aria-labelledby="skinTitle" hidden>
+ <div class="skinPanel">
+  <div class="skinTop">
+   <div><strong id="skinTitle">W / WIZARD WARDROBE</strong><small>20 choices • tap to equip • star the keepers</small></div>
+   <button class="minibtn" type="button" id="skinDone">BACK TO LAB ✕</button>
+  </div>
+  <div class="skinControls">
+   <button type="button" class="skinNav" id="skinPrev" aria-label="Previous skin">◀</button>
+   <div class="skinPreview">
+    <div id="skinLarge" class="skinLarge" aria-hidden="true"></div>
+    <div class="skinIdentity">DESIGN <b id="skinBigNo">01</b><small id="skinStatus">CURRENT LOOK</small></div>
+   </div>
+   <button type="button" class="skinNav" id="skinNext" aria-label="Next skin">▶</button>
+   <button type="button" id="skinKeeper" class="skinKeeperBtn" aria-pressed="false">☆ KEEPER</button>
+  </div>
+  <div class="skinGrid" id="skinGrid" aria-label="Twenty numbered wizard designs"></div>
+  <div class="skinFoot"><span id="skinCount">0 KEEPERS</span><span>Saved on this device</span></div>
+ </div>
+</div>
+<!-- HUE FORGE 011: isolated dye interface. No changes to the game world. -->
+<div id="hueOverlay" role="dialog" aria-modal="true" aria-labelledby="hueTitle" hidden>
+ <div class="huePanel">
+  <div class="hueTop">
+   <div><strong id="hueTitle">W / HUE FORGE</strong><small>Dye cloth, not magic. Four finalist silhouettes.</small></div>
+   <button type="button" class="minibtn" id="hueDone">BACK TO LAB ✕</button>
+  </div>
+  <div class="hueTopRow">
+   <div class="hueCharacters" id="hueCharacters" aria-label="Choose wizard base design"></div>
+   <div class="hueHero">
+    <img id="hueHeroImg" alt="Current dyed wizard preview" width="56" height="68">
+    <div><small>DESIGN</small><b id="hueDesignNo">08</b><span id="hueCurrentName">ORIGINAL FABRIC</span></div>
+   </div>
+  </div>
+  <div class="hueControls">
+   <div class="hueChannels" id="hueChannels" role="group" aria-label="Material to dye">
+    <button type="button" class="hueChannel" data-channel="robe">ROBE</button>
+    <button type="button" class="hueChannel" data-channel="scarf">SCARF</button>
+    <button type="button" class="hueChannel" data-channel="trim">TRIM</button>
+   </div>
+   <button type="button" id="hueOriginal" class="hueSecondary">RESET LAYER</button>
+  </div>
+  <div class="huePaletteLabel"><span id="hueLayerStatus">ROBE • ORIGINAL</span><span>HUE BOOK / STARTER COLLECTION</span></div>
+  <div class="huePalette" id="huePalette" aria-label="Hues and undiscovered dye entries"></div>
+  <div class="hueBottom">
+   <div class="hueInfo" id="hueInfo">Pick a hue to recolor the chosen fabric.</div>
+   <button type="button" class="hueSecondary hueCopy" id="hueCopy">COPY LOOK</button>
+  </div>
+ </div>
+</div>
+<div id="rotationGate" role="status" aria-label="Rotate your phone to landscape">
+  <div class="rotBrand">W / ARCANE LAB</div>
+  <div class="rotPhone" aria-hidden="true">▭</div>
+  <h1>TURN SIDEWAYS</h1>
+  <p>This laboratory is built to be held like a Game Boy Advance. Rotate your phone and keep both thumbs on the controls.</p>
+  <small>If it stays upright, turn off Portrait Orientation Lock.</small>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+<script src="./combat.js?v=009"></script>
+<script src="./hue-forge.js?v=012"></script>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const W=960,H=600,MINX=64,MAXX=896,MINY=68,MAXY=532;
+const recipeKey="wrkman-arcane-lab001";
+const skinKey="wrkman-arcane-lab010-skin";
+const SKIN_COUNT=20,SKIN_W=56,SKIN_H=68;
+const storedSkin=Number(localStorage.getItem(skinKey+"-selected"));
+let activeSkin=Number.isInteger(storedSkin)&&storedSkin>=1&&storedSkin<=20?storedSkin:1;
+let keepers=new Set();
+try{
+ const saved=JSON.parse(localStorage.getItem(skinKey+"-keepers")||"[]");
+ if(Array.isArray(saved))keepers=new Set(saved.filter(n=>Number.isInteger(n)&&n>=1&&n<=20));
+}catch(_){}
+const skinLabel=n=>String(n).padStart(2,"0");
+const Hue=window.WRKMAN_HUE_FORGE||null;
+let lookPalettes=Hue?Hue.read(localStorage):{};
+let hueSkin=Hue?.validSkin(activeSkin)?activeSkin:8;
+let hueChannel="robe";
+const spells=["bolt","well","pulse","frost","flame","detonate"];
+// Cast semantics are explicit for each ability, ready to become spell metadata.
+const spellInfo={
+ bolt:{name:"ARC BOLT",button:"quick",origin:"aim",hint:"ARC BOLT • TAP AGAIN TO FIRE"},
+ well:{name:"GRAVITY WELL",button:"target",origin:"target",hint:"GRAVITY • TAP ARENA TO PLACE"},
+ pulse:{name:"KINETIC PULSE",button:"quick",origin:"self",hint:"PULSE • TAP AGAIN • SELF"},
+ frost:{name:"FROST FIELD",button:"quick",origin:"self",hint:"FROST • TAP AGAIN • SELF"},
+ flame:{name:"FLAME FIELD",button:"target",origin:"target",hint:"FLAME • TAP ARENA TO IGNITE"},
+ detonate:{name:"DETONATION",button:"target",origin:"target",hint:"DETONATE • TAP ARENA TO BLAST"}
+};
+function spellButtonIntent(current,requested){
+ if(current!==requested)return "equip";
+ return spellInfo[requested].button==="target"?"place":"quick";
+}
+let selected="bolt", power=Number(localStorage.getItem(recipeKey)||5), scene=null, started=false;
+const touches={x:0,y:0};
+$("force").value=power;$("forceValue").textContent=power;
+$("force").addEventListener("input",e=>{power=Number(e.target.value);$("forceValue").textContent=power;localStorage.setItem(recipeKey,String(power));});
+const announce=msg=>{$("log").textContent=msg;};
+function selectSpell(type){
+ selected=type;
+ document.querySelectorAll(".spell").forEach(b=>b.classList.toggle("sel",b.dataset.spell===type));
+ $("castHint").textContent=spellInfo[type].hint;
+}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+const color={bolt:0xffdc8d,well:0xb994ff,pulse:0x84ecdb,frost:0x96d8ff,flame:0xff8c43,detonate:0xffd084};
+if(!window.Phaser||!window.WRKMAN_COMBAT){$("missing").style.display="block";$("missing").textContent="The game engine or combat module did not load. Please reload with a connection.";return;}
+const Combat=window.WRKMAN_COMBAT;
+const MatterBody=Phaser.Physics.Matter.Matter.Body;
+class Lab extends Phaser.Scene{
+ preload(){
+  this.load.spritesheet("wizardSkins010","./skins/wizard-skins-20.webp?v=010",
+   {frameWidth:SKIN_W,frameHeight:SKIN_H});
+  this.load.image("wizardHueMasks012","./skins/wizard-hue-masks-012.png?v=012");
+ }
+ constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];}
+ create(){
+  scene=this;
+  // Visual only: no hitbox or movement geometry changes when you equip.
+  if(this.textures.exists("wizardSkins010")){
+   this.playerSkinSprite=this.add.sprite(this.player.x,this.player.y-12,"wizardSkins010",activeSkin-1)
+     .setScale(1.16).setDepth(6);
+  }else{
+   this.playerSkinSprite=null;
+   announce("WIZARD ART UNAVAILABLE • Using classic laboratory mage.");
+  }
+  this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show")||!$("skinOverlay").hidden)return;
+   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
+   if(["1","2","3","4","5","6"].includes(e.key))selectSpell(spells[Number(e.key)-1]);
+   if(e.key.toLowerCase()==="e")this.addCrate();
+   if(e.key.toLowerCase()==="r")this.resetLab();
+   if(e.key===" ")this.dash();
+  });
+  this.keys=this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT");
+  this.input.on("pointermove",p=>{if(!p.down||p.event?.pointerType==="mouse")this.setAim(p.x,p.y);});
+  this.input.on("pointerdown",p=>{
+   if($("instructions").classList.contains("show"))return;
+   // Mobile touch casting is handled once in the DOM capture listener.
+   // Otherwise Phaser can fire a second cast for the same touch.
+   if(p.event?.pointerType==="touch"||p.event?.type?.startsWith("touch"))return;
+   this.setAim(p.x,p.y);this.cast(selected,p.x,p.y);
+  });
+  this.g=this.add.graphics();this.drawFloor();
+  this.draw=this.add.graphics().setDepth(4);
+  this.matter.world.setBounds(MINX,MINY,MAXX-MINX,MAXY-MINY,34,true,true,true,true);
+  this.matter.world.on("collisionstart",ev=>this.collisions(ev));
+  this.resetLab();
+  this.setSkin(activeSkin);
+  refreshSkinUI();
+  refreshHueUI();
+ }
+ setSkin(id){
+  if(!this.playerSkinSprite)return;
+  // Always detach from old dyed canvas before modifying that texture.
+  this.playerSkinSprite.setTexture("wizardSkins010",id-1);
+  if(!Hue||!Hue.validSkin(id)||!Hue.hasDye(lookPalettes[id]))return;
+  if(!this.textures.exists("wizardHueMasks012"))return;
+  try{
+   const atlas=this.textures.get("wizardSkins010").getSourceImage();
+   const mask=this.textures.get("wizardHueMasks012").getSourceImage();
+   const canvas=Hue.makeCanvas(id,lookPalettes[id],atlas,mask,document);
+   if(this.textures.exists("wizardDyed011"))this.textures.remove("wizardDyed011");
+   this.textures.addCanvas("wizardDyed011",canvas);
+   this.playerSkinSprite.setTexture("wizardDyed011");
+  }catch(error){
+   announce("HUE FORGE • Material preview unavailable; using original art.");
+  }
+ }
+ announceCombat(msg){announce(msg);}
+ drawFloor(){
+  const g=this.g;g.fillGradientStyle(0x0d2632,0x0c2737,0x08151f,0x0b1d2d,1);g.fillRect(0,0,W,H);
+  g.fillStyle(0x172c39,1);g.fillRoundedRect(44,48,872,504,20);
+  g.lineStyle(2,0x5a7480,.65);g.strokeRoundedRect(45,48,870,504,20);
+  g.lineStyle(1,0x294656,.55);
+  for(let x=67;x<900;x+=47)g.lineBetween(x,64,x,539);
+  for(let y=66;y<540;y+=47)g.lineBetween(62,y,898,y);
+  g.lineStyle(2,0x355e73,.5);g.strokeCircle(480,300,180);g.strokeCircle(480,300,222);
+  g.lineStyle(1,0x58717c,.32);g.lineBetween(480,80,480,520);g.lineBetween(85,300,875,300);
+  const random=(i)=>{const n=Math.sin(i*92.73+14)*43829.63;return n-Math.floor(n);};
+  for(let i=0;i<130;i++){const x=65+random(i)*825,y=73+random(i+450)*452;g.fillStyle(0x8ed6ec,random(i+133)*.17);g.fillCircle(x,y,random(i+41)*1.8+.3);}
+  g.lineStyle(2,0x69a8bf,.32);for(const [x,y] of [[94,97],[862,99],[96,501],[860,504]]){g.strokeCircle(x,y,18);g.lineBetween(x-25,y,x+25,y);g.lineBetween(x,y-25,x,y+25);}
+ }
+ resetLab(){
+  for(const p of [...this.projectiles,...this.actors])this.matter.world.remove(p.body);
+  this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];
+  this.player={x:254,y:305,vx:0,vy:0};this.aim={x:1,y:0};this.dummyHP=400;this.deflections=0;this.impacts=0;this.lastCast=0;
+  const d=this.matter.add.circle(704,304,30,{frictionAir:.07,restitution:.8,density:.006,slop:.02});
+  d.gameTag="dummy";this.dummy={body:d,r:30};
+  this.actors.push(this.dummy);
+  [[452,244],[539,346],[470,411],[618,222]].forEach(([x,y])=>this.addCrate(x,y,true));
+  Combat.reset(this);
+  this.updateHeads();
+  announce("LAB RESET • Gravity, motion, and materials are live.");
+ }
+ addCrate(x,y,quiet=false){
+  if(this.actors.filter(a=>a.body?.gameTag==="crate").length>=16)return;
+  x=clamp(x===undefined?this.player.x+100:x,MINX+35,MAXX-35);
+  y=clamp(y===undefined?this.player.y-52:y,MINY+35,MAXY-35);
+  const b=this.matter.add.rectangle(x,y,34,34,{frictionAir:.048,restitution:.72,density:.0018, chamfer:{radius:4}});
+  b.gameTag="crate";this.actors.push({body:b,r:25});
+  if(!quiet)announce("A new physical object entered the chamber.");
+ }
+ updateHeads(){$("hp").textContent=Math.round(Math.max(0,this.dummyHP)/400*100)+"%";$("bends").textContent=this.deflections;$("hits").textContent=this.impacts;}
+ setAim(x,y){const dx=x-this.player.x,dy=y-this.player.y,l=Math.hypot(dx,dy);if(l>12)this.aim={x:dx/l,y:dy/l};}
+ dash(){
+  if(this.time.now<this.dashUntil+480)return;
+  const v=this.getMove();if(!v.x&&!v.y){v.x=this.aim.x;v.y=this.aim.y;}
+  this.player.x=clamp(this.player.x+v.x*70,MINX+20,MAXX-20);
+  this.player.y=clamp(this.player.y+v.y*70,MINY+20,MAXY-20);
+  this.dashUntil=this.time.now+120;
+  this.burst(this.player.x,this.player.y,0x8ddcff,14,5);
+ }
+ cast(type,tx,ty){
+  if(!started||this.time.now<this.lastCast)return;
+  const cost={bolt:190,well:520,pulse:600,frost:680,flame:800,detonate:480};
+  this.lastCast=this.time.now+cost[type];
+  let aim={...this.aim};
+  if(Number.isFinite(tx)&&Number.isFinite(ty)){const dx=tx-this.player.x,dy=ty-this.player.y,l=Math.hypot(dx,dy);if(l>15)aim={x:dx/l,y:dy/l};}
+  this.aim=aim;
+  const px=this.player.x,py=this.player.y;
+  if(type==="bolt"){
+   const b=this.matter.add.circle(px+aim.x*28,py+aim.y*28,8,{restitution:.65,frictionAir:.0015,density:.005});
+   b.gameTag="bolt";b.labAlive=true;b.labDeflected=false;
+   MatterBody.setVelocity(b,{x:aim.x*13,y:aim.y*13});
+   this.projectiles.push({body:b,born:this.time.now,trail:[]});
+   this.burst(px+aim.x*21,py+aim.y*21,color.bolt,7,2.5);
+   announce("ARC BOLT • Watch for curvature around active wells.");
+  }else if(type==="well"){
+   let x=clamp(px+aim.x*160,MINX+24,MAXX-24),y=clamp(py+aim.y*160,MINY+24,MAXY-24);
+   if(Number.isFinite(tx)&&Number.isFinite(ty)){x=clamp(tx,MINX+24,MAXX-24);y=clamp(ty,MINY+24,MAXY-24);}
+   this.wells.push({x,y,r:208,born:this.time.now,life:4800,phase:Math.random()*6});
+   this.burst(x,y,color.well,20,4);announce("GRAVITY WELL • All nearby moving bodies feel its pull.");
+  }else if(type==="pulse"){
+   const x=px,y=py,radius=204; // Self-centered: push outward from the wizard.
+   for(const actor of [...this.actors,...this.projectiles]){
+    const b=actor.body;if(b.isStatic)continue;
+    const dx=b.position.x-x,dy=b.position.y-y,d=Math.max(28,Math.hypot(dx,dy));
+    if(d<radius){const f=(1-d/radius)*.028*b.mass;
+      MatterBody.applyForce(b,b.position,{x:dx/d*f,y:dy/d*f});}
+   }
+   this.rings.push({x,y,r:12,life:500,born:this.time.now,c:color.pulse});
+   this.burst(x,y,color.pulse,28,8);announce("KINETIC PULSE • Force applied to physical bodies.");
+  }else if(type==="frost"){
+   const x=px,y=py; // Self-centered frost field, anchored where cast.
+   this.frosts.push({x,y,r:152,born:this.time.now,life:3400});
+   this.burst(x,y,color.frost,18,4);announce("FROST FIELD • Objects lose momentum inside the radius.");
+  }else if(type==="flame"){
+   const x=Number.isFinite(tx)?tx:px+aim.x*140;
+   const y=Number.isFinite(ty)?ty:py+aim.y*140;
+   Combat.flame(this,x,y);
+  }else if(type==="detonate"){
+   const x=clamp(Number.isFinite(tx)?tx:px+aim.x*170,90,870);
+   const y=clamp(Number.isFinite(ty)?ty:py+aim.y*170,90,510);
+   Combat.blast(this,x,y,{radius:146,energy:100,chain:false});
+  }
+ }
+ collisions(ev){
+  for(const pair of ev.pairs){
+   const a=pair.bodyA,b=pair.bodyB;
+   Combat.environmentCollision(this,a,b,pair.collision?.normal);
+   Combat.bodyCollision(this,a,b,pair.collision?.normal);
+   const shot=["bolt","ember"].includes(a.gameTag)?a:(["bolt","ember"].includes(b.gameTag)?b:null);
+   if(!shot||!shot.labAlive)continue;
+   const other=shot===a?b:a;
+   if(other.gameTag==="bolt"||other.gameTag==="ember")continue;
+   if(Combat.environmentProjectile(this,shot,other))continue;
+   if(Combat.collision(this,shot,other))continue;
+   // Legacy training dummy and crates still respond to player Arc Bolts.
+   shot.labAlive=false;this.removal.push(shot);
+   this.burst(shot.position.x,shot.position.y,color.bolt,14,6);
+   if(other.gameTag==="dummy"){
+    this.dummyHP=Math.max(0,this.dummyHP-32);this.impacts++;
+    this.cameras.main.shake(65,.0025);
+    announce("IMPACT REGISTERED • "+this.impacts+" arc bolt strikes.");
+    if(this.dummyHP===0){this.dummyHP=400;this.burst(other.position.x,other.position.y,0xf4c577,38,8);announce("DUMMY RECONSTRUCTED • Keep experimenting.");}
+   }else if(other.gameTag==="crate"){announce("ARC BOLT • Kinetic impact transferred to a crate.");}
+   this.updateHeads();
+  }
+ }
+ burst(x,y,c,count,speed){
+  for(let i=0;i<count;i++){const t=Math.random()*Math.PI*2,v=speed*(.4+Math.random());
+   this.fx.push({x,y,vx:Math.cos(t)*v,vy:Math.sin(t)*v,life:300+Math.random()*420,max:680,c,size:1+Math.random()*3});}
+  if(this.fx.length>360)this.fx.splice(0,this.fx.length-360);
+ }
+ getMove(){
+  const k=this.keys;
+  let x=Number(k.D.isDown||k.RIGHT.isDown)-Number(k.A.isDown||k.LEFT.isDown)+touches.x;
+  let y=Number(k.S.isDown||k.DOWN.isDown)-Number(k.W.isDown||k.UP.isDown)+touches.y;
+  const l=Math.hypot(x,y);if(l>1){x/=l;y/=l;}
+  return {x,y};
+ }
+ update(time,delta){
+  if(!started)return;
+  delta=Math.min(delta,50);const t=delta/16.667;
+  const mv=this.getMove(),combat=this.combat;
+  const staggered=combat&&time<combat.playerStaggerUntil;
+  // Input is briefly damped after a strong hit. Knockback is a separate
+  // velocity, integrated over successive frames with exponential drag.
+  // This preserves responsive input and does not snap the wizard on impact.
+  const steer=staggered?.24:1;
+  this.player.vx=mv.x*4.4*steer;this.player.vy=mv.y*4.4*steer;
+  const knock=combat?.playerKnock||{x:0,y:0};
+  const nextX=this.player.x+(this.player.vx+knock.x)*t;
+  const nextY=this.player.y+(this.player.vy+knock.y)*t;
+  this.player.x=clamp(nextX,MINX+20,MAXX-20);
+  this.player.y=clamp(nextY,MINY+20,MAXY-20);
+  Combat.resolvePlayerEnvironment(this,time);
+  if(combat){
+   const drag=Math.pow(.855,t);
+   knock.x*=drag;knock.y*=drag;
+   if(Math.abs(knock.x)<.055)knock.x=0;
+   if(Math.abs(knock.y)<.055)knock.y=0;
+   if(this.player.x!==nextX)knock.x=0;
+   if(this.player.y!==nextY)knock.y=0;
+  }
+  this.wells=this.wells.filter(w=>time-w.born<w.life);
+  this.frosts=this.frosts.filter(f=>time-f.born<f.life);
+  this.rings=this.rings.filter(r=>time-r.born<r.life);
+  const all=[...this.actors,...this.projectiles];
+  for(const obj of all){const b=obj.body;if(b.isStatic||!b.labAlive&&b.gameTag==="bolt")continue;
+   for(const w of this.wells){
+    const dx=w.x-b.position.x,dy=w.y-b.position.y,d=Math.max(18,Math.hypot(dx,dy));
+    if(d<w.r){
+     const fall=Math.pow(1-d/w.r,1.35);
+     const resistance=b.gameTag==="enemy"&&b.enemyRef?.type==="charger"?.48:1;
+     const force=(.00033+power*.00022)*b.mass*fall*resistance;
+     // Pure attraction: projectiles curve under the same force law as crates.
+     MatterBody.applyForce(b,b.position,{x:dx/d*force,y:dy/d*force});
+     if(b.gameTag==="bolt"&&!b.labDeflected&&d<w.r*.82){b.labDeflected=true;this.deflections++;this.updateHeads();announce("DEFLECTION OBSERVED • The gravity field bent a projectile.");}
+    }
+   }
+   for(const f of this.frosts){if(dist(b.position,f)<f.r){
+    const slow=Math.pow(.969,t);
+    MatterBody.setVelocity(b,{x:b.velocity.x*slow,y:b.velocity.y*slow});
+   }}
+  }
+  Combat.step(this,time,delta);
+  for(const p of this.projectiles){if(!p.body.labAlive)continue;p.trail.push({x:p.body.position.x,y:p.body.position.y});if(p.trail.length>10)p.trail.shift();if(time-p.born>6500){p.body.labAlive=false;this.removal.push(p.body);}}
+  if(this.removal.length){const dead=new Set(this.removal);for(const b of dead)this.matter.world.remove(b);this.projectiles=this.projectiles.filter(p=>!dead.has(p.body));this.actors=this.actors.filter(a=>!dead.has(a.body));this.combat.enemies=this.combat.enemies.filter(e=>!dead.has(e.body));this.removal=[];}
+  this.fx=this.fx.filter(p=>{p.x+=p.vx*t;p.y+=p.vy*t;p.vx*=.96;p.vy*=.96;p.life-=delta;return p.life>0;});
+  this.renderWorld(time);
+ }
+ renderWorld(time){
+  const g=this.draw;g.clear();
+  for(const f of this.frosts){const q=Math.max(0,1-(time-f.born)/f.life);
+   g.fillStyle(color.frost,.09*q);g.fillCircle(f.x,f.y,f.r);
+   g.lineStyle(2,0x98e2ff,.4*q);g.strokeCircle(f.x,f.y,f.r);
+   for(let i=0;i<20;i++){const a=i*2.399+time*.00022,r=(35+i*27)%f.r;g.fillStyle(0xc1edff,.22*q);g.fillCircle(f.x+Math.cos(a)*r,f.y+Math.sin(a)*r,2.2);}
+  }
+  for(const w of this.wells){const q=Math.min(1,(w.life-(time-w.born))/450),rot=time*.0016+w.phase;
+   g.fillStyle(color.well,.06*q);g.fillCircle(w.x,w.y,w.r);
+   g.lineStyle(1,0xc1a3ff,.30*q);g.strokeCircle(w.x,w.y,w.r);
+   for(let i=0;i<4;i++){const r=28+i*29+Math.sin(time*.003+i)*3,a=rot*(1+(i%2)*-.4)+i*1.7;
+    g.lineStyle(2,0xb39aff,(.32+i*.08)*q);g.beginPath();g.arc(w.x,w.y,r,a,a+Math.PI*1.25);g.strokePath();}
+   g.fillStyle(0x9477ff,.52*q);g.fillCircle(w.x,w.y,15);
+   g.fillStyle(0xe3d8ff,.8*q);g.fillCircle(w.x,w.y,5);
+  }
+  for(const r of this.rings){const p=(time-r.born)/r.life;
+   g.lineStyle(6*(1-p)+1,r.c,(1-p)*.85);g.strokeCircle(r.x,r.y,12+p*197);}
+  Combat.paint(this,g,time);
+  for(const a of this.actors){
+   const b=a.body,x=b.position.x,y=b.position.y;
+   if(["enemy","pillar","debris"].includes(b.gameTag))continue; // Drawn by Combat.paint.
+   if(b.gameTag==="dummy"){
+    g.fillStyle(0x041016,.38);g.fillEllipse(x,y+21,70,20);
+    g.fillStyle(0x864a48,1);g.fillCircle(x,y,32);
+    g.lineStyle(5,0xd9a28a,1);g.strokeCircle(x,y,28);
+    g.lineStyle(2,0xffe0a9,.75);g.strokeCircle(x,y,17);g.lineBetween(x-24,y,x+24,y);g.lineBetween(x,y-24,x,y+24);
+    g.fillStyle(0xffddb0,.8);g.fillCircle(x,y,5);
+   }else{
+    g.fillStyle(0x060d14,.38);g.fillEllipse(x,y+17,47,13);
+    g.save();g.translateCanvas(x,y);g.rotateCanvas(b.angle);
+    g.fillStyle(0x586c79,1);g.fillRoundedRect(-18,-18,36,36,5);
+    g.lineStyle(3,0xa1bcc3,.8);g.strokeRoundedRect(-16,-16,32,32,4);
+    g.lineStyle(1,0xc8dddb,.5);g.lineBetween(-10,-10,10,10);g.lineBetween(10,-10,-10,10);g.restore();
+   }
+  }
+  for(const p of this.projectiles){
+   const b=p.body;for(let i=0;i<p.trail.length;i++){const t=p.trail[i];g.fillStyle(b.gameTag==="ember"?0xff794d:0xffd37b,i/p.trail.length*.45);g.fillCircle(t.x,t.y,2+i*.5);}
+   g.fillStyle(b.gameTag==="ember"?0xff7e4d:0xffe7ad,.18);g.fillCircle(b.position.x,b.position.y,19);
+   g.fillStyle(b.gameTag==="ember"?0xff8451:0xffdfa1);g.fillCircle(b.position.x,b.position.y,8);
+   g.fillStyle(0xffffff);g.fillCircle(b.position.x,b.position.y,3);
+  }
+  for(const p of this.fx){const q=Math.min(1,p.life/p.max);g.fillStyle(p.c,q*.8);g.fillCircle(p.x,p.y,p.size*q);}
+  const p=this.player;
+  if(this.playerSkinSprite){
+   this.playerSkinSprite.setPosition(p.x,p.y-12);
+   const isHurt=this.combat&&time-this.combat.playerHurtAt<180;
+   this.playerSkinSprite.setRotation(isHurt?Math.sin(time*.045)*.09:0);
+   this.playerSkinSprite.setAlpha(isHurt?.94:1);
+  }
+  const hurt=this.combat&&time-this.combat.playerHurtAt<240;
+  const fade=hurt?Math.max(0,1-(time-this.combat.playerHurtAt)/240):0;
+  if(fade){
+   const dir=this.combat.playerHurtDir;
+   // Directional afterimage sells displacement; the real sprite follows
+   // integrated knockback, so these echoes are purely visual.
+   for(let i=3;i>=1;i--){
+    const tail=dir.x*i*11,up=dir.y*i*11;
+    g.fillStyle(0xffaa8f,fade*.055*(4-i));
+    g.fillEllipse(p.x-tail,p.y-up+3,40,44);
+   }
+   g.lineStyle(3+3*fade,0xffbe97,.78*fade);
+   g.strokeCircle(p.x,p.y,24+(1-fade)*24);
+  }
+  if(!this.playerSkinSprite){
+  g.fillStyle(0x01080e,.6);g.fillEllipse(p.x,p.y+22,44,14);
+  g.fillStyle(hurt?0x914e56:0x1b4d67,.98);g.fillCircle(p.x,p.y+4,19);
+  g.lineStyle(3,hurt?0xffbd96:0x6fd7f2,.87);g.strokeCircle(p.x,p.y+3,19);
+  g.fillStyle(0x82d9f8,.28);g.fillCircle(p.x,p.y-13,16);
+  g.fillStyle(0xfce3b2);g.fillCircle(p.x,p.y-13,10);
+  g.fillStyle(0x132f49);g.fillTriangle(p.x-17,p.y-18,p.x+17,p.y-18,p.x,p.y-46);
+  g.lineStyle(3,0xf9ca74,.9);g.lineBetween(p.x-14,p.y-19,p.x+14,p.y-19);
+  g.lineStyle(3,0x82ddff,.45);g.lineBetween(p.x,p.y,p.x+this.aim.x*37,p.y+this.aim.y*37);
+  g.fillStyle(0xfbd27e);g.fillCircle(p.x+this.aim.x*35,p.y+this.aim.y*35,4);
+  }
+ }
+}
+const game=new Phaser.Game({type:Phaser.AUTO,parent:"stage",width:W,height:H,backgroundColor:"#091825",render:{antialias:true,pixelArt:false},scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},physics:{default:"matter",matter:{gravity:{x:0,y:0},debug:false,enableSleeping:false}},scene:[Lab],fps:{target:60,forceSetTimeOut:false}});
+// Phaser 3.90 can keep stale parent dimensions after a mobile rotation.
+// See phaserjs/phaser#7213 (fixed upstream after our pinned version).
+// Re-measure the actual canvas parent BEFORE refreshing Phaser's FIT scale.
+// Do not resize the canvas CSS by hand: that would desync Phaser's input bounds.
+const fitStage=$("stage");
+const fitShell=$("stageWrap");
+let resizeTimers=[];
+function refreshGameFit(){
+ if(!game.scale||!game.canvas||!game.canvas.isConnected)return;
+ const box=fitStage.getBoundingClientRect();
+ if(box.width<2||box.height<2)return;
+ game.scale.getParentBounds();
+ game.scale.refresh();
+ game.scale.updateBounds();
+}
+function scheduleGameFit(){
+ // iOS Safari can fire orientationchange before 100dvh, browser bars, and
+ // flexbox dimensions finish settling. Try across that short transition.
+ for(const timer of resizeTimers)clearTimeout(timer);
+ resizeTimers=[];
+ const run=()=>{
+  requestAnimationFrame(()=>requestAnimationFrame(refreshGameFit));
+ };
+ run();
+ for(const delay of [90,240,500,950])resizeTimers.push(setTimeout(run,delay));
+}
+window.addEventListener("resize",scheduleGameFit,{passive:true});
+window.addEventListener("orientationchange",scheduleGameFit,{passive:true});
+window.visualViewport?.addEventListener("resize",scheduleGameFit,{passive:true});
+window.addEventListener("pageshow",scheduleGameFit,{passive:true});
+document.addEventListener("visibilitychange",()=>{
+ if(!document.hidden)scheduleGameFit();
+});
+if(typeof ResizeObserver!=="undefined"){
+ const fitObserver=new ResizeObserver(()=>scheduleGameFit());
+ fitObserver.observe(fitShell);
+}
+// Catch initial Phaser boot and first layout in both portrait and landscape.
+scheduleGameFit();
+function quickCast(type){
+ if(!scene||!started)return;
+ // Quick-cast is for aim-based and self-centered abilities only.
+ // A targeted spell never guesses a placement point.
+ if(spellInfo[type].button!=="quick")return;
+ if(spellInfo[type].origin==="self"){
+  scene.cast(type); // No coordinates: the spell originates at the player.
+  return;
+ }
+ const dummy=scene.dummy.body.position;
+ // Aim at the dummy only if there has been no recent manual arena aim.
+ if(!scene.manualAim||scene.time.now-scene.manualAim>3300){
+  const living=scene.combat.enemies.find(e=>e.alive);
+  scene.setAim(living?living.body.position.x:dummy.x,living?living.body.position.y:dummy.y);
+ }
+ const a=scene.aim;
+ scene.cast(type,scene.player.x+a.x*180,scene.player.y+a.y*180);
+}
+function pressSpell(type){
+ const intent=spellButtonIntent(selected,type);
+ if(intent==="equip"){
+  selectSpell(type);
+  announce(spellInfo[type].name+" EQUIPPED • "+(spellInfo[type].button==="target"?"Tap the arena to place.":"Tap again to cast."));
+  return;
+ }
+ if(intent==="place"){
+  announce(spellInfo[type].name+" READY • Tap the exact arena position.");
+  return;
+ }
+ quickCast(type);
+}
+// Fire on touch-down, NOT synthesized click: Safari can defer clicks while
+// another finger is held on a control. Keyboard and mouse keep click behavior.
+function bindInstantPress(el, action){
+ let lastTouch=0;
+ const touchAction=(e)=>{
+  const now=Date.now();
+  if(now-lastTouch>90){lastTouch=now;action();}
+  e.preventDefault();
+  e.stopPropagation();
+ };
+ el.addEventListener("pointerdown",e=>{if(e.pointerType==="touch")touchAction(e);});
+ el.addEventListener("touchstart",e=>touchAction(e),{passive:false});
+ el.addEventListener("click",e=>{
+  if(Date.now()-lastTouch<800){e.preventDefault();return;}
+  action();
+ });
+}
+document.querySelectorAll(".spell").forEach(b=>bindInstantPress(b,()=>pressSpell(b.dataset.spell)));
+$("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
+$("notes").onclick=()=>{$("instructions").classList.add("show");};
+$("reset").onclick=()=>{scene?.resetLab();};
+bindInstantPress($("relic"),()=>Combat.toggleRelic(scene));
+bindInstantPress($("dash"),()=>scene?.dash());
+bindInstantPress($("crate"),()=>scene?.addCrate());
+$("copy").onclick=async()=>{
+ const build={format:"wrkman-spell-lab",version:1,fieldPower:power,
+  wizardSkin:activeSkin,keeperSkins:[...keepers].sort((a,b)=>a-b),
+  spells:spells.map((id,i)=>({id,slot:i+1})),
+  notes:"Experimental laboratory recipe; appearance numbers 01–20; not yet compatible with Spell Designer."};
+ try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
+ catch(_){announce("Clipboard unavailable; open this page in a secure browser context.");}
+};
+// Wardrobe: state is presentation-only; user picks and favorites are local.
+const skinOverlay=$("skinOverlay"),skinGrid=$("skinGrid");
+function refreshSkinUI(){
+ $("skinActiveNo").textContent=skinLabel(activeSkin);
+ $("skinBigNo").textContent=skinLabel(activeSkin);
+ applySkinThumb($("skinLarge"),activeSkin);
+ $("skinStatus").textContent=keepers.has(activeSkin)?"★ MARKED KEEPER":"CURRENT LOOK";
+ $("skinKeeper").classList.toggle("is-keeper",keepers.has(activeSkin));
+ $("skinKeeper").setAttribute("aria-pressed",String(keepers.has(activeSkin)));
+ $("skinKeeper").textContent=(keepers.has(activeSkin)?"★":"☆")+" KEEPER";
+ $("skinCount").textContent=keepers.size+" KEEPER"+(keepers.size===1?"":"S");
+ skinGrid.querySelectorAll(".skinSlot").forEach(slot=>{
+  const n=Number(slot.dataset.skin);
+  const choice=slot.querySelector(".skinChoice"),star=slot.querySelector(".skinChoiceStar");
+  applySkinThumb(slot.querySelector(".skinThumb"),n);
+  choice.classList.toggle("chosen",n===activeSkin);
+  choice.setAttribute("aria-pressed",String(n===activeSkin));
+  star.textContent=keepers.has(n)?"★":"☆";
+  star.classList.toggle("is-keeper",keepers.has(n));
+  star.setAttribute("aria-pressed",String(keepers.has(n)));
+  star.setAttribute("aria-label",(keepers.has(n)?"Unmark":"Mark")+" skin "+skinLabel(n)+" as keeper");
+ });
+}
+function equipSkin(n){
+ activeSkin=((n-1+SKIN_COUNT)%SKIN_COUNT)+1;
+ localStorage.setItem(skinKey+"-selected",String(activeSkin));
+ scene?.setSkin(activeSkin);
+ refreshSkinUI();
+ announce("WIZARD DESIGN "+skinLabel(activeSkin)+" EQUIPPED.");
+}
+function toggleSkinKeeper(n){
+ if(keepers.has(n))keepers.delete(n);else keepers.add(n);
+ localStorage.setItem(skinKey+"-keepers",JSON.stringify([...keepers].sort((a,b)=>a-b)));
+ refreshSkinUI();
+}
+function openSkinOverlay(){
+ skinOverlay.hidden=false;
+ // Browsing skins must not let enemies attack the player unseen.
+ scene?.scene.pause();
+ neutralStick();
+ joyTouchId=null;joyPointer=null;
+ refreshSkinUI();
+ $("skinDone").focus({preventScroll:true});
+}
+function closeSkinOverlay(){
+ skinOverlay.hidden=true;
+ scene?.scene.resume();
+ $("skinsOpen").focus({preventScroll:true});
+}
+for(let n=1;n<=SKIN_COUNT;n++){
+ const slot=document.createElement("div");slot.className="skinSlot";slot.dataset.skin=String(n);
+ const button=document.createElement("button");button.type="button";button.className="skinChoice";
+ button.setAttribute("aria-label","Equip wizard skin "+skinLabel(n));
+ const thumb=document.createElement("span");thumb.className="skinThumb";thumb.setAttribute("aria-hidden","true");
+ thumb.style.backgroundPosition="-"+((n-1)%5*SKIN_W)+"px -"+(Math.floor((n-1)/5)*SKIN_H)+"px";
+ const label=document.createElement("span");label.className="skinChoiceNumber";label.textContent=skinLabel(n);
+ button.append(thumb,label);button.addEventListener("click",()=>equipSkin(n));
+ const star=document.createElement("button");star.type="button";star.className="skinChoiceStar";star.textContent="☆";
+ star.addEventListener("click",()=>toggleSkinKeeper(n));
+ slot.append(button,star);skinGrid.append(slot);
+}
+$("skinsOpen").addEventListener("click",openSkinOverlay);
+$("skinDone").addEventListener("click",closeSkinOverlay);
+$("skinPrev").addEventListener("click",()=>equipSkin(activeSkin-1));
+$("skinNext").addEventListener("click",()=>equipSkin(activeSkin+1));
+$("skinKeeper").addEventListener("click",()=>toggleSkinKeeper(activeSkin));
+skinOverlay.addEventListener("keydown",e=>{
+ if(e.key==="Escape"){e.stopPropagation();closeSkinOverlay();}
+ if(e.key==="ArrowLeft"){e.preventDefault();equipSkin(activeSkin-1);}
+ if(e.key==="ArrowRight"){e.preventDefault();equipSkin(activeSkin+1);}
+});
+refreshSkinUI();
+
+/* DYE PREVIEW: produce just the requested 56×68 frame; never mutate source
+   assets. A per-skin cache is cleared whenever the user changes that look. */
+const huePreviewCache=new Map();
+function tintedPreview(n){
+ if(!Hue||!Hue.validSkin(n)||!Hue.hasDye(lookPalettes[n]))return null;
+ if(huePreviewCache.has(n))return huePreviewCache.get(n);
+ if(!scene?.textures?.exists("wizardHueMasks012"))return null;
+ try{
+  const atlas=scene.textures.get("wizardSkins010").getSourceImage();
+  const masks=scene.textures.get("wizardHueMasks012").getSourceImage();
+  const canvas=Hue.makeCanvas(n,lookPalettes[n],atlas,masks,document);
+  const data=canvas.toDataURL("image/png");
+  huePreviewCache.set(n,data);
+  return data;
+ }catch(_){return null;}
+}
+function applySkinThumb(el,n){
+ const preview=tintedPreview(n);
+ if(preview){
+  el.style.backgroundImage='url("'+preview+'")';
+  el.style.backgroundPosition="0 0";
+ }else{
+  el.style.backgroundImage='url("./skins/wizard-skins-20.webp?v=010")';
+  el.style.backgroundPosition="-"+((n-1)%5*SKIN_W)+"px -"+
+   (Math.floor((n-1)/5)*SKIN_H)+"px";
+ }
+}
+const hueOverlay=$("hueOverlay"),hueCharacters=$("hueCharacters"),huePalette=$("huePalette");
+const hueChoices=new Map();
+function refreshHueUI(){
+ if(!Hue)return;
+ $("hueDesignNo").textContent=skinLabel(hueSkin);
+ const p=lookPalettes[hueSkin]||{};
+ const selected=p[hueChannel];
+ const name=selected?Hue.color(selected)?.name||"UNKNOWN":"ORIGINAL FABRIC";
+ $("hueCurrentName").textContent=name.toUpperCase();
+ $("hueLayerStatus").textContent=hueChannel.toUpperCase()+" • "+name.toUpperCase();
+ document.querySelectorAll(".hueChannel").forEach(el=>el.classList.toggle("active",el.dataset.channel===hueChannel));
+ for(const [n,parts] of hueChoices){
+  parts.button.classList.toggle("active",n===hueSkin);
+  parts.button.setAttribute("aria-pressed",String(n===hueSkin));
+  const dyed=tintedPreview(n);
+  parts.image.src=dyed||"./skins/wizard-skins-20.webp?v=010";
+  if(dyed){
+   parts.image.style.objectPosition="center";
+   parts.image.style.objectFit="contain";
+   parts.image.style.width="";parts.image.style.height="";
+  }else{
+   // CSS object-position alone cannot crop atlas cells. Use background
+   // on the already created image container for undyed preview.
+   parts.image.style.display="none";
+   parts.thumbnail.style.display="block";
+   applySkinThumb(parts.thumbnail,n);
+  }
+  if(dyed){parts.image.style.display="block";parts.thumbnail.style.display="none";}
+ }
+ const photo=tintedPreview(hueSkin);
+ const hero=$("hueHeroImg");
+ if(photo){
+  hero.src=photo;hero.style.display="block";
+  $("hueHeroFallback").style.display="none";
+ }else{
+  hero.removeAttribute("src");hero.style.display="none";
+  $("hueHeroFallback").style.display="block";
+  applySkinThumb($("hueHeroFallback"),hueSkin);
+ }
+ for(const [id,el] of hueSwatches){
+  const yes=id===selected;
+  el.classList.toggle("selected",yes);
+  el.setAttribute("aria-pressed",String(yes));
+ }
+}
+const hueSwatches=new Map();
+if(Hue){
+ for(const n of Hue.FINALISTS){
+  const button=document.createElement("button");
+  button.type="button";button.className="hueCharacter";
+  button.setAttribute("aria-label","Dye wizard "+skinLabel(n));
+  const thumb=document.createElement("span");thumb.className="skinThumb";thumb.setAttribute("aria-hidden","true");
+  const image=document.createElement("img");image.alt="";image.width=56;image.height=68;
+  const num=document.createElement("span");num.textContent=skinLabel(n);
+  button.append(thumb,image,num);
+  button.addEventListener("click",()=>{
+   hueSkin=n;equipSkin(n);refreshHueUI();
+  });
+  hueCharacters.append(button);hueChoices.set(n,{button,thumbnail:thumb,image});
+ }
+ const fallback=document.createElement("div");fallback.id="hueHeroFallback";
+ fallback.className="skinThumb";fallback.style.display="none";
+ $("hueHeroImg").insertAdjacentElement("beforebegin",fallback);
+ for(const hue of Hue.HUES){
+  const button=document.createElement("button");button.type="button";button.className="hueSwatch";
+  button.setAttribute("aria-label",hue.name+" "+hue.hex);
+  const face=document.createElement("span");face.className="hueColor";face.style.background=hue.hex;
+  const label=document.createElement("span");label.textContent=hue.name;
+  button.append(face,label);button.title=hue.name+" • "+hue.hex;
+  button.addEventListener("click",()=>applyHue(hue.id));
+  huePalette.append(button);hueSwatches.set(hue.id,button);
+ }
+ for(const key of Hue.FUTURE){
+  const button=document.createElement("button");button.type="button";
+  button.className="hueSwatch locked";button.disabled=true;
+  button.title="Undiscovered hue. Collectible mechanics are not enabled yet.";
+  const face=document.createElement("span");face.className="hueColor";face.textContent="✦";
+  const label=document.createElement("span");label.textContent=key;
+  button.append(face,label);huePalette.append(button);
+ }
+ document.querySelectorAll(".hueChannel").forEach(el=>{
+  el.addEventListener("click",()=>{hueChannel=el.dataset.channel;refreshHueUI();});
+ });
+ $("hueOriginal").addEventListener("click",()=>applyHue(null));
+ $("hueOpen").addEventListener("click",openHueForge);
+ $("hueDone").addEventListener("click",closeHueForge);
+ $("hueCopy").addEventListener("click",async()=>{
+  const code=Hue.shareCode(hueSkin,lookPalettes[hueSkin]);
+  try{
+   await navigator.clipboard.writeText(code);
+   $("hueInfo").textContent="LOOK COPIED • "+code;
+  }catch(_){
+   $("hueInfo").textContent=code; // Visible even if clipboard permission is denied
+  }
+ });
+ hueOverlay.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){e.stopPropagation();closeHueForge();}
+ });
+}else{
+ $("hueOpen").disabled=true;
+ $("hueOpen").title="Hue Forge module failed to load";
+}
+function applyHue(id){
+ if(!Hue||id!==null&&!Hue.color(id))return;
+ lookPalettes[hueSkin][hueChannel]=id;
+ const stored=Hue.write(localStorage,lookPalettes);
+ huePreviewCache.delete(hueSkin);
+ if(hueSkin===activeSkin)scene?.setSkin(activeSkin);
+ refreshHueUI();refreshSkinUI();
+ $("hueInfo").textContent=(id?Hue.color(id).name+" applied to ":"Original material restored on ")+hueChannel+
+  (stored?" • SAVED":" • Storage unavailable");
+}
+function openHueForge(){
+ if(!Hue)return;
+ if(!scene?.textures?.exists("wizardHueMasks012")){
+  announce("HUE FORGE • Dye mask failed to load. Try reloading online.");
+  return;
+ }
+ hueSkin=Hue.validSkin(activeSkin)?activeSkin:hueSkin;
+ hueOverlay.hidden=false;
+ scene.scene.pause();
+ neutralStick();joyPointer=null;joyTouchId=null;
+ refreshHueUI();
+ $("hueDone").focus({preventScroll:true});
+}
+function closeHueForge(){
+ hueOverlay.hidden=true;
+ scene?.scene.resume();
+ $("hueOpen").focus({preventScroll:true});
+}
+
+const joy=$("joystick"),stick=$("stick");
+let joyPointer=null,joyTouchId=null;
+function neutralStick(){
+ touches.x=touches.y=0;
+ stick.style.transform="translate(0,0)";
+}
+function joystick(e){
+ const rect=joy.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+ const dx=e.clientX-cx,dy=e.clientY-cy,rad=Math.min(rect.width,rect.height)*.32,mag=Math.hypot(dx,dy);
+ touches.x=clamp(dx/rad,-1,1);touches.y=clamp(dy/rad,-1,1);
+ if(mag>rad){touches.x=dx/mag;touches.y=dy/mag;}
+ stick.style.transform="translate("+(touches.x*rad)+"px,"+(touches.y*rad)+"px)";
+}
+// Track the joystick's exact touch identifier. Other simultaneous fingers
+// can now press spells, DASH, or aim on the canvas without releasing movement.
+joy.addEventListener("touchstart",e=>{
+ if(joyTouchId===null&&e.changedTouches.length){
+  const t=e.changedTouches[0];joyTouchId=t.identifier;joystick(t);
+ }
+ e.preventDefault();e.stopPropagation();
+},{passive:false});
+document.addEventListener("touchmove",e=>{
+ if(joyTouchId===null)return;
+ for(const t of e.changedTouches){
+  if(t.identifier===joyTouchId){joystick(t);e.preventDefault();break;}
+ }
+},{passive:false});
+function releaseJoyTouch(e){
+ if(joyTouchId===null)return;
+ for(const t of e.changedTouches){
+  if(t.identifier===joyTouchId){joyTouchId=null;neutralStick();break;}
+ }
+}
+document.addEventListener("touchend",releaseJoyTouch,{passive:true});
+document.addEventListener("touchcancel",releaseJoyTouch,{passive:true});
+// Mouse/pen fallback. No touch pointer capture: each finger has its own job.
+joy.addEventListener("pointerdown",e=>{
+ if(e.pointerType==="touch"||joyPointer!==null)return;
+ joyPointer=e.pointerId;
+ try{joy.setPointerCapture(e.pointerId);}catch(_){}
+ joystick(e);e.preventDefault();
+});
+joy.addEventListener("pointermove",e=>{if(e.pointerId===joyPointer){joystick(e);e.preventDefault();}});
+function joyPointerEnd(e){if(e.pointerId===joyPointer){joyPointer=null;neutralStick();}}
+joy.addEventListener("pointerup",joyPointerEnd);
+joy.addEventListener("pointercancel",joyPointerEnd);
+addEventListener("blur",()=>{joyPointer=null;joyTouchId=null;neutralStick();});
+
+// Capture canvas touches directly so Phaser's pointer management cannot
+// eat the second thumb while the first is held on the external joystick.
+$("stage").addEventListener("touchstart",e=>{
+ if(!started||!scene||$("instructions").classList.contains("show")||!$("skinOverlay").hidden)return;
+ const canvas=$("stage").querySelector("canvas");
+ if(!canvas)return;
+ const r=canvas.getBoundingClientRect();
+ for(const t of e.changedTouches){
+  if(t.clientX<r.left||t.clientX>r.right||t.clientY<r.top||t.clientY>r.bottom)continue;
+  const x=(t.clientX-r.left)*W/r.width, y=(t.clientY-r.top)*H/r.height;
+  scene.manualAim=scene.time.now;
+  scene.setAim(x,y);
+  scene.cast(selected,x,y);
+ }
+ e.preventDefault();
+},{passive:false,capture:true});
+$("stage").addEventListener("pointerdown",e=>{if(scene&&started&&e.pointerType!=="touch"){scene.manualAim=scene.time.now;}});
+})();
+</script>
+</body>
+</html>
