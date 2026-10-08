@@ -40,7 +40,7 @@
   {id:"bronze",name:"Ancient Bronze",hex:"#a88450"}
  ]);
  const FUTURE=Object.freeze(["HUE-025","HUE-026","HUE-027","HUE-028","HUE-029","HUE-030","HUE-031","HUE-032"]);
- const byId=Object.freeze(Object.fromEntries(HUES.map((h,i)=>[h.id,Object.freeze({...h,index:i+1})])));
+ const byId=Object.freeze(Object.assign(Object.create(null),Object.fromEntries(HUES.map((h,i)=>[h.id,Object.freeze({...h,index:i+1})]))));
  const validSkin=n=>FINALISTS.includes(Number(n));
  const empty=()=>({robe:null,scarf:null,trim:null});
  function normalize(looks){
