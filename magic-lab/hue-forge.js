@@ -91,7 +91,9 @@
    const shade=Math.min(1.25,Math.max(.33,.44+lum*.80));
    for(let j=0;j<3;j++){
     if(!target[j])continue;
-    // Metallic trim needs fuller pigment uptake while retaining the source\n    // luminance for highlights. Robe/scarf retain their v011 shading curve.\n    const weight=Math.min(.985,(mask[i+j]/255)*(j===2?1.10:.94));
+    // Metallic trim gets fuller pigment uptake while highlights survive.
+    // Robe/scarf retain their original shading curve.
+    const weight=Math.min(.985,(mask[i+j]/255)*(j===2?1.10:.94));
     if(weight<.002)continue;
     const c=target[j];
     r=r*(1-weight)+Math.min(255,c[0]*shade)*weight;
