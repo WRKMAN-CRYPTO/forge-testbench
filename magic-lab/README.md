@@ -56,6 +56,12 @@ Quick checks:
 3. Switch to Pulse, cast near crates, and verify the outward force originates at the wizard.
 4. Equip Gravity again and tap a location beside a crate. Verify the well center is at that exact place, within the chamber walls.
 
+## Safari rotation regression (build 005)
+
+Mobile test: start the lab in landscape, rotate to portrait, then back to landscape, without refreshing the page. The entire original fixed-size arena should fit inside the stage on both landscape appearances, and all spell/canvas touch targets should line up after rotating back. Repeat two or three times, including with Safari's browser toolbar visible.
+
+Why this exists: Phaser 3.90.0 can reuse outdated container dimensions after rotation (Phaser issue #7213, fixed on the upstream master branch after 3.90). Build 005 explicitly calls `game.scale.getParentBounds()` before `refresh()` and `updateBounds()`, after the parent layout settles. It listens to orientation, browser/window/visualViewport resize, and the stage container ResizeObserver. The game world remains 960x600, with FIT scaling and no camera zoom change.
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
