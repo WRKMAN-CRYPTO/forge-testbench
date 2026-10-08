@@ -106,6 +106,29 @@ Selecting a different spell equips without casting. Tapping an already-equipped 
 Combat logic is separated into `combat.js` and invokes the existing Matter world via `WRKMAN_COMBAT`. Render effects are lightweight procedural graphics. No external enemy art was introduced, and no matchmaking or accounts exist yet.
 
 
+## Kinetic collisions + impact feedback (build 007)
+
+Your playtest confirmed the effects and Cinderheart DPS were working, but the small secondary explosions did not feel forceful enough. This pass preserves the same elemental rules and improves physical interactions and impact readability.
+
+**What's new**
+- **Matter contact normals** determine whether two bodies actually slam together. Fast sideways scrapes do not cause impact damage.
+- **Mass sharing** changes the damage outcome: a fast heavy Charger striking a light Wisp causes more damage to the Wisp than to the Charger. Charging units also resist explosive displacement more than Wisps.
+- **Body-to-body and wall collisions** deal kinetic damage above a speed threshold, with a per-pair cooldown. Burning enemies can transmit attenuated Burn when they slam into other enemies.
+- **Stagger** briefly pauses enemy decision-making on sufficiently hard hits, without freezing their physical momentum.
+- **Readable impacts**: bright short shock lines, contact sparks, expanding blast cores, shockwave circles, and modest screen shake. Rendering effects are capped for mobile performance.
+- **Cinderheart** still propagates with decreasing ignition energy and bounded chain budgets; it now has stronger visual and kinetic presence while preserving the 60% energy-transfer rule.
+
+**How to test**
+1. RESET to revive the 2 Chargers and 2 Wisps. Let a Charger begin charging and try pulling it off-course with Gravity Well, preferably toward a Wisp.
+2. Use Flame Field on a group, then cast Detonation to throw one burning enemy into another. Watch for impact sparks, stagger, and Burn transfer.
+3. Blast a light Wisp and then a heavy Charger at comparable distances. The Wisp should launch farther.
+4. Redirect an enemy into a stone wall; high-speed wall contact should give its own impact flash.
+5. Toggle CINDERHEART ON and OFF and compare the delayed blasts.
+6. Rotate landscape → portrait → landscape, then hold movement while selecting and casting spells to check for any control regressions.
+
+The simulation still uses local-only gameplay. Runtime logic tests are not a substitute for a phone playtest.
+
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
