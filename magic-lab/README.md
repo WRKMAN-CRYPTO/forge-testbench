@@ -149,6 +149,30 @@ Field feedback on 007: hits felt like the wizard teleported and Detonation barel
 
 Source checks and instrumented synthetic physics tests passed; phone gameplay and subjective weight still need actual playtesting.
 
+## Fracture physics + environmental weapons (build 009)
+
+This build turns the arena itself into a combat resource. **No new spell buttons** or save/network dependencies are introduced.
+
+- **Three solid stone pillars** occupy the chamber. The wizard cannot walk through intact pillars, and they resist moving physics bodies.
+- A fast charging enemy, moving object, Arc Bolt, or Detonation can chip or fracture a pillar. Structural damage is shown as cracks. A direct centered Detonation will shatter a healthy pillar in the lab balance settings.
+- Breaking stone removes its static Matter collider and creates **one heavy central fragment and six smaller rubble pieces**, each with its own Matter body, velocity, drag, restitution, and collision response. Fragments can damage enemies through the kinetic-impact system.
+- **Four loose stones** exist at the start of the encounter so you can pull rocks with Gravity Well before breaking anything.
+- **Gravity Well, Frost Field, Kinetic Pulse, and Detonation** affect loose debris via the same physics processing as crates, enemies, and projectiles.
+- Flying rubble moving fast enough can hurt the wizard too. Intact pillars block the kinematic player; a knockback into a column can damage its structure.
+- Debris is capped to **36 active objects** and expires after **18 seconds**. All Matter bodies are removed by RESET or when expired. No permanent level destruction is saved.
+
+### Quick physics field test
+
+1. Try walking into an intact pillar. It should stop the wizard.
+2. Target a pillar with Arc Bolt and inspect the cracks, then Detonate to fracture it.
+3. Place a Gravity Well near the fragments: watch the heavy core and lighter stones pull into the field.
+4. Detonate beside the debris and try launching it into a Wisp or Charger. Collision damage should depend on mass and speed.
+5. Let a Charger rush into the next intact pillar and fracture it.
+6. Watch out for flying shrapnel yourself. RESET restores all three pillars, four loose rocks, enemies and the training objects.
+7. Confirm that Burn chains, Cinderheart toggling, six spells, multitouch, and portrait-to-landscape recovery remain working.
+
+The logic tests are synthetic. Real iPhone performance, layout, and the feel of destruction still require hands-on gameplay feedback.
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
