@@ -52,13 +52,13 @@ header .actions{display:flex;gap:6px}
 <div id="shell">
 <header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>EXPERIMENT 001 • MATTER PHYSICS</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
-<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">DRAG TO AIM • TAP TO CAST</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Move with the left thumbstick. Tap spells to cast toward the target, or tap the arena to aim.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–4 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the offline combat-physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Move with the left thumbstick. Tap spells to cast toward the target, or tap the arena to aim.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–4 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
 <button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span>1 • ARC BOLT</span></button>
 <button class="spell" data-spell="well"><span class="glyph">◉</span><span>2 • GRAVITY</span></button>
 <button class="spell" data-spell="pulse"><span class="glyph">◎</span><span>3 • PULSE</span></button>
 <button class="spell" data-spell="frost"><span class="glyph">❄</span><span>4 • FROST</span></button></div>
-<div class="bottomRow"><div class="controls"><label for="force">FIELD POWER</label><input type="range" id="force" min="1" max="10" value="5"><span id="forceValue">5</span></div><button class="minibtn" id="crate">+ OBJECT</button></div>
+<div class="bottomRow"><div class="controls"><label for="force">FIELD POWER</label><input type="range" id="force" min="1" max="10" value="5"><span id="forceValue">5</span></div><button class="minibtn" id="dash">DASH</button><button class="minibtn" id="crate">+ OBJECT</button></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
@@ -302,7 +302,7 @@ document.querySelectorAll(".spell").forEach(b=>b.addEventListener("click",()=>ai
 $("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
 $("notes").onclick=()=>{$("instructions").classList.add("show");};
 $("reset").onclick=()=>{scene?.resetLab();};
-$("crate").onclick=()=>{scene?.addCrate();};
+$("dash").onclick=()=>{scene?.dash();};$("crate").onclick=()=>{scene?.addCrate();};
 $("copy").onclick=async()=>{
  const build={format:"wrkman-spell-lab",version:1,fieldPower:power,spells:spells.map((id,i)=>({id,slot:i+1})),notes:"Experimental laboratory recipe; not yet compatible with the Spell Designer."};
  try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
