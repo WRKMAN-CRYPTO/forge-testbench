@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 012</title>
+<title>WRKMAN | Magic Physics Laboratory 013</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -126,7 +126,7 @@ header .actions{display:flex;gap:6px}
 .skinTop small{display:block;color:#abc9d9;font-size:10px}
 .skinControls{display:flex;gap:9px;align-items:center;justify-content:center;min-height:77px;background:#0c1b2b;border:1px solid #30485d;border-radius:12px;padding:4px 10px}
 .skinPreview{display:flex;align-items:center;justify-content:center;gap:9px;min-width:125px;flex:1}
-.skinLarge,.skinThumb{background-image:url("./skins/wizard-skins-20.webp?v=010");background-repeat:no-repeat;flex:none}
+.skinLarge,.skinThumb{background-image:url("./skins/wizard-skins-20-013.webp?v=013");background-repeat:no-repeat;flex:none}
 .skinLarge{width:56px;height:68px;transform:scale(1.03)}
 .skinIdentity{display:flex;flex-direction:column;gap:1px;color:#b0d0e2;font:bold 10px ui-monospace,monospace;letter-spacing:.11em}
 .skinIdentity b{color:#ffe1a6;font-size:23px}
@@ -224,7 +224,7 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 012 • HUE REFINEMENT</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 013 • DUAL-MASK MAGE</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
 <div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
@@ -349,9 +349,9 @@ const Combat=window.WRKMAN_COMBAT;
 const MatterBody=Phaser.Physics.Matter.Matter.Body;
 class Lab extends Phaser.Scene{
  preload(){
-  this.load.spritesheet("wizardSkins010","./skins/wizard-skins-20.webp?v=010",
+  this.load.spritesheet("wizardSkins010","./skins/wizard-skins-20-013.webp?v=013",
    {frameWidth:SKIN_W,frameHeight:SKIN_H});
-  this.load.image("wizardHueMasks012","./skins/wizard-hue-masks-012.png?v=012");
+  this.load.image("wizardHueMasks013","./skins/wizard-hue-masks-013.png?v=013");
  }
  constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];}
  create(){
@@ -394,10 +394,10 @@ class Lab extends Phaser.Scene{
   // Always detach from old dyed canvas before modifying that texture.
   this.playerSkinSprite.setTexture("wizardSkins010",id-1);
   if(!Hue||!Hue.validSkin(id)||!Hue.hasDye(lookPalettes[id]))return;
-  if(!this.textures.exists("wizardHueMasks012"))return;
+  if(!this.textures.exists("wizardHueMasks013"))return;
   try{
    const atlas=this.textures.get("wizardSkins010").getSourceImage();
-   const mask=this.textures.get("wizardHueMasks012").getSourceImage();
+   const mask=this.textures.get("wizardHueMasks013").getSourceImage();
    const canvas=Hue.makeCanvas(id,lookPalettes[id],atlas,mask,document);
    if(this.textures.exists("wizardDyed011"))this.textures.remove("wizardDyed011");
    this.textures.addCanvas("wizardDyed011",canvas);
@@ -765,7 +765,9 @@ function refreshSkinUI(){
  $("skinActiveNo").textContent=skinLabel(activeSkin);
  $("skinBigNo").textContent=skinLabel(activeSkin);
  applySkinThumb($("skinLarge"),activeSkin);
- $("skinStatus").textContent=keepers.has(activeSkin)?"★ MARKED KEEPER":"CURRENT LOOK";
+ $("skinStatus").textContent=activeSkin===3?
+  "🎭 DUAL-MASK MAGE"+(keepers.has(3)?" ★":""):
+  (keepers.has(activeSkin)?"★ MARKED KEEPER":"CURRENT LOOK");
  $("skinKeeper").classList.toggle("is-keeper",keepers.has(activeSkin));
  $("skinKeeper").setAttribute("aria-pressed",String(keepers.has(activeSkin)));
  $("skinKeeper").textContent=(keepers.has(activeSkin)?"★":"☆")+" KEEPER";
@@ -838,10 +840,10 @@ const huePreviewCache=new Map();
 function tintedPreview(n){
  if(!Hue||!Hue.validSkin(n)||!Hue.hasDye(lookPalettes[n]))return null;
  if(huePreviewCache.has(n))return huePreviewCache.get(n);
- if(!scene?.textures?.exists("wizardHueMasks012"))return null;
+ if(!scene?.textures?.exists("wizardHueMasks013"))return null;
  try{
   const atlas=scene.textures.get("wizardSkins010").getSourceImage();
-  const masks=scene.textures.get("wizardHueMasks012").getSourceImage();
+  const masks=scene.textures.get("wizardHueMasks013").getSourceImage();
   const canvas=Hue.makeCanvas(n,lookPalettes[n],atlas,masks,document);
   const data=canvas.toDataURL("image/png");
   huePreviewCache.set(n,data);
@@ -854,7 +856,7 @@ function applySkinThumb(el,n){
   el.style.backgroundImage='url("'+preview+'")';
   el.style.backgroundPosition="0 0";
  }else{
-  el.style.backgroundImage='url("./skins/wizard-skins-20.webp?v=010")';
+  el.style.backgroundImage='url("./skins/wizard-skins-20-013.webp?v=013")';
   el.style.backgroundPosition="-"+((n-1)%5*SKIN_W)+"px -"+
    (Math.floor((n-1)/5)*SKIN_H)+"px";
  }
@@ -864,6 +866,7 @@ const hueChoices=new Map();
 function refreshHueUI(){
  if(!Hue)return;
  $("hueDesignNo").textContent=skinLabel(hueSkin);
+ $("hueTitle").textContent=hueSkin===3?"W / HUE FORGE • DUAL-MASK":"W / HUE FORGE";
  const p=lookPalettes[hueSkin]||{};
  const selected=p[hueChannel];
  const name=selected?Hue.color(selected)?.name||"UNKNOWN":"ORIGINAL FABRIC";
@@ -874,7 +877,7 @@ function refreshHueUI(){
   parts.button.classList.toggle("active",n===hueSkin);
   parts.button.setAttribute("aria-pressed",String(n===hueSkin));
   const dyed=tintedPreview(n);
-  parts.image.src=dyed||"./skins/wizard-skins-20.webp?v=010";
+  parts.image.src=dyed||"./skins/wizard-skins-20-013.webp?v=013";
   if(dyed){
    parts.image.style.objectPosition="center";
    parts.image.style.objectFit="contain";
@@ -909,10 +912,11 @@ if(Hue){
  for(const n of Hue.FINALISTS){
   const button=document.createElement("button");
   button.type="button";button.className="hueCharacter";
-  button.setAttribute("aria-label","Dye wizard "+skinLabel(n));
+  button.setAttribute("aria-label","Dye wizard "+skinLabel(n)+(n===3?" Dual-Mask Mage":""));
+  if(n===3)button.title="03 • DUAL-MASK MAGE • Trim dyes the tragic half of the face";
   const thumb=document.createElement("span");thumb.className="skinThumb";thumb.setAttribute("aria-hidden","true");
   const image=document.createElement("img");image.alt="";image.width=56;image.height=68;
-  const num=document.createElement("span");num.textContent=skinLabel(n);
+  const num=document.createElement("span");num.textContent=skinLabel(n)+(n===3?" 🎭":"");
   button.append(thumb,image,num);
   button.addEventListener("click",()=>{
    hueSkin=n;equipSkin(n);refreshHueUI();
@@ -973,7 +977,7 @@ function applyHue(id){
 }
 function openHueForge(){
  if(!Hue)return;
- if(!scene?.textures?.exists("wizardHueMasks012")){
+ if(!scene?.textures?.exists("wizardHueMasks013")){
   announce("HUE FORGE • Dye mask failed to load. Try reloading online.");
   return;
  }
