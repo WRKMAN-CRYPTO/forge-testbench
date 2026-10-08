@@ -643,7 +643,10 @@ bindInstantPress($("relic"),()=>Combat.toggleRelic(scene));
 bindInstantPress($("dash"),()=>scene?.dash());
 bindInstantPress($("crate"),()=>scene?.addCrate());
 $("copy").onclick=async()=>{
- const build={format:"wrkman-spell-lab",version:1,fieldPower:power,spells:spells.map((id,i)=>({id,slot:i+1})),notes:"Experimental laboratory recipe; not yet compatible with the Spell Designer."};
+ const build={format:"wrkman-spell-lab",version:1,fieldPower:power,
+  wizardSkin:activeSkin,keeperSkins:[...keepers].sort((a,b)=>a-b),
+  spells:spells.map((id,i)=>({id,slot:i+1})),
+  notes:"Experimental laboratory recipe; appearance numbers 01–20; not yet compatible with Spell Designer."};
  try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
  catch(_){announce("Clipboard unavailable; open this page in a secure browser context.");}
 };
@@ -684,6 +687,8 @@ function toggleSkinKeeper(n){
 }
 function openSkinOverlay(){
  skinOverlay.hidden=false;
+ // Browsing skins must not let enemies attack the player unseen.
+ scene?.scene.pause();
  neutralStick();
  joyTouchId=null;joyPointer=null;
  refreshSkinUI();
@@ -691,6 +696,7 @@ function openSkinOverlay(){
 }
 function closeSkinOverlay(){
  skinOverlay.hidden=true;
+ scene?.scene.resume();
  $("skinsOpen").focus({preventScroll:true});
 }
 for(let n=1;n<=SKIN_COUNT;n++){
