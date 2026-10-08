@@ -210,16 +210,17 @@ function bodyCollision(s,a,b){
  s.combat.pairCollisions.set(key,now(s));
  if(s.combat.pairCollisions.size>180)s.combat.pairCollisions.clear();
  const force=clamp((speed-3.5)*2.9,2,32);
+ // Transfer the original Burn states before damage. A fatal impact can
+ // therefore still leave an ignited body that explodes on death.
+ if(aEnemy&&bEnemy&&aEnemy.alive&&bEnemy.alive){
+  const burnA=aEnemy.burn&&{...aEnemy.burn},burnB=bEnemy.burn&&{...bEnemy.burn};
+  if(burnA&&burnA.depth<MAX_DEPTH)
+   addBurn(s,bEnemy,burnA.energy*.68,burnA.chainId,burnA.depth+1);
+  if(burnB&&burnB.depth<MAX_DEPTH)
+   addBurn(s,aEnemy,burnB.energy*.68,burnB.chainId,burnB.depth+1);
+ }
  if(aEnemy)hitEnemy(s,aEnemy,force*(aEnemy.type==="charger"?.48:1),"impact");
  if(bEnemy)hitEnemy(s,bEnemy,force*(bEnemy.type==="charger"?.48:1),"impact");
- // A burning enemy can become a kinetic status-delivery projectile.
- // No duplicate chain detonation: every enemy/chain is tracked by seenSet.
- if(aEnemy&&bEnemy&&aEnemy.alive&&bEnemy.alive){
-  if(aEnemy.burn&&aEnemy.burn.depth<MAX_DEPTH)
-   addBurn(s,bEnemy,aEnemy.burn.energy*.68,aEnemy.burn.chainId,aEnemy.burn.depth+1);
-  if(bEnemy.burn&&bEnemy.burn.depth<MAX_DEPTH)
-   addBurn(s,aEnemy,bEnemy.burn.energy*.68,bEnemy.burn.chainId,bEnemy.burn.depth+1);
- }
  if(aEnemy||bEnemy){
   const ax=a.position?.x??0,ay=a.position?.y??0,bx=b.position?.x??0,by=b.position?.y??0;
   s.burst((ax+bx)/2,(ay+by)/2,0xffc387,7,Math.min(6,speed*.5));
