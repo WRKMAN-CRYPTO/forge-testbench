@@ -199,6 +199,38 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Hue Forge: material dye bench (build 011)
+
+A **separate, mobile-first hue bench** is now available in Arcane Lab through the **🎨 HUES** header button.
+
+- The selected finalists **03, 06, 08, and 16** have individually built dye masks for three channels: **robe**, **scarf**, and **trim**. For 08 and 16, robe includes their white hood or wizard hat. Skin, exposed hair, eyes, boots, and magical glow stay protected by the masks as much as possible.
+- Hue Forge shows four character previews, a currently selected wizard, material tabs, and **24 named starter hues**. Every color can be applied immediately to one selected fabric layer. **RESET LAYER** returns just that material to its unchanged original artwork.
+- **Eight locked catalog slots (HUE-025…HUE-032)** are *future collectible placeholders only*. There are **no drop rates, loot drops, rarity modifiers, trading, or purchase system** in Build 011.
+- Every finalist has its **own independent saved robe, scarf, and trim dyes**. The selected wizard appearance and starred keepers still persist as in Build 010. Hue choices use a separate localStorage entry on the current device. Your original twenty skin assets remain untouched.
+- **COPY LOOK** copies a shareable text code such as `WRKMAN-HUE/011|08|robe:violet|scarf:teal|trim:original`. This is **an export string**, not a network-backed trading, importing, or account system.
+- Hue Forge pauses the encounter while you're browsing, like the existing wardrobe. It does not affect hitbox size, spell costs, movement, damage, or combat physics.
+
+### Recoloring implementation
+
+- New pure `hue-forge.js` module: hue registry, validation, independent persistent palettes, deterministic RGBA recoloring, frame extraction, and copyable palette codes.
+- Hand-prepared **channel-coded** PNG `skins/wizard-hue-masks-011.png` (280×272). Each sprite frame is 56×68 and matches the existing 20-frame WebP atlas; red=robe, green=scarf, blue=trim. All other sixteen frames have zero masks.
+- Phaser loads the same original WebP atlas plus the small mask PNG. The renderer calculates a **single current 56×68 canvas texture**, blending selected dye hues with the original pixel luminance. Original alpha and unaffected areas are preserved. Gallery/bench previews come from the same per-skin recoloring path.
+- Material masks are an **early art pass**, prepared from compressed concept sprites. They intentionally favor protecting faces/glows over covering every possible cloth pixel. Further hand art refinements can improve fabric edges before animation.
+- With missing masks, Hue Forge refuses to open and displays an error. With missing original art, the old vector wizard is still the fallback.
+- Run **`node magic-lab/hue-forge.tests.js`** for 27 offline tests. UI interaction checks also cover four finalist buttons, independent layering, save/reset, and modal pause/resume.
+
+### Suggested first playtest
+
+1. Open **HUES** on the sideways phone. Pick **08**, select **ROBE**, and try **Voidbloom**, **Obsidian**, and **Royal Cobalt**.
+2. Switch to **TRIM** and choose **Ancient Bronze**. Switch to **SCARF** and choose **Deep Current**.
+3. Tap 03, 06, and 16. Each should maintain a separate set of colors; 08's outfit should still be waiting when you return.
+4. Tap **RESET LAYER** to restore the original coloring of just the selected part.
+5. Close the panel, run around and cast: only the wizard's appearance should change. Try SKINS and starred keepers again.
+6. Close and reopen the page: appearance, keeper stars, and palettes should survive via local device storage.
+7. Try **COPY LOOK**; inspect the literal material IDs in its code.
+
+**Not enabled:** Hue drops, discoveries, collectibles, online sync, shared spellbook, the dormant Spell-Language runtime, or automatic hue evolution.
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
