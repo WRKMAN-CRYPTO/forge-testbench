@@ -129,6 +129,25 @@ Your playtest confirmed the effects and Cinderheart DPS were working, but the sm
 The simulation still uses local-only gameplay. Runtime logic tests are not a substitute for a phone playtest.
 
 
+## Impact & momentum pass (build 008)
+
+Field feedback on 007: hits felt like the wizard teleported and Detonation barely pushed heavy Chargers. Both issues came from the movement model, not the visual effects.
+
+**Changes**
+- **Player knockback is time-integrated**, rather than directly editing position by 23 world units on hit. Charger collisions impart a strong initial velocity which decays smoothly over subsequent frames; normal input is briefly dampened but not disabled, and the player remains within world boundaries. Hit invulnerability still applies.
+- **Readable player recoil**: a stronger shake, directional afterimage, a short hit-color flash, and an impact ring. The wizard doesn't snap to a new position except for the existing explicit respawn at zero HP.
+- **Detonation physically redirects bodies** using one immediate Matter velocity impulse, instead of a weak single-frame `applyForce`. Heavy Chargers are given lower knockback than lightweight Wisps, but are visibly displaced even when moving toward the explosion.
+- **Explosion interrupts enemy steering for a short stagger** so their inertia continues carrying them instead of AI acceleration immediately canceling the launch. Chain depth, ignition decay and bounded FX from previous builds are unchanged.
+
+**On-device checks**
+1. Let a Charger hit you while standing still, then while holding the joystick. Your wizard should travel *over time* with visible feedback instead of moving one frame by a fixed distance.
+2. Cast Detonation near a Charger, then near a Wisp at approximately the same distance. Charger should recoil significantly; Wisp should fly farther.
+3. Try detonating in front of a Charger mid-charge: the incoming momentum should be redirected outward.
+4. Hit enemies into walls or one another and observe collision damage and ignition transfer.
+5. Verify Cinderheart ON/OFF, six-spell targeting, RESET, landscape rotation, multitouch movement, and dash.
+
+Source checks and instrumented synthetic physics tests passed; phone gameplay and subjective weight still need actual playtesting.
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
