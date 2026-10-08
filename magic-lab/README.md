@@ -69,7 +69,7 @@ This remains a **solo local prototype**, not the final roguelike and not multipl
 ### New physical enemies
 
 - **Charger**: a dense, heavy enemy that pursues, telegraphs its attack, commits to a directional dash, and recovers afterward. It is harder to move with gravity than lighter enemies, and high-speed impacts cause collision damage.
-- **Ember Wisp**: a lighter enemy that keeps its distance and releases slow, physical ember bolts. Wells, frost and other matter interactions affect them.
+- **Ember Wisp**: a lighter enemy that keeps its distance and releases slow, physical ember bolts. Wells, frost and other matter interactions affect them. A sufficiently redirected ember bolt can hit its own caster after a brief spawn grace period.
 - Enemy health, player health, enemies remaining, and kills appear in the HUD.
 - The original dummy and crates remain for repeatable physics tests. Use **RESET** to replay the encounter.
 
