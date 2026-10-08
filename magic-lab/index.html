@@ -141,7 +141,7 @@ header .actions{display:flex;gap:6px}
   <small>If it stays upright, turn off Portrait Orientation Lock.</small>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
-<script src="./combat.js?v=006"></script>
+<script src="./combat.js?v=006b"></script>
 <script>
 (()=>{
 "use strict";
@@ -295,6 +295,7 @@ class Lab extends Phaser.Scene{
  collisions(ev){
   for(const pair of ev.pairs){
    const a=pair.bodyA,b=pair.bodyB;
+   Combat.bodyCollision(this,a,b);
    const shot=["bolt","ember"].includes(a.gameTag)?a:(["bolt","ember"].includes(b.gameTag)?b:null);
    if(!shot||!shot.labAlive)continue;
    const other=shot===a?b:a;
