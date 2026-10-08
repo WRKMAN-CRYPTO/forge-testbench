@@ -199,6 +199,31 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Safe startup recovery (build 014)
+
+After switching Build 013 to the new Dual-Mask Mage assets, field testing reported an apparently frozen arena: no enemies or crates, no movement/spell response, and Hue Forge wouldn't open. GitHub Pages completed deployment, but the exact phone-side image/loader exception was not available for inspection.
+
+Build 014 **decouples cosmetic asset loading from scene startup**:
+
+- Phaser now initializes its Matter world, the dummy, crates, enemies, HUD, input handlers, and basic vector wizard **without waiting for any artwork to download**.
+- Only after `Lab.create()` completes does it asynchronously request the Build 013 WebP sprite atlas and PNG material mask.
+- Successful loading swaps the vector fallback to a true player sprite. If the new atlas fails, the game tries the known-working Build 012 art; if both fail, the vector wizard remains fully playable.
+- If the new mask fails while the atlas succeeds, Hue Forge can load the prior Build 012 dye mask instead. This preserves dyeing on most outfits but may temporarily use the old 03 mask coverage until the new mask is available.
+- Existing `localStorage` palette, skin and keeper keys are unchanged. Build 013's dual-mask art remains the intended default when the assets are available.
+- Combat JS and Spell-Language files are unchanged.
+
+### Recovery field test
+
+1. Open `magic-lab/?v=014`, dismiss the how-to overlay if shown, and confirm enemies, crates, and the dummy are visible **before** the wizard image finishes loading.
+2. Move and cast spells. Hit RESET and verify everything returns.
+3. Tap HUES, select 03, and confirm the split mask and trim tint when the 013 art is available.
+4. If the character remains vector-drawn or uses an older sprite, wait for the art to load, then refresh. Combat should remain usable regardless.
+5. The deployment and the exact iOS loading behavior cannot be fully proven by code inspection alone; collect Safari console output if the frozen symptoms recur.
+
+### Verification
+
+An instrumented scene-start test simulated the 013 art **failing completely**, verified that the Matter setup and original five lab bodies (dummy + four crates) had already been initialized, and confirmed successful fallback to the 012 art. The exact failure underlying the original phone report is not yet independently established.
+
 ## Dual-Mask Mage • wizard 03 (build 013)
 
 Wizard **03** now has an intentional, theater-inspired **comedy/tragedy face mask**. The character retains its original white tousled hair, blue scarf, compact outfit, frame index **03**, and every gameplay property. The mask is physically drawn into the existing 56×68 sprite art, not placed on top of the Phaser hitbox or dynamically scaled from a concept sheet.
