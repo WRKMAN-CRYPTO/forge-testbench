@@ -188,7 +188,7 @@ function ember(s,e){
  const b=s.matter.add.circle(p.x+nx*38,p.y+ny*38,8,{
   restitution:.65,frictionAir:.002,density:.004
  });
- b.gameTag="ember";b.labAlive=true;b.owner=e.id;b.labDeflected=false;
+ b.gameTag="ember";b.labAlive=true;b.owner=e.id;b.labBorn=now(s);b.labDeflected=false;
  Body.setVelocity(b,{x:nx*6.3,y:ny*6.3});
  s.projectiles.push({body:b,born:now(s),trail:[]});
  s.burst(b.position.x,b.position.y,0xff7a4a,5,2);
@@ -230,7 +230,9 @@ function bodyCollision(s,a,b){
 function collision(s,projectile,other){
  if(!projectile?.labAlive)return false;
  const tag=projectile.gameTag;
- if(tag==="ember"&&other.gameTag==="enemy"&&projectile.owner===other.enemyRef?.id)return true;
+ // Prevent accidental spawn contact, but allow skillful reflected shots
+ // to strike their own caster once the projectile has traveled away.
+ if(tag==="ember"&&other.gameTag==="enemy"&&projectile.owner===other.enemyRef?.id&&now(s)-projectile.labBorn<280)return true;
  if(tag!=="bolt"&&tag!=="ember")return false;
  // Enemy missiles can be deflected into their own allies and crates.
  if(tag==="bolt"&&other.gameTag==="enemy"){
