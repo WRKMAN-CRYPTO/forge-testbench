@@ -7,7 +7,8 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const WORLD={left:90,right:870,top:90,bottom:510};
 const CHAIN_FRACTION=.60,CHAIN_THRESHOLD=15,MAX_DEPTH=5,MAX_QUEUE=64,MAX_EVENTS_PER_FRAME=8;
-let chainCounter=0,enemyCounter=0;
+const MAX_DEBRIS=36,DEBRIS_LIFE=18000,PILLAR_HEALTH=82;
+let chainCounter=0,enemyCounter=0,pillarCounter=0;
 const now=s=>s.time.now;
 function spawn(s,type,x,y){
  const heavy=type==="charger";
@@ -34,12 +35,14 @@ function reset(s){
  s.combat={
   hp:100,kills:0,invulnUntil:0,enemyShots:0,
   enemies:[],fields:[],pending:[],seen:new Map(),
-  relic:true,damageEvents:0,pairCollisions:new Map(),impactFX:[],blastFX:[],lastShake:-1000,wallHits:0,collisionHits:0,playerKnock:{x:0,y:0},playerStaggerUntil:0,playerHurtAt:-9999,playerHurtDir:{x:0,y:0}
+  relic:true,damageEvents:0,pairCollisions:new Map(),impactFX:[],blastFX:[],lastShake:-1000,wallHits:0,collisionHits:0,pillars:[],debris:[],pendingRuptures:[],playerKnock:{x:0,y:0},playerStaggerUntil:0,playerHurtAt:-9999,playerHurtDir:{x:0,y:0}
  };
  spawn(s,"charger",585,205);
  spawn(s,"charger",620,410);
  spawn(s,"wisp",760,174);
  spawn(s,"wisp",753,426);
+ // Keep starting props clear of the four original crate locations.
+ pillar(s,371,165);pillar(s,694,362);pillar(s,377,457);
  heads(s);
 }
 function heads(s){
@@ -49,9 +52,11 @@ function heads(s){
  const k=document.getElementById("kills");
  const e=document.getElementById("enemies");
  const relic=document.getElementById("relic");
+ const pillars=document.getElementById("pillars");
  if(h)h.textContent=Math.max(0,Math.round(c.hp))+"%";
  if(k)k.textContent=String(c.kills);
  if(e)e.textContent=String(c.enemies.filter(x=>x.alive).length);
+ if(pillars)pillars.textContent=String(c.pillars.filter(p=>p.alive).length);
  if(relic){
   relic.textContent="✹ CINDERHEART "+(c.relic?"ON":"OFF");
   relic.setAttribute("aria-pressed",c.relic?"true":"false");
@@ -63,6 +68,156 @@ function toggleRelic(s){
  s.combat.relic=!s.combat.relic;
  heads(s);
 }
+// Pillars stay static until their structure fails. Once broken, all rubble
+// becomes real Matter bodies shared by the existing gravity/ice/impulse code.
+function pillar(s,x,y){
+ const b=s.matter.add.circle(x,y,29,{isStatic:true,friction:.85,restitution:.19,slop:.025});
+ const p={id:++pillarCounter,body:b,alive:true,hp:PILLAR_HEALTH,maxHP:PILLAR_HEALTH,r:29};
+ b.gameTag="pillar";b.pillarRef=p;b.labAlive=true;
+ s.actors.push(p);s.combat.pillars.push(p);
+ return p;
+}
+function damagePillar(s,p,amount,source){
+ if(!p?.alive||!Number.isFinite(amount)||amount<=0)return false;
+ p.hp=Math.max(0,p.hp-amount);
+ const pos=p.body.position;
+ if(p.hp>0){
+  s.burst(pos.x,pos.y,0xb4c5c6,6,2.8);
+  return false;
+ }
+ p.alive=false;p.body.labAlive=false;
+ s.removal.push(p.body);
+ const c=s.combat;
+ // Defer Matter world creation until the next update, outside the collision
+ // callback. A break always replaces, never duplicates, the original pillar.
+ c.pendingRuptures.push({x:pos.x,y:pos.y,id:p.id,source});
+ c.impactFX.push({x:pos.x,y:pos.y,energy:54,nx:1,ny:0,born:now(s),life:380,wall:false});
+ if(c.impactFX.length>24)c.impactFX.shift();
+ s.burst(pos.x,pos.y,0xe3c4a2,34,8);
+ s.cameras.main.shake(100,.003);
+ s.announceCombat("STONE FRACTURED • Flying debris is now a weapon.");
+ heads(s);
+ return true;
+}
+function rubble(s,x,y,r,vx,vy,core=false){
+ const c=s.combat;
+ // Evict the oldest rubble before Matter bodies accumulate indefinitely.
+ while(c.debris.length>=MAX_DEBRIS){
+  const oldest=c.debris.shift();
+  if(oldest?.alive){oldest.alive=false;oldest.body.labAlive=false;s.removal.push(oldest.body);}
+ }
+ const b=s.matter.add.circle(clamp(x,100,860),clamp(y,100,500),r,{
+  frictionAir:core?.025:.035,restitution:core?.42:.53,
+  density:core?.008:.0038,friction:.6,slop:.025
+ });
+ b.gameTag="debris";b.labAlive=true;
+ const obj={body:b,r,core,alive:true,born:now(s),
+  tone:(r*7+Math.round(x*3+y))%3};
+ b.debrisRef=obj;s.actors.push(obj);c.debris.push(obj);
+ Body.setVelocity(b,{x:vx,y:vy});
+ return obj;
+}
+function rupture(s,q){
+ const c=s.combat;
+ const sourceAngle=(q.id*2.399963229728653)%(Math.PI*2);
+ // Large central fragment travels fast enough to slam a nearby enemy;
+ // smaller stones fan outward and obey wells, frost and detonations.
+ for(let i=0;i<7;i++){
+  const core=i===0,r=core?19:7+(i%3)*2.5;
+  const angle=sourceAngle+i*2.399963229728653;
+  const speed=core?7.4:6.0+(i%3)*2.2;
+  const dx=Math.cos(angle),dy=Math.sin(angle);
+  rubble(s,q.x+dx*(core?7:18),q.y+dy*(core?7:18),r,dx*speed,dy*speed,core);
+ }
+ if(c.debris.length>MAX_DEBRIS)throw Error("Debris cap violated");
+}
+function environmentCollision(s,a,b,normal){
+ const pa=a.gameTag==="pillar"?a.pillarRef:null;
+ const pb=b.gameTag==="pillar"?b.pillarRef:null;
+ if(!pa&&!pb)return false;
+ // Structural impacts need meaningful speed along the collision normal.
+ const pillarBody=pa?a:b,moving=pa?b:a,p=pa||pb;
+ if(!p.alive||moving.isStatic)return true;
+ const vx=moving.velocity?.x||0,vy=moving.velocity?.y||0;
+ const px=pillarBody.position.x,py=pillarBody.position.y;
+ const dx=px-moving.position.x,dy=py-moving.position.y;
+ const len=Math.max(.001,Math.hypot(dx,dy));
+ const nx=dx/len,ny=dy/len;
+ const approach=Math.abs(vx*nx+vy*ny);
+ if(approach<3.0)return true;
+ // Charge + hard debris outrank ordinary rolling crates. Damage is capped
+ // per object/pillar pair, avoiding dozens of hits in one contact.
+ const key=p.id+":"+(moving.id||0),t=now(s),c=s.combat;
+ const old=c.pairCollisions.get("pillar:"+key)??-Infinity;
+ if(t-old<340)return true;
+ c.pairCollisions.set("pillar:"+key,t);
+ const mult=moving.gameTag==="enemy"&&moving.enemyRef?.type==="charger"?1.45:
+  moving.gameTag==="debris"&&moving.debrisRef?.core?1.15:1;
+ damagePillar(s,p,Math.max(2,(approach-2.4)*8.4*mult),"impact");
+ return true;
+}
+function environmentProjectile(s,shot,other){
+ if(other.gameTag!=="pillar")return false;
+ if(!shot?.labAlive||!other.pillarRef?.alive)return true;
+ shot.labAlive=false;s.removal.push(shot);
+ const p=other.position;
+ damagePillar(s,other.pillarRef,shot.gameTag==="bolt"?43:20,"projectile");
+ s.burst(p.x,p.y,shot.gameTag==="bolt"?0xffe6a9:0xffaa83,12,4);
+ return true;
+}
+function environmentStep(s,time){
+ const c=s.combat;
+ for(const q of c.pendingRuptures)rupture(s,q);
+ c.pendingRuptures.length=0;
+ for(const d of c.debris){
+  if(d.alive&&time-d.born>DEBRIS_LIFE){
+   d.alive=false;d.body.labAlive=false;s.removal.push(d.body);
+  }
+ }
+ c.debris=c.debris.filter(d=>d.alive);
+}
+function paintEnvironment(s,g,time){
+ const c=s.combat;if(!c)return;
+ for(const p of c.pillars){
+  if(!p.alive)continue;
+  const x=p.body.position.x,y=p.body.position.y,crack=1-p.hp/p.maxHP;
+  g.fillStyle(0x040b14,.44);g.fillEllipse(x,y+23,70,24);
+  g.fillStyle(0x445566);g.fillCircle(x,y,31);
+  g.fillStyle(0x677b85);g.fillCircle(x,y-3,26);
+  g.lineStyle(4,0xb0b6aa,.85);g.strokeCircle(x,y-3,24);
+  g.lineStyle(2,0x344854,.75);g.strokeCircle(x,y-3,17);
+  g.fillStyle(0xa3b7b5,.67);g.fillCircle(x-6,y-11,6);
+  if(crack>.08){
+   const k=crack*22;
+   g.lineStyle(2.7,0x182733,.95);
+   g.lineBetween(x+1,y-22,x+3+k*.28,y-10);
+   g.lineBetween(x+3+k*.28,y-10,x-4+k*.52,y+3);
+   g.lineBetween(x-4+k*.52,y+3,x+5+k*.85,y+18);
+   if(crack>.46){
+    g.lineBetween(x-4+k*.52,y+3,x-15,y+12);
+    g.lineBetween(x+3+k*.28,y-10,x+14,y-17);
+   }
+  }
+ }
+ for(const d of c.debris){
+  if(!d.alive)continue;
+  const b=d.body,x=b.position.x,y=b.position.y,r=d.r;
+  g.fillStyle(0x060b11,.36);g.fillEllipse(x,y+r*.55,r*2.5,r*.85);
+  g.save();g.translateCanvas(x,y);g.rotateCanvas(b.angle||0);
+  g.fillStyle(d.core?0x667c88:d.tone===0?0x879ba2:d.tone===1?0x596d78:0x9baba6);
+  g.fillRoundedRect(-r,-r,r*2,r*2,d.core?6:2);
+  g.lineStyle(d.core?3:1.8,0xc5c5ba,.85);
+  g.strokeRoundedRect(-r+1,-r+1,r*2-2,r*2-2,d.core?6:2);
+  g.lineStyle(2,0x344854,.8);
+  g.lineBetween(-r*.75,-r*.45,r*.5,r*.5);
+  if(d.core){
+   g.lineBetween(-r*.55,r*.35,r*.3,-r*.7);
+   g.fillStyle(0xaab8b3,.7);g.fillCircle(-r*.3,-r*.4,4);
+  }
+  g.restore();
+ }
+}
+
 function hitPlayer(s,amount,x,y,source){
  const c=s.combat,time=now(s);
  if(time<c.invulnUntil||time<s.dashUntil)return;
@@ -177,7 +332,12 @@ function blast(s,x,y,options={}){
   const b=a.body;if(!b||!b.position||a.alive===false||b.labAlive===false)continue;
   const dx=b.position.x-x,dy=b.position.y-y,radialDist=Math.hypot(dx,dy);
   const d=Math.max(18,radialDist);
-  if(d>radius||b.isStatic)continue;
+  if(d>radius)continue;
+  if(b.gameTag==="pillar"){
+   damagePillar(s,b.pillarRef,(chain?47:105)*(energy/100)*(1-d/radius*.45),"explosion");
+   continue;
+  }
+  if(b.isStatic)continue;
   const falloff=Math.max(.08,1-d/radius);
   const type=b.gameTag==="enemy"?b.enemyRef.type:null;
   const weight=type==="charger"?.78:type==="wisp"?1.48:1.1;
@@ -308,7 +468,9 @@ function bodyCollision(s,a,b,collisionNormal){
  const py=atWall?(aEnemy?a.position.y:b.position.y):(a.position.y+b.position.y)*.5;
  impactFeedback(s,px,py,kinetic,nx,ny,atWall);
  if(atWall)c.wallHits++;
- if(kinetic>24)s.announceCombat(atWall?"WALL SLAM • Impact energy transferred.":"BODY COLLISION • Mass and velocity determine the damage.");
+ if(kinetic>24)s.announceCombat(atWall?"WALL SLAM • Impact energy transferred.":
+  a.gameTag==="debris"||b.gameTag==="debris"?"RUBBLE IMPACT • The broken arena fights back.":
+  "BODY COLLISION • Mass and velocity determine the damage.");
 }
 
 function collision(s,projectile,other){
@@ -335,6 +497,7 @@ function collision(s,projectile,other){
 }
 function step(s,time,delta){
  const c=s.combat;if(!c)return;
+ environmentStep(s,time);
  const dt=Math.min(delta,48)/16.667;
  c.fields=c.fields.filter(f=>time-f.born<f.life);
  c.impactFX=c.impactFX.filter(f=>time-f.born<f.life);
@@ -439,6 +602,7 @@ function step(s,time,delta){
 }
 function paint(s,g,time){
  const c=s.combat;if(!c)return;
+ paintEnvironment(s,g,time);
  // Shock fronts + bright core flash provide visual mass without persistent
  // particles or a heavy post-processing pipeline on the iPhone.
  for(const fx of c.blastFX){
@@ -521,5 +685,5 @@ function paint(s,g,time){
   }
  }
 }
-window.WRKMAN_COMBAT={reset,heads,toggleRelic,hitEnemy,hitPlayer,flame,blast,collision,bodyCollision,step,paint,spawn};
+window.WRKMAN_COMBAT={reset,heads,toggleRelic,hitEnemy,hitPlayer,flame,blast,collision,bodyCollision,environmentCollision,environmentProjectile,damagePillar,step,paint,spawn};
 })();
