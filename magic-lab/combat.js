@@ -34,7 +34,7 @@ function reset(s){
  s.combat={
   hp:100,kills:0,invulnUntil:0,enemyShots:0,
   enemies:[],fields:[],pending:[],seen:new Map(),
-  relic:true,damageEvents:0,pairCollisions:new Map(),impactFX:[],blastFX:[],lastShake:-1000,wallHits:0,collisionHits:0
+  relic:true,damageEvents:0,pairCollisions:new Map(),impactFX:[],blastFX:[],lastShake:-1000,wallHits:0,collisionHits:0,playerKnock:{x:0,y:0},playerStaggerUntil:0,playerHurtAt:-9999,playerHurtDir:{x:0,y:0}
  };
  spawn(s,"charger",585,205);
  spawn(s,"charger",620,410);
@@ -68,14 +68,25 @@ function hitPlayer(s,amount,x,y,source){
  if(time<c.invulnUntil||time<s.dashUntil)return;
  c.hp=Math.max(0,c.hp-amount);
  c.invulnUntil=time+850;
- const dx=s.player.x-x,dy=s.player.y-y,d=Math.max(1,Math.hypot(dx,dy));
- s.player.x=clamp(s.player.x+dx/d*23,90,870);
- s.player.y=clamp(s.player.y+dy/d*23,90,510);
- s.burst(s.player.x,s.player.y,0xff9691,11,4);
- s.cameras.main.shake(70,.003);
+ // The wizard is currently a kinematic sprite, not a Matter body.
+ // Store a knockback velocity that the SAME movement integration consumes;
+ // never teleport 23px on every hit.
+ const dx=s.player.x-x,dy=s.player.y-y,d=Math.hypot(dx,dy);
+ const nx=d>.001?dx/d:-s.aim?.x||1,ny=d>.001?dy/d:-s.aim?.y||0;
+ const heavy=/golem|charg|wall|impact/i.test(source);
+ const speed=heavy?15.2:/bolt/i.test(source)?10.5:8.4;
+ c.playerKnock={x:nx*speed,y:ny*speed};
+ c.playerStaggerUntil=time+(heavy?165:100);
+ c.playerHurtAt=time;c.playerHurtDir={x:nx,y:ny};
+ s.burst(s.player.x,s.player.y,0xffb19b,heavy?26:16,heavy?7:4);
+ // Brief strong camera reaction and a visible ring mark a real impact.
+ s.rings.push({x:s.player.x,y:s.player.y,r:12,life:340,born:time,c:0xffaa84});
+ if(s.rings.length>36)s.rings.shift();
+ s.cameras.main.shake(heavy?140:90,heavy?.005:.0033);
  if(c.hp===0){
   c.hp=100;c.invulnUntil=time+2000;
   s.player.x=245;s.player.y=304;
+  c.playerKnock={x:0,y:0};c.playerStaggerUntil=0;
   s.burst(s.player.x,s.player.y,0x8edafa,26,6);
   s.announceCombat("WIZARD RECOVERED • Keep experimenting.");
  } else {
@@ -167,10 +178,34 @@ function blast(s,x,y,options={}){
   const d=Math.max(18,distance(b.position,origin));
   if(d>radius)continue;
   const falloff=Math.max(.08,1-d/radius);
-  const resistance=b.gameTag==="enemy"?(b.enemyRef.type==="charger"?.38:1.28):1;
-  // Equal impulses must not accelerate our massive charger like a wisp.
-  const impulse=(.014+energy*.00030)*b.mass*falloff*resistance*(chain?.88:1);
-  Body.applyForce(b,b.position,{x:(b.position.x-x)/d*impulse,y:(b.position.y-y)/d*impulse});
+  const type=b.gameTag==="enemy"?b.enemyRef.type:null;
+  const weight=type==="charger"?.78:type==="wisp"?1.48:1.1;
+  const nx=(b.position.x-x)/d,ny=(b.position.y-y)/d;
+  // Explosion = one instantaneous velocity impulse, NOT a weak force
+  // applied for one physics tick. Matter frictionAir was dissipating the
+  // old one-frame force before the Charger visibly moved.
+  const strength=Math.sqrt(energy/100);
+  const kick=(chain?13.4:19.2)*strength*falloff*weight;
+  const vx=b.velocity?.x||0,vy=b.velocity?.y||0;
+  const along=vx*nx+vy*ny;
+  // The blast redirects incoming momentum and retains sideways motion.
+  // A charging enemy can't completely swallow a close explosion.
+  const outward=Math.max(along+kick,kick*.7);
+  const change=outward-along;
+  const maxSpeed=type==="charger"?17:25;
+  const nextX=vx+nx*change,nextY=vy+ny*change;
+  const magnitude=Math.hypot(nextX,nextY);
+  const cap=Math.min(1,maxSpeed/Math.max(.001,magnitude));
+  Body.setVelocity(b,{x:nextX*cap,y:nextY*cap});
+  if(type){
+   // Interrupt steering briefly while the rigid body travels under its
+   // own inertia; the enemy is not glued to its AI path mid-explosion.
+   const foe=b.enemyRef;
+   foe.staggerUntil=Math.max(foe.staggerUntil,now(s)+(type==="charger"?320:420)*falloff);
+   if(foe.phase==="windup"||foe.phase==="charge"){
+    foe.phase="recover";foe.until=Math.max(foe.until,now(s)+360);
+   }
+  }
   if(b.gameTag==="enemy"){
    const foe=b.enemyRef;
    const dmg=(chain?11:31)*falloff*(energy/100);
