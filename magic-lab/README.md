@@ -37,6 +37,25 @@ Tap HOW TO for instructions.
 - Test on an actual phone: hold the left joystick, drag to move, and repeatedly tap Arc Bolt, Gravity, and DASH with the right thumb without letting go. Then tap open arena space while holding the stick.
 - There is no confirmed live-device verification yet. GitHub Pages may cache old content; use `?v=003` when testing.
 
+## Deliberate spell activation (build 004)
+
+**Selecting a different spell never casts it.** The spell button only equips that slot.
+
+| Equipped spell | Press its button again | Tap the arena |
+| --- | --- | --- |
+| Arc Bolt | Quick-fire along current aim (defaults to dummy without recent manual aim) | Aim precisely and fire |
+| Gravity Well | Wait for target placement (no automatic well) | Place at the tapped coordinates |
+| Kinetic Pulse | Cast an outward impulse **centered on the player** | Cast at the player |
+| Frost Field | Cast a slowing field **centered on the player** | Cast at the player |
+
+The game shows a compact status hint for the selected spell. On PC, keyboard 1–4 still equips spells and mouse clicks still cast; only the pointer position affects targeted and aimed abilities. On phone, direct arena taps choose targeted coordinates while another finger can keep moving.
+
+Quick checks:
+1. From Arc Bolt, tap GRAVITY. Confirm no well appears until you touch the arena.
+2. Hold the joystick while selecting Frost. Confirm switching doesn't cast. Tap Frost again: the field originates where you're standing.
+3. Switch to Pulse, cast near crates, and verify the outward force originates at the wizard.
+4. Equip Gravity again and tap a location beside a crate. Verify the well center is at that exact place, within the chamber walls.
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
