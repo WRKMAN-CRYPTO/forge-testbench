@@ -21,6 +21,14 @@ Or serve this folder from any static HTTP server. The first load needs an intern
 
 Tap HOW TO for instructions.
 
+## Phone handheld layout (build 002)
+
+- **Landscape only for phones.** Portrait displays a turn-sideways notice. On iPhone, turn off Portrait Orientation Lock if rotation is blocked; normal Safari pages cannot reliably force device orientation.
+- Hold the phone sideways like a Game Boy Advance: virtual movement stick left, 2x2 spell pad right. Buttons cast while the left thumb keeps moving.
+- The stage claims almost all remaining landscape height. DASH and + OBJECT stay near the bottom, and the info/reset controls are at the top.
+- On PC, the original keyboard and mouse controls and full layout remain available.
+- For the cleanest handheld experience, add the page to your phone Home Screen.
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
