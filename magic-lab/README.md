@@ -199,6 +199,28 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Dual-Mask Mage • wizard 03 (build 013)
+
+Wizard **03** now has an intentional, theater-inspired **comedy/tragedy face mask**. The character retains its original white tousled hair, blue scarf, compact outfit, frame index **03**, and every gameplay property. The mask is physically drawn into the existing 56×68 sprite art, not placed on top of the Phaser hitbox or dynamically scaled from a concept sheet.
+
+- **Comedy:** ivory/light half, with a happy eye and small smile; remains readable even with dark trim colors.
+- **Tragedy:** indigo/dark half, sorrowful eye and a small cyan teardrop. The tragedy side has intentional **TRIM** dye coverage. The gold border and forehead jewel frame the theatrical theme.
+- The new source assets are `skins/wizard-skins-20-013.webp` (a complete 20-frame transparent atlas with updated frame 03) and `skins/wizard-hue-masks-013.png` (material weights updated only for 03). All other 19 characters retain the same **visible pixels**, and the other three finalists retain the prior material masks.
+- Old `011`/ `012` files remain in the repository for art comparison and rollback. The live page now loads both 013 assets with independent versioned URLs.
+- The **SKINS** and **HUES** selectors still use 01–20 and the same `localStorage` keys. Your saved 03 robe/scarf/trim palette remains in effect. TRIM on 03 now recolors the intentionally masked tragedy side instead of an accidental skin-colored patch.
+- The Hue Forge title and 03 selection label identify the Dual-Mask Mage. The other skins, collider, movement, six spells, Cinderheart, destruction, and multiplayer status are unchanged. Spell-Language is still dormant.
+
+### Verify 013 on iPhone
+
+1. Reload `magic-lab/?v=013`. Select **03** in SKINS or HUES. Confirm the ivory/light half and sorrowful dark half are visible underneath the white hair.
+2. In HUES, select **03 → TRIM**. Try **Voidbloom**, **Royal Cobalt**, and **Obsidian**. The tragedy face half should respond but the comedy half should stay pale.
+3. Change **ROBE** and **SCARF** separately. The mask geometry should not move and the white hair should stay white.
+4. Switch to **06**, **08**, and **16**. Their old appearance and dye behavior should be unchanged.
+5. Return to the arena: no hitbox, physics, or combat behavior changes.
+6. Reload to verify that the existing selected skin and individual color choices survive.
+
+The concept sheet is higher-resolution *design reference*. Build 013 is the first readable pixel-scale adaptation; it is not a frame-by-frame facial animation.
+
 ## Hue Forge refinements (build 012)
 
 This is a targeted response to the first **iPhone landscape** dye-bench field test: wizard 06 robe coverage, fingertip access to **ROBE / SCARF / TRIM**, and weak trim dye uptake.
