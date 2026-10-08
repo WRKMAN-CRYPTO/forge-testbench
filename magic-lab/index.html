@@ -49,9 +49,12 @@ header .actions{display:flex;gap:6px}
 @media (min-width:900px){#shell{max-height:950px;padding:0 12px}#stageWrap{margin:0 8px}#toolbar{padding-bottom:12px}.spell{min-height:62px}.pill{font-size:12px}}
 @media (max-height:680px){header{padding-top:5px;padding-bottom:5px}#heads{padding-bottom:4px}#toolbar{gap:5px;padding-top:5px}.spell{min-height:49px}.spell .glyph{font-size:18px}#joystick{width:88px;height:88px}#stick{width:40px;height:40px;left:23px;top:23px}}
 
-/* 002: Phone is a sideways handheld: left thumb locomotion, right thumb magic.
+/* 003: Phone is a sideways handheld: left thumb locomotion, right thumb magic.
    Portrait phone sessions are intentionally blocked by the rotate cue; desktops
    and larger tablets retain the original layout. */
+/* Separate touch identifiers own the joystick and spell/canvas inputs.
+   Prevent OS gestures without consuming the second finger's action. */
+#joystick,#stage,#stage canvas,.spell,#dash,#crate{touch-action:none;-webkit-user-select:none;user-select:none}
 #rotationGate{display:none}
 @media (pointer:coarse) and (orientation:portrait) and (max-width:690px){
   #rotationGate{display:flex;position:fixed;inset:0;z-index:10000;background:radial-gradient(circle at 50% 44%,#243c4e 0%,#0b1724 63%,#07111c 100%);color:#f9e7c4;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:25px 28px calc(25px + env(safe-area-inset-bottom))}
@@ -111,7 +114,7 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 002 • LANDSCAPE HANDHELD</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 003 • MULTITOUCH</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
 <div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Rotate sideways like a handheld console. Left thumb moves; right thumb casts, dashes, or taps the arena to aim.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–4 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
@@ -366,17 +369,40 @@ function aimedCast(type){
  if(!scene.manualAim||scene.time.now-scene.manualAim>3300){scene.setAim(d.x,d.y);a=scene.aim;}
  scene.cast(type,scene.player.x+a.x*180,scene.player.y+a.y*180);
 }
-document.querySelectorAll(".spell").forEach(b=>b.addEventListener("click",()=>aimedCast(b.dataset.spell)));
+// Fire on touch-down, NOT synthesized click: Safari can defer clicks while
+// another finger is held on a control. Keyboard and mouse keep click behavior.
+function bindInstantPress(el, action){
+ let lastTouch=0;
+ const touchAction=(e)=>{
+  const now=Date.now();
+  if(now-lastTouch>90){lastTouch=now;action();}
+  e.preventDefault();
+  e.stopPropagation();
+ };
+ el.addEventListener("pointerdown",e=>{if(e.pointerType==="touch")touchAction(e);});
+ el.addEventListener("touchstart",e=>touchAction(e),{passive:false});
+ el.addEventListener("click",e=>{
+  if(Date.now()-lastTouch<800){e.preventDefault();return;}
+  action();
+ });
+}
+document.querySelectorAll(".spell").forEach(b=>bindInstantPress(b,()=>aimedCast(b.dataset.spell)));
 $("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
 $("notes").onclick=()=>{$("instructions").classList.add("show");};
 $("reset").onclick=()=>{scene?.resetLab();};
-$("dash").onclick=()=>{scene?.dash();};$("crate").onclick=()=>{scene?.addCrate();};
+bindInstantPress($("dash"),()=>scene?.dash());
+bindInstantPress($("crate"),()=>scene?.addCrate());
 $("copy").onclick=async()=>{
  const build={format:"wrkman-spell-lab",version:1,fieldPower:power,spells:spells.map((id,i)=>({id,slot:i+1})),notes:"Experimental laboratory recipe; not yet compatible with the Spell Designer."};
  try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
  catch(_){announce("Clipboard unavailable; open this page in a secure browser context.");}
 };
-const joy=$("joystick"),stick=$("stick");let joyPointer=null;
+const joy=$("joystick"),stick=$("stick");
+let joyPointer=null,joyTouchId=null;
+function neutralStick(){
+ touches.x=touches.y=0;
+ stick.style.transform="translate(0,0)";
+}
 function joystick(e){
  const rect=joy.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
  const dx=e.clientX-cx,dy=e.clientY-cy,rad=Math.min(rect.width,rect.height)*.32,mag=Math.hypot(dx,dy);
@@ -384,11 +410,58 @@ function joystick(e){
  if(mag>rad){touches.x=dx/mag;touches.y=dy/mag;}
  stick.style.transform="translate("+(touches.x*rad)+"px,"+(touches.y*rad)+"px)";
 }
-joy.addEventListener("pointerdown",e=>{joyPointer=e.pointerId;joy.setPointerCapture(e.pointerId);joystick(e);e.preventDefault();});
+// Track the joystick's exact touch identifier. Other simultaneous fingers
+// can now press spells, DASH, or aim on the canvas without releasing movement.
+joy.addEventListener("touchstart",e=>{
+ if(joyTouchId===null&&e.changedTouches.length){
+  const t=e.changedTouches[0];joyTouchId=t.identifier;joystick(t);
+ }
+ e.preventDefault();e.stopPropagation();
+},{passive:false});
+document.addEventListener("touchmove",e=>{
+ if(joyTouchId===null)return;
+ for(const t of e.changedTouches){
+  if(t.identifier===joyTouchId){joystick(t);e.preventDefault();break;}
+ }
+},{passive:false});
+function releaseJoyTouch(e){
+ if(joyTouchId===null)return;
+ for(const t of e.changedTouches){
+  if(t.identifier===joyTouchId){joyTouchId=null;neutralStick();break;}
+ }
+}
+document.addEventListener("touchend",releaseJoyTouch,{passive:true});
+document.addEventListener("touchcancel",releaseJoyTouch,{passive:true});
+// Mouse/pen fallback. No touch pointer capture: each finger has its own job.
+joy.addEventListener("pointerdown",e=>{
+ if(e.pointerType==="touch"||joyPointer!==null)return;
+ joyPointer=e.pointerId;
+ try{joy.setPointerCapture(e.pointerId);}catch(_){}
+ joystick(e);e.preventDefault();
+});
 joy.addEventListener("pointermove",e=>{if(e.pointerId===joyPointer){joystick(e);e.preventDefault();}});
-function joyEnd(e){if(e.pointerId===joyPointer){joyPointer=null;touches.x=touches.y=0;stick.style.transform="translate(0,0)";}}
-joy.addEventListener("pointerup",joyEnd);joy.addEventListener("pointercancel",joyEnd);addEventListener("blur",()=>{touches.x=touches.y=0;stick.style.transform="translate(0,0)";});
-$("stage").addEventListener("pointerdown",e=>{if(scene&&started){scene.manualAim=scene.time.now;}});
+function joyPointerEnd(e){if(e.pointerId===joyPointer){joyPointer=null;neutralStick();}}
+joy.addEventListener("pointerup",joyPointerEnd);
+joy.addEventListener("pointercancel",joyPointerEnd);
+addEventListener("blur",()=>{joyPointer=null;joyTouchId=null;neutralStick();});
+
+// Capture canvas touches directly so Phaser's pointer management cannot
+// eat the second thumb while the first is held on the external joystick.
+$("stage").addEventListener("touchstart",e=>{
+ if(!started||!scene||$("instructions").classList.contains("show"))return;
+ const canvas=$("stage").querySelector("canvas");
+ if(!canvas)return;
+ const r=canvas.getBoundingClientRect();
+ for(const t of e.changedTouches){
+  if(t.clientX<r.left||t.clientX>r.right||t.clientY<r.top||t.clientY>r.bottom)continue;
+  const x=(t.clientX-r.left)*W/r.width, y=(t.clientY-r.top)*H/r.height;
+  scene.manualAim=scene.time.now;
+  scene.setAim(x,y);
+  scene.cast(selected,x,y);
+ }
+ e.preventDefault();
+},{passive:false,capture:true});
+$("stage").addEventListener("pointerdown",e=>{if(scene&&started&&e.pointerType!=="touch"){scene.manualAim=scene.time.now;}});
 })();
 </script>
 </body>
