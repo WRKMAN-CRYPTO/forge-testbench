@@ -25,6 +25,7 @@ header .actions{display:flex;gap:6px}
 #stage{height:100%;width:100%;touch-action:none}#stage canvas{display:block;touch-action:none}
 #joystick{position:absolute;left:18px;bottom:17px;width:110px;height:110px;border:1px solid #b2cbdd45;border-radius:50%;background:#9cc2d00c;display:none;touch-action:none;z-index:5}
 #stick{position:absolute;left:29px;top:29px;width:50px;height:50px;border:2px solid #9ecde5aa;border-radius:50%;background:#72b7de38;box-shadow:0 0 20px #3fbbf144;pointer-events:none}
+#castHint{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:6;max-width:65%;pointer-events:none;padding:5px 9px;border:1px solid #7e9caf88;background:#0b2138d9;color:#f9dfad;border-radius:18px;font:800 10px/1.3 ui-monospace,monospace;letter-spacing:.065em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #cross{position:absolute;right:12px;bottom:10px;color:#b1d7e1;font-size:10px;letter-spacing:.06em;text-shadow:0 1px 4px #000;pointer-events:none}
 #toolbar{padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:#0e1825;border-top:1px solid #2c435a;display:flex;flex-direction:column;gap:8px}
 #spellRow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
@@ -83,11 +84,12 @@ header .actions{display:flex;gap:6px}
   #stick{width:46%;height:46%;left:27%;top:27%;border:2px solid #e2f0f6a8;background:#88bce35c;box-shadow:inset 0 1px 12px #ffffff1c,0 0 16px #5c9cb65f}
   #toolbar{position:relative;z-index:7;flex:none;padding:3px 6px calc(3px + env(safe-area-inset-bottom));border-top:0;background:transparent;gap:2px;min-height:37px}
   #spellRow{position:fixed;z-index:8;right:calc(15px + env(safe-area-inset-right));top:49%;transform:translateY(-38%);width:clamp(124px,20.5vw,175px);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;pointer-events:auto}
-  #spellRow:before{content:"CAST";position:absolute;right:2px;top:-19px;font:bold 10px monospace;letter-spacing:.18em;color:#c9e3ec}
+  #spellRow:before{content:"EQUIP / CAST";position:absolute;right:2px;top:-19px;font:bold 10px monospace;letter-spacing:.18em;color:#c9e3ec}
   .spell{min-width:0;min-height:clamp(50px,15dvh,70px);border:1px solid #648299;border-radius:17px;padding:4px 2px;gap:2px;background:linear-gradient(145deg,#304963dd,#192b41ed);box-shadow:0 3px 0 #0b1827,0 0 18px #69b9e01c;line-height:1.02;user-select:none}
   .spell .glyph{font-size:22px;line-height:1}
   .spell .spell-name{font-size:9px;letter-spacing:.02em;white-space:nowrap}
   .spell.sel{border:2px solid #ffd084;background:linear-gradient(145deg,#695133,#2b3440);box-shadow:0 0 18px #ffc06b3c}
+  #castHint{top:4px;left:50%;max-width:54%;font-size:9px;padding:3px 9px}
   #cross{display:none}
   .bottomRow{justify-content:center;gap:8px;min-height:30px}
   .controls{flex:0 1 200px;gap:4px}
@@ -114,9 +116,9 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 003 • MULTITOUCH</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 004 • CAST CONTROL</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
-<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Rotate sideways like a handheld console. Left thumb moves; right thumb casts, dashes, or taps the arena to aim.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–4 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity appears where you tap.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–4 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
 <button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span class="spell-name">1 • ARC BOLT</span></button>
 <button class="spell" data-spell="well"><span class="glyph">◉</span><span class="spell-name">2 • GRAVITY</span></button>
@@ -140,12 +142,27 @@ const $=id=>document.getElementById(id);
 const W=960,H=600,MINX=64,MAXX=896,MINY=68,MAXY=532;
 const recipeKey="wrkman-arcane-lab001";
 const spells=["bolt","well","pulse","frost"];
+// Cast semantics are explicit for each ability, ready to become spell metadata.
+const spellInfo={
+ bolt:{name:"ARC BOLT",button:"quick",origin:"aim",hint:"ARC BOLT • TAP AGAIN TO FIRE"},
+ well:{name:"GRAVITY WELL",button:"target",origin:"target",hint:"GRAVITY • TAP ARENA TO PLACE"},
+ pulse:{name:"KINETIC PULSE",button:"quick",origin:"self",hint:"PULSE • TAP AGAIN • SELF"},
+ frost:{name:"FROST FIELD",button:"quick",origin:"self",hint:"FROST • TAP AGAIN • SELF"}
+};
+function spellButtonIntent(current,requested){
+ if(current!==requested)return "equip";
+ return spellInfo[requested].button==="target"?"place":"quick";
+}
 let selected="bolt", power=Number(localStorage.getItem(recipeKey)||5), scene=null, started=false;
 const touches={x:0,y:0};
 $("force").value=power;$("forceValue").textContent=power;
 $("force").addEventListener("input",e=>{power=Number(e.target.value);$("forceValue").textContent=power;localStorage.setItem(recipeKey,String(power));});
 const announce=msg=>{$("log").textContent=msg;};
-function selectSpell(type){selected=type;document.querySelectorAll(".spell").forEach(b=>b.classList.toggle("sel",b.dataset.spell===type));}
+function selectSpell(type){
+ selected=type;
+ document.querySelectorAll(".spell").forEach(b=>b.classList.toggle("sel",b.dataset.spell===type));
+ $("castHint").textContent=spellInfo[type].hint;
+}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
 const color={bolt:0xffdc8d,well:0xb994ff,pulse:0x84ecdb,frost:0x96d8ff};
@@ -164,7 +181,13 @@ class Lab extends Phaser.Scene{
   });
   this.keys=this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT");
   this.input.on("pointermove",p=>{if(!p.down||p.event?.pointerType==="mouse")this.setAim(p.x,p.y);});
-  this.input.on("pointerdown",p=>{if($("instructions").classList.contains("show"))return;this.setAim(p.x,p.y);this.cast(selected,p.x,p.y);});
+  this.input.on("pointerdown",p=>{
+   if($("instructions").classList.contains("show"))return;
+   // Mobile touch casting is handled once in the DOM capture listener.
+   // Otherwise Phaser can fire a second cast for the same touch.
+   if(p.event?.pointerType==="touch"||p.event?.type?.startsWith("touch"))return;
+   this.setAim(p.x,p.y);this.cast(selected,p.x,p.y);
+  });
   this.g=this.add.graphics();this.drawFloor();
   this.draw=this.add.graphics().setDepth(4);
   this.matter.world.setBounds(MINX,MINY,MAXX-MINX,MAXY-MINY,34,true,true,true,true);
@@ -229,12 +252,12 @@ class Lab extends Phaser.Scene{
    this.burst(px+aim.x*21,py+aim.y*21,color.bolt,7,2.5);
    announce("ARC BOLT • Watch for curvature around active wells.");
   }else if(type==="well"){
-   let x=clamp(px+aim.x*160,MINX+115,MAXX-115),y=clamp(py+aim.y*160,MINY+115,MAXY-115);
-   if(Number.isFinite(tx)&&Number.isFinite(ty)){x=clamp(tx,MINX+115,MAXX-115);y=clamp(ty,MINY+115,MAXY-115);}
+   let x=clamp(px+aim.x*160,MINX+24,MAXX-24),y=clamp(py+aim.y*160,MINY+24,MAXY-24);
+   if(Number.isFinite(tx)&&Number.isFinite(ty)){x=clamp(tx,MINX+24,MAXX-24);y=clamp(ty,MINY+24,MAXY-24);}
    this.wells.push({x,y,r:208,born:this.time.now,life:4800,phase:Math.random()*6});
    this.burst(x,y,color.well,20,4);announce("GRAVITY WELL • All nearby moving bodies feel its pull.");
   }else if(type==="pulse"){
-   const x=clamp(px+aim.x*70,MINX+60,MAXX-60),y=clamp(py+aim.y*70,MINY+60,MAXY-60),radius=204;
+   const x=px,y=py,radius=204; // Self-centered: push outward from the wizard.
    for(const actor of [...this.actors,...this.projectiles]){
     const b=actor.body;if(b.isStatic)continue;
     const dx=b.position.x-x,dy=b.position.y-y,d=Math.max(28,Math.hypot(dx,dy));
@@ -244,7 +267,7 @@ class Lab extends Phaser.Scene{
    this.rings.push({x,y,r:12,life:500,born:this.time.now,c:color.pulse});
    this.burst(x,y,color.pulse,28,8);announce("KINETIC PULSE • Force applied to physical bodies.");
   }else if(type==="frost"){
-   const x=clamp(px+aim.x*140,MINX+100,MAXX-100),y=clamp(py+aim.y*140,MINY+100,MAXY-100);
+   const x=px,y=py; // Self-centered frost field, anchored where cast.
    this.frosts.push({x,y,r:152,born:this.time.now,life:3400});
    this.burst(x,y,color.frost,18,4);announce("FROST FIELD • Objects lose momentum inside the radius.");
   }
@@ -360,14 +383,33 @@ class Lab extends Phaser.Scene{
  }
 }
 const game=new Phaser.Game({type:Phaser.AUTO,parent:"stage",width:W,height:H,backgroundColor:"#091825",render:{antialias:true,pixelArt:false},scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},physics:{default:"matter",matter:{gravity:{x:0,y:0},debug:false,enableSleeping:false}},scene:[Lab],fps:{target:60,forceSetTimeOut:false}});
-function aimedCast(type){
- selectSpell(type);
+function quickCast(type){
  if(!scene||!started)return;
- const d=scene.dummy.body.position;
- // Cast toward the dummy unless the player has manually aimed on the arena.
- let a=scene.aim;
- if(!scene.manualAim||scene.time.now-scene.manualAim>3300){scene.setAim(d.x,d.y);a=scene.aim;}
+ // Quick-cast is for aim-based and self-centered abilities only.
+ // A targeted spell never guesses a placement point.
+ if(spellInfo[type].button!=="quick")return;
+ if(spellInfo[type].origin==="self"){
+  scene.cast(type); // No coordinates: the spell originates at the player.
+  return;
+ }
+ const dummy=scene.dummy.body.position;
+ // Aim at the dummy only if there has been no recent manual arena aim.
+ if(!scene.manualAim||scene.time.now-scene.manualAim>3300)scene.setAim(dummy.x,dummy.y);
+ const a=scene.aim;
  scene.cast(type,scene.player.x+a.x*180,scene.player.y+a.y*180);
+}
+function pressSpell(type){
+ const intent=spellButtonIntent(selected,type);
+ if(intent==="equip"){
+  selectSpell(type);
+  announce(spellInfo[type].name+" EQUIPPED • "+(spellInfo[type].button==="target"?"Tap the arena to place.":"Tap again to cast."));
+  return;
+ }
+ if(intent==="place"){
+  announce("GRAVITY WELL READY • Tap the exact arena position.");
+  return;
+ }
+ quickCast(type);
 }
 // Fire on touch-down, NOT synthesized click: Safari can defer clicks while
 // another finger is held on a control. Keyboard and mouse keep click behavior.
@@ -386,7 +428,7 @@ function bindInstantPress(el, action){
   action();
  });
 }
-document.querySelectorAll(".spell").forEach(b=>bindInstantPress(b,()=>aimedCast(b.dataset.spell)));
+document.querySelectorAll(".spell").forEach(b=>bindInstantPress(b,()=>pressSpell(b.dataset.spell)));
 $("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
 $("notes").onclick=()=>{$("instructions").classList.add("show");};
 $("reset").onclick=()=>{scene?.resetLab();};
