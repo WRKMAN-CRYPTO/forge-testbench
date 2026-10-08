@@ -29,6 +29,14 @@ Tap HOW TO for instructions.
 - On PC, the original keyboard and mouse controls and full layout remain available.
 - For the cleanest handheld experience, add the page to your phone Home Screen.
 
+## Multitouch fix (build 003)
+
+- Independent touch identifiers now control the joystick, so holding the left thumb does not reserve inputs from the right thumb.
+- On touch devices, spells and DASH activate on the press event instead of waiting for a synthesized click.
+- Touching the canvas while steering also aims and casts. Desktop mouse/keyboard behavior is preserved.
+- Test on an actual phone: hold the left joystick, drag to move, and repeatedly tap Arc Bolt, Gravity, and DASH with the right thumb without letting go. Then tap open arena space while holding the stick.
+- There is no confirmed live-device verification yet. GitHub Pages may cache old content; use `?v=003` when testing.
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
