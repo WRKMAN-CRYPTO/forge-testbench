@@ -175,12 +175,18 @@ function blast(s,x,y,options={}){
  const origin={x,y};
  for(const a of [...s.actors,...s.projectiles]){
   const b=a.body;if(!b||!b.position||a.alive===false||b.labAlive===false)continue;
-  const d=Math.max(18,distance(b.position,origin));
-  if(d>radius)continue;
+  const dx=b.position.x-x,dy=b.position.y-y,radialDist=Math.hypot(dx,dy);
+  const d=Math.max(18,radialDist);
+  if(d>radius||b.isStatic)continue;
   const falloff=Math.max(.08,1-d/radius);
   const type=b.gameTag==="enemy"?b.enemyRef.type:null;
   const weight=type==="charger"?.78:type==="wisp"?1.48:1.1;
-  const nx=(b.position.x-x)/d,ny=(b.position.y-y)/d;
+  // A Gravity Well often puts foes precisely at the blast center.
+  // Zero distance has no geometric outward vector: use a deterministic
+  // per-body direction so the center never becomes a knockback dead zone.
+  const angle=((b.id||a.id||1)*2.399963229728653)% (Math.PI*2);
+  const nx=radialDist>.001?dx/radialDist:Math.cos(angle);
+  const ny=radialDist>.001?dy/radialDist:Math.sin(angle);
   // Explosion = one instantaneous velocity impulse, NOT a weak force
   // applied for one physics tick. Matter frictionAir was dissipating the
   // old one-frame force before the Charger visibly moved.
