@@ -120,7 +120,7 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 007 • KINETIC COLLISIONS</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 008 • IMPACT & MOMENTUM</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
 <div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
@@ -141,7 +141,7 @@ header .actions{display:flex;gap:6px}
   <small>If it stays upright, turn off Portrait Orientation Lock.</small>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
-<script src="./combat.js?v=007"></script>
+<script src="./combat.js?v=008"></script>
 <script>
 (()=>{
 "use strict";
@@ -328,9 +328,26 @@ class Lab extends Phaser.Scene{
  update(time,delta){
   if(!started)return;
   delta=Math.min(delta,50);const t=delta/16.667;
-  const mv=this.getMove();this.player.vx=mv.x*4.4;this.player.vy=mv.y*4.4;
-  this.player.x=clamp(this.player.x+this.player.vx*t,MINX+20,MAXX-20);
-  this.player.y=clamp(this.player.y+this.player.vy*t,MINY+20,MAXY-20);
+  const mv=this.getMove(),combat=this.combat;
+  const staggered=combat&&time<combat.playerStaggerUntil;
+  // Input is briefly damped after a strong hit. Knockback is a separate
+  // velocity, integrated over successive frames with exponential drag.
+  // This preserves responsive input and does not snap the wizard on impact.
+  const steer=staggered?.24:1;
+  this.player.vx=mv.x*4.4*steer;this.player.vy=mv.y*4.4*steer;
+  const knock=combat?.playerKnock||{x:0,y:0};
+  const nextX=this.player.x+(this.player.vx+knock.x)*t;
+  const nextY=this.player.y+(this.player.vy+knock.y)*t;
+  this.player.x=clamp(nextX,MINX+20,MAXX-20);
+  this.player.y=clamp(nextY,MINY+20,MAXY-20);
+  if(combat){
+   const drag=Math.pow(.855,t);
+   knock.x*=drag;knock.y*=drag;
+   if(Math.abs(knock.x)<.055)knock.x=0;
+   if(Math.abs(knock.y)<.055)knock.y=0;
+   if(this.player.x!==nextX)knock.x=0;
+   if(this.player.y!==nextY)knock.y=0;
+  }
   this.wells=this.wells.filter(w=>time-w.born<w.life);
   this.frosts=this.frosts.filter(f=>time-f.born<f.life);
   this.rings=this.rings.filter(r=>time-r.born<r.life);
@@ -400,9 +417,24 @@ class Lab extends Phaser.Scene{
    g.fillStyle(0xffffff);g.fillCircle(b.position.x,b.position.y,3);
   }
   for(const p of this.fx){const q=Math.min(1,p.life/p.max);g.fillStyle(p.c,q*.8);g.fillCircle(p.x,p.y,p.size*q);}
-  const p=this.player;g.fillStyle(0x01080e,.6);g.fillEllipse(p.x,p.y+22,44,14);
-  g.fillStyle(0x1b4d67,.98);g.fillCircle(p.x,p.y+4,19);
-  g.lineStyle(3,0x6fd7f2,.87);g.strokeCircle(p.x,p.y+3,19);
+  const p=this.player;
+  const hurt=this.combat&&time-this.combat.playerHurtAt<240;
+  const fade=hurt?Math.max(0,1-(time-this.combat.playerHurtAt)/240):0;
+  if(fade){
+   const dir=this.combat.playerHurtDir;
+   // Directional afterimage sells displacement; the real sprite follows
+   // integrated knockback, so these echoes are purely visual.
+   for(let i=3;i>=1;i--){
+    const tail=dir.x*i*11,up=dir.y*i*11;
+    g.fillStyle(0xffaa8f,fade*.055*(4-i));
+    g.fillEllipse(p.x-tail,p.y-up+3,40,44);
+   }
+   g.lineStyle(3+3*fade,0xffbe97,.78*fade);
+   g.strokeCircle(p.x,p.y,24+(1-fade)*24);
+  }
+  g.fillStyle(0x01080e,.6);g.fillEllipse(p.x,p.y+22,44,14);
+  g.fillStyle(hurt?0x914e56:0x1b4d67,.98);g.fillCircle(p.x,p.y+4,19);
+  g.lineStyle(3,hurt?0xffbd96:0x6fd7f2,.87);g.strokeCircle(p.x,p.y+3,19);
   g.fillStyle(0x82d9f8,.28);g.fillCircle(p.x,p.y-13,16);
   g.fillStyle(0xfce3b2);g.fillCircle(p.x,p.y-13,10);
   g.fillStyle(0x132f49);g.fillTriangle(p.x-17,p.y-18,p.x+17,p.y-18,p.x,p.y-46);
