@@ -263,7 +263,8 @@ function bodyCollision(s,a,b,collisionNormal){
   if(kinetic>8)bEnemy.staggerUntil=Math.max(bEnemy.staggerUntil,now(s)+Math.min(bEnemy.type==="charger"?175:480,kinetic*(bEnemy.type==="charger"?3:10)));
   hitEnemy(s,bEnemy,dmgB,"kinetic-impact");
  }
- const px=(a.position.x+b.position.x)*.5,py=(a.position.y+b.position.y)*.5;
+ const px=atWall?(aEnemy?a.position.x:b.position.x):(a.position.x+b.position.x)*.5;
+ const py=atWall?(aEnemy?a.position.y:b.position.y):(a.position.y+b.position.y)*.5;
  impactFeedback(s,px,py,kinetic,nx,ny,atWall);
  if(atWall)c.wallHits++;
  if(kinetic>24)s.announceCombat(atWall?"WALL SLAM • Impact energy transferred.":"BODY COLLISION • Mass and velocity determine the damage.");
