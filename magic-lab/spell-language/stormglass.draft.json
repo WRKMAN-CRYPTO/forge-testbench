@@ -1,0 +1,52 @@
+{
+  "format": "wrkman.sl/0.1-draft",
+  "id": "stormglass.seed",
+  "name": "Stormglass / Prototype",
+  "version": 1,
+  "status": "draft",
+  "lineage": {
+    "rootId": "stormglass.seed",
+    "parentId": null,
+    "generation": 0
+  },
+  "program": [
+    {
+      "op": "FOCUS",
+      "selector": "enemy_cluster"
+    },
+    {
+      "op": "CAST",
+      "spell": "gravity.well"
+    },
+    {
+      "op": "UNTIL",
+      "test": "cluster.converged",
+      "timeout": 24
+    },
+    {
+      "op": "CAST",
+      "spell": "frost.field"
+    },
+    {
+      "op": "UNTIL",
+      "test": "target.frozen",
+      "timeout": 36
+    },
+    {
+      "op": "CAST",
+      "spell": "flame.field"
+    },
+    {
+      "op": "UNTIL",
+      "test": "vapor.present",
+      "timeout": 48
+    },
+    {
+      "op": "CAST",
+      "spell": "lightning.arc"
+    },
+    {
+      "op": "END"
+    }
+  ]
+}
