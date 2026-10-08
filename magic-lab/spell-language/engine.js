@@ -149,6 +149,11 @@
           break;
         }
       }else if(op.op==="CAST"){
+        // Branches can skip FOCUS. A missing selection must fail closed even
+        // if the linear validator saw a FOCUS somewhere earlier.
+        if(!state.focus){
+          state.status="failed";state.failure="target_not_selected";break;
+        }
         // The interpreter NEVER calls the game. It returns a proposal only.
         const price=COST[op.spell];
         if(state.emitted>=LIMITS.casts||state.spent+price>LIMITS.energy){
