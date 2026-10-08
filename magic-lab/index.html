@@ -28,10 +28,12 @@ header .actions{display:flex;gap:6px}
 #castHint{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:6;max-width:65%;pointer-events:none;padding:5px 9px;border:1px solid #7e9caf88;background:#0b2138d9;color:#f9dfad;border-radius:18px;font:800 10px/1.3 ui-monospace,monospace;letter-spacing:.065em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #cross{position:absolute;right:12px;bottom:10px;color:#b1d7e1;font-size:10px;letter-spacing:.06em;text-shadow:0 1px 4px #000;pointer-events:none}
 #toolbar{padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:#0e1825;border-top:1px solid #2c435a;display:flex;flex-direction:column;gap:8px}
-#spellRow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+#spellRow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
 .spell{position:relative;min-height:59px;background:linear-gradient(180deg,#1e2a3d,#121c2c);color:#eff1e9;border:1px solid #496075;border-radius:12px;font-size:10px;font-weight:850;letter-spacing:.015em;padding:7px 3px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px}
 .spell .glyph{font-size:22px;line-height:1.1}.spell.sel{border:2px solid var(--gold);background:linear-gradient(180deg,#3a342a,#1c242a);box-shadow:0 0 14px #f7c56d20}
 .spell:active{transform:translateY(1px)}
+.relic{color:#d6dce7;border-color:#56647a;background:#222633;white-space:nowrap}
+.relic.on{color:#ffe0ac;border-color:#c48655;background:#443125}
 .bottomRow{display:flex;align-items:center;justify-content:space-between;gap:9px}
 .controls{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
 .controls label{font-size:10px;color:#bbd0df;white-space:nowrap;font-weight:850}
@@ -77,17 +79,18 @@ header .actions{display:flex;gap:6px}
   #heads{flex:none;padding:1px 7px 5px;gap:5px}
   .pill{padding:2px 8px;font-size:9px}
   #heads .pill:last-child{display:none}
+  #heads .pill:nth-child(4),#heads .pill:nth-child(6){display:none}
   #stageWrap{flex:1;min-height:0;margin:0 4px;border-radius:19px;border:2px solid #65839a;background:#101e2b}
   #stage{height:100%;width:100%}
   #joystick{display:block;left:clamp(12px,2.6vw,30px);bottom:clamp(12px,4vh,20px);width:clamp(86px,27dvh,124px);height:clamp(86px,27dvh,124px);border:2px solid #83b5d07c;box-shadow:0 0 0 6px #0c1e2b57,0 0 23px #8ed2f51d;background:#21445c4a}
   #joystick:after{content:"MOVE";position:absolute;left:0;right:0;top:-20px;font:bold 10px monospace;letter-spacing:.12em;text-align:center;color:#b7d9eb;pointer-events:none}
   #stick{width:46%;height:46%;left:27%;top:27%;border:2px solid #e2f0f6a8;background:#88bce35c;box-shadow:inset 0 1px 12px #ffffff1c,0 0 16px #5c9cb65f}
   #toolbar{position:relative;z-index:7;flex:none;padding:3px 6px calc(3px + env(safe-area-inset-bottom));border-top:0;background:transparent;gap:2px;min-height:37px}
-  #spellRow{position:fixed;z-index:8;right:calc(15px + env(safe-area-inset-right));top:49%;transform:translateY(-38%);width:clamp(124px,20.5vw,175px);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;pointer-events:auto}
+  #spellRow{position:fixed;z-index:8;right:calc(13px + env(safe-area-inset-right));top:49%;transform:translateY(-39%);width:clamp(191px,31vw,258px);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;pointer-events:auto}
   #spellRow:before{content:"EQUIP / CAST";position:absolute;right:2px;top:-19px;font:bold 10px monospace;letter-spacing:.18em;color:#c9e3ec}
-  .spell{min-width:0;min-height:clamp(50px,15dvh,70px);border:1px solid #648299;border-radius:17px;padding:4px 2px;gap:2px;background:linear-gradient(145deg,#304963dd,#192b41ed);box-shadow:0 3px 0 #0b1827,0 0 18px #69b9e01c;line-height:1.02;user-select:none}
+  .spell{min-width:0;min-height:clamp(45px,15dvh,68px);border:1px solid #648299;border-radius:17px;padding:4px 2px;gap:2px;background:linear-gradient(145deg,#304963dd,#192b41ed);box-shadow:0 3px 0 #0b1827,0 0 18px #69b9e01c;line-height:1.02;user-select:none}
   .spell .glyph{font-size:22px;line-height:1}
-  .spell .spell-name{font-size:9px;letter-spacing:.02em;white-space:nowrap}
+  .spell .spell-name{font-size:clamp(7.5px,1.1vw,9px);letter-spacing:0;white-space:nowrap}
   .spell.sel{border:2px solid #ffd084;background:linear-gradient(145deg,#695133,#2b3440);box-shadow:0 0 18px #ffc06b3c}
   #castHint{top:4px;left:50%;max-width:54%;font-size:9px;padding:3px 9px}
   #cross{display:none}
@@ -96,6 +99,7 @@ header .actions{display:flex;gap:6px}
   .controls label{font-size:9px}
   #force{width:clamp(50px,12vw,110px)}
   #forceValue{font-size:10px;width:15px}
+  #relic{max-width:148px;font-size:9px;min-height:28px;padding:3px 5px}
   #dash{font-weight:950;letter-spacing:.06em;color:#ffe7b6;background:#59472e;border-color:#b1895a}
   #log{display:none}
   #instructions{padding:9px}
@@ -116,15 +120,17 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 005 • ROTATION FIX</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
-<div id="heads"><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
-<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity appears where you tap.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–4 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 006 • LIVING TARGETS</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
+<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
 <button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span class="spell-name">1 • ARC BOLT</span></button>
 <button class="spell" data-spell="well"><span class="glyph">◉</span><span class="spell-name">2 • GRAVITY</span></button>
 <button class="spell" data-spell="pulse"><span class="glyph">◎</span><span class="spell-name">3 • PULSE</span></button>
-<button class="spell" data-spell="frost"><span class="glyph">❄</span><span class="spell-name">4 • FROST</span></button></div>
-<div class="bottomRow"><div class="controls"><label for="force">FIELD POWER</label><input type="range" id="force" min="1" max="10" value="5"><span id="forceValue">5</span></div><button class="minibtn" id="dash">DASH</button><button class="minibtn" id="crate">+ OBJECT</button></div>
+<button class="spell" data-spell="frost"><span class="glyph">❄</span><span class="spell-name">4 • FROST</span></button>
+<button class="spell" data-spell="flame"><span class="glyph">♨</span><span class="spell-name">5 • FLAME</span></button>
+<button class="spell" data-spell="detonate"><span class="glyph">✹</span><span class="spell-name">6 • BOOM</span></button></div>
+<div class="bottomRow"><div class="controls"><label for="force">FIELD POWER</label><input type="range" id="force" min="1" max="10" value="5"><span id="forceValue">5</span></div><button class="minibtn relic on" id="relic" type="button" aria-pressed="true">✹ CINDERHEART ON</button><button class="minibtn" id="dash">DASH</button><button class="minibtn" id="crate">+ OBJECT</button></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div></div>
 </div>
 <div id="rotationGate" role="status" aria-label="Rotate your phone to landscape">
@@ -135,19 +141,22 @@ header .actions{display:flex;gap:6px}
   <small>If it stays upright, turn off Portrait Orientation Lock.</small>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+<script src="./combat.js?v=006"></script>
 <script>
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id);
 const W=960,H=600,MINX=64,MAXX=896,MINY=68,MAXY=532;
 const recipeKey="wrkman-arcane-lab001";
-const spells=["bolt","well","pulse","frost"];
+const spells=["bolt","well","pulse","frost","flame","detonate"];
 // Cast semantics are explicit for each ability, ready to become spell metadata.
 const spellInfo={
  bolt:{name:"ARC BOLT",button:"quick",origin:"aim",hint:"ARC BOLT • TAP AGAIN TO FIRE"},
  well:{name:"GRAVITY WELL",button:"target",origin:"target",hint:"GRAVITY • TAP ARENA TO PLACE"},
  pulse:{name:"KINETIC PULSE",button:"quick",origin:"self",hint:"PULSE • TAP AGAIN • SELF"},
- frost:{name:"FROST FIELD",button:"quick",origin:"self",hint:"FROST • TAP AGAIN • SELF"}
+ frost:{name:"FROST FIELD",button:"quick",origin:"self",hint:"FROST • TAP AGAIN • SELF"},
+ flame:{name:"FLAME FIELD",button:"target",origin:"target",hint:"FLAME • TAP ARENA TO IGNITE"},
+ detonate:{name:"DETONATION",button:"target",origin:"target",hint:"DETONATE • TAP ARENA TO BLAST"}
 };
 function spellButtonIntent(current,requested){
  if(current!==requested)return "equip";
@@ -165,8 +174,9 @@ function selectSpell(type){
 }
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
-const color={bolt:0xffdc8d,well:0xb994ff,pulse:0x84ecdb,frost:0x96d8ff};
-if(!window.Phaser){$("missing").style.display="block";return;}
+const color={bolt:0xffdc8d,well:0xb994ff,pulse:0x84ecdb,frost:0x96d8ff,flame:0xff8c43,detonate:0xffd084};
+if(!window.Phaser||!window.WRKMAN_COMBAT){$("missing").style.display="block";$("missing").textContent="The game engine or combat module did not load. Please reload with a connection.";return;}
+const Combat=window.WRKMAN_COMBAT;
 const MatterBody=Phaser.Physics.Matter.Matter.Body;
 class Lab extends Phaser.Scene{
  constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];}
@@ -174,7 +184,7 @@ class Lab extends Phaser.Scene{
   scene=this;
   this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show"))return;
    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
-   if(["1","2","3","4"].includes(e.key))selectSpell(spells[Number(e.key)-1]);
+   if(["1","2","3","4","5","6"].includes(e.key))selectSpell(spells[Number(e.key)-1]);
    if(e.key.toLowerCase()==="e")this.addCrate();
    if(e.key.toLowerCase()==="r")this.resetLab();
    if(e.key===" ")this.dash();
@@ -194,6 +204,7 @@ class Lab extends Phaser.Scene{
   this.matter.world.on("collisionstart",ev=>this.collisions(ev));
   this.resetLab();
  }
+ announceCombat(msg){announce(msg);}
  drawFloor(){
   const g=this.g;g.fillGradientStyle(0x0d2632,0x0c2737,0x08151f,0x0b1d2d,1);g.fillRect(0,0,W,H);
   g.fillStyle(0x172c39,1);g.fillRoundedRect(44,48,872,504,20);
@@ -215,6 +226,7 @@ class Lab extends Phaser.Scene{
   d.gameTag="dummy";this.dummy={body:d,r:30};
   this.actors.push(this.dummy);
   [[452,244],[539,346],[470,411],[618,222]].forEach(([x,y])=>this.addCrate(x,y,true));
+  Combat.reset(this);
   this.updateHeads();
   announce("LAB RESET • Gravity, motion, and materials are live.");
  }
@@ -238,7 +250,7 @@ class Lab extends Phaser.Scene{
  }
  cast(type,tx,ty){
   if(!started||this.time.now<this.lastCast)return;
-  const cost={bolt:190,well:520,pulse:600,frost:680};
+  const cost={bolt:190,well:520,pulse:600,frost:680,flame:800,detonate:480};
   this.lastCast=this.time.now+cost[type];
   let aim={...this.aim};
   if(Number.isFinite(tx)&&Number.isFinite(ty)){const dx=tx-this.player.x,dy=ty-this.player.y,l=Math.hypot(dx,dy);if(l>15)aim={x:dx/l,y:dy/l};}
@@ -270,16 +282,27 @@ class Lab extends Phaser.Scene{
    const x=px,y=py; // Self-centered frost field, anchored where cast.
    this.frosts.push({x,y,r:152,born:this.time.now,life:3400});
    this.burst(x,y,color.frost,18,4);announce("FROST FIELD • Objects lose momentum inside the radius.");
+  }else if(type==="flame"){
+   const x=Number.isFinite(tx)?tx:px+aim.x*140;
+   const y=Number.isFinite(ty)?ty:py+aim.y*140;
+   Combat.flame(this,x,y);
+  }else if(type==="detonate"){
+   const x=clamp(Number.isFinite(tx)?tx:px+aim.x*170,90,870);
+   const y=clamp(Number.isFinite(ty)?ty:py+aim.y*170,90,510);
+   Combat.blast(this,x,y,{radius:146,energy:100,chain:false});
   }
  }
  collisions(ev){
   for(const pair of ev.pairs){
    const a=pair.bodyA,b=pair.bodyB;
-   const bolt=a.gameTag==="bolt"?a:(b.gameTag==="bolt"?b:null);
-   if(!bolt||!bolt.labAlive)continue;
-   const other=bolt===a?b:a;if(other.gameTag==="bolt")continue;
-   bolt.labAlive=false;this.removal.push(bolt);
-   this.burst(bolt.position.x,bolt.position.y,color.bolt,14,6);
+   const shot=["bolt","ember"].includes(a.gameTag)?a:(["bolt","ember"].includes(b.gameTag)?b:null);
+   if(!shot||!shot.labAlive)continue;
+   const other=shot===a?b:a;
+   if(other.gameTag==="bolt"||other.gameTag==="ember")continue;
+   if(Combat.collision(this,shot,other))continue;
+   // Legacy training dummy and crates still respond to player Arc Bolts.
+   shot.labAlive=false;this.removal.push(shot);
+   this.burst(shot.position.x,shot.position.y,color.bolt,14,6);
    if(other.gameTag==="dummy"){
     this.dummyHP=Math.max(0,this.dummyHP-32);this.impacts++;
     this.cameras.main.shake(65,.0025);
@@ -315,7 +338,9 @@ class Lab extends Phaser.Scene{
    for(const w of this.wells){
     const dx=w.x-b.position.x,dy=w.y-b.position.y,d=Math.max(18,Math.hypot(dx,dy));
     if(d<w.r){
-     const fall=Math.pow(1-d/w.r,1.35),force=(.00033+power*.00022)*b.mass*fall;
+     const fall=Math.pow(1-d/w.r,1.35);
+     const resistance=b.gameTag==="enemy"&&b.enemyRef?.type==="charger"?.48:1;
+     const force=(.00033+power*.00022)*b.mass*fall*resistance;
      // Pure attraction: projectiles curve under the same force law as crates.
      MatterBody.applyForce(b,b.position,{x:dx/d*force,y:dy/d*force});
      if(b.gameTag==="bolt"&&!b.labDeflected&&d<w.r*.82){b.labDeflected=true;this.deflections++;this.updateHeads();announce("DEFLECTION OBSERVED • The gravity field bent a projectile.");}
@@ -326,8 +351,9 @@ class Lab extends Phaser.Scene{
     MatterBody.setVelocity(b,{x:b.velocity.x*slow,y:b.velocity.y*slow});
    }}
   }
+  Combat.step(this,time,delta);
   for(const p of this.projectiles){if(!p.body.labAlive)continue;p.trail.push({x:p.body.position.x,y:p.body.position.y});if(p.trail.length>10)p.trail.shift();if(time-p.born>6500){p.body.labAlive=false;this.removal.push(p.body);}}
-  if(this.removal.length){const dead=new Set(this.removal);for(const b of dead)this.matter.world.remove(b);this.projectiles=this.projectiles.filter(p=>!dead.has(p.body));this.removal=[];}
+  if(this.removal.length){const dead=new Set(this.removal);for(const b of dead)this.matter.world.remove(b);this.projectiles=this.projectiles.filter(p=>!dead.has(p.body));this.actors=this.actors.filter(a=>!dead.has(a.body));this.combat.enemies=this.combat.enemies.filter(e=>!dead.has(e.body));this.removal=[];}
   this.fx=this.fx.filter(p=>{p.x+=p.vx*t;p.y+=p.vy*t;p.vx*=.96;p.vy*=.96;p.life-=delta;return p.life>0;});
   this.renderWorld(time);
  }
@@ -348,8 +374,10 @@ class Lab extends Phaser.Scene{
   }
   for(const r of this.rings){const p=(time-r.born)/r.life;
    g.lineStyle(6*(1-p)+1,r.c,(1-p)*.85);g.strokeCircle(r.x,r.y,12+p*197);}
+  Combat.paint(this,g,time);
   for(const a of this.actors){
    const b=a.body,x=b.position.x,y=b.position.y;
+   if(b.gameTag==="enemy")continue; // Drawn by Combat.paint, with state cues.
    if(b.gameTag==="dummy"){
     g.fillStyle(0x041016,.38);g.fillEllipse(x,y+21,70,20);
     g.fillStyle(0x864a48,1);g.fillCircle(x,y,32);
@@ -365,9 +393,9 @@ class Lab extends Phaser.Scene{
    }
   }
   for(const p of this.projectiles){
-   const b=p.body;for(let i=0;i<p.trail.length;i++){const t=p.trail[i];g.fillStyle(0xffd37b,i/p.trail.length*.45);g.fillCircle(t.x,t.y,2+i*.5);}
-   g.fillStyle(0xffe7ad,.18);g.fillCircle(b.position.x,b.position.y,19);
-   g.fillStyle(0xffdfa1);g.fillCircle(b.position.x,b.position.y,8);
+   const b=p.body;for(let i=0;i<p.trail.length;i++){const t=p.trail[i];g.fillStyle(b.gameTag==="ember"?0xff794d:0xffd37b,i/p.trail.length*.45);g.fillCircle(t.x,t.y,2+i*.5);}
+   g.fillStyle(b.gameTag==="ember"?0xff7e4d:0xffe7ad,.18);g.fillCircle(b.position.x,b.position.y,19);
+   g.fillStyle(b.gameTag==="ember"?0xff8451:0xffdfa1);g.fillCircle(b.position.x,b.position.y,8);
    g.fillStyle(0xffffff);g.fillCircle(b.position.x,b.position.y,3);
   }
   for(const p of this.fx){const q=Math.min(1,p.life/p.max);g.fillStyle(p.c,q*.8);g.fillCircle(p.x,p.y,p.size*q);}
@@ -433,7 +461,10 @@ function quickCast(type){
  }
  const dummy=scene.dummy.body.position;
  // Aim at the dummy only if there has been no recent manual arena aim.
- if(!scene.manualAim||scene.time.now-scene.manualAim>3300)scene.setAim(dummy.x,dummy.y);
+ if(!scene.manualAim||scene.time.now-scene.manualAim>3300){
+  const living=scene.combat.enemies.find(e=>e.alive);
+  scene.setAim(living?living.body.position.x:dummy.x,living?living.body.position.y:dummy.y);
+ }
  const a=scene.aim;
  scene.cast(type,scene.player.x+a.x*180,scene.player.y+a.y*180);
 }
@@ -445,7 +476,7 @@ function pressSpell(type){
   return;
  }
  if(intent==="place"){
-  announce("GRAVITY WELL READY • Tap the exact arena position.");
+  announce(spellInfo[type].name+" READY • Tap the exact arena position.");
   return;
  }
  quickCast(type);
@@ -471,6 +502,7 @@ document.querySelectorAll(".spell").forEach(b=>bindInstantPress(b,()=>pressSpell
 $("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
 $("notes").onclick=()=>{$("instructions").classList.add("show");};
 $("reset").onclick=()=>{scene?.resetLab();};
+bindInstantPress($("relic"),()=>Combat.toggleRelic(scene));
 bindInstantPress($("dash"),()=>scene?.dash());
 bindInstantPress($("crate"),()=>scene?.addCrate());
 $("copy").onclick=async()=>{
