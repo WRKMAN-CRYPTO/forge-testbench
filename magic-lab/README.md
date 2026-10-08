@@ -199,6 +199,26 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Hue Forge refinements (build 012)
+
+This is a targeted response to the first **iPhone landscape** dye-bench field test: wizard 06 robe coverage, fingertip access to **ROBE / SCARF / TRIM**, and weak trim dye uptake.
+
+- **Mask 012:** New source asset `skins/wizard-hue-masks-012.png` replaces the earlier masked channel PNG at runtime. The 06 robe channel now avoids pale head hair and covers more of its sleeves and lower cloth. The four finalists' metallic trim channels have stronger, better localized pigment weights. Source white-cloth highlights, skin and magic glow remain protected as far as the compact concept art allows.
+- **Trim rendering:** The dedicated trim blend is slightly stronger than fabric, while preserving per-pixel light and shadow instead of painting flat RGB. The 24 original named hues, eight locked mystery placeholders and per-skin `localStorage` keys remain unchanged.
+- **UI:** A selected/tinted portrait no longer forces a 68px inline height inside a small landscape card. Character cards have bounded height and clipping. Material tabs now occupy a separate, clearly bordered row with **44px minimum** touch targets, **46px in compact landscape**. Restoring a layer and copying looks remain available.
+- **Caching:** Build 012 loads `hue-forge.js?v=012` and `wizard-hue-masks-012.png?v=012` to avoid stale assets.
+- **Tests:** Run `node magic-lab/hue-forge.tests.js`: **30 offline checks**. Includes alpha integrity, trim uptake, invalid IDs, independent materials and persistence. The game script syntax/DOM regression checks preserve movement, spells, touch handling and the old rotate fix. Real-device comfort is still subject to player review.
+
+### Suggested phone test
+1. Open **HUES** while holding the iPhone sideways. Confirm the 03 card no longer covers the material buttons.
+2. Tap **ROBE**, **SCARF**, **TRIM** repeatedly while 03 is selected, including the left and right edge of each tab.
+3. Switch to **06** and dye its robe dark violet. Its hair should stay pale while both lower cloth panels respond.
+4. Switch to **TRIM** and compare **Royal Cobalt**, **Voidbloom**, **Sunmetal**, and **Obsidian** across 03/06/08/16. Metallic decorations should visibly change without destroying the original shading.
+5. Switch among the four looks and refresh the page. Previously saved palettes should still exist.
+6. Return to combat and check spells, dual-thumb controls, dash, and the landscape rotation fit.
+
+This version does **not** enable color drops, trading, account synchronization or Spell-Language.
+
 ## Hue Forge: material dye bench (build 011)
 
 A **separate, mobile-first hue bench** is now available in Arcane Lab through the **🎨 HUES** header button.
