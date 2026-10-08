@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 011</title>
+<title>WRKMAN | Magic Physics Laboratory 012</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -170,20 +170,20 @@ header .actions{display:flex;gap:6px}
 .hueTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .hueTop strong{font:900 15px/1.1 ui-monospace,monospace;color:#ffdb96;letter-spacing:.12em}
 .hueTop small{display:block;font-size:10px;color:#aac3ce}
-.hueTopRow{display:flex;align-items:stretch;gap:7px;min-height:86px}
-.hueCharacters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;flex:1;min-width:0}
-.hueCharacter{position:relative;background:#112839;border:1px solid #456077;border-radius:10px;color:#d4e2e6;display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;padding:3px 1px}
+.hueTopRow{display:flex;align-items:stretch;gap:7px;min-height:0;height:78px;flex:0 0 78px;overflow:hidden;position:relative;isolation:isolate}
+.hueCharacters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;flex:1;min-width:0;min-height:0;height:100%}
+.hueCharacter{position:relative;background:#112839;border:1px solid #456077;border-radius:10px;color:#d4e2e6;display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:0;height:100%;max-height:100%;overflow:hidden;padding:2px 1px}
 .hueCharacter.active{border:2px solid #ffcb80;background:#354359}
-.hueCharacter img{width:56px;height:68px;object-fit:contain;max-width:65%;flex:none}
+.hueCharacter img{width:auto;height:60px;max-width:65%;max-height:100%;object-fit:contain;flex:0 1 auto}
 .hueCharacter span{font:900 11px ui-monospace,monospace}
-.hueHero{display:flex;gap:7px;align-items:center;justify-content:center;background:#0d2130;border:1px solid #37526b;border-radius:9px;padding:3px 8px;min-width:116px}
+.hueHero{display:flex;gap:7px;align-items:center;justify-content:center;background:#0d2130;border:1px solid #37526b;border-radius:9px;padding:3px 8px;min-width:116px;max-height:100%;overflow:hidden}
 .hueHero img{width:56px;height:68px;object-fit:contain}
 .hueHero div{display:flex;flex-direction:column}
 .hueHero small,.hueHero span{font:700 9px ui-monospace,monospace;color:#9dbfce}
 .hueHero b{font:950 22px ui-monospace,monospace;color:#ffdc98}
-.hueControls{display:flex;gap:6px;align-items:center;justify-content:space-between}
-.hueChannels{display:flex;gap:5px;flex:1}
-.hueChannel,.hueSecondary{font:850 11px ui-monospace,monospace;color:#c6d5e0;background:#1d3449;border:1px solid #496681;border-radius:9px;padding:8px 12px}
+.hueControls{display:flex;gap:8px;align-items:center;justify-content:space-between;min-height:56px;flex:0 0 auto;position:relative;z-index:2;background:#112437;border-top:1px solid #345169;border-bottom:1px solid #345169;border-radius:10px;padding:4px 6px}
+.hueChannels{display:flex;gap:8px;flex:1;min-width:0;align-items:stretch}
+.hueChannel,.hueSecondary{font:850 11px ui-monospace,monospace;color:#c6d5e0;background:#1d3449;border:1px solid #496681;border-radius:9px;padding:8px 12px;min-height:44px;touch-action:manipulation}.hueChannel{flex:1;min-width:0;font-size:12px;white-space:nowrap}
 .hueChannel.active{background:#59432c;border-color:#ffca78;color:#ffe6b9;box-shadow:0 0 12px #dc995627}
 .hueSecondary{background:#26313d}
 .huePaletteLabel{display:flex;justify-content:space-between;gap:6px;font:800 10px ui-monospace,monospace;letter-spacing:.045em;color:#f1c782}
@@ -199,16 +199,20 @@ header .actions{display:flex;gap:6px}
 .hueInfo{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hueCopy{white-space:nowrap;background:#39442f;border-color:#798c58;color:#e2f1c3}
 #hueOpen{border-color:#82a39e;color:#bdf3e6}
-@media (max-width:850px){.huePanel{padding:7px;gap:4px}.hueSwatch{min-height:70px}.hueColor{height:28px}.hueCharacter img{max-width:60%}}
+@media (max-width:850px){.huePanel{padding:7px;gap:4px}.hueSwatch{min-height:70px}.hueColor{height:28px}.hueCharacter img{max-width:60%;max-height:100%}}
 @media (max-width:580px){.huePalette{grid-template-columns:repeat(4,minmax(0,1fr))}.hueHero{display:none}.hueSwatch{min-height:75px}}
 @media (pointer:coarse) and (orientation:landscape) and (max-height:440px){
  #hueOverlay{padding:3px max(6px,env(safe-area-inset-right)) 3px max(6px,env(safe-area-inset-left))}
  .huePanel{width:min(900px,100%);padding:5px;gap:3px}
  .hueTop strong{font-size:12px}.hueTop small{font-size:8px}
- .hueTopRow{min-height:54px}
- .hueCharacter img{width:36px;height:43px;max-width:50%}.hueCharacter span{font-size:10px}
+ .hueTopRow{height:65px;flex:0 0 65px;min-height:0}
+ .hueCharacter{height:100%;min-height:0;overflow:hidden}
+ .hueCharacter img{width:auto;height:55px;max-height:100%;max-width:50%}.hueCharacter .skinThumb{transform:scale(.73);margin:-8px -5px}.hueCharacter span{font-size:10px}
  .hueHero{min-width:95px}.hueHero img{width:36px;height:44px}.hueHero b{font-size:16px}
- .hueChannel,.hueSecondary{font-size:9px;padding:5px 9px}
+ .hueControls{min-height:51px;padding:2px 5px;gap:5px}
+ .hueChannels{gap:5px}
+ .hueChannel{min-height:46px;font-size:12px;padding:6px 10px}
+ .hueSecondary{min-height:44px;font-size:10px;padding:6px 9px}
  .huePaletteLabel{font-size:9px}
  .huePalette{grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}
  .hueSwatch{min-height:65px;padding:3px 2px}.hueColor{height:24px}
@@ -220,7 +224,7 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 011 • HUE FORGE</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 012 • HUE REFINEMENT</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
 <div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
@@ -347,7 +351,7 @@ class Lab extends Phaser.Scene{
  preload(){
   this.load.spritesheet("wizardSkins010","./skins/wizard-skins-20.webp?v=010",
    {frameWidth:SKIN_W,frameHeight:SKIN_H});
-  this.load.image("wizardHueMasks011","./skins/wizard-hue-masks-011.png?v=011");
+  this.load.image("wizardHueMasks012","./skins/wizard-hue-masks-012.png?v=012");
  }
  constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];}
  create(){
@@ -390,10 +394,10 @@ class Lab extends Phaser.Scene{
   // Always detach from old dyed canvas before modifying that texture.
   this.playerSkinSprite.setTexture("wizardSkins010",id-1);
   if(!Hue||!Hue.validSkin(id)||!Hue.hasDye(lookPalettes[id]))return;
-  if(!this.textures.exists("wizardHueMasks011"))return;
+  if(!this.textures.exists("wizardHueMasks012"))return;
   try{
    const atlas=this.textures.get("wizardSkins010").getSourceImage();
-   const mask=this.textures.get("wizardHueMasks011").getSourceImage();
+   const mask=this.textures.get("wizardHueMasks012").getSourceImage();
    const canvas=Hue.makeCanvas(id,lookPalettes[id],atlas,mask,document);
    if(this.textures.exists("wizardDyed011"))this.textures.remove("wizardDyed011");
    this.textures.addCanvas("wizardDyed011",canvas);
@@ -834,10 +838,10 @@ const huePreviewCache=new Map();
 function tintedPreview(n){
  if(!Hue||!Hue.validSkin(n)||!Hue.hasDye(lookPalettes[n]))return null;
  if(huePreviewCache.has(n))return huePreviewCache.get(n);
- if(!scene?.textures?.exists("wizardHueMasks011"))return null;
+ if(!scene?.textures?.exists("wizardHueMasks012"))return null;
  try{
   const atlas=scene.textures.get("wizardSkins010").getSourceImage();
-  const masks=scene.textures.get("wizardHueMasks011").getSourceImage();
+  const masks=scene.textures.get("wizardHueMasks012").getSourceImage();
   const canvas=Hue.makeCanvas(n,lookPalettes[n],atlas,masks,document);
   const data=canvas.toDataURL("image/png");
   huePreviewCache.set(n,data);
@@ -874,7 +878,7 @@ function refreshHueUI(){
   if(dyed){
    parts.image.style.objectPosition="center";
    parts.image.style.objectFit="contain";
-   parts.image.style.width="56px";parts.image.style.height="68px";
+   parts.image.style.width="";parts.image.style.height="";
   }else{
    // CSS object-position alone cannot crop atlas cells. Use background
    // on the already created image container for undyed preview.
@@ -969,7 +973,7 @@ function applyHue(id){
 }
 function openHueForge(){
  if(!Hue)return;
- if(!scene?.textures?.exists("wizardHueMasks011")){
+ if(!scene?.textures?.exists("wizardHueMasks012")){
   announce("HUE FORGE • Dye mask failed to load. Try reloading online.");
   return;
  }
