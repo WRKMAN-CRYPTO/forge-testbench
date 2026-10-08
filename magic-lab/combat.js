@@ -34,7 +34,7 @@ function reset(s){
  s.combat={
   hp:100,kills:0,invulnUntil:0,enemyShots:0,
   enemies:[],fields:[],pending:[],seen:new Map(),
-  relic:true,damageEvents:0
+  relic:true,damageEvents:0,pairCollisions:new Map()
  };
  spawn(s,"charger",585,205);
  spawn(s,"charger",620,410);
@@ -193,6 +193,39 @@ function ember(s,e){
  s.projectiles.push({body:b,born:now(s),trail:[]});
  s.burst(b.position.x,b.position.y,0xff7a4a,5,2);
 }
+function bodyCollision(s,a,b){
+ const aEnemy=a.gameTag==="enemy"?a.enemyRef:null;
+ const bEnemy=b.gameTag==="enemy"?b.enemyRef:null;
+ if((!aEnemy&&!bEnemy)||a.gameTag==="bolt"||b.gameTag==="bolt"||a.gameTag==="ember"||b.gameTag==="ember")return;
+ if(aEnemy&&!aEnemy.alive||bEnemy&&!bEnemy.alive)return;
+ // A thrown body retains real momentum. Damage and Burn transfer happen only
+ // after a meaningful impact, not when entities gently touch each other.
+ const av=a.velocity||{x:0,y:0},bv=b.velocity||{x:0,y:0};
+ const speed=Math.hypot(av.x-bv.x,av.y-bv.y);
+ if(speed<4.4)return;
+ const idA=Math.min(a.id||0,b.id||0),idB=Math.max(a.id||0,b.id||0);
+ const key=idA+":"+idB;
+ const recent=s.combat.pairCollisions.get(key)||0;
+ if(now(s)-recent<460)return;
+ s.combat.pairCollisions.set(key,now(s));
+ if(s.combat.pairCollisions.size>180)s.combat.pairCollisions.clear();
+ const force=clamp((speed-3.5)*2.9,2,32);
+ if(aEnemy)hitEnemy(s,aEnemy,force*(aEnemy.type==="charger"?.48:1),"impact");
+ if(bEnemy)hitEnemy(s,bEnemy,force*(bEnemy.type==="charger"?.48:1),"impact");
+ // A burning enemy can become a kinetic status-delivery projectile.
+ // No duplicate chain detonation: every enemy/chain is tracked by seenSet.
+ if(aEnemy&&bEnemy&&aEnemy.alive&&bEnemy.alive){
+  if(aEnemy.burn&&aEnemy.burn.depth<MAX_DEPTH)
+   addBurn(s,bEnemy,aEnemy.burn.energy*.68,aEnemy.burn.chainId,aEnemy.burn.depth+1);
+  if(bEnemy.burn&&bEnemy.burn.depth<MAX_DEPTH)
+   addBurn(s,aEnemy,bEnemy.burn.energy*.68,bEnemy.burn.chainId,bEnemy.burn.depth+1);
+ }
+ if(aEnemy||bEnemy){
+  const ax=a.position?.x??0,ay=a.position?.y??0,bx=b.position?.x??0,by=b.position?.y??0;
+  s.burst((ax+bx)/2,(ay+by)/2,0xffc387,7,Math.min(6,speed*.5));
+ }
+}
+
 function collision(s,projectile,other){
  if(!projectile?.labAlive)return false;
  const tag=projectile.gameTag;
@@ -365,5 +398,5 @@ function paint(s,g,time){
   }
  }
 }
-window.WRKMAN_COMBAT={reset,heads,toggleRelic,hitEnemy,hitPlayer,flame,blast,collision,step,paint,spawn};
+window.WRKMAN_COMBAT={reset,heads,toggleRelic,hitEnemy,hitPlayer,flame,blast,collision,bodyCollision,step,paint,spawn};
 })();
