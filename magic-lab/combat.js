@@ -195,6 +195,21 @@ function resolvePlayerEnvironment(s,time){
   // oblique wall slam can slide along the column instead of sticking.
   if(inward>0){knock.x+=nx*inward;knock.y+=ny*inward;}
  }
+ // Shrapnel is neutral: flying rubble can hurt the wizard as readily
+ // as an enemy, while slow or settled stones are harmless to walk past.
+ for(const d of c.debris){
+  if(!d.alive)continue;
+  const b=d.body,vel=b.velocity||{x:0,y:0};
+  const speed=Math.hypot(vel.x,vel.y);
+  if(speed<5.6||distance(player,b.position)>d.r+17)continue;
+  const before=c.hp;
+  hitPlayer(s,Math.min(23,Math.max(6,Math.round(speed*1.4))),b.position.x,b.position.y,"flying rubble");
+  if(c.hp!==before){
+   Body.setVelocity(b,{x:vel.x*.43,y:vel.y*.43});
+   impactFeedback(s,player.x,player.y,speed*3,vel.x/Math.max(.01,speed),vel.y/Math.max(.01,speed));
+  }
+  break;
+ }
 }
 
 function environmentStep(s,time){
