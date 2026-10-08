@@ -1034,15 +1034,16 @@ function applyHue(id){
 }
 function openHueForge(){
  if(!Hue)return;
- if(!skinArtReady||!scene?.textures?.exists(activeMaskKey)){
-  announce("HUE FORGE • Dye mask failed to load. Try reloading online.");
-  return;
- }
+ // The dye book remains accessible even when optional graphics fail.
+ // Palette changes are saved now and rendered once the art becomes ready.
  hueSkin=Hue.validSkin(activeSkin)?activeSkin:hueSkin;
  hueOverlay.hidden=false;
- scene.scene.pause();
+ scene?.scene.pause();
  neutralStick();joyPointer=null;joyTouchId=null;
  refreshHueUI();
+ if(!skinArtReady||!scene?.textures?.exists(activeMaskKey)){
+  $("hueInfo").textContent="WIZARD ART LOADING • Hue choices will save; previews appear when art is ready.";
+ }
  $("hueDone").focus({preventScroll:true});
 }
 function closeHueForge(){
