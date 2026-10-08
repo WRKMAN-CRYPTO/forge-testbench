@@ -17,7 +17,7 @@ Or serve this folder from any static HTTP server. The first load needs an intern
 | 1, 2, 3, 4: select spell | Tap spell buttons: choose + cast |
 | E: add a crate | + OBJECT |
 | R: reset lab | RESET |
-| Space: dash | Dash button not included yet |
+| Space: dash | DASH button |
 
 Tap HOW TO for instructions.
 
