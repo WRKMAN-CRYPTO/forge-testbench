@@ -173,6 +173,32 @@ This build turns the arena itself into a combat resource. **No new spell buttons
 
 The logic tests are synthetic. Real iPhone performance, layout, and the feel of destruction still require hands-on gameplay feedback.
 
+## Wizard wardrobe: 20 selectable skins (build 010)
+
+The generated concept sheet's **twenty designs** are individually extracted and packed in
+[the transparent WebP sprite atlas](./skins/wizard-skins-20.webp). Frame numbering follows the
+original sheet's grid exactly: **01–05** first row, **06–10** second row,
+**11–15** third row, and **16–20** fourth row. Every frame is 56 × 68 pixels
+in a 5 × 4 image (280 × 272). This is a static concept-skin pass, **not a
+walking animation or direction-aware sprite set**.
+
+### How to review on phone or PC
+
+- Open the game and tap **SKINS 01/20** in the header.
+- Tap any numbered character to equip it. The previous/next arrows move through all twenty; you can also use the keyboard's left and right arrows while the wardrobe is open.
+- Tap the **☆** on a character card (or the large **☆ KEEPER** control for the selected look) to mark or unmark it. A **★** indicates a keeper.
+- Tap **BACK TO LAB** to resume gameplay. The arena pauses while the wardrobe is open; no combat can occur behind it.
+- The last selected character number and starred keeper numbers persist in browser `localStorage` on the current device. No wallet, account, or cross-device synchronization is involved.
+- The existing **COPY BUILD** command now includes `wizardSkin` and `keeperSkins`, making it easy to send feedback identifying favorites.
+
+### Technical details
+
+- Phaser 3 loads `skins/wizard-skins-20.webp` as a 5 × 4 spritesheet; the wizard is a separate image sprite drawn above the existing graphics.
+- Changing `frame` changes **appearance only**. Movement, dash, aiming, collisions, the player's kinematic coordinates, and spell damage are unmodified.
+- If the texture fails to load, the previous vector-drawn laboratory wizard remains as a fallback.
+- The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
+- **Spell-Language remains dormant and unconnected.**
+
 ## Physics systems
 * Arc Bolt is a Matter circle with actual velocity and collisions.
 * Gravity Well applies the same distance-based attraction to any dynamic Matter body within range (including bolts).
