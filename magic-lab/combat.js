@@ -43,6 +43,11 @@ function reset(s){
  spawn(s,"wisp",753,426);
  // Keep starting props clear of the four original crate locations.
  pillar(s,371,165);pillar(s,694,362);pillar(s,377,457);
+ // A little loose rubble gives wells something to play with even before
+ // the first pillar breaks.
+ for(const [x,y,r] of [[322,247,9],[785,304,11],[570,465,8],[316,401,7]]){
+  rubble(s,x,y,r,0,0);
+ }
  heads(s);
 }
 function heads(s){
@@ -72,7 +77,7 @@ function toggleRelic(s){
 // becomes real Matter bodies shared by the existing gravity/ice/impulse code.
 function pillar(s,x,y){
  const b=s.matter.add.circle(x,y,29,{isStatic:true,friction:.85,restitution:.19,slop:.025});
- const p={id:++pillarCounter,body:b,alive:true,hp:PILLAR_HEALTH,maxHP:PILLAR_HEALTH,r:29};
+ const p={id:++pillarCounter,body:b,alive:true,hp:PILLAR_HEALTH,maxHP:PILLAR_HEALTH,r:29,lastPlayerHit:-9999};
  b.gameTag="pillar";b.pillarRef=p;b.labAlive=true;
  s.actors.push(p);s.combat.pillars.push(p);
  return p;
@@ -138,6 +143,7 @@ function environmentCollision(s,a,b,normal){
  // Structural impacts need meaningful speed along the collision normal.
  const pillarBody=pa?a:b,moving=pa?b:a,p=pa||pb;
  if(!p.alive||moving.isStatic)return true;
+ if(moving.gameTag==="bolt"||moving.gameTag==="ember")return true; // handled once by environmentProjectile
  const vx=moving.velocity?.x||0,vy=moving.velocity?.y||0;
  const px=pillarBody.position.x,py=pillarBody.position.y;
  const dx=px-moving.position.x,dy=py-moving.position.y;
@@ -165,6 +171,32 @@ function environmentProjectile(s,shot,other){
  s.burst(p.x,p.y,shot.gameTag==="bolt"?0xffe6a9:0xffaa83,12,4);
  return true;
 }
+function resolvePlayerEnvironment(s,time){
+ const c=s.combat;if(!c)return;
+ const player=s.player,knock=c.playerKnock;
+ for(const pillar of c.pillars){
+  if(!pillar.alive)continue;
+  const p=pillar.body.position,dx=player.x-p.x,dy=player.y-p.y;
+  const d=Math.hypot(dx,dy),target=19+pillar.r;
+  if(d>=target)continue;
+  const nx=d>.01?dx/d:1,ny=d>.01?dy/d:0;
+  // The player is currently kinematic; solve the overlap explicitly.
+  // The structural column is solid even when no damage occurs.
+  const penetration=target-d+.7;
+  player.x=clamp(player.x+nx*penetration,WORLD.left+0,WORLD.right-0);
+  player.y=clamp(player.y+ny*penetration,WORLD.top+0,WORLD.bottom-0);
+  const inward=Math.max(0,-(knock.x*nx+knock.y*ny));
+  if(inward>3.5&&time-pillar.lastPlayerHit>360){
+   pillar.lastPlayerHit=time;
+   damagePillar(s,pillar,Math.min(54,inward*4),"wizard-slam");
+   impactFeedback(s,player.x,player.y,Math.min(48,inward*4),nx,ny,true);
+  }
+  // Kill only the inward velocity; keep tangential momentum so an
+  // oblique wall slam can slide along the column instead of sticking.
+  if(inward>0){knock.x+=nx*inward;knock.y+=ny*inward;}
+ }
+}
+
 function environmentStep(s,time){
  const c=s.combat;
  for(const q of c.pendingRuptures)rupture(s,q);
@@ -685,5 +717,5 @@ function paint(s,g,time){
   }
  }
 }
-window.WRKMAN_COMBAT={reset,heads,toggleRelic,hitEnemy,hitPlayer,flame,blast,collision,bodyCollision,environmentCollision,environmentProjectile,damagePillar,step,paint,spawn};
+window.WRKMAN_COMBAT={reset,heads,toggleRelic,hitEnemy,hitPlayer,flame,blast,collision,bodyCollision,environmentCollision,environmentProjectile,resolvePlayerEnvironment,damagePillar,step,paint,spawn};
 })();
