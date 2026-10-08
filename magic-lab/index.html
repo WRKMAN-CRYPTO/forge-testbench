@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#080e16">
+<title>WRKMAN | Magic Physics Laboratory 001</title>
+<style>
+:root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;overscroll-behavior:none}
+button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}
+#shell{width:100%;height:100dvh;display:flex;flex-direction:column;max-width:1300px;margin:auto;overflow:hidden;background:radial-gradient(ellipse at top,#15263a 0,#080e16 75%)}
+header{padding:calc(9px + env(safe-area-inset-top)) 12px 9px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{font-size:clamp(12px,3.1vw,18px);font-weight:950;letter-spacing:.13em;white-space:nowrap}
+.brand strong{color:var(--gold);font-size:1.26em} .brand span{color:var(--muted);font-size:.66em;display:block;letter-spacing:.19em;font-weight:750}
+header .actions{display:flex;gap:6px}
+.minibtn{min-height:36px;padding:6px 9px;background:#1a2939;color:#e9e4d8;border:1px solid #3c5267;border-radius:9px;font-size:11px;font-weight:850}
+#heads{display:flex;gap:7px;align-items:center;padding:0 12px 8px;overflow:hidden}
+.pill{border:1px solid #394c60;background:#0c1725;border-radius:20px;padding:5px 9px;min-width:0;font-size:10px;color:#b9cedc;white-space:nowrap}
+.pill b{color:#fce2a8;font-variant-numeric:tabular-nums}
+#stageWrap{position:relative;flex:1;min-height:185px;margin:0 9px;border:1px solid #426078;border-radius:14px;overflow:hidden;touch-action:none;background:#0b1925;box-shadow:inset 0 0 40px #0008}
+#stage{height:100%;width:100%;touch-action:none}#stage canvas{display:block;touch-action:none}
+#joystick{position:absolute;left:18px;bottom:17px;width:110px;height:110px;border:1px solid #b2cbdd45;border-radius:50%;background:#9cc2d00c;display:none;touch-action:none;z-index:5}
+#stick{position:absolute;left:29px;top:29px;width:50px;height:50px;border:2px solid #9ecde5aa;border-radius:50%;background:#72b7de38;box-shadow:0 0 20px #3fbbf144;pointer-events:none}
+#cross{position:absolute;right:12px;bottom:10px;color:#b1d7e1;font-size:10px;letter-spacing:.06em;text-shadow:0 1px 4px #000;pointer-events:none}
+#toolbar{padding:9px 10px calc(9px + env(safe-area-inset-bottom));background:#0e1825;border-top:1px solid #2c435a;display:flex;flex-direction:column;gap:8px}
+#spellRow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.spell{position:relative;min-height:59px;background:linear-gradient(180deg,#1e2a3d,#121c2c);color:#eff1e9;border:1px solid #496075;border-radius:12px;font-size:10px;font-weight:850;letter-spacing:.015em;padding:7px 3px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px}
+.spell .glyph{font-size:22px;line-height:1.1}.spell.sel{border:2px solid var(--gold);background:linear-gradient(180deg,#3a342a,#1c242a);box-shadow:0 0 14px #f7c56d20}
+.spell:active{transform:translateY(1px)}
+.bottomRow{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.controls{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.controls label{font-size:10px;color:#bbd0df;white-space:nowrap;font-weight:850}
+#force{width:min(170px,25vw);accent-color:#ffd280}
+#forceValue{font:800 12px monospace;color:var(--gold);width:20px}
+.note{font-size:10px;color:#98b4c7;max-width:65%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#log{font:11px/1.35 ui-monospace,Menlo,monospace;color:#b4d2c5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#instructions{display:none;position:absolute;inset:0;background:#07121fdb;z-index:12;align-items:center;justify-content:center;padding:20px}
+#instructions.show{display:flex}
+#modal{border:1px solid #59738b;border-radius:18px;background:#142237;padding:22px;max-width:410px;width:100%;box-shadow:0 18px 80px #000a}
+#modal h1{margin:0 0 8px;color:#f8d68d;font-size:25px;line-height:1.1}#modal p{color:#bad2df;font-size:13px;margin:10px 0}
+#modal button{border:1px solid #f4bd66;background:#4a3823;color:#ffedc9;padding:12px;border-radius:10px;font-weight:900;width:100%;margin-top:9px}
+#modal b{color:white}
+#missing{display:none;position:absolute;inset:0;padding:25px;background:#07121f;color:#fff;z-index:15}
+@media (pointer:coarse){#joystick{display:block}.spell{min-height:64px}.note{display:none}}
+@media (min-width:900px){#shell{max-height:950px;padding:0 12px}#stageWrap{margin:0 8px}#toolbar{padding-bottom:12px}.spell{min-height:62px}.pill{font-size:12px}}
+@media (max-height:680px){header{padding-top:5px;padding-bottom:5px}#heads{padding-bottom:4px}#toolbar{gap:5px;padding-top:5px}.spell{min-height:49px}.spell .glyph{font-size:18px}#joystick{width:88px;height:88px}#stick{width:40px;height:40px;left:23px;top:23px}}
+</style>
+</head>
+<body>
+<div id="shell">
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>EXPERIMENT 001 • MATTER PHYSICS</span></div><div class="actions"><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<div id="heads"><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
+<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">DRAG TO AIM • TAP TO CAST</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Move with the left thumbstick. Tap spells to cast toward the target, or tap the arena to aim.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–4 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the offline combat-physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+<div id="toolbar"><div id="spellRow">
+<button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span>1 • ARC BOLT</span></button>
+<button class="spell" data-spell="well"><span class="glyph">◉</span><span>2 • GRAVITY</span></button>
+<button class="spell" data-spell="pulse"><span class="glyph">◎</span><span>3 • PULSE</span></button>
+<button class="spell" data-spell="frost"><span class="glyph">❄</span><span>4 • FROST</span></button></div>
+<div class="bottomRow"><div class="controls"><label for="force">FIELD POWER</label><input type="range" id="force" min="1" max="10" value="5"><span id="forceValue">5</span></div><button class="minibtn" id="crate">+ OBJECT</button></div>
+<div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const W=960,H=600,MINX=64,MAXX=896,MINY=68,MAXY=532;
+const recipeKey="wrkman-arcane-lab001";
+const spells=["bolt","well","pulse","frost"];
+let selected="bolt", power=Number(localStorage.getItem(recipeKey)||5), scene=null, started=false;
+const touches={x:0,y:0};
+$("force").value=power;$("forceValue").textContent=power;
+$("force").addEventListener("input",e=>{power=Number(e.target.value);$("forceValue").textContent=power;localStorage.setItem(recipeKey,String(power));});
+const announce=msg=>{$("log").textContent=msg;};
+function selectSpell(type){selected=type;document.querySelectorAll(".spell").forEach(b=>b.classList.toggle("sel",b.dataset.spell===type));}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+const color={bolt:0xffdc8d,well:0xb994ff,pulse:0x84ecdb,frost:0x96d8ff};
+if(!window.Phaser){$("missing").style.display="block";return;}
+const MatterBody=Phaser.Physics.Matter.Matter.Body;
+class Lab extends Phaser.Scene{
+ constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];}
+ create(){
+  scene=this;
+  this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show"))return;
+   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
+   if(["1","2","3","4"].includes(e.key))selectSpell(spells[Number(e.key)-1]);
+   if(e.key.toLowerCase()==="e")this.addCrate();
+   if(e.key.toLowerCase()==="r")this.resetLab();
+   if(e.key===" ")this.dash();
+  });
+  this.keys=this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT");
+  this.input.on("pointermove",p=>{if(!p.down||p.event?.pointerType==="mouse")this.setAim(p.x,p.y);});
+  this.input.on("pointerdown",p=>{if($("instructions").classList.contains("show"))return;this.setAim(p.x,p.y);this.cast(selected,p.x,p.y);});
+  this.g=this.add.graphics();this.drawFloor();
+  this.draw=this.add.graphics().setDepth(4);
+  this.matter.world.setBounds(MINX,MINY,MAXX-MINX,MAXY-MINY,34,true,true,true,true);
+  this.matter.world.on("collisionstart",ev=>this.collisions(ev));
+  this.resetLab();
+ }
+ drawFloor(){
+  const g=this.g;g.fillGradientStyle(0x0d2632,0x0c2737,0x08151f,0x0b1d2d,1);g.fillRect(0,0,W,H);
+  g.fillStyle(0x172c39,1);g.fillRoundedRect(44,48,872,504,20);
+  g.lineStyle(2,0x5a7480,.65);g.strokeRoundedRect(45,48,870,504,20);
+  g.lineStyle(1,0x294656,.55);
+  for(let x=67;x<900;x+=47)g.lineBetween(x,64,x,539);
+  for(let y=66;y<540;y+=47)g.lineBetween(62,y,898,y);
+  g.lineStyle(2,0x355e73,.5);g.strokeCircle(480,300,180);g.strokeCircle(480,300,222);
+  g.lineStyle(1,0x58717c,.32);g.lineBetween(480,80,480,520);g.lineBetween(85,300,875,300);
+  const random=(i)=>{const n=Math.sin(i*92.73+14)*43829.63;return n-Math.floor(n);};
+  for(let i=0;i<130;i++){const x=65+random(i)*825,y=73+random(i+450)*452;g.fillStyle(0x8ed6ec,random(i+133)*.17);g.fillCircle(x,y,random(i+41)*1.8+.3);}
+  g.lineStyle(2,0x69a8bf,.32);for(const [x,y] of [[94,97],[862,99],[96,501],[860,504]]){g.strokeCircle(x,y,18);g.lineBetween(x-25,y,x+25,y);g.lineBetween(x,y-25,x,y+25);}
+ }
+ resetLab(){
+  for(const p of [...this.projectiles,...this.actors])this.matter.world.remove(p.body);
+  this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];
+  this.player={x:254,y:305,vx:0,vy:0};this.aim={x:1,y:0};this.dummyHP=400;this.deflections=0;this.impacts=0;this.lastCast=0;
+  const d=this.matter.add.circle(704,304,30,{frictionAir:.07,restitution:.8,density:.006,slop:.02});
+  d.gameTag="dummy";this.dummy={body:d,r:30};
+  this.actors.push(this.dummy);
+  [[452,244],[539,346],[470,411],[618,222]].forEach(([x,y])=>this.addCrate(x,y,true));
+  this.updateHeads();
+  announce("LAB RESET • Gravity, motion, and materials are live.");
+ }
+ addCrate(x,y,quiet=false){
+  if(this.actors.length>21)return;
+  x=clamp(x===undefined?this.player.x+100:x,MINX+35,MAXX-35);
+  y=clamp(y===undefined?this.player.y-52:y,MINY+35,MAXY-35);
+  const b=this.matter.add.rectangle(x,y,34,34,{frictionAir:.048,restitution:.72,density:.0018, chamfer:{radius:4}});
+  b.gameTag="crate";this.actors.push({body:b,r:25});
+  if(!quiet)announce("A new physical object entered the chamber.");
+ }
+ updateHeads(){$("hp").textContent=Math.round(Math.max(0,this.dummyHP)/400*100)+"%";$("bends").textContent=this.deflections;$("hits").textContent=this.impacts;}
+ setAim(x,y){const dx=x-this.player.x,dy=y-this.player.y,l=Math.hypot(dx,dy);if(l>12)this.aim={x:dx/l,y:dy/l};}
+ dash(){
+  if(this.time.now<this.dashUntil+480)return;
+  const v=this.getMove();if(!v.x&&!v.y){v.x=this.aim.x;v.y=this.aim.y;}
+  this.player.x=clamp(this.player.x+v.x*70,MINX+20,MAXX-20);
+  this.player.y=clamp(this.player.y+v.y*70,MINY+20,MAXY-20);
+  this.dashUntil=this.time.now+120;
+  this.burst(this.player.x,this.player.y,0x8ddcff,14,5);
+ }
+ cast(type,tx,ty){
+  if(!started||this.time.now<this.lastCast)return;
+  const cost={bolt:190,well:520,pulse:600,frost:680};
+  this.lastCast=this.time.now+cost[type];
+  let aim={...this.aim};
+  if(Number.isFinite(tx)&&Number.isFinite(ty)){const dx=tx-this.player.x,dy=ty-this.player.y,l=Math.hypot(dx,dy);if(l>15)aim={x:dx/l,y:dy/l};}
+  this.aim=aim;
+  const px=this.player.x,py=this.player.y;
+  if(type==="bolt"){
+   const b=this.matter.add.circle(px+aim.x*28,py+aim.y*28,8,{restitution:.65,frictionAir:.0015,density:.005});
+   b.gameTag="bolt";b.labAlive=true;b.labDeflected=false;
+   MatterBody.setVelocity(b,{x:aim.x*13,y:aim.y*13});
+   this.projectiles.push({body:b,born:this.time.now,trail:[]});
+   this.burst(px+aim.x*21,py+aim.y*21,color.bolt,7,2.5);
+   announce("ARC BOLT • Watch for curvature around active wells.");
+  }else if(type==="well"){
+   let x=clamp(px+aim.x*160,MINX+115,MAXX-115),y=clamp(py+aim.y*160,MINY+115,MAXY-115);
+   if(Number.isFinite(tx)&&Number.isFinite(ty)){x=clamp(tx,MINX+115,MAXX-115);y=clamp(ty,MINY+115,MAXY-115);}
+   this.wells.push({x,y,r:208,born:this.time.now,life:4800,phase:Math.random()*6});
+   this.burst(x,y,color.well,20,4);announce("GRAVITY WELL • All nearby moving bodies feel its pull.");
+  }else if(type==="pulse"){
+   const x=clamp(px+aim.x*70,MINX+60,MAXX-60),y=clamp(py+aim.y*70,MINY+60,MAXY-60),radius=204;
+   for(const actor of [...this.actors,...this.projectiles]){
+    const b=actor.body;if(b.isStatic)continue;
+    const dx=b.position.x-x,dy=b.position.y-y,d=Math.max(28,Math.hypot(dx,dy));
+    if(d<radius){const f=(1-d/radius)*.028*b.mass;
+      MatterBody.applyForce(b,b.position,{x:dx/d*f,y:dy/d*f});}
+   }
+   this.rings.push({x,y,r:12,life:500,born:this.time.now,c:color.pulse});
+   this.burst(x,y,color.pulse,28,8);announce("KINETIC PULSE • Force applied to physical bodies.");
+  }else if(type==="frost"){
+   const x=clamp(px+aim.x*140,MINX+100,MAXX-100),y=clamp(py+aim.y*140,MINY+100,MAXY-100);
+   this.frosts.push({x,y,r:152,born:this.time.now,life:3400});
+   this.burst(x,y,color.frost,18,4);announce("FROST FIELD • Objects lose momentum inside the radius.");
+  }
+ }
+ collisions(ev){
+  for(const pair of ev.pairs){
+   const a=pair.bodyA,b=pair.bodyB;
+   const bolt=a.gameTag==="bolt"?a:(b.gameTag==="bolt"?b:null);
+   if(!bolt||!bolt.labAlive)continue;
+   const other=bolt===a?b:a;if(other.gameTag==="bolt")continue;
+   bolt.labAlive=false;this.removal.push(bolt);
+   this.burst(bolt.position.x,bolt.position.y,color.bolt,14,6);
+   if(other.gameTag==="dummy"){
+    this.dummyHP=Math.max(0,this.dummyHP-32);this.impacts++;
+    this.cameras.main.shake(65,.0025);
+    announce("IMPACT REGISTERED • "+this.impacts+" arc bolt strikes.");
+    if(this.dummyHP===0){this.dummyHP=400;this.burst(other.position.x,other.position.y,0xf4c577,38,8);announce("DUMMY RECONSTRUCTED • Keep experimenting.");}
+   }else if(other.gameTag==="crate"){announce("ARC BOLT • Kinetic impact transferred to a crate.");}
+   this.updateHeads();
+  }
+ }
+ burst(x,y,c,count,speed){
+  for(let i=0;i<count;i++){const t=Math.random()*Math.PI*2,v=speed*(.4+Math.random());
+   this.fx.push({x,y,vx:Math.cos(t)*v,vy:Math.sin(t)*v,life:300+Math.random()*420,max:680,c,size:1+Math.random()*3});}
+  if(this.fx.length>360)this.fx.splice(0,this.fx.length-360);
+ }
+ getMove(){
+  const k=this.keys;
+  let x=Number(k.D.isDown||k.RIGHT.isDown)-Number(k.A.isDown||k.LEFT.isDown)+touches.x;
+  let y=Number(k.S.isDown||k.DOWN.isDown)-Number(k.W.isDown||k.UP.isDown)+touches.y;
+  const l=Math.hypot(x,y);if(l>1){x/=l;y/=l;}
+  return {x,y};
+ }
+ update(time,delta){
+  if(!started)return;
+  delta=Math.min(delta,50);const t=delta/16.667;
+  const mv=this.getMove();this.player.vx=mv.x*4.4;this.player.vy=mv.y*4.4;
+  this.player.x=clamp(this.player.x+this.player.vx*t,MINX+20,MAXX-20);
+  this.player.y=clamp(this.player.y+this.player.vy*t,MINY+20,MAXY-20);
+  this.wells=this.wells.filter(w=>time-w.born<w.life);
+  this.frosts=this.frosts.filter(f=>time-f.born<f.life);
+  this.rings=this.rings.filter(r=>time-r.born<r.life);
+  const all=[...this.actors,...this.projectiles];
+  for(const obj of all){const b=obj.body;if(b.isStatic||!b.labAlive&&b.gameTag==="bolt")continue;
+   for(const w of this.wells){
+    const dx=w.x-b.position.x,dy=w.y-b.position.y,d=Math.max(18,Math.hypot(dx,dy));
+    if(d<w.r){
+     const fall=Math.pow(1-d/w.r,1.35),force=(.00033+power*.00022)*b.mass*fall;
+     // Pure attraction: projectiles curve under the same force law as crates.
+     MatterBody.applyForce(b,b.position,{x:dx/d*force,y:dy/d*force});
+     if(b.gameTag==="bolt"&&!b.labDeflected&&d<w.r*.82){b.labDeflected=true;this.deflections++;this.updateHeads();announce("DEFLECTION OBSERVED • The gravity field bent a projectile.");}
+    }
+   }
+   for(const f of this.frosts){if(dist(b.position,f)<f.r){
+    const slow=Math.pow(.969,t);
+    MatterBody.setVelocity(b,{x:b.velocity.x*slow,y:b.velocity.y*slow});
+   }}
+  }
+  for(const p of this.projectiles){if(!p.body.labAlive)continue;p.trail.push({x:p.body.position.x,y:p.body.position.y});if(p.trail.length>10)p.trail.shift();if(time-p.born>6500){p.body.labAlive=false;this.removal.push(p.body);}}
+  if(this.removal.length){const dead=new Set(this.removal);for(const b of dead)this.matter.world.remove(b);this.projectiles=this.projectiles.filter(p=>!dead.has(p.body));this.removal=[];}
+  this.fx=this.fx.filter(p=>{p.x+=p.vx*t;p.y+=p.vy*t;p.vx*=.96;p.vy*=.96;p.life-=delta;return p.life>0;});
+  this.renderWorld(time);
+ }
+ renderWorld(time){
+  const g=this.draw;g.clear();
+  for(const f of this.frosts){const q=Math.max(0,1-(time-f.born)/f.life);
+   g.fillStyle(color.frost,.09*q);g.fillCircle(f.x,f.y,f.r);
+   g.lineStyle(2,0x98e2ff,.4*q);g.strokeCircle(f.x,f.y,f.r);
+   for(let i=0;i<20;i++){const a=i*2.399+time*.00022,r=(35+i*27)%f.r;g.fillStyle(0xc1edff,.22*q);g.fillCircle(f.x+Math.cos(a)*r,f.y+Math.sin(a)*r,2.2);}
+  }
+  for(const w of this.wells){const q=Math.min(1,(w.life-(time-w.born))/450),rot=time*.0016+w.phase;
+   g.fillStyle(color.well,.06*q);g.fillCircle(w.x,w.y,w.r);
+   g.lineStyle(1,0xc1a3ff,.30*q);g.strokeCircle(w.x,w.y,w.r);
+   for(let i=0;i<4;i++){const r=28+i*29+Math.sin(time*.003+i)*3,a=rot*(1+(i%2)*-.4)+i*1.7;
+    g.lineStyle(2,0xb39aff,(.32+i*.08)*q);g.beginPath();g.arc(w.x,w.y,r,a,a+Math.PI*1.25);g.strokePath();}
+   g.fillStyle(0x9477ff,.52*q);g.fillCircle(w.x,w.y,15);
+   g.fillStyle(0xe3d8ff,.8*q);g.fillCircle(w.x,w.y,5);
+  }
+  for(const r of this.rings){const p=(time-r.born)/r.life;
+   g.lineStyle(6*(1-p)+1,r.c,(1-p)*.85);g.strokeCircle(r.x,r.y,12+p*197);}
+  for(const a of this.actors){
+   const b=a.body,x=b.position.x,y=b.position.y;
+   if(b.gameTag==="dummy"){
+    g.fillStyle(0x041016,.38);g.fillEllipse(x,y+21,70,20);
+    g.fillStyle(0x864a48,1);g.fillCircle(x,y,32);
+    g.lineStyle(5,0xd9a28a,1);g.strokeCircle(x,y,28);
+    g.lineStyle(2,0xffe0a9,.75);g.strokeCircle(x,y,17);g.lineBetween(x-24,y,x+24,y);g.lineBetween(x,y-24,x,y+24);
+    g.fillStyle(0xffddb0,.8);g.fillCircle(x,y,5);
+   }else{
+    g.fillStyle(0x060d14,.38);g.fillEllipse(x,y+17,47,13);
+    g.save();g.translateCanvas(x,y);g.rotateCanvas(b.angle);
+    g.fillStyle(0x586c79,1);g.fillRoundedRect(-18,-18,36,36,5);
+    g.lineStyle(3,0xa1bcc3,.8);g.strokeRoundedRect(-16,-16,32,32,4);
+    g.lineStyle(1,0xc8dddb,.5);g.lineBetween(-10,-10,10,10);g.lineBetween(10,-10,-10,10);g.restore();
+   }
+  }
+  for(const p of this.projectiles){
+   const b=p.body;for(let i=0;i<p.trail.length;i++){const t=p.trail[i];g.fillStyle(0xffd37b,i/p.trail.length*.45);g.fillCircle(t.x,t.y,2+i*.5);}
+   g.fillStyle(0xffe7ad,.18);g.fillCircle(b.position.x,b.position.y,19);
+   g.fillStyle(0xffdfa1);g.fillCircle(b.position.x,b.position.y,8);
+   g.fillStyle(0xffffff);g.fillCircle(b.position.x,b.position.y,3);
+  }
+  for(const p of this.fx){const q=Math.min(1,p.life/p.max);g.fillStyle(p.c,q*.8);g.fillCircle(p.x,p.y,p.size*q);}
+  const p=this.player;g.fillStyle(0x01080e,.6);g.fillEllipse(p.x,p.y+22,44,14);
+  g.fillStyle(0x1b4d67,.98);g.fillCircle(p.x,p.y+4,19);
+  g.lineStyle(3,0x6fd7f2,.87);g.strokeCircle(p.x,p.y+3,19);
+  g.fillStyle(0x82d9f8,.28);g.fillCircle(p.x,p.y-13,16);
+  g.fillStyle(0xfce3b2);g.fillCircle(p.x,p.y-13,10);
+  g.fillStyle(0x132f49);g.fillTriangle(p.x-17,p.y-18,p.x+17,p.y-18,p.x,p.y-46);
+  g.lineStyle(3,0xf9ca74,.9);g.lineBetween(p.x-14,p.y-19,p.x+14,p.y-19);
+  g.lineStyle(3,0x82ddff,.45);g.lineBetween(p.x,p.y,p.x+this.aim.x*37,p.y+this.aim.y*37);
+  g.fillStyle(0xfbd27e);g.fillCircle(p.x+this.aim.x*35,p.y+this.aim.y*35,4);
+ }
+}
+const game=new Phaser.Game({type:Phaser.AUTO,parent:"stage",width:W,height:H,backgroundColor:"#091825",render:{antialias:true,pixelArt:false},scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},physics:{default:"matter",matter:{gravity:{x:0,y:0},debug:false,enableSleeping:false}},scene:[Lab],fps:{target:60,forceSetTimeOut:false}});
+function aimedCast(type){
+ selectSpell(type);
+ if(!scene||!started)return;
+ const d=scene.dummy.body.position;
+ // Cast toward the dummy unless the player has manually aimed on the arena.
+ let a=scene.aim;
+ if(!scene.manualAim||scene.time.now-scene.manualAim>3300){scene.setAim(d.x,d.y);a=scene.aim;}
+ scene.cast(type,scene.player.x+a.x*180,scene.player.y+a.y*180);
+}
+document.querySelectorAll(".spell").forEach(b=>b.addEventListener("click",()=>aimedCast(b.dataset.spell)));
+$("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
+$("notes").onclick=()=>{$("instructions").classList.add("show");};
+$("reset").onclick=()=>{scene?.resetLab();};
+$("crate").onclick=()=>{scene?.addCrate();};
+$("copy").onclick=async()=>{
+ const build={format:"wrkman-spell-lab",version:1,fieldPower:power,spells:spells.map((id,i)=>({id,slot:i+1})),notes:"Experimental laboratory recipe; not yet compatible with the Spell Designer."};
+ try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
+ catch(_){announce("Clipboard unavailable; open this page in a secure browser context.");}
+};
+const joy=$("joystick"),stick=$("stick");let joyPointer=null;
+function joystick(e){
+ const rect=joy.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+ const dx=e.clientX-cx,dy=e.clientY-cy,rad=Math.min(rect.width,rect.height)*.32,mag=Math.hypot(dx,dy);
+ touches.x=clamp(dx/rad,-1,1);touches.y=clamp(dy/rad,-1,1);
+ if(mag>rad){touches.x=dx/mag;touches.y=dy/mag;}
+ stick.style.transform="translate("+(touches.x*rad)+"px,"+(touches.y*rad)+"px)";
+}
+joy.addEventListener("pointerdown",e=>{joyPointer=e.pointerId;joy.setPointerCapture(e.pointerId);joystick(e);e.preventDefault();});
+joy.addEventListener("pointermove",e=>{if(e.pointerId===joyPointer){joystick(e);e.preventDefault();}});
+function joyEnd(e){if(e.pointerId===joyPointer){joyPointer=null;touches.x=touches.y=0;stick.style.transform="translate(0,0)";}}
+joy.addEventListener("pointerup",joyEnd);joy.addEventListener("pointercancel",joyEnd);addEventListener("blur",()=>{touches.x=touches.y=0;stick.style.transform="translate(0,0)";});
+$("stage").addEventListener("pointerdown",e=>{if(scene&&started){scene.manualAim=scene.time.now;}});
+})();
+</script>
+</body>
+</html>
