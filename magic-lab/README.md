@@ -199,6 +199,41 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 019 • Emergent elemental material physics
+
+**Status: Live laboratory experiment, solo play.** Inspired by the proposed **Frozen Enemy → Flame → Steam → Lightning** interaction. This is *not* a hardcoded spell recipe. The elemental system independently models local body temperature, water content, frozen water, thermal vapor release, moving steam parcels, and electrical conduction through vapor volumes.
+
+### What's playable
+
+- **Frost Field (4):** The existing self-centered frost field now subtracts heat and deposits condensable moisture onto nearby enemies, props, and rubble. As materials cool, liquid water becomes physical ice. Ice temporarily damps body movement and enemy AI without teleporting them.
+- **Flame Field (5):** The same damaging Burn field adds heat, melting stored ice back to liquid and, when hot enough, evaporating it into the arena. Naturally moist material can also evaporate *without prior freezing*. Truly dry material cannot create steam just because you cast Flame.
+- **Steam clouds:** Each released volume has a position, temperature, mass, finite lifetime, drift, buoyancy and radius. Nearby volumes can merge; clouds are capped at 14 for mobile performance. Hot clouds inflict limited periodic scald damage.
+- **Gravity Well (2):** Attracts moving vapor clouds, changing their trajectory rather than hardcoding a `gravity + steam` spell recipe.
+- **Detonation (6) and Cinderheart chains:** Existing explosions push nearby steam away through a small, optional impulse hook in `combat.js`. The explosion's original damage and chain mechanics are left unchanged.
+- **Spark (7):** A new small footer button **⚡ 7 SPARK**. Tap it to equip, then tap the arena to discharge. In dry air it creates a small localized spark. If the tap intersects a moisture-bearing vapor cloud, discharge expands into an electrical sphere that can hurt enemies; overlapping damp clouds conduct in a bounded wave. Enemies are hit at most once per discharge.
+- **PHASE HUD:** `DRY`, `ICE n`, or `VAPOR n` reports what the elemental layer is tracking. Vapor is rendered as drifting pale clouds; stored ice has frost crystals; discharges have radial electric shock arcs.
+
+The existing 6 large thumb-spell buttons stay in their original 3×2 grid on landscape phones; Spark lives beside DASH in the footer. Key **7** selects Spark on desktop. Material state is automatically cleared when the arena is reset, and no material state is stored in a user's account or linked to collectible hues.
+
+### Test a reaction deliberately
+
+1. Start a new encounter. Approach a Charger or a loose object and cast **FROST (4)** close enough to cover it, allowing around 2 seconds of chill.
+2. Cast **FLAME (5)** where the frozen target stands. Wait for liquid to evaporate into moving vapor clouds.
+3. Cast **GRAVITY (2)** near the steam or **BOOM (6)** to observe clouds being pulled or shoved.
+4. Press **⚡ 7 SPARK** to select, then tap **inside the visible steam**. The discharge sphere should be larger and more effective than an isolated dry spark.
+5. Try Flame without Frost. Moisture-rich objects can still make steam. Compare with steam produced from a frozen target.
+6. Check that SKINS/HUES still work, your saved outfits survive, and Spell-Language is still dormant.
+
+### Constraints and model integrity
+
+This is a deliberately **stylized** 2D material-transport model, not real computational fluid dynamics or a laboratory-calibrated simulator. It treats heat, liquid water, and ice as conserved-ish local finite state, but energy and water are abstract units. It does *not* yet simulate ambient rain, rivers, wood combustion, real electrical conductivity through metal, or persistent world climate. It never checks for the names or order of spells cast.
+
+- Module `elements.js` runs independently of `combat.js`; if it fails to load, core spells and the arena still run. The tiny optional blast hook is guarded to prevent material code from breaking damage handling.
+- Maximum 14 vapor parcels, 14 arc flashes, and 80 tracked bodies per step.
+- Reusable tests in `elements.tests.js`: **23 passing deterministic checks** for freeze/melt/steam, hot dry materials, spark conduction and amplification, finite lifetimes, momentum transfer, and reset.
+- An integration smoke test using the **actual combat module**, saved dyed 06 profile and game scene confirmed 16 actors, `LAB RUN:A`, ice formation, two vapor clouds and an electrically discharged sphere, without a startup exception.
+- No change to Hue Forge's saved storage keys or the Dual-Mask Mage. **Spell-Language remains dormant.**
+
 ## Build 018 • Chrome saved-hue startup bug, resolved
 
 ### Reproduced failure
