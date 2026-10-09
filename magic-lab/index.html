@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 016</title>
+<title>WRKMAN | Magic Physics Laboratory 017</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -224,8 +224,8 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 016 • DIAGNOSTIC RECOVERY</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
-<div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">LAB <b id="labState">BOOT</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 017 • PROFILE ISOLATION</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">LAB <b id="labState">BOOT</b></div><div class="pill">DATA <b id="profileMode">SAVED</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
 <div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
 <button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span class="spell-name">1 • ARC BOLT</span></button>
@@ -301,6 +301,27 @@ header .actions{display:flex;gap:6px}
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id);
+// Build 017: Isolate old profile data without touching the player's saved looks.
+// &fresh=1 creates temporary session-only values; refreshing restores defaults.
+// Normal play uses the exact same storage keys as before.
+const freshProfile=/(?:[?&])fresh=1(?:&|$)/.test(window.location?.search||"");
+let nativeStore=null;
+try{nativeStore=window.localStorage;}catch(_){}
+const temporaryValues=new Map();
+const gameStorage={
+ getItem(key){
+  if(freshProfile)return temporaryValues.has(key)?temporaryValues.get(key):null;
+  try{return nativeStore?.getItem(key)??null;}catch(_){return null;}
+ },
+ setItem(key,value){
+  if(freshProfile){temporaryValues.set(key,String(value));return;}
+  try{nativeStore?.setItem(key,String(value));}catch(_){}
+ },
+ removeItem(key){
+  if(freshProfile){temporaryValues.delete(key);return;}
+  try{nativeStore?.removeItem(key);}catch(_){}
+ }
+};
 const W=960,H=600,MINX=64,MAXX=896,MINY=68,MAXY=532;
 const recipeKey="wrkman-arcane-lab001";
 const skinKey="wrkman-arcane-lab010-skin";
@@ -309,16 +330,16 @@ const SKIN_COUNT=20,SKIN_W=56,SKIN_H=68;
 let activeAtlasKey="wizardSkins013",activeMaskKey="wizardHueMasks013";
 let activeAtlasURL="./skins/wizard-skins-20-013.webp?v=013";
 let skinArtReady=false;
-const storedSkin=Number(localStorage.getItem(skinKey+"-selected"));
+const storedSkin=Number(gameStorage.getItem(skinKey+"-selected"));
 let activeSkin=Number.isInteger(storedSkin)&&storedSkin>=1&&storedSkin<=20?storedSkin:1;
 let keepers=new Set();
 try{
- const saved=JSON.parse(localStorage.getItem(skinKey+"-keepers")||"[]");
+ const saved=JSON.parse(gameStorage.getItem(skinKey+"-keepers")||"[]");
  if(Array.isArray(saved))keepers=new Set(saved.filter(n=>Number.isInteger(n)&&n>=1&&n<=20));
 }catch(_){}
 const skinLabel=n=>String(n).padStart(2,"0");
 const Hue=window.WRKMAN_HUE_FORGE||null;
-let lookPalettes=Hue?Hue.read(localStorage):{};
+let lookPalettes=Hue?Hue.read(gameStorage):{};
 let hueSkin=Hue?.validSkin(activeSkin)?activeSkin:8;
 let hueChannel="robe";
 const spells=["bolt","well","pulse","frost","flame","detonate"];
@@ -335,11 +356,13 @@ function spellButtonIntent(current,requested){
  if(current!==requested)return "equip";
  return spellInfo[requested].button==="target"?"place":"quick";
 }
-let selected="bolt", power=Number(localStorage.getItem(recipeKey)||5), scene=null, started=false;
+let selected="bolt", power=Number(gameStorage.getItem(recipeKey)||5), scene=null, started=false;
 const touches={x:0,y:0};
 $("force").value=power;$("forceValue").textContent=power;
-$("force").addEventListener("input",e=>{power=Number(e.target.value);$("forceValue").textContent=power;localStorage.setItem(recipeKey,String(power));});
+$("force").addEventListener("input",e=>{power=Number(e.target.value);$("forceValue").textContent=power;gameStorage.setItem(recipeKey,String(power));});
 const announce=msg=>{$("log").textContent=msg;};
+$("profileMode").textContent=freshProfile?"FRESH TEST":"SAVED";
+
 // Make failures readable on-screen, including exceptions caught by Phaser.
 function reportLabError(stage,error){
  const message=String(error?.message||error||"Unknown game error");
@@ -878,14 +901,14 @@ function refreshSkinUI(){
 }
 function equipSkin(n){
  activeSkin=((n-1+SKIN_COUNT)%SKIN_COUNT)+1;
- localStorage.setItem(skinKey+"-selected",String(activeSkin));
+ gameStorage.setItem(skinKey+"-selected",String(activeSkin));
  scene?.setSkin(activeSkin);
  refreshSkinUI();
  announce("WIZARD DESIGN "+skinLabel(activeSkin)+" EQUIPPED.");
 }
 function toggleSkinKeeper(n){
  if(keepers.has(n))keepers.delete(n);else keepers.add(n);
- localStorage.setItem(skinKey+"-keepers",JSON.stringify([...keepers].sort((a,b)=>a-b)));
+ gameStorage.setItem(skinKey+"-keepers",JSON.stringify([...keepers].sort((a,b)=>a-b)));
  refreshSkinUI();
 }
 function openSkinOverlay(){
@@ -1060,7 +1083,7 @@ if(Hue){
 function applyHue(id){
  if(!Hue||id!==null&&!Hue.color(id))return;
  lookPalettes[hueSkin][hueChannel]=id;
- const stored=Hue.write(localStorage,lookPalettes);
+ const stored=Hue.write(gameStorage,lookPalettes);
  huePreviewCache.delete(hueSkin);
  if(hueSkin===activeSkin)scene?.setSkin(activeSkin);
  refreshHueUI();refreshSkinUI();
