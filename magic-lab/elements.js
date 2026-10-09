@@ -11,7 +11,8 @@
  else if(root)root.WRKMAN_ELEMENTS=api;
 })(typeof globalThis==="object"?globalThis:null,function(){
  "use strict";
- const WORLD={left:90,right:870,top:90,bottom:510};
+ // Keep material transport inside the expanded world, not the old viewport.
+const WORLD={left:-800,right:1760,top:-520,bottom:1120};
  const MAX_CLOUDS=14,MAX_FLASHES=14,MAX_BODIES=80;
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
