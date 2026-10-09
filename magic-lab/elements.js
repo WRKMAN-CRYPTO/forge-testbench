@@ -93,7 +93,6 @@
     if(a.type&&a.alive) a.staggerUntil=Math.max(a.staggerUntil||0,time+65);
     if(!b.isStatic&&b.velocity){
      const damp=clamp(1-m.ice*.12, .74,.98);
-     const bodyApi=s.matter?.world?.engine?.world?null:null;
      // Existing Matter Body method, not a new physics integration.
      const Body=typeof Phaser!=="undefined"?Phaser.Physics?.Matter?.Matter?.Body:null;
      if(Body?.setVelocity)Body.setVelocity(b,{x:b.velocity.x*damp,y:b.velocity.y*damp});
@@ -127,7 +126,7 @@
     }
    }
   }
-  w.clouds=w.clouds.filter(c=>time<c.until);
+  w.clouds=w.clouds.filter(c=>time<c.until).slice(-MAX_CLOUDS);
   w.flashes=w.flashes.filter(f=>time<f.until);
   w.iceCount=actors.filter(a=>a.body&&w.states.get(a.body)?.ice>.24).length;
  }
