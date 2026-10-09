@@ -199,6 +199,20 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 015 • Scene boot-order repair and stable recovery page
+
+Build 014 removed the blocking Phaser `preload()` assets so that the game could initialize without optional art. On a real iPhone, counters showed four foes and three stones but nothing rendered. The **likely timing regression** is that a scene can reach `Lab.create()` synchronously before later top-level `const` bindings (skin grid, hue choices, thumb controls) have initialized. `resetLab()` updates the counters, then an early menu refresh can throw before the first frame is drawn.
+
+Build 015 corrects the ordering:
+- **Phaser.Game is instantiated at the very end of the inline script**, after every UI binding and touch listener has been established. This remains safe even if `Lab.create()` fires synchronously without mandatory preloads.
+- `Lab.create()` completes the playable level first, then cosmetic loading is queued with a short timeout; scene startup no longer calls the Phaser loader mid-create.
+- **LAB BOOT / READY / ERROR** is visible in the HUD. Runtime JavaScript exceptions are copied into the page's message log instead of failing completely silently.
+- Hue Forge may open even while character art is loading or has failed. Palette colors continue to save; rendered previews resume when masks become available. It is still not part of combat's initialization.
+- No changes to damage, spells, Matter physics, existing palettes, keeper marks, or dormant Spell-Language.
+- A frozen **[Build 012 playable baseline](./stable-012.html)** now lives alongside the current game. Its sprites, script, and dye controls match the last version that successfully played on the user's phone. This is a separate page, *not* a query-string cache buster, so it can be used to distinguish a modern-boot regression from an environment-specific issue.
+
+**Regression check:** a synchronous Phaser scene-start simulation now creates the world and encounters with the UI fully available (`LAB READY`), even before the first asynchronous cosmetic download. This reproduces the specific startup timing we had not tested for 014. Real Safari rendering still requires a device-side test.
+
 ## Safe startup recovery (build 014)
 
 After switching Build 013 to the new Dual-Mask Mage assets, field testing reported an apparently frozen arena: no enemies or crates, no movement/spell response, and Hue Forge wouldn't open. GitHub Pages completed deployment, but the exact phone-side image/loader exception was not available for inspection.
