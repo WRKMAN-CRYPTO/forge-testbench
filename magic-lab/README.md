@@ -199,6 +199,31 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 023 • Follow camera and expanded explorable arena
+
+**Design objective:** retain the Build 022 full-bleed phone view but stop treating the physical arena as a single fixed screen. Keep the existing six thumb controls and Spark button for now; the six-equipped-spell loadout design is the separate next phase.
+
+### What changed
+- **Logical viewport remains 960×600.** The traversable physics world is now x=-800..1760, y=-520..1120, with a decorative backdrop covering x=-860..1820, y=-580..1180.
+- **Smooth follow camera** uses Phaser Camera.startFollow on a stable point-like target, with 500×350 screen-space deadzone and X/Y lerp of .11. The wizard can move a little without camera shake. Leaving the deadzone causes the camera to scroll. The target remains stable across resets even though the player state object gets recreated.
+- **True world coordinates:** mobile direct DOM capture first maps the touch from the cover-cropped canvas bounding box into Phaser viewport pixels, then calls `camera.getWorldPoint(sx,sy)`. Phaser mouse pointer movement and presses are likewise converted using `getWorldPoint(p.x,p.y)`. This prevents placing Gravity, Flame, Boom, Spark or aiming a Bolt in the wrong place after scrolling.
+- **All spatial boundaries updated** in the main scene, combat helper (including collision nudges, rubble spawning and flame targeting), and elemental material helper (cloud drift, new cloud locations and dry spark placement). Physics walls are expanded; no invisible walls remain at the old 960×600 chamber edge.
+- **Larger drawn floor** consists of a continuous bounded grid, connected floor routes, and five distinguishable experiment pads: the familiar center plus new west/east/north/south pads. Six additional movable crates provide things to experiment with outside the starting encounter. Initial enemies remain in their familiar original locations.
+- **RESET** restores the starting player coordinates and original camera framing; repeated play does not accumulate actors, steam or saved camera state.
+- **Unchanged:** two-second Frost balance, 580ms freeze stagger, elemental reactions, Arc Bolt, mobile buttons, saved robes/keepers, Dual-Mask Mage, dormant Spell-Language, and desktop control mappings.
+
+### Important limitations
+This adds a **following camera and one larger connected sandbox**, not new enemy waves, quest progression, map streaming, a minimap, camera zoom controls, or revised six-slot loadouts. The player's sprite still uses its static outfit artwork. All world graphics are static and deterministic; no extra heavy tilemaps were added.
+
+### Testing
+- Simulated scene startup with the **real combat/material modules and a saved dyed wizard 06** passed in both phone ENVELOP and desktop FIT renderer configurations.
+- Both modes initialized **22 physical actors** (original 16 + six extra crates), rendered `LAB RUN:A`, moved the player beyond the original chamber, and verified the camera target followed the new player coordinates.
+- With a simulated camera scroll of x=510/y=-70, clicking and tapping on logical canvas position 120/300 both resolved to world coordinate **630/230**. Camera reset returned to scroll 0 and the original spawn.
+- 16 additional spatial/compatibility checks passed, including large-world material effects outside the old arena, spatial bounds agreement, mobile casting, original six buttons, and saved hue startup order.
+- Existing material physics suite: **Elemental World 021: 29 tests passed**.
+
+**Field test:** `magic-lab/?v=023`. Move west or east past the original chamber rings; watch the floor slide under the character. Cast Gravity or Flame at an object in a distant pad to check world-accurate taps. Reverse direction to see the camera pan back smoothly. RESET should show the starting chamber. Repeat on landscape Safari; actual iPhone rendering still needs user verification.
+
 ## Build 022 • Full-bleed landscape gameplay (phone UI pass 1)
 
 **Purpose:** stop using a header, HUD and bottom toolbar as rigid reserved screen strips. On a landscape phone, the **game stage now fills the entire available viewport** (100vw × 100dvh) and all current controls are transparent overlays. The desktop layout remains the original FIT view, and portrait phone sessions retain the rotate cue.
