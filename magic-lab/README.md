@@ -199,6 +199,20 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 020 • Frost control balance
+
+Field feedback: one Frost cast held the enemy chamber too long, allowing Arc Bolt to eliminate everything with little opposition. Two systems compounded the problem: the field was **3.4 seconds** long, and the material engine refreshed `staggerUntil` every frame that an enemy had ice. Remaining ice could therefore suspend AI long after the visible field disappeared.
+
+**Targeted balance changes:**
+
+- The self-centered Frost Field now chills for **1.35 seconds**, down from 3.4s. Recasting relocates the existing patch instead of stacking multiple long-lived fields.
+- Each enemy receives **one short 580ms freeze-stun** upon sufficient icing, not perpetual stagger extension. The same enemy can't be stun-locked by rapid recasts due to a roughly four-second per-target refractory window.
+- Stored ice causes **moderate physical slowdown** after stagger expires, while the enemy AI is allowed to resume decisions, lunges, and spells.
+- Ambient warmth now raises material temperatures promptly once the Frost field ends; ice thaws naturally without requiring Flame. Flame still speeds melting and can create vapor and wet electrical conduction.
+- No changes to Arc Bolt, enemy HP, cast controls, the Dual-Mask Mage, saved dye profiles, or dormant Spell-Language.
+
+**Check the feel:** Approach an enemy; cast Frost once and watch it recover. Repeat Frost quickly and verify that the second cast doesn't indefinitely stun it. Then try Frost → Flame → Steam → Spark: the elemental chain should still work, but its timing matters more now. Run `node magic-lab/elements.tests.js` for **29 material tests**, including finite stagger, natural thawing, repeat-cast immunity, and a working steam chain.
+
 ## Build 019 • Emergent elemental material physics
 
 **Status: Live laboratory experiment, solo play.** Inspired by the proposed **Frozen Enemy → Flame → Steam → Lightning** interaction. This is *not* a hardcoded spell recipe. The elemental system independently models local body temperature, water content, frozen water, thermal vapor release, moving steam parcels, and electrical conduction through vapor volumes.
