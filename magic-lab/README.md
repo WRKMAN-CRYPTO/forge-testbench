@@ -199,6 +199,17 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 024 • Earlier camera tracking
+
+Field feedback: Build 023 follows the wizard, but the view begins chasing too late, when the character is getting close to the screen edge.
+
+- Reduced the camera deadzone from **500×350** to **180×120** logical pixels within the unchanged 960×600 view. The wizard can move a short distance near the center before panning begins; the camera now starts chasing long before a screen edge.
+- Increased follow interpolation from **0.11** to **0.20** on both axes, improving catch-up without snapping instantly.
+- No changes to the expanded arena, physics, spells, mobile six-button arrangement, saved dye looks, touch-to-world conversion, or RESET behavior.
+- Validation: game script syntax/DOM checks passed; original 29 elemental material tests still pass. Real phone camera feel remains to be confirmed.
+
+Try `magic-lab/?v=024` and check if the wizard stays comfortably inside the screen during long runs, reversing direction, and quick dashes.
+
 ## Build 023 • Follow camera and expanded explorable arena
 
 **Design objective:** retain the Build 022 full-bleed phone view but stop treating the physical arena as a single fixed screen. Keep the existing six thumb controls and Spark button for now; the six-equipped-spell loadout design is the separate next phase.
