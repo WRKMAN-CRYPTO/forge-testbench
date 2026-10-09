@@ -76,4 +76,35 @@ const graphics=new Proxy({}, {get(_,name){return ()=>graphics}});
 E.paint(dry.scene,graphics,dry.scene.time.now);
 test("effects renderer accepts dry discharge",true);
 test("bounded body material state",E.MAX_BODIES<=80);
-console.log("Elemental World 019: "+passed+" tests passed");
+// 020: one short chill must NOT indefinitely refresh the AI stagger.
+const balanced=chamber();
+balanced.scene.frosts=[{x:430,y:270,r:152,born:0,life:1350}];
+tick(balanced.scene,27); // 1.35s exposure
+const shortState=balanced.scene.elementWorld.states.get(balanced.body);
+const frozenAt=shortState.ice,staggerEnd=balanced.enemy.staggerUntil;
+test("brief frost field still freezes material",frozenAt>.24);
+test("one freeze grants only short stagger",staggerEnd>0&&staggerEnd<balanced.scene.time.now);
+balanced.scene.frosts=[];
+tick(balanced.scene,20); // 1s ambient recovery
+test("ice cannot endlessly refresh stagger",balanced.enemy.staggerUntil===staggerEnd);
+const thawValue=shortState.ice;
+tick(balanced.scene,30); // 2.5s more warming
+test("residual ice thaws naturally without flame",shortState.ice<thawValue);
+// Recast during the refractory interval cannot extend the original stun.
+const repeat=chamber();
+repeat.scene.frosts=[{x:430,y:270,r:152,born:0,life:1350}];
+tick(repeat.scene,27);
+repeat.scene.frosts=[];
+tick(repeat.scene,8);
+const repeatEnd=repeat.enemy.staggerUntil;
+repeat.scene.frosts=[{x:430,y:270,r:152,born:repeat.scene.time.now,life:1350}];
+tick(repeat.scene,16);
+test("repeated frost cannot restun during recovery lockout",repeat.enemy.staggerUntil===repeatEnd);
+const cycle=chamber();
+cycle.scene.frosts=[{x:430,y:270,r:152,born:0,life:1350}];
+tick(cycle.scene,27);
+cycle.scene.frosts=[];
+cycle.scene.combat.fields=[{x:430,y:270,r:130}];
+tick(cycle.scene,45);
+test("short frost still enables melt to vapor combo",E.snapshot(cycle.scene).clouds>0);
+console.log("Elemental World 020: "+passed+" tests passed");
