@@ -25,7 +25,8 @@
  function stateFor(world,body){
   let m=world.states.get(body);
   if(!m){
-   m={temperature:20,liquid:waterFor(body.gameTag),ice:0,steamReserve:0};
+   m={temperature:20,liquid:waterFor(body.gameTag),ice:0,steamReserve:0,
+    freezeStunSpent:false,nextFreezeStunAt:0};
    world.states.set(body,m);
   }
   return m;
@@ -68,15 +69,21 @@
    const m=stateFor(w,b),p=b.position;
    const chill=cold.some(f=>inside(p,f)),heat=hot.some(f=>inside(p,f));
    // Temperature is a state variable; fields supply energy, not recipes.
-   m.temperature+=((20-m.temperature)*.16+(heat?155:0)-(chill?104:0))*dt;
+   // Cold exposure is brief. Without a field, ambient warmth returns quickly;
+   // lingering ice still exists for melting, vapor and conductive experiments.
+   const ambientExchange=chill?.16:1.35;
+   m.temperature+=((20-m.temperature)*ambientExchange+(heat?155:0)-(chill?104:0))*dt;
    m.temperature=clamp(m.temperature,-65,150);
    if(chill)m.liquid=clamp(m.liquid+dt*.22,0,1.4); // frost deposits moisture
    if(m.temperature< -7&&m.liquid>0){
     const transfer=Math.min(m.liquid,dt*(Math.abs(m.temperature)+7)*.044);
     m.liquid-=transfer;m.ice=clamp(m.ice+transfer,0,1.65);
    }
-   if(m.temperature>5&&m.ice>0){
-    const melt=Math.min(m.ice,dt*(m.temperature-5)*.060);
+   if(m.temperature> -3&&m.ice>0){
+    // Ice thaws on its own once warm enough. Nearby Flame transfers much
+    // more heat, so player-created steam still benefits from spell timing.
+    const meltSpeed=.26+Math.max(0,m.temperature-5)*.060;
+    const melt=Math.min(m.ice,dt*meltSpeed);
     m.ice-=melt;m.liquid=clamp(m.liquid+melt,0,1.6);
    }
    if(m.temperature>58&&m.liquid>0){
@@ -88,15 +95,20 @@
       clamp((b.velocity?.x||0)*.45,-4,4),clamp((b.velocity?.y||0)*.30-.3,-3,3),time);
     }
    }
-   // Freeze changes momentum and AI intent, but cannot teleport the body.
-   if(m.ice>.24){
-    if(a.type&&a.alive) a.staggerUntil=Math.max(a.staggerUntil||0,time+65);
-    if(!b.isStatic&&b.velocity){
-     const damp=clamp(1-m.ice*.12, .74,.98);
-     // Existing Matter Body method, not a new physics integration.
-     const Body=typeof Phaser!=="undefined"?Phaser.Physics?.Matter?.Matter?.Body:null;
-     if(Body?.setVelocity)Body.setVelocity(b,{x:b.velocity.x*damp,y:b.velocity.y*damp});
-    }
+   // Freeze-stun fires once per chilling exposure, never every frame.
+   // A per-target refractory window prevents keeping a whole chamber
+   // immobilized with repeated Frost casts. Ice itself still slows movement.
+   if(!chill)m.freezeStunSpent=false;
+   if(chill&&m.ice>.24&&!m.freezeStunSpent&&time>=m.nextFreezeStunAt){
+    if(a.type&&a.alive) a.staggerUntil=Math.max(a.staggerUntil||0,time+580);
+    m.freezeStunSpent=true;
+    m.nextFreezeStunAt=time+4000;
+   }
+   if(m.ice>.24&&!b.isStatic&&b.velocity){
+    // A modest residual slowdown instead of continuous immobilization.
+    const damp=clamp(1-m.ice*.038,.935,.995);
+    const Body=typeof Phaser!=="undefined"?Phaser.Physics?.Matter?.Matter?.Body:null;
+    if(Body?.setVelocity)Body.setVelocity(b,{x:b.velocity.x*damp,y:b.velocity.y*damp});
    }
   }
   // Stale body state may not accumulate across multiple arena resets.
