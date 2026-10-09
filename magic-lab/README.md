@@ -199,6 +199,14 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 021 • Frost duration fine-tuning
+
+Player testing confirmed a successful Frost → Flame → Steam → Lightning sphere chain, but the **1.35-second** field from Build 020 felt too short. Build 021 extends **only the Frost Field's active chill to 2.0 seconds**.
+
+The **580ms single freeze-stun**, per-target **4-second restun lockout**, nonstacking field behavior, moderate ice slowdown, natural thaw, and all steam/lightning interactions remain unchanged. No change to character art, Hue Forge, Arc Bolt, or Spell-Language.
+
+The 29 deterministic elemental tests still pass after updating field-duration test fixtures. Use `magic-lab/?v=021` to evaluate combat timing.
+
 ## Build 020 • Frost control balance
 
 Field feedback: one Frost cast held the enemy chamber too long, allowing Arc Bolt to eliminate everything with little opposition. Two systems compounded the problem: the field was **3.4 seconds** long, and the material engine refreshed `staggerUntil` every frame that an enemy had ice. Remaining ice could therefore suspend AI long after the visible field disappeared.
