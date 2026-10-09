@@ -366,6 +366,9 @@ function blast(s,x,y,options={}){
  // Blast visuals are independent of damage, so even weak descendant bursts
  // remain legible without inflating their actual damage or chain range.
  c.blastFX.push({x,y,born:now(s),life:530,energy,chain});
+ // Blasts displace free vapor using the same spatial impulse origin.
+ // Optional visual/material hook must never interrupt combat damage.
+ try{window.WRKMAN_ELEMENTS?.impulse(s,x,y,energy);}catch(_){}
  if(c.blastFX.length>24)c.blastFX.shift();
  s.rings.push({x,y,r:12,life:480,born:now(s),c:chain?0xffd47e:0xff8d43});
  s.burst(x,y,chain?0xffd37a:0xff8758,Math.min(48,18+Math.floor(energy/3)),8);
