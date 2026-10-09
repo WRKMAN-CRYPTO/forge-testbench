@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 022</title>
+<title>WRKMAN | Magic Physics Laboratory 023</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -281,9 +281,9 @@ header .actions{display:flex;gap:6px}
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 022 • FULL-BLEED ARENA</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 023 • FOLLOW CAMERA</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">LAB <b id="labState">BOOT</b></div><div class="pill" id="phasePill">PHASE <b id="phaseStatus">DRY</b></div><div class="pill">DATA <b id="profileMode">SAVED</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
-<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Select ⚡ 7 SPARK and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–7 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Select ⚡ 7 SPARK and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–7 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="toolbar"><div id="spellRow">
 <button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span class="spell-name">1 • ARC BOLT</span></button>
 <button class="spell" data-spell="well"><span class="glyph">◉</span><span class="spell-name">2 • GRAVITY</span></button>
@@ -352,8 +352,8 @@ header .actions{display:flex;gap:6px}
   <small>If it stays upright, turn off Portrait Orientation Lock.</small>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
-<script src="./combat.js?v=019"></script>
-<script src="./elements.js?v=020"></script>
+<script src="./combat.js?v=023"></script>
+<script src="./elements.js?v=023"></script>
 <script src="./hue-forge.js?v=012"></script>
 <script>
 (()=>{
@@ -380,7 +380,11 @@ const gameStorage={
   try{nativeStore?.removeItem(key);}catch(_){}
  }
 };
-const W=960,H=600,MINX=64,MAXX=896,MINY=68,MAXY=532;
+// Logical camera viewport remains 960×600. The traversable world extends
+// beyond it in every direction, independently of device aspect ratio.
+const W=960,H=600,MINX=-800,MAXX=1760,MINY=-520,MAXY=1120;
+const MAP={left:MINX-60,top:MINY-60,right:MAXX+60,bottom:MAXY+60};
+const VIEW_ANCHOR={x:W/2,y:H/2};
 const recipeKey="wrkman-arcane-lab001";
 const skinKey="wrkman-arcane-lab010-skin";
 const SKIN_COUNT=20,SKIN_W=56,SKIN_H=68;
@@ -472,17 +476,31 @@ class Lab extends Phaser.Scene{
    if(e.key===" ")this.dash();
   });
   this.keys=this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT");
-  this.input.on("pointermove",p=>{if(!p.down||p.event?.pointerType==="mouse")this.setAim(p.x,p.y);});
+  // Phaser pointer coordinates are screen-space. All aiming and placement
+  // must use world-space after the camera starts moving.
+  this.input.on("pointermove",p=>{
+   if(!p.down||p.event?.pointerType==="mouse"){
+    const pos=this.cameras.main.getWorldPoint(p.x,p.y);
+    this.setAim(pos.x,pos.y);
+   }
+  });
   this.input.on("pointerdown",p=>{
    if($("instructions").classList.contains("show"))return;
-   // Mobile touch casting is handled once in the DOM capture listener.
-   // Otherwise Phaser can fire a second cast for the same touch.
+   // The DOM capture listener owns phone taps; avoid duplicate casting.
    if(p.event?.pointerType==="touch"||p.event?.type?.startsWith("touch"))return;
-   this.setAim(p.x,p.y);this.cast(selected,p.x,p.y);
+   const pos=this.cameras.main.getWorldPoint(p.x,p.y);
+   this.setAim(pos.x,pos.y);this.cast(selected,pos.x,pos.y);
   });
   $("labState").textContent="FLOOR";
   this.g=this.add.graphics();this.drawFloor();
   this.draw=this.add.graphics().setDepth(4);
+  // Camera follows a stable point, not a particular player object. The
+  // player object is recreated by RESET and by some future respawn flows.
+  this.cameraFocus={x:254,y:305};
+  this.cameras.main.setBounds(MAP.left,MAP.top,MAP.right-MAP.left,MAP.bottom-MAP.top);
+  this.cameras.main.setDeadzone(500,350);
+  this.cameras.main.setScroll(0,0); // Initial chamber appears as before.
+  this.cameras.main.startFollow(this.cameraFocus,false,.11,.11);
   this.matter.world.setBounds(MINX,MINY,MAXX-MINX,MAXY-MINY,34,true,true,true,true);
   this.matter.world.on("collisionstart",ev=>this.collisions(ev));
   $("labState").textContent="WORLD";
@@ -574,26 +592,59 @@ class Lab extends Phaser.Scene{
  }
  announceCombat(msg){announce(msg);}
  drawFloor(){
-  const g=this.g;g.fillGradientStyle(0x0d2632,0x0c2737,0x08151f,0x0b1d2d,1);g.fillRect(0,0,W,H);
-  g.fillStyle(0x172c39,1);g.fillRoundedRect(44,48,872,504,20);
-  g.lineStyle(2,0x5a7480,.65);g.strokeRoundedRect(45,48,870,504,20);
-  g.lineStyle(1,0x294656,.55);
-  for(let x=67;x<900;x+=47)g.lineBetween(x,64,x,539);
-  for(let y=66;y<540;y+=47)g.lineBetween(62,y,898,y);
-  g.lineStyle(2,0x355e73,.5);g.strokeCircle(480,300,180);g.strokeCircle(480,300,222);
-  g.lineStyle(1,0x58717c,.32);g.lineBetween(480,80,480,520);g.lineBetween(85,300,875,300);
-  const random=(i)=>{const n=Math.sin(i*92.73+14)*43829.63;return n-Math.floor(n);};
-  for(let i=0;i<130;i++){const x=65+random(i)*825,y=73+random(i+450)*452;g.fillStyle(0x8ed6ec,random(i+133)*.17);g.fillCircle(x,y,random(i+41)*1.8+.3);}
-  g.lineStyle(2,0x69a8bf,.32);for(const [x,y] of [[94,97],[862,99],[96,501],[860,504]]){g.strokeCircle(x,y,18);g.lineBetween(x-25,y,x+25,y);g.lineBetween(x,y-25,x,y+25);}
+  const g=this.g,wl=MAP.left,wt=MAP.top,wr=MAP.right,wb=MAP.bottom;
+  const ww=wr-wl,hh=wb-wt;
+  // One bounded, world-space floor. Do not fill a screen-space rectangle:
+  // the camera can visit any point in the enlarged laboratory.
+  g.fillGradientStyle(0x0b222e,0x0a1b2a,0x081822,0x102637,1);
+  g.fillRect(wl,wt,ww,hh);
+  // Courtyard paths help orient the player as the camera starts tracking.
+  g.lineStyle(39,0x294556,.16);
+  for(const [x,y] of [[-430,240],[1340,250],[510,-250],[510,860]]){
+   g.lineBetween(480,300,x,y);
+  }
+  // Subtle repeating world grid, bounded independently of the camera.
+  g.lineStyle(1,0x315369,.33);
+  for(let x=Math.ceil(wl/60)*60;x<=wr;x+=60)g.lineBetween(x,wt,x,wb);
+  for(let y=Math.ceil(wt/60)*60;y<=wb;y+=60)g.lineBetween(wl,y,wr,y);
+  // Connected experiment pads provide readable landmarks when exploring.
+  for(const [x,y,r,c] of [[480,300,222,0x4a8098],[-430,240,160,0x6089a2],
+    [1340,250,185,0x56849b],[510,-250,163,0x7a7aa6],[510,860,180,0x587f90]]){
+   g.fillStyle(0x244152,.12);g.fillCircle(x,y,r+19);
+   g.lineStyle(2,c,.48);g.strokeCircle(x,y,r);
+   g.lineStyle(1,c,.36);g.strokeCircle(x,y,r*.77);
+   g.lineBetween(x-r*.83,y,x+r*.83,y);
+   g.lineBetween(x,y-r*.83,x,y+r*.83);
+  }
+  const random=i=>{const n=Math.sin(i*92.73+14)*43829.63;return n-Math.floor(n);};
+  for(let i=0;i<350;i++){
+   const x=wl+35+random(i)* (ww-70),y=wt+35+random(i+450)*(hh-70);
+   g.fillStyle(0x8ed6ec,random(i+133)*.15);
+   g.fillCircle(x,y,random(i+41)*1.7+.25);
+  }
+  // The bright perimeter is a real physical wall, not a former arena border.
+  g.lineStyle(5,0x729ab0,.52);g.strokeRoundedRect(MINX,MINY,MAXX-MINX,MAXY-MINY,16);
+  g.lineStyle(1,0x82bbd4,.22);
+  for(const [x,y] of [[MINX+70,MINY+70],[MAXX-70,MINY+70],
+                      [MINX+70,MAXY-70],[MAXX-70,MAXY-70]]){
+   g.strokeCircle(x,y,24);g.lineBetween(x-31,y,x+31,y);
+   g.lineBetween(x,y-31,x,y+31);
+  }
  }
  resetLab(){
   for(const p of [...this.projectiles,...this.actors])this.matter.world.remove(p.body);
   this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];
   this.player={x:254,y:305,vx:0,vy:0};this.aim={x:1,y:0};this.dummyHP=400;this.deflections=0;this.impacts=0;this.lastCast=0;
+  // Reset returns the camera to the original chamber, even after exploring.
+  if(this.cameraFocus){this.cameraFocus.x=this.player.x;this.cameraFocus.y=this.player.y;}
+  this.cameras?.main?.setScroll(0,0);
   const d=this.matter.add.circle(704,304,30,{frictionAir:.07,restitution:.8,density:.006,slop:.02});
   d.gameTag="dummy";this.dummy={body:d,r:30};
   this.actors.push(this.dummy);
   [[452,244],[539,346],[470,411],[618,222]].forEach(([x,y])=>this.addCrate(x,y,true));
+  // Small props in the outer pads let players test physics far off-screen.
+  [[-470,205],[-350,280],[1280,210],[1410,310],[485,-270],
+   [550,835]].forEach(([x,y])=>this.addCrate(x,y,true));
   Combat.reset(this);
   if(Elements)Elements.reset(this);
   this.updateHeads();
@@ -661,12 +712,12 @@ class Lab extends Phaser.Scene{
    const y=Number.isFinite(ty)?ty:py+aim.y*140;
    Combat.flame(this,x,y);
   }else if(type==="detonate"){
-   const x=clamp(Number.isFinite(tx)?tx:px+aim.x*170,90,870);
-   const y=clamp(Number.isFinite(ty)?ty:py+aim.y*170,90,510);
+   const x=clamp(Number.isFinite(tx)?tx:px+aim.x*170,MINX,MAXX);
+   const y=clamp(Number.isFinite(ty)?ty:py+aim.y*170,MINY,MAXY);
    Combat.blast(this,x,y,{radius:146,energy:100,chain:false});
   }else if(type==="lightning"){
-   const x=clamp(Number.isFinite(tx)?tx:px+aim.x*180,90,870);
-   const y=clamp(Number.isFinite(ty)?ty:py+aim.y*180,90,510);
+   const x=clamp(Number.isFinite(tx)?tx:px+aim.x*180,MINX,MAXX);
+   const y=clamp(Number.isFinite(ty)?ty:py+aim.y*180,MINY,MAXY);
    if(Elements){
     const info=Elements.discharge(this,x,y,Combat);
     this.burst(x,y,0x8edfff,9,3);
@@ -732,6 +783,7 @@ class Lab extends Phaser.Scene{
   this.player.x=clamp(nextX,MINX+20,MAXX-20);
   this.player.y=clamp(nextY,MINY+20,MAXY-20);
   Combat.resolvePlayerEnvironment(this,time);
+  if(this.cameraFocus){this.cameraFocus.x=this.player.x;this.cameraFocus.y=this.player.y;}
   if(combat){
    const drag=Math.pow(.855,t);
    knock.x*=drag;knock.y*=drag;
@@ -1254,10 +1306,13 @@ $("stage").addEventListener("touchstart",e=>{
  const r=canvas.getBoundingClientRect();
  for(const t of e.changedTouches){
   if(t.clientX<r.left||t.clientX>r.right||t.clientY<r.top||t.clientY>r.bottom)continue;
-  const x=(t.clientX-r.left)*W/r.width, y=(t.clientY-r.top)*H/r.height;
+  // Convert touch location on the (possibly cover-cropped) canvas to
+  // Phaser's viewport, then through the moving camera into world space.
+  const sx=(t.clientX-r.left)*W/r.width,sy=(t.clientY-r.top)*H/r.height;
+  const pos=scene.cameras.main.getWorldPoint(sx,sy);
   scene.manualAim=scene.time.now;
-  scene.setAim(x,y);
-  scene.cast(selected,x,y);
+  scene.setAim(pos.x,pos.y);
+  scene.cast(selected,pos.x,pos.y);
  }
  e.preventDefault();
 },{passive:false,capture:true});
