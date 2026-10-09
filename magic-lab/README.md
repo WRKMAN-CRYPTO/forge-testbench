@@ -199,6 +199,25 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 027 • Bottom-right Dash + Wheel, experimental strip removed
+
+Requested phone UI cleanup:
+
+- Removed the entire **Field Power / Cinderheart / + OBJECT bottom strip** and its three DOM controls (plus their control event handlers). The experiment/gameplay modules remain intact.
+- **Field Power:** preserves the player's previously saved numeric power value as a hidden, clamped tuning value, with fallback 5. The visible slider is gone; existing Gravity behavior is unchanged for that saved setting.
+- **Cinderheart:** stays enabled by default, as in the existing Combat reset logic; removing its toggle does not remove the Burn chains.
+- **+ OBJECT:** removed from the phone/desktop interface. Desktop keyboard `E` remains for experimental object spawning and the arena retains its props.
+- **DASH:** now lives beside the six-slot wheel as a large, accessible button, at the same vertical center and just **to the left**. It still calls the existing `scene.dash()`, including simultaneous movement on phone.
+- **WHEEL:** anchored to the bottom-right of the arena with phone safe-area insets instead of 52% from the top. All six radial options open inward; the collapsed instruction readout is hidden to reduce obstruction, but appears above the wheel when it opens. The phone active wheel is 216×216, and Dash 74×64.
+- The `log` remains as a non-visible live status element for existing JS announcements. All previous HUES/SKINS, Spellbook, camera-aware aiming, six-slot loadout storage, and 2-second Frost behavior are unchanged.
+
+### Verification
+
+- Tested actual game inline script initialization against the combat/material/hue/loadout modules with stored dyed wizard 06, for **phone ENVELOP and desktop FIT**. Both spawned 22 actors, rendered `LAB RUN:A`, invoked Dash via its click binding, selected Flame using a held radial gesture, and opened/closed Spellbook cleanly.
+- The **34 wheel/loadout tests** and **29 elemental material tests** still pass.
+- Geometric checks for 900×390, 740×360, and 850×393 (with right/bottom safe-area offsets) verify a visible, reachable wheel, ≥11.5 logical pixels clearance between Dash and expanded left rune, and ≥9.5 logical pixels clearance below the lowest rune. This is calculated layout geometry, not a substitute for real iPhone Safari testing.
+- Field check: open `magic-lab/?v=027` in landscape, confirm no bottom strip remains, use left joystick + Dash together, hold orb + slide to the left-most rune, and check that the lowest rune remains visible above the browser/home indicator. Verify Spellbook and dyed wizard still work.
+
 ## Build 026 • Six-Rune radial wheel + separate Spellbook
 
 Player request: replace the old permanently visible six-button 3×2 cluster with a thumb-friendly wheel, allowing **at most six equipped spells** from an expandable known spell library. Keep Build 025's full-bleed follow camera, normal physics, Hue Forge and dyes.
