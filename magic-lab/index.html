@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 025</title>
+<title>WRKMAN | Magic Physics Laboratory 026</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -277,21 +277,109 @@ header .actions{display:flex;gap:6px}
  .bottomRow{bottom:calc(2px + env(safe-area-inset-bottom))}
 }
 
+/* 026 / WRKMAN RADIAL SPELL WHEEL
+ * Six spells are visible only during an intentional hold, never a 3x2
+ * permanent wall over the battlefield. Compact hub stays in thumb reach. */
+#wheelDock{position:absolute;z-index:10;top:52%;right:12px;transform:translateY(-50%);
+ width:244px;height:244px;pointer-events:none;touch-action:none;-webkit-user-select:none;user-select:none}
+#wheelDock:before{content:"";position:absolute;left:50%;top:50%;width:211px;height:211px;
+ transform:translate(-50%,-50%) scale(.65);opacity:0;pointer-events:none;
+ border:1px solid #a7c8d66d;border-radius:50%;background:radial-gradient(circle,#182c41d9 9%,#102131c2 64%,#07182a66 100%);
+ box-shadow:0 0 27px #091523a6;transition:opacity .10s ease,transform .10s ease}
+#wheelDock.open:before{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#wheelSlots{position:absolute;inset:0;pointer-events:none}
+.wheelSlot{position:absolute;transform:translate(-50%,-50%) scale(.75);
+ width:47px;height:47px;border:1.5px solid #668ba6;background:#1c354ce9;border-radius:50%;
+ display:none;align-items:center;justify-content:center;flex-direction:column;gap:0;padding:2px;
+ color:#f5f3e8;touch-action:none;-webkit-user-select:none;pointer-events:auto;
+ box-shadow:0 2px 11px #050e19a6;transition:transform .08s}
+.open .wheelSlot{display:flex;transform:translate(-50%,-50%) scale(1)}
+.wheelSlot.selected{border:2px solid #f9cd7b;background:#53412ec9}
+.wheelSlot.hot{background:#77542d;border:3px solid #ffe7ac;transform:translate(-50%,-50%) scale(1.15);
+ box-shadow:0 0 20px #ffce805e}
+.wheelSlot .wheelRune{font-size:23px;line-height:1.06}
+.wheelSlot .wheelNo{font:900 9px/1 ui-monospace,monospace;opacity:.84}
+#wheelHub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+ border:2px solid #ffcc83;border-radius:50%;width:71px;height:71px;pointer-events:auto;
+ display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;padding:5px;
+ background:radial-gradient(circle at 36% 20%,#4c6b80,#243e55 55%,#172b40);
+ color:#fff1cf;box-shadow:0 0 22px #ffc97635,0 3px 8px #07111be6;
+ touch-action:none;-webkit-user-select:none;user-select:none}
+#wheelHub:active,.open #wheelHub{background:radial-gradient(circle,#6b573d,#263b4e)}
+#wheelGlyph{font-size:27px;line-height:1}
+#wheelName{font:950 10px/1 ui-monospace,monospace;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip}
+#wheelReadout{position:absolute;left:50%;bottom:0;transform:translateX(-50%);color:#d0e6ef;
+ background:#0a1a2cbd;border:1px solid #506d7f80;border-radius:13px;pointer-events:none;
+ font:800 9px/1.2 ui-monospace,monospace;letter-spacing:.04em;padding:4px 7px;
+ text-align:center;white-space:nowrap}
+#wheelDock:not(.open) #wheelReadout{opacity:.8}
+#spellbookOpen{border-color:#719aab;color:#ddf3f8}
+#spellbookOverlay[hidden]{display:none!important}
+#spellbookOverlay{position:fixed;inset:0;z-index:50;background:#030b14ed;
+ display:flex;align-items:center;justify-content:center;padding:max(6px,env(safe-area-inset-top))
+ max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+.bookPanel{width:min(920px,100%);max-height:100%;overflow:hidden;background:linear-gradient(140deg,#172b3e,#0a1a28);
+ border:1px solid #718da3;border-radius:15px;padding:10px;display:flex;flex-direction:column;gap:7px;box-shadow:0 18px 68px #000b}
+.bookHead,.bookFoot{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.bookHead strong{font:950 16px ui-monospace,monospace;color:#ffe0a3;letter-spacing:.13em}
+.bookHead small{display:block;font:700 10px ui-monospace,monospace;color:#a8ccdc}
+.bookExplain{font:700 10px/1.35 system-ui,sans-serif;color:#bcd5dd}
+.bookColumns{display:grid;grid-template-columns:1fr 1.08fr;gap:10px;min-height:0;flex:1;overflow:hidden}
+.bookSection{display:flex;flex-direction:column;gap:4px;overflow:hidden;min-height:0}
+.bookSection h3{font:900 11px ui-monospace,monospace;color:#ffda98;margin:0;letter-spacing:.065em}
+.bookSlots,.bookLibrary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ grid-auto-rows:minmax(0,1fr);gap:5px;min-height:0;overflow-y:auto;align-content:start;overscroll-behavior:contain}
+.bookLibrary{grid-template-columns:repeat(2,minmax(0,1fr))}
+.bookEntry{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ min-height:47px;padding:3px 5px;background:#18344b;border:1px solid #526c86;color:#f0ebdf;
+ border-radius:10px;min-width:0;touch-action:manipulation}
+.bookEntry.active{border:2px solid #ffcd7f;background:#56442e}
+.bookEntry.assigned{border-color:#6d9ea6}
+.bookEntry b{font-size:22px;line-height:1}
+.bookEntry span{font:850 9px/1.12 ui-monospace,monospace;max-width:100%;text-align:center}
+.bookEntry small{font:700 8px/1.25 ui-monospace,monospace;color:#a6c4d5}
+.bookFoot{font:700 10px ui-monospace,monospace;color:#bfd4de}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:600px){
+ #wheelDock{right:calc(4px + env(safe-area-inset-right));top:52%;width:216px;height:216px}
+ #wheelDock:before{width:190px;height:190px}
+ #wheelHub{width:66px;height:66px}
+ .wheelSlot{width:43px;height:43px}
+ #wheelReadout{bottom:-1px;font-size:8px}
+ #spellbookOpen{padding:3px 6px}
+ .bookPanel{padding:6px;gap:4px}
+ .bookHead strong{font-size:13px}
+ .bookHead small,.bookExplain{font-size:9px}
+ .bookSlots,.bookLibrary{gap:4px}
+ .bookEntry{min-height:40px}
+ .bookEntry b{font-size:19px}.bookEntry span{font-size:8px}
+ .bookEntry small{font-size:7px}
+ .bookSection h3,.bookFoot{font-size:9px}
+}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:380px){
+ #wheelDock{top:51%}
+ .bookPanel{padding:5px;gap:3px}
+ .bookHead small{display:none}
+ .bookExplain{display:none}
+ .bookEntry{min-height:33px;padding:2px}
+ .bookEntry b{font-size:17px}.bookEntry span{font-size:8px}
+ .bookEntry small{font-size:7px}
+}
+
 </style>
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 025 • VERTICAL CHASE</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
+<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 026 • SIX-RUNE WHEEL</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
 <div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">LAB <b id="labState">BOOT</b></div><div class="pill" id="phasePill">PHASE <b id="phaseStatus">DRY</b></div><div class="pill">DATA <b id="profileMode">SAVED</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
-<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP AGAIN TO FIRE</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. Tap a different spell to <b>equip only</b>. Tap an equipped Bolt, Pulse, or Frost again to quick-cast. For Gravity, tap the arena to <b>place the well precisely</b>.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Select ⚡ 7 SPARK and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–7 select spells, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
-<div id="toolbar"><div id="spellRow">
-<button class="spell sel" data-spell="bolt"><span class="glyph">✦</span><span class="spell-name">1 • ARC BOLT</span></button>
-<button class="spell" data-spell="well"><span class="glyph">◉</span><span class="spell-name">2 • GRAVITY</span></button>
-<button class="spell" data-spell="pulse"><span class="glyph">◎</span><span class="spell-name">3 • PULSE</span></button>
-<button class="spell" data-spell="frost"><span class="glyph">❄</span><span class="spell-name">4 • FROST</span></button>
-<button class="spell" data-spell="flame"><span class="glyph">♨</span><span class="spell-name">5 • FLAME</span></button>
-<button class="spell" data-spell="detonate"><span class="glyph">✹</span><span class="spell-name">6 • BOOM</span></button></div>
-<div class="bottomRow"><div class="controls"><label for="force">FIELD POWER</label><input type="range" id="force" min="1" max="10" value="5"><span id="forceValue">5</span></div><button class="minibtn relic on" id="relic" type="button" aria-pressed="true">✹ CINDERHEART ON</button><button class="minibtn" id="dash">DASH</button><button class="minibtn" id="sparkBtn" type="button">⚡ 7 SPARK</button><button class="minibtn" id="crate">+ OBJECT</button></div>
+<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP ORB TO FIRE</div>
+<div id="wheelDock" aria-label="Six-slot spell wheel">
+ <div id="wheelSlots" role="group" aria-label="Equipped spells"></div>
+ <button id="wheelHub" type="button" aria-expanded="false" aria-label="Cast equipped spell; hold and slide to switch spells">
+  <span id="wheelGlyph" aria-hidden="true">✦</span><span id="wheelName">BOLT</span>
+ </button>
+ <div id="wheelReadout" aria-live="polite">HOLD + SLIDE TO EQUIP</div>
+</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the central <b>CAST orb</b>: tap to quick-cast, or hold and slide toward one of your six runes, then release to equip. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Turn Cinderheart ON to detonate burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E adds an object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+<div id="toolbar"><div class="bottomRow"><div class="controls"><label for="force">FIELD POWER</label><input type="range" id="force" min="1" max="10" value="5"><span id="forceValue">5</span></div><button class="minibtn relic on" id="relic" type="button" aria-pressed="true">✹ CINDERHEART ON</button><button class="minibtn" id="dash">DASH</button><button class="minibtn" id="crate">+ OBJECT</button></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div></div>
 </div>
 <!-- The wardrobe is a separate presentation layer, never a gameplay control. -->
@@ -312,6 +400,19 @@ header .actions{display:flex;gap:6px}
   </div>
   <div class="skinGrid" id="skinGrid" aria-label="Twenty numbered wizard designs"></div>
   <div class="skinFoot"><span id="skinCount">0 KEEPERS</span><span>Saved on this device</span></div>
+ </div>
+</div>
+<!-- 026: Loadout editing pauses combat and never changes spell mechanics. -->
+<div id="spellbookOverlay" role="dialog" aria-modal="true" aria-labelledby="spellbookTitle" hidden>
+ <div class="bookPanel">
+  <div class="bookHead"><div><strong id="spellbookTitle">W / SPELLBOOK</strong><small>Known magic is unlimited • six spells equipped at a time</small></div>
+   <button class="minibtn" id="spellbookDone" type="button">BACK TO LAB ✕</button></div>
+  <div class="bookExplain" id="bookExplain">Select one of your six slots, then choose any spell from your library. If it is already equipped, the two spells swap places.</div>
+  <div class="bookColumns">
+   <section class="bookSection"><h3>SIX EQUIPPED RUNES</h3><div id="bookSlots" class="bookSlots" role="group" aria-label="Six equipped slots"></div></section>
+   <section class="bookSection"><h3>KNOWN SPELLS <span id="bookTotal">7</span></h3><div id="bookLibrary" class="bookLibrary" role="group" aria-label="Known spell library"></div></section>
+  </div>
+  <div class="bookFoot"><span id="bookStatus">Saved on this device • your robes are untouched</span><button class="minibtn" id="bookDefaults" type="button">RESTORE SIX</button></div>
  </div>
 </div>
 <!-- HUE FORGE 011: isolated dye interface. No changes to the game world. -->
@@ -355,6 +456,7 @@ header .actions{display:flex;gap:6px}
 <script src="./combat.js?v=023"></script>
 <script src="./elements.js?v=023"></script>
 <script src="./hue-forge.js?v=012"></script>
+<script src="./spell-loadout.js?v=026"></script>
 <script>
 (()=>{
 "use strict";
@@ -1010,10 +1112,11 @@ bindInstantPress($("relic"),()=>Combat.toggleRelic(scene));
 bindInstantPress($("dash"),()=>scene?.dash());
 bindInstantPress($("crate"),()=>scene?.addCrate());
 $("copy").onclick=async()=>{
- const build={format:"wrkman-spell-lab",version:1,fieldPower:power,
+ const build={format:"wrkman-spell-lab",version:2,fieldPower:power,
   wizardSkin:activeSkin,keeperSkins:[...keepers].sort((a,b)=>a-b),
-  spells:spells.map((id,i)=>({id,slot:i+1})),
-  notes:"Experimental laboratory recipe; appearance numbers 01–20; not yet compatible with Spell Designer."};
+  spells:equipped.map((id,i)=>({id,slot:i+1})),
+  library:spells.slice(),
+  notes:"Six equipped rune slots; seven known spells. Appearance numbers 01–20; not yet compatible with Spell Designer."};
  try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
  catch(_){announce("Clipboard unavailable; open this page in a secure browser context.");}
 };
