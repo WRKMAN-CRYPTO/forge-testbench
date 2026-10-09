@@ -199,6 +199,26 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 022 • Full-bleed landscape gameplay (phone UI pass 1)
+
+**Purpose:** stop using a header, HUD and bottom toolbar as rigid reserved screen strips. On a landscape phone, the **game stage now fills the entire available viewport** (100vw × 100dvh) and all current controls are transparent overlays. The desktop layout remains the original FIT view, and portrait phone sessions retain the rotate cue.
+
+### Layout change
+
+- Arena stage and stage wrapper fill the phone viewport edge to edge, with no frame, bezel, margins or rounded stage corners. Phone Phaser scale uses `ENVELOP` rather than stretching its 960×600 simulation: outer arena borders can be cropped on wide screens, but physical dimensions and input scaling remain consistent. Desktop Phaser continues using `FIT`.
+- WRKMAN brand/menu actions are in a small transparent top overlay. Health, foes, KOs, phase and lab debug info float beneath the top controls. The existing joystick overlays the lower-left arena above the safe area. The existing six-spell 3×2 temporary touch grid, Spark and the current bottom controls still overlay the arena.
+- HUD and toolbar wrappers allow touch events through to the game canvas except on actual controls. Canvas touch aiming still maps touch positions using the canvas's actual screen rectangle, so ENVELOP scaling does not distort aiming.
+- Resize/orientation handling remains on the Phaser scale manager, and the existing Chrome saved-hue startup fix remains in place.
+- No changes to elemental physics, Frost's two-second duration, combat, wizard appearance, local storage or player save data.
+
+**Note:** On-screen browser chrome (URL/navigation controls) is outside the HTML page; the arena fills the *available web viewport*. Standalone Home Screen/PWA display may offer more usable screen than a browser tab.
+
+**Test:** open `magic-lab/?v=022` on a landscape iPhone. Confirm the arena extends behind the HUD and temporary spell controls to all four viewport edges, the joystick still steers with a second finger casting, taps land accurately, and SKINS/HUES menus still work. Because the canvas is intentionally cover-fitted, outer top/bottom decorative world edges may be cropped. Recheck on rotation. Desktop should remain visually unchanged.
+
+**Next decision (intentionally not part of this build):** redesign mobile spell selection and equip/loadout UI, with a six-equipped-spell cap. Keep the actual available spell library separate from held combat slots.
+
+Automated smoke checks ran startup + first graphics frame using the real combat engine and a previously dyed wizard profile in both `ENVELOP` phone and `FIT` desktop cases; each initialized 16 actors and reported `LAB RUN:A`. Real Safari/Opera device rendering still requires user testing.
+
 ## Build 021 • Frost duration fine-tuning
 
 Player testing confirmed a successful Frost → Flame → Steam → Lightning sphere chain, but the **1.35-second** field from Build 020 felt too short. Build 021 extends **only the Frost Field's active chill to 2.0 seconds**.
