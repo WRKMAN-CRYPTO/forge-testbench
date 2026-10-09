@@ -199,6 +199,16 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 025 • Faster vertical camera chase
+
+Field feedback: even with the earlier camera chase, landscape phone users could approach enemies from above or below with too little warning. The horizontal follow felt acceptable; adjust only vertical tracking.
+
+- **Deadzone:** 180×120 → **180×48** logical pixels (X unchanged). Within a 960×600 logical camera, Y follow starts after about 24px of up/down movement from the center zone instead of 60px.
+- **Lerp:** X/Y = 0.20/0.20 → **0.20/0.34**. Vertical camera displacement catches up more promptly but remains smoothly interpolated.
+- **Untouched:** camera world bounds, player physics, spell aiming/casting, phone full-bleed layout, six original spell slots, reset, Hue Forge and Frost duration.
+- JS parse, DOM identifier, world-coordinate touch conversion, and saved-hue boot-order checks passed; the elemental test suite remains **Elemental World 021: 29 tests passed**.
+- Device test: move straight north or south near enemies, then reverse. The player should remain farther from the top/bottom viewport edges. Real iPhone rendering and follow comfort require field feedback.
+
 ## Build 024 • Earlier camera tracking
 
 Field feedback: Build 023 follows the wizard, but the view begins chasing too late, when the character is getting close to the screen edge.
