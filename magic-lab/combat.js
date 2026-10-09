@@ -5,7 +5,8 @@
 const Body=Phaser.Physics.Matter.Matter.Body;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-const WORLD={left:90,right:870,top:90,bottom:510};
+// Shared with the Lab scene's expanded navigable world.
+const WORLD={left:-800,right:1760,top:-520,bottom:1120};
 const CHAIN_FRACTION=.60,CHAIN_THRESHOLD=15,MAX_DEPTH=5,MAX_QUEUE=64,MAX_EVENTS_PER_FRAME=8;
 const MAX_DEBRIS=36,DEBRIS_LIFE=18000,PILLAR_HEALTH=82;
 let chainCounter=0,enemyCounter=0,pillarCounter=0;
@@ -111,7 +112,7 @@ function rubble(s,x,y,r,vx,vy,core=false){
   const oldest=c.debris.shift();
   if(oldest?.alive){oldest.alive=false;oldest.body.labAlive=false;s.removal.push(oldest.body);}
  }
- const b=s.matter.add.circle(clamp(x,100,860),clamp(y,100,500),r,{
+ const b=s.matter.add.circle(clamp(x,WORLD.left+10,WORLD.right-10),clamp(y,WORLD.top+10,WORLD.bottom-10),r,{
   frictionAir:core?.025:.035,restitution:core?.42:.53,
   density:core?.008:.0038,friction:.6,slop:.025
  });
@@ -443,7 +444,7 @@ function blast(s,x,y,options={}){
 function flame(s,x,y){
  const c=s.combat;
  const chainId=++chainCounter;
- const f={x:clamp(x,90,870),y:clamp(y,90,510),r:129,born:now(s),life:4050,
+ const f={x:clamp(x,WORLD.left,WORLD.right),y:clamp(y,WORLD.top,WORLD.bottom),r:129,born:now(s),life:4050,
   nextTick:now(s),chainId};
  c.fields.push(f);
  if(c.fields.length>6)c.fields.shift();
