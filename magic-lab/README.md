@@ -199,6 +199,30 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 018 • Chrome saved-hue startup bug, resolved
+
+### Reproduced failure
+
+Normal Chrome showed the current build but could freeze before the arena rendered. Incognito and Opera GX worked, while clearing only cached files in Chrome did not. A locally simulated normal-Chrome profile with **saved dye palettes for wizard 03, 06, and 16** reproduced an uncaught `ReferenceError: Cannot access 'huePreviewCache' before initialization`.
+
+The cause was a JavaScript temporal-dead-zone bug: wardrobe construction calls `refreshSkinUI()` before `const huePreviewCache = new Map()` was initialized. `tintedPreview()` returns immediately when a skin has no saved dye, so the bug stayed hidden for fresh Incognito profiles. With any saved dyes, it tried accessing the uninitialized cache and halted page startup.
+
+### Repair
+
+- The preview cache is now created **before** the first wardrobe refresh.
+- `Build 018` retains the existing saved palettes, keeper marks, original sprite and Dual-Mask Mage files, and combat engine.
+- A non-destructive `&fresh=1` diagnostic mode temporarily ignores site-specific saved data and uses only an in-memory store. It **does not read, modify, or erase normal Chrome's original palette/keeper data**. When the tab is closed/reloaded, the temporary selections vanish. The game shows `DATA FRESH TEST` instead of `DATA SAVED`.
+- Run regular mode at `magic-lab/?v=018`. The control test is `magic-lab/?v=018&fresh=1`.
+- This is a **real code defect**, not evidence that Chrome is generally faulty. Clearing the browser's cache or site data isn't necessary for this fix.
+
+### Regression verification
+
+A synthetic runtime booted the **actual Phaser scene + original combat module** in two configurations:
+1. Stored selected wizard 16, saved palette hues for 03/06/16, four keeper entries, and field power 10. Result: 16 actors spawned, `LAB RUN:A`, original palette state read and retained until explicitly changed.
+2. `fresh=1` on the same simulated browser profile. Result: default wizard 01 and field power 5, 16 actors spawned, `LAB RUN:A`, **zero persistent storage reads/writes**, even after changing the selected skin.
+
+The smoke tests don't replace real Chrome rendering checks, but they directly exercise the failure reported from saved palettes.
+
 ## Build 016 • Diagnostic recovery (iOS in-app browser vs Safari)
 
 Field observations: the frozen Build 012 reference showed a rendered floor and wizard but no active combat drawings; Build 015 showed `LAB BOOT` and an empty arena. The captures were made in the ChatGPT in-app browser, not standalone Safari. This is a **relevant environmental difference**, not proof of the cause.
