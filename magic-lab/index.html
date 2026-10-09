@@ -520,11 +520,20 @@ const spellInfo={
  detonate:{name:"DETONATION",button:"target",origin:"target",hint:"DETONATE • TAP ARENA TO BLAST"},
  lightning:{name:"SPARK",button:"target",origin:"target",hint:"SPARK ⚡ • TAP VAPOR TO DISCHARGE"}
 };
-function spellButtonIntent(current,requested){
- if(current!==requested)return "equip";
- return spellInfo[requested].button==="target"?"place":"quick";
-}
-let selected="bolt", power=Number(gameStorage.getItem(recipeKey)||5), scene=null, started=false;
+// The module is a UI/state layer, not a prerequisite for the combat engine.
+// If its CDN-style asset is unavailable, the six default runes still work.
+const Loadout=window.WRKMAN_SPELL_LOADOUT||(()=>{
+ const DEFAULT=["bolt","well","frost","flame","detonate","lightning"],GLYPH={bolt:"✦",well:"◉",pulse:"◎",frost:"❄",flame:"♨",detonate:"✹",lightning:"⚡"};
+ const pos=i=>({x:87*Math.cos((-90+i*60)*Math.PI/180),y:87*Math.sin((-90+i*60)*Math.PI/180)});
+ return {DEFAULT,LIBRARY:spells,GLYPH,read:()=>DEFAULT.slice(),write:()=>false,
+ assign:(arr,index,id)=>{const x=arr.slice(),old=x.indexOf(id);if(old>=0&&old!==index)x[old]=x[index];x[index]=id;return x;},
+ pos,gesture:(x,y)=>{const d=Math.hypot(x,y);if(d<40)return {action:"cast",index:-1};
+  if(d<48||d>158)return {action:"cancel",index:-1};
+  let idx=0,best=Infinity;for(let i=0;i<6;i++){const p=pos(i),n=Math.hypot(x-p.x,y-p.y);if(n<best){idx=i;best=n;}}
+  return best<70?{action:"select",index:idx}:{action:"cancel",index:-1};}};
+})();
+let equipped=Loadout.read(gameStorage);
+let selected=equipped[0],power=Number(gameStorage.getItem(recipeKey)||5),scene=null,started=false;
 const touches={x:0,y:0};
 $("force").value=power;$("forceValue").textContent=power;
 $("force").addEventListener("input",e=>{power=Number(e.target.value);$("forceValue").textContent=power;gameStorage.setItem(recipeKey,String(power));});
@@ -545,10 +554,13 @@ function reportLabError(stage,error){
 const canvasDiagnostic=/[?&]renderer=canvas(?:&|$)/.test(window.location?.search||"");
 
 function selectSpell(type){
+ if(!equipped.includes(type)||!spellInfo[type])return;
  selected=type;
- document.querySelectorAll(".spell").forEach(b=>b.classList.toggle("sel",b.dataset.spell===type));
- $("sparkBtn").classList.toggle("sel",type==="lightning");
- $("castHint").textContent=spellInfo[type].hint;
+ $("wheelGlyph").textContent=Loadout.GLYPH[type]||"✦";
+ $("wheelName").textContent=spellInfo[type].name.split(" ")[0];
+ $("castHint").textContent=spellInfo[type].name+
+   (spellInfo[type].button==="target"?" • TAP ARENA TO PLACE":" • TAP ORB TO CAST");
+ for(const el of $("wheelSlots").children)el.classList.toggle("selected",el.dataset.spell===type);
 }
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
@@ -570,9 +582,10 @@ class Lab extends Phaser.Scene{
   // Start with our built-in vector wizard. Art upgrades asynchronously;
   // failure cannot interrupt enemy spawning, input, or combat setup.
   this.playerSkinSprite=null;
-  this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show")||!$("skinOverlay").hidden)return;
+  this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show")||!$("skinOverlay").hidden||!$("spellbookOverlay").hidden)return;
    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
-   if(["1","2","3","4","5","6","7"].includes(e.key))selectSpell(spells[Number(e.key)-1]);
+   if(["1","2","3","4","5","6"].includes(e.key))selectSpell(equipped[Number(e.key)-1]);
+   if(e.key.toLowerCase()==="b")openSpellbook();
    if(e.key.toLowerCase()==="e")this.addCrate();
    if(e.key.toLowerCase()==="r")this.resetLab();
    if(e.key===" ")this.dash();
@@ -1073,19 +1086,6 @@ function quickCast(type){
  const a=scene.aim;
  scene.cast(type,scene.player.x+a.x*180,scene.player.y+a.y*180);
 }
-function pressSpell(type){
- const intent=spellButtonIntent(selected,type);
- if(intent==="equip"){
-  selectSpell(type);
-  announce(spellInfo[type].name+" EQUIPPED • "+(spellInfo[type].button==="target"?"Tap the arena to place.":"Tap again to cast."));
-  return;
- }
- if(intent==="place"){
-  announce(spellInfo[type].name+" READY • Tap the exact arena position.");
-  return;
- }
- quickCast(type);
-}
 // Fire on touch-down, NOT synthesized click: Safari can defer clicks while
 // another finger is held on a control. Keyboard and mouse keep click behavior.
 function bindInstantPress(el, action){
@@ -1103,8 +1103,200 @@ function bindInstantPress(el, action){
   action();
  });
 }
-document.querySelectorAll(".spell").forEach(b=>bindInstantPress(b,()=>pressSpell(b.dataset.spell)));
-bindInstantPress($("sparkBtn"),()=>pressSpell("lightning"));
+// 026 WHEEL: press/hold center, slide to one of six runes, release to
+// select. Releasing in the hub taps the current quick spell. Targeted spells
+// arm a subsequent world-space canvas tap instead of firing at the orb.
+const wheelDock=$("wheelDock"),wheelHub=$("wheelHub"),wheelSlots=$("wheelSlots");
+const wheelButtons=[];
+let wheelTouchId=null,wheelMouseId=null,wheelLastFinish=0,wheelHot=-1,bookSlot=0;
+function wheelPoint(){
+ const r=wheelHub.getBoundingClientRect();
+ return {x:r.left+r.width/2,y:r.top+r.height/2};
+}
+function wheelShow(){
+ if(!$("spellbookOverlay").hidden||!started)return false;
+ wheelDock.classList.add("open");
+ wheelHub.setAttribute("aria-expanded","true");
+ $("wheelReadout").textContent="SLIDE TO A RUNE";
+ wheelHot=-1;
+ for(const el of wheelButtons)el.classList.remove("hot");
+ return true;
+}
+function wheelHide(){
+ wheelDock.classList.remove("open");
+ wheelHub.setAttribute("aria-expanded","false");
+ $("wheelReadout").textContent="HOLD + SLIDE TO EQUIP";
+ wheelHot=-1;
+ for(const el of wheelButtons)el.classList.remove("hot");
+}
+function wheelPosition(x,y){
+ const c=wheelPoint(),res=Loadout.gesture(x-c.x,y-c.y);
+ const index=res.action==="select"?res.index:-1;
+ if(wheelHot!==index){
+  wheelHot=index;
+  for(let i=0;i<wheelButtons.length;i++)wheelButtons[i].classList.toggle("hot",i===index);
+  $("wheelReadout").textContent=index<0?"RELEASE TO CAST / CANCEL":
+   spellInfo[equipped[index]].name;
+ }
+ return res;
+}
+function wheelCast(){
+ if(!started)return;
+ if(spellInfo[selected].button==="quick")quickCast(selected);
+ else announce(spellInfo[selected].name+" ARMED • Tap the arena to place.");
+}
+function wheelFinish(x,y,cancel=false){
+ const result=cancel?{action:"cancel"}:wheelPosition(x,y);
+ wheelHide();wheelLastFinish=Date.now();
+ if(result.action==="select"){
+  selectSpell(equipped[result.index]);
+  announce(spellInfo[selected].name+" EQUIPPED • "+(spellInfo[selected].button==="quick"?"Tap orb to cast.":"Tap arena to place."));
+ }else if(result.action==="cast")wheelCast();
+}
+for(let i=0;i<6;i++){
+ const button=document.createElement("button");button.type="button";button.className="wheelSlot";
+ const point=Loadout.pos(i);
+ button.style.left="calc(50% + "+point.x.toFixed(2)+"px)";
+ button.style.top="calc(50% + "+point.y.toFixed(2)+"px)";
+ button.dataset.index=String(i);
+ button.setAttribute("aria-label","Equip rune "+(i+1));
+ const rune=document.createElement("span");rune.className="wheelRune";
+ const no=document.createElement("span");no.className="wheelNo";no.textContent=String(i+1);
+ button.append(rune,no);
+ button.addEventListener("click",()=>{if(wheelDock.classList.contains("open")){selectSpell(equipped[i]);wheelHide();}});
+ wheelSlots.append(button);wheelButtons.push(button);
+}
+function refreshWheel(){
+ for(let i=0;i<6;i++){
+  const id=equipped[i],b=wheelButtons[i];
+  b.dataset.spell=id;
+  b.querySelector(".wheelRune").textContent=Loadout.GLYPH[id]||"✦";
+  b.title=String(i+1)+" • "+spellInfo[id].name;
+  b.setAttribute("aria-label","Slot "+(i+1)+": "+spellInfo[id].name);
+ }
+ if(!equipped.includes(selected))selected=equipped[0];
+ selectSpell(selected);
+}
+wheelHub.addEventListener("touchstart",e=>{
+ if(wheelTouchId!==null||!e.changedTouches?.length)return;
+ if(!wheelShow())return;
+ wheelTouchId=e.changedTouches[0].identifier;
+ e.preventDefault();e.stopPropagation();
+},{passive:false});
+document.addEventListener("touchmove",e=>{
+ if(wheelTouchId===null)return;
+ for(const touch of e.changedTouches){
+  if(touch.identifier===wheelTouchId){
+   wheelPosition(touch.clientX,touch.clientY);
+   e.preventDefault();break;
+  }
+ }
+},{passive:false});
+function wheelEndTouch(e,cancel){
+ if(wheelTouchId===null)return;
+ for(const t of e.changedTouches){
+  if(t.identifier===wheelTouchId){
+   wheelTouchId=null;wheelFinish(t.clientX,t.clientY,cancel);
+   if(e.cancelable)e.preventDefault();
+   break;
+  }
+ }
+}
+document.addEventListener("touchend",e=>wheelEndTouch(e,false),{passive:false});
+document.addEventListener("touchcancel",e=>wheelEndTouch(e,true),{passive:false});
+wheelHub.addEventListener("pointerdown",e=>{
+ if(e.pointerType==="touch"||wheelMouseId!==null)return;
+ if(!wheelShow())return;
+ wheelMouseId=e.pointerId;
+ e.preventDefault();
+});
+document.addEventListener("pointermove",e=>{
+ if(wheelMouseId!==null&&e.pointerId===wheelMouseId)wheelPosition(e.clientX,e.clientY);
+});
+document.addEventListener("pointerup",e=>{
+ if(wheelMouseId===null||e.pointerId!==wheelMouseId)return;
+ wheelMouseId=null;wheelFinish(e.clientX,e.clientY,false);
+});
+document.addEventListener("pointercancel",e=>{
+ if(wheelMouseId!==null&&e.pointerId===wheelMouseId){
+  wheelMouseId=null;wheelHide();
+ }
+});
+wheelHub.addEventListener("click",e=>{
+ // Browser-synthesized clicks follow touch and pointer-up. No double casts.
+ if(Date.now()-wheelLastFinish<650){e.preventDefault();return;}
+ wheelCast(); // keyboard / assistive activation
+});
+addEventListener("blur",()=>{wheelTouchId=null;wheelMouseId=null;wheelHide();});
+
+// Separate inventory UI. Editing pauses enemies; it does not affect
+// current physics, hues, or saved skins. Swapping keeps exactly six unique.
+const bookOverlay=$("spellbookOverlay");
+function refreshSpellbook(){
+ const slots=$("bookSlots"),library=$("bookLibrary");
+ slots.replaceChildren();library.replaceChildren();
+ for(let i=0;i<6;i++){
+  const spell=equipped[i],button=document.createElement("button");
+  button.type="button";button.className="bookEntry"+(i===bookSlot?" active":"");
+  button.setAttribute("aria-label","Select equipped slot "+(i+1)+": "+spellInfo[spell].name);
+  const rune=document.createElement("b");rune.textContent=Loadout.GLYPH[spell];
+  const name=document.createElement("span");name.textContent=(i+1)+" • "+spellInfo[spell].name;
+  const instruction=document.createElement("small");instruction.textContent=i===bookSlot?"EDITING":"TAP TO EDIT";
+  button.append(rune,name,instruction);
+  button.addEventListener("click",()=>{bookSlot=i;refreshSpellbook();});
+  slots.append(button);
+ }
+ for(const id of spells){
+  const ix=equipped.indexOf(id),button=document.createElement("button");
+  button.type="button";button.className="bookEntry"+(ix>=0?" assigned":"");
+  button.setAttribute("aria-label","Assign "+spellInfo[id].name+" to slot "+(bookSlot+1));
+  const rune=document.createElement("b");rune.textContent=Loadout.GLYPH[id];
+  const name=document.createElement("span");name.textContent=spellInfo[id].name;
+  const status=document.createElement("small");status.textContent=ix<0?"AVAILABLE":"SLOT "+(ix+1);
+  button.append(rune,name,status);
+  button.addEventListener("click",()=>assignBookSpell(id));
+  library.append(button);
+ }
+ $("bookTotal").textContent=String(spells.length);
+}
+function assignBookSpell(id){
+ equipped=Loadout.assign(equipped,bookSlot,id);
+ const saved=Loadout.write(gameStorage,equipped);
+ selected=equipped[bookSlot];
+ refreshWheel();refreshSpellbook();
+ $("bookStatus").textContent=spellInfo[id].name+" → RUNE "+(bookSlot+1)+(saved?" • SAVED":" • SESSION ONLY");
+ announce("SPELLBOOK • "+spellInfo[id].name+" EQUIPPED");
+}
+function openSpellbook(){
+ if(!started||!bookOverlay.hidden)return;
+ wheelTouchId=null;wheelMouseId=null;wheelHide();
+ bookOverlay.hidden=false;
+ scene?.scene.pause();
+ neutralStick();joyPointer=null;joyTouchId=null;
+ bookSlot=Math.max(0,equipped.indexOf(selected));
+ refreshSpellbook();
+ $("bookStatus").textContent="SIX SLOTS • SAVED LOCALLY • ROBES UNCHANGED";
+ $("spellbookDone").focus({preventScroll:true});
+}
+function closeSpellbook(){
+ if(bookOverlay.hidden)return;
+ bookOverlay.hidden=true;
+ scene?.scene.resume();
+ $("spellbookOpen").focus({preventScroll:true});
+}
+$("spellbookOpen").addEventListener("click",openSpellbook);
+$("spellbookDone").addEventListener("click",closeSpellbook);
+$("bookDefaults").addEventListener("click",()=>{
+ equipped=Loadout.DEFAULT.slice();
+ Loadout.write(gameStorage,equipped);
+ selected=equipped[0];refreshWheel();refreshSpellbook();
+ $("bookStatus").textContent="DEFAULT SIX RESTORED • SAVED";
+});
+bookOverlay.addEventListener("keydown",e=>{
+ if(e.key==="Escape"){e.preventDefault();e.stopPropagation();closeSpellbook();}
+});
+refreshWheel();
+
 $("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");if($("labState").textContent==="READY")$("labState").textContent="START";announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
 $("notes").onclick=()=>{$("instructions").classList.add("show");};
 $("reset").onclick=()=>{scene?.resetLab();};
