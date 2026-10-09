@@ -199,6 +199,23 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 016 • Diagnostic recovery (iOS in-app browser vs Safari)
+
+Field observations: the frozen Build 012 reference showed a rendered floor and wizard but no active combat drawings; Build 015 showed `LAB BOOT` and an empty arena. The captures were made in the ChatGPT in-app browser, not standalone Safari. This is a **relevant environmental difference**, not proof of the cause.
+
+An accelerated startup simulation reproduces a failure in Build 012: `Lab.create()` can execute before the later `skinGrid` constant initializes, raising `ReferenceError: Cannot access 'skinGrid' before initialization`. This makes the earlier 012 snapshot an art/layout baseline, **not a guaranteed startup-safe release**. Build 015 moved game construction after the controls, and Build 016 continues that fix.
+
+Build 016 adds explicit diagnostics without altering combat physics, dye masks, or existing saved palettes:
+
+- HUD state `SCENE`, `FLOOR`, `WORLD`, `READY`, `START`, or `RUN:A` records the last meaningful startup/render stage. `RUN:C` is the Canvas renderer test variant.
+- If `Lab.create()` or the update/render frame throws, it shows `ERR:CREATE` or `ERR:FRAME`, with the exception's message in the in-game error banner. Global script exceptions show `ERR:SCRIPT`.
+- A missing welcome modal gate is auto-recovered if the instructions are no longer visible but gameplay has not started.
+- For browser-specific graphics issues, open `magic-lab/?v=016&renderer=canvas` to request Phaser's Canvas renderer instead of the normal `AUTO` selection. This A/B comparison helps isolate WebGL/context failures.
+- The earlier real-combat synthetic scene test passed startup and its first drawing/update with 16 actors; an injected rendering exception produced `ERR:FRAME` and an on-screen error.
+- When testing on an iPhone, first open the link in **standalone Safari** using the in-app viewer's compass/open-in-browser control. Compare before attributing rendering bugs solely to game code.
+
+If the screen is blank: report the precise `LAB` label and, if present, the visible error message. If the label says `RUN:A` but nothing draws, try `RUN:C` in the Canvas test and compare. Nothing about Spell-Language has been activated.
+
 ## Build 015 • Scene boot-order repair and stable recovery page
 
 Build 014 removed the blocking Phaser `preload()` assets so that the game could initialize without optional art. On a real iPhone, counters showed four foes and three stones but nothing rendered. The **likely timing regression** is that a scene can reach `Lab.create()` synchronously before later top-level `const` bindings (skin grid, hue choices, thumb controls) have initialized. `resetLab()` updates the counters, then an early menu refresh can throw before the first frame is drawn.
