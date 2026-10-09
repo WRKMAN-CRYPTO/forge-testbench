@@ -199,6 +199,29 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 026 • Six-Rune radial wheel + separate Spellbook
+
+Player request: replace the old permanently visible six-button 3×2 cluster with a thumb-friendly wheel, allowing **at most six equipped spells** from an expandable known spell library. Keep Build 025's full-bleed follow camera, normal physics, Hue Forge and dyes.
+
+### New phone/game UI
+- **Wheel hub** resides near the right-hand thumb at the mid-right of the arena. It remains visible as a compact circular button showing the currently selected spell glyph.
+- **Tap orb:** casts quick spells (Arc Bolt, Frost, Pulse) once. Targeted spells (Gravity, Flame, Boom, Spark) become **armed**, then you tap the arena for exact world-space placement, including after camera scroll.
+- **Hold-and-slide:** press the hub to reveal six runes around it. Drag toward a rune and release to select without casting. Release within 40px of the hub to cast, or release far outside the ring to cancel. The document-level touch handler owns one exact touch identifier, so a simultaneous left-thumb joystick touch doesn't cancel the gesture. Mouse dragging uses a separate pointer identifier; keyboard users can activate the focused orb with Enter/Space.
+- **SPELLBOOK:** top menu button opens a combat-paused editor showing the six active slots and the full seven-spell known library. Tap a numbered slot, then a spell. Unequipped spells replace the chosen slot; choosing an already-equipped spell **swaps** the two. The player can restore the starting six. Status text reports whether changes were saved.
+- **Starting six:** Arc Bolt / Gravity / Frost / Flame / Detonation / Spark. **Kinetic Pulse** starts unequipped but is immediately available in SPELLBOOK. The seven spell implementations remain in the code, and no spell is deleted.
+- Keyboard **1–6** chooses the configured rune slots. The **B** shortcut opens the Spellbook, Escape closes it. The original six chunky right-side spell buttons and detached footer Spark button are removed.
+- **COPY BUILD** now exports the six equipped runes, ordered, and the seven-spell library separately (format version 2).
+- **Saved state:** spell wheel stores only the validated six-spell ID array at `wrkman-arcane-lab026-spell-loadout-v1`. It never overwrites robe, skin, or keeper data. Bad or duplicate saves fall back to defaults. Existing `fresh=1` profile mode isolates the new loadout as well. If the loadout module fails to download, a small no-storage default fallback keeps the combat game usable.
+
+### Test evidence
+- **Spell Wheel 026: 34 tests passed**: validates six unique slots, allowed library, swapping, invalid storage, private-storage fallbacks, six radial hit regions, tap-to-cast and cancel zones.
+- **Elemental World 021: 29 tests passed**: existing elemental mechanics remain green.
+- Full simulated scene startup with the real combat and elemental modules and stored dyed wizard **06** spawned 22 actors, rendered `LAB RUN:A`, and exercised actual DOM touch and mouse gestures: orb casts Arc Bolt once; sliding selects Frost without casting; Spellbook pauses enemies, replaces Frost with Pulse, saves a six-slot loadout; dragging selects Spark; tapping the arena after simulated camera scroll still emits an electrical sphere at the correct **world** coordinates.
+- Desktop/phone rendering and ergonomic gesture comfort still need real device validation. Do not claim these simulations establish iOS Safari touch feel.
+
+### Suggested device test
+Visit `magic-lab/?v=026` in landscape. Enter the lab. Tap the orb for Arc Bolt. Hold and slide north or southwest, release to change the rune, then tap orb again. Try selecting Flame or Spark and tapping a distant cloud with the moving camera. Open SPELLBOOK, select a slot, swap in Pulse, close, and reopen to verify the saved assignment. Lastly verify SKINS/HUES still show dyed wizard 06 and controls work while holding the joystick with a separate finger.
+
 ## Build 025 • Faster vertical camera chase
 
 Field feedback: even with the earlier camera chase, landscape phone users could approach enemies from above or below with too little warning. The horizontal follow felt acceptable; adjust only vertical tracking.
