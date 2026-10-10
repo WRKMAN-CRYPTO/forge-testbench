@@ -199,6 +199,32 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 028 • Game-first HUD (mobile-inspired cleanup)
+
+Inspired by two handheld dungeon games: preserve a **large, readable world** and keep the on-screen input controls recognizable via quiet cyan/gold accents, without adopting the other game's green palette. Build 028 is an **interface-only redesign**, not a combat or camera change.
+
+### Play view
+- Replaced the oversized WRKMAN tool header with a **compact translucent top-left health HUD** featuring a red heart, a live percentage health bar, nearby enemy count and current material phase.
+- The upper-right is now **one ☰ menu button**. The original top buttons and scattered debug pills no longer block the battlefield. The game still fills the phone viewport in landscape.
+- The lower-left joystick is modestly smaller and more transparent, keeping comfortable touch hit targets. The right-side Dash and six-slot spell wheel remain near the bottom-right, with soft cyan and warm gold instead of bright green.
+- Cast hint text remains available, but appears only when a **targeted spell is armed**, unless full hints are enabled in Settings. The center stays uncluttered.
+
+### ☰ Menu
+- Contains **SPELLBOOK, SKINS, HUES, HOW TO PLAY, COPY BUILD and RESET ARENA**, retaining the original element IDs and features.
+- **Display settings** include persistent `CAST HINTS: ON/OFF` and `CONTROLS: SOFT/BOLD`. Stored under `wrkman-arcane-lab028-ui-settings-v1`, separately from legacy Field Power, saved spells, skin keepers and robe dyes; `fresh=1` remains non-destructive.
+- **LAB TELEMETRY** expands on demand for developer metrics: KOs, dummy HP, deflections, impacts, pillars, lab frame status, saved profile status and solo/local mode.
+- Menu opening pauses enemies and neutralizes joystick input. Closing via ☰, tapping outside or Escape resumes. Selecting SPELLBOOK / SKINS / HUES transfers that pause to the corresponding fullscreen dialog without prematurely unpausing enemies. HOW TO resumes when the player taps ENTER THE LAB. COPY BUILD keeps menu open so clipboard feedback is visible; RESET closes and resumes immediately.
+
+### Architecture/testing
+- Existing `Combat.heads` still writes `playerHP` and `enemies` because those IDs now live in the new HUD. A lightweight UI-only sync updates `healthFill` from the current combat HP every four game ticks and resets to full health on RESET.
+- No edits to `combat.js`, `elements.js`, `spell-loadout.js`, Hue Forge, sprite art, follow-camera constants, material physics, spell physics or saved values.
+- JS parse, DOM ID/reference and saved-hue boot order checked.
+- Full simulated scene startup with real combat/material/hue/loadout modules, using both an existing dyed skin 06 and a fresh profile: **22 actors initialized, LAB RUN:A**, HUD health meter correctly reflected 65% during combat, menu opened/closed safely, all three nested dialogs handed off pause/resume, HOW TO resumed, RESET worked, Dash and spell orb remained active, display preferences persisted only in the saved profile.
+- Existing **34 spell-wheel** and **29 elemental** deterministic tests remain green.
+- Real iPhone Safari appearance and reachability still need field feedback; this is a game-first visual pass, not an image or an animation update.
+
+Field test: open `magic-lab/?v=028` in landscape. The top of the play view should show only health at left and ☰ at right. Start a fight, check the live health bar and disappearing KOs/diagnostics. Open ☰, try Spellbook, Hues, Settings, Reset, and return to battle. Confirm hints appear on aimed Flame/Spark, and that joystick + Dash + wheel still work together. If the HUD overlaps a browser notch, report device orientation/safe area.
+
 ## Build 027 • Bottom-right Dash + Wheel, experimental strip removed
 
 Requested phone UI cleanup:
