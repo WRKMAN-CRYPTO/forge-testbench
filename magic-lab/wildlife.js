@@ -252,9 +252,11 @@
   for(const a of w.creatures){
    if(p&&hyp(a.x-p.x,a.y-p.y)>810)continue;
    const tumbling=time<a.tumbleUntil;
-   const x=tumbling?0:Math.round(a.x),y=tumbling?0:Math.round(a.y);
+   // Preserve subpixel travel. Only the creature SHAPES are pixel-sized;
+   // rounding the entire creature every frame would reintroduce stepping.
+   const x=tumbling?0:a.x,y=tumbling?0:a.y;
    if(tumbling){
-    g.save();g.translateCanvas(Math.round(a.x),Math.round(a.y));
+    g.save();g.translateCanvas(a.x,a.y);
     g.rotateCanvas((a.tumbleUntil-time)*(a.type==="pillbug"?.024:a.type==="ant"?.035:.019));
    }
    // Tiny pixel-built silhouettes: few draws, still readable at 0.8 camera.
