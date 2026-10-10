@@ -13,6 +13,15 @@ const a=R.make("012345"),b=R.make("012345"),c=R.make("012346");
 assert("repeatable geography",JSON.stringify(a)===JSON.stringify(b));
 assert("different addresses produce distinct seeds",a.seed!==c.seed);
 assert("address is preserved",a.address==="012345");
+assert("v1 pinned geography seed",a.seed===2940093781);
+assert("v1 pinned first landmark x",Math.abs(a.sectors[0].pads[0].x-374.56005465222194)<1e-7);
+assert("v1 pinned first landmark y",Math.abs(a.sectors[0].pads[0].y-843.1960947733596)<1e-7);
+assert("v1 pinned sector identity",a.sectors[1].name==="Silent Wildwood"&&a.sectors[4].name==="Moonlit Battle Grounds");
+assert("v1 explicit version matches default",JSON.stringify(a)===JSON.stringify(R.make("012345",1)));
+let rejected=false;
+try{R.make("012345",2);}catch(_){rejected=true;}
+assert("future version cannot silently replace v1 geography",rejected);
+
 assert("five sectors",a.sectors.length===5);
 assert("arrival is sanctuary",a.sectors[0].name==="Arrival Sanctuary");
 assert("sanctuary has no enemy",a.sectors[0].enemies.length===0);
