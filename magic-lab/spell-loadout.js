@@ -1,4 +1,4 @@
-/* WRKMAN / ARCANE LAB 026 — six-slot loadout, independent of combat.
+/* WRKMAN / ARCANE LAB 029 — six-slot loadout + quarter-fan aiming, independent of combat.
  * No browser APIs here. UI and persistence are consumers of this module.
  */
 (function(root,factory){
@@ -34,21 +34,31 @@
   return result;
  }
  function unassigned(slots){const equip=new Set(safe(slots));return LIBRARY.filter(id=>!equip.has(id));}
- function pos(index,radius=87){
-  const a=(-90+index*60)*Math.PI/180;
-  return {x:Math.cos(a)*radius,y:Math.sin(a)*radius};
+ // Coordinates are relative to the CAST orb, not the old wheel center.
+ // Two three-rune arcs fit entirely in the upper-left quadrant.
+ // The bottom-left strip remains empty so DASH stays accessible.
+ const FAN=Object.freeze([
+  {degrees:-90,radius:112},{degrees:-120,radius:112},{degrees:-150,radius:112},
+  {degrees:-90,radius:165},{degrees:-120,radius:165},{degrees:-150,radius:165}
+ ].map(p=>Object.freeze(p)));
+ function pos(index){
+  const p=FAN[index];
+  if(!p)return {x:0,y:0};
+  const a=p.degrees*Math.PI/180;
+  return {x:Math.cos(a)*p.radius,y:Math.sin(a)*p.radius};
  }
  function gesture(dx,dy){
   const len=Math.hypot(dx,dy);
   if(len<40)return {action:"cast",index:-1};
-  if(len<48||len>158)return {action:"cancel",index:-1};
-  let best=-1,d=Infinity;
+  // Only the inward upper-left quarter can select a rune. Small boundary
+  // tolerance lets a finger land on the vertical/top-edge rune.
+  if(dx>12||dy>8||len<70||len>201)return {action:"cancel",index:-1};
+  let closest=-1,distance=Infinity;
   for(let i=0;i<SLOT_COUNT;i++){
-   const pt=pos(i);
-   const a=Math.hypot(dx-pt.x,dy-pt.y);
-   if(a<d){d=a;best=i;}
+   const point=pos(i),d=Math.hypot(dx-point.x,dy-point.y);
+   if(d<distance){distance=d;closest=i;}
   }
-  return d<70?{action:"select",index:best}:{action:"cancel",index:-1};
+  return distance<=40?{action:"select",index:closest}:{action:"cancel",index:-1};
  }
- return Object.freeze({KEY,LIBRARY,DEFAULT,SLOT_COUNT,GLYPH,safe,valid,read,write,assign,unassigned,pos,gesture});
+ return Object.freeze({KEY,LIBRARY,DEFAULT,SLOT_COUNT,GLYPH,FAN,safe,valid,read,write,assign,unassigned,pos,gesture});
 });
