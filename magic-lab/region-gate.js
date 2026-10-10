@@ -10,7 +10,7 @@
  else if(root)root.WRKMAN_REGIONS=api;
 })(typeof globalThis==="object"?globalThis:null,function(){
  "use strict";
- const VERSION=1, HOME="000000";
+ const VERSION=1; // Home is a separate scene; every six-glyph address is valid.
  const GLYPHS=Object.freeze(["☼","◇","☽","✦","≋","△","⬡","✶"]);
  const ORIGIN=Object.freeze({x:254,y:305});
  const GATE=Object.freeze({x:128,y:300});
@@ -96,8 +96,11 @@
   return {index,name:nameFor(theme,index,rng),theme:theme.name,colors:theme.colors.slice(),
    line:theme.line,glow:theme.glow,pads,crate,pillar,debris,enemies,links:neighbors(index)};
  }
- function make(code){
+ function make(code,version=VERSION){
   if(!valid(code))throw Error("A gate address requires six glyphs");
+  // V1 is immutable. Future generators add cases instead of silently
+  // rerolling the geography of addresses discovered with this version.
+  if(version!==1)throw Error("Unsupported region generator version: "+version);
   const seed=hash(code),sectors=Array.from({length:5},(_,i)=>sector(seed,i));
   return {address:code,version:VERSION,seed,sectors};
  }
@@ -157,5 +160,5 @@
   }
   g.fillStyle(0xeffbff,.7+beat*.25);g.fillCircle(x,y,8+beat*5);
  }
- return Object.freeze({VERSION,GLYPHS,HOME,ORIGIN,GATE,EXITS,valid,hash,make,neighbors,portals,drawFloor,drawPortal,drawGate});
+ return Object.freeze({VERSION,GLYPHS,ORIGIN,GATE,EXITS,valid,hash,make,neighbors,portals,drawFloor,drawPortal,drawGate});
 });
