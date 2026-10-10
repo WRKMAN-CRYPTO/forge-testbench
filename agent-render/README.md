@@ -1,33 +1,29 @@
-# WRKMAN Agent-Render v0.2.1 · Scroll-safe Focus Engine
+# WRKMAN Agent-Render v0.3 | Edge Awareness
 
-A phone-first experimental 2D renderer in one self-contained HTML file. Hexagonal rendering agents sample an independent procedural scene or an imported image. Larger agents provide coverage; smaller agents split to refine details, drift locally, and can merge back when appropriate.
+A phone-first experiment in **rendering with living populations of colored hexagons**, not pre-drawn sprites. The independent procedural flower or imported image is the target. Agents sample its colors, move, split, and merge under a hard population budget.
 
-Open `index.html` in a browser, or try:
-https://wrkman-crypto.github.io/forge-testbench/agent-render/
+## v0.3 changes
 
-## Focus controls
+- **Edge-aware local sampling:** a center and two concentric six-point rings examine local color variation and sharp transitions, catching finer features than a single ring.
+- **Edge priority slider:** trade off general color detail against sharp borders and lettering, adjustable while the renderer runs.
+- **EDGES mode:** a visual diagnostic of local edge scores at the agents' current locations. This is *not* an actual image layer in the reconstruction.
+- **Adaptive color fitting:** fine agents gently favor the reference pixel at their center on sharp edges instead of always averaging away those edges.
+- **Population competition:** when full, a stable low-value sibling cluster can merge to free space for a stronger unresolved edge, subject to cooldowns.
+- **Smaller-detail option:** a third split depth becomes possible for high budgets, with adjustable population up to 2,200 (heavier on phones).
+- **Preserves the v0.2 Focus Engine** and **v0.2.1 scroll-safe resizing**.
 
-- **Refocus**: collapse the current swarm to the existing root hexes, dim coarse color estimates, and allow actual sampling and splitting to rebuild the image.
-- **Rebirth**: reconstruct a new coarse population with randomized starting positions.
-- **Settle**: accelerate the remainder of the current focus sequence; when already focused, hold or release the image.
-- **Pulse**: after the current focus completes, wait about 13.5 seconds and repeat a gentler refocus. Toggle it off to stop looping.
-- **Hold image when focused**: stop scene time and agent updates after the focus sequence reaches completion. Incompatible with Pulse.
-- **Pause**: stop/restart animation manually. While held, the same button releases the hold.
+## How to test
 
-Also includes adjustable detail threshold, population budget, freedom, wireframe, reference view, compare view, and file import. No network or runtime dependencies; local image import stays on the user's device.
+1. On mobile, open `index.html`, watch the flower arrive, then scroll down. It should **not refocus** unless you press Refocus, Rebirth, or enable Pulse.
+2. Import an image containing lettering. Switch between AGENTS, TRUTH, COMPARE, and EDGES.
+3. Increase **Edge priority** to emphasize boundaries; decrease it if you prefer softer gradients.
+4. Increase **Agent budget** to 1,500–2,000 for finer text, provided your device stays responsive.
+5. Use **Refocus** to watch the same image rebuild with the new settings. **Rebirth** starts from randomized roots.
 
-## v0.2.1 mobile scroll fix
+## Honest limitations
 
-- The stage now uses `svh` (stable viewport height) rather than `dvh`. iOS Safari address-bar movements cannot repeatedly resize the scene.
-- Actual geometry changes preserve the agent population, split lineage, RGB estimates, focus progress, and held/paused state. Only first startup initializes a new swarm.
-- Vertical touch gestures can scroll the page. A tap or sideways gesture intentionally disturbs the swarm.
+This is still experimental. With only hundreds of solid-color hexagons, tiny letters will remain abstract. Edge preference can also overspend on strong frame borders. Fidelity is a budgeted tradeoff, not guaranteed pixel-for-pixel superiority on every image. High budgets cost more processing. The system does not paint the truth image under or over the agents in AGENTS mode.
 
-## Architectural boundary
+## Files
 
-This is a rendering experiment. The procedural flower or uploaded image exists as an independent sample source. Rendering agents do not control object simulation logic.
-
-## Notes
-
-- Coarse root agents are retained to prevent empty regions. Root count may be greater than an unusually low population budget on large screens.
-- Focus progression is a scheduling heuristic, not an independently measured picture-quality score.
-- The result is an adaptive painterly approximation, not a mathematically exact recursive hex tiling.
+`index.html` is standalone, no network or build step required. The controls operate entirely in-browser. Imported images are processed locally and not uploaded.
