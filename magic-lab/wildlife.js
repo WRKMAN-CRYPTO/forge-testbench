@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 031 / SPARK-DRAWER WILDLIFE
+/* WRKMAN ARCANE LAB 032 / SPARK-DRAWER WILDLIFE
  * Tiny residents, not enemies. No health bars, spell identifiers, inventory,
  * navigation server, persistent storage, timers or Phaser dependencies.
  * They perceive only environmental measurements provided by the scene:
@@ -36,7 +36,7 @@
   const px=clamp(x+Math.cos(angle)*radius,LIMIT.left+28,LIMIT.right-28);
   const py=clamp(y+Math.sin(angle)*radius*.69,LIMIT.top+28,LIMIT.bottom-28);
   const heading=rand(w)*Math.PI*2;
-  return {type,x:px,y:py,vx:0,vy:0,heading,turnAt:0,pauseUntil:0,
+  return {type,x:px,y:py,vx:0,vy:0,targetX:0,targetY:0,kickX:0,kickY:0,tumbleUntil:0,recoverUntil:0,heading,turnAt:0,pauseUntil:0,
    alarm:0,nextRelayAt:0,fleeX:0,fleeY:0,curlUntil:0,
    crumb:type==="ant"&&rand(w)<.34,wing:rand(w)*6.28,
    shade:rand(w),age:rand(w)*3000};
@@ -92,13 +92,8 @@
   if(heat>.78){urgency=Math.max(urgency,heat);const t=(env.thermals||[]).find(h=>h.heat>.78&&hyp(a.x-h.x,a.y-h.y)<(h.radius||100)+95);if(t){const d=Math.max(1,hyp(a.x-t.x,a.y-t.y));fromX=(a.x-t.x)/d;fromY=(a.y-t.y)/d;}}
   return {urgency,fromX,fromY,heat,chill,glowTarget,glowWeight};
  }
- function step(w,env,time,delta){
-  if(!w||!Array.isArray(w.creatures))return;
-  // Scene sends measured time from its 80ms sampler; cap stalls, not ticks.
-  w.acc+=clamp(Number(delta)||0,0,160);
-  if(w.acc<TICK)return;
-  const dt=Math.min(w.acc,160)/1000;
-  w.acc=0;w.steps++;
+ function think(w,env,time,dt){
+  w.steps++;
   const p=env.player||{x:254,y:305};
   const senses=w.creatures.map(a=>environmentSense(a,env,time));
   // Neighbors can become alarmed by a fleeing ant even when they never saw
@@ -155,7 +150,7 @@
     const dx=a.x-obstacle.x,dy=a.y-obstacle.y,d=Math.max(1,hyp(dx,dy));
     dirX+=dx/d*2;dirY+=dy/d*2;
     if(a.type==="pillbug"&&a.curlUntil>time){
-     a.vx+=dx/d*16;a.vy+=dy/d*16;
+     a.kickX+=dx/d*16;a.kickY+=dy/d*16;
     }
    }
    // Ambient acceleration acts directly on the body, not on its knowledge.
@@ -164,7 +159,7 @@
     const dx=force.x-a.x,dy=force.y-a.y,d=Math.max(10,hyp(dx,dy));
     if(d<(force.radius||190)){
      const pull=(1-d/(force.radius||190))*clamp(force.strength||1,0,3);
-     a.vx+=dx/d*pull*8;a.vy+=dy/d*pull*8;
+     a.kickX+=dx/d*pull*8;a.kickY+=dy/d*pull*8;
      if(a.type==="pillbug"&&pull>.3)a.curlUntil=Math.max(a.curlUntil,time+1100);
     }
    }
@@ -174,33 +169,93 @@
    const speed=(a.type==="ant"?34:a.type==="pillbug"?21:43)*
       (a.alarm>.2?2.1:1)*chillFactor;
    if(a.type==="moth"){
-    a.wing+=dt*23;
     dirX+=Math.sin(a.wing*.71)*.30;
     dirY+=Math.cos(a.wing*.59)*.24;
    }
    const d=Math.max(1,hyp(dirX,dirY));
-   const targetX=resting||rolled?0:dirX/d*speed;
-   const targetY=resting||rolled?0:dirY/d*speed;
-   const blend=rolled?.12:.22;
-   a.vx+=(targetX-a.vx)*blend;a.vy+=(targetY-a.vy)*blend;
-   // Clamp extreme outside impulses before integrating position.
-   const cap=rolled?130:135,v=hyp(a.vx,a.vy);
-   if(v>cap){a.vx*=cap/v;a.vy*=cap/v;}
-   a.x+=a.vx*dt;a.y+=a.vy*dt;
-   if(a.x<LIMIT.left+18||a.x>LIMIT.right-18){a.vx*=-.62;a.heading=Math.PI-a.heading;}
-   if(a.y<LIMIT.top+18||a.y>LIMIT.bottom-18){a.vy*=-.62;a.heading=-a.heading;}
-   a.x=clamp(a.x,LIMIT.left+18,LIMIT.right-18);
-   a.y=clamp(a.y,LIMIT.top+18,LIMIT.bottom-18);
+   // Perception updates goals, not position. Frame-rate motion is separate.
+   const recovering=time<a.recoverUntil;
+   a.targetX=resting||rolled||recovering?0:dirX/d*speed;
+   a.targetY=resting||rolled||recovering?0:dirY/d*speed;
    if(a.type==="ant"&&a.crumb&&a.alarm>.42)a.crumb=false;
    else if(a.type==="ant"&&!a.crumb&&a.alarm<.1&&rand(w)<.004)a.crumb=true;
   }
+ }
+ // Direct blast response: impact is physical, independent of whether the
+ // creature noticed anything during its previous low-frequency sense tick.
+ function impulse(w,x,y,radius=140,energy=100,time=0){
+  if(!w)return 0;
+  const r=Math.max(12,Number(radius)||140),strength=clamp(Number(energy)||0,0,200)/100;
+  let count=0;
+  for(let i=0;i<w.creatures.length;i++){
+   const a=w.creatures[i],dx=a.x-x,dy=a.y-y,d=hyp(dx,dy);
+   if(d>r+7)continue;
+   const angle=(i+1)*2.39996323;
+   const nx=d>.001?dx/d:Math.cos(angle),ny=d>.001?dy/d:Math.sin(angle);
+   const fall=Math.pow(clamp(1-d/(r+7),0,1),.65);
+   const speed=(a.type==="ant"?330:a.type==="pillbug"?240:285)*strength*fall;
+   if(speed<3)continue;
+   a.kickX=clamp(a.kickX+nx*speed,-450,450);
+   a.kickY=clamp(a.kickY+ny*speed,-450,450);
+   a.alarm=Math.max(a.alarm,.86);
+   a.fleeX=nx;a.fleeY=ny;a.pauseUntil=0;
+   a.tumbleUntil=Math.max(a.tumbleUntil,time+(a.type==="pillbug"?1050:a.type==="moth"?680:440));
+   a.recoverUntil=Math.max(a.recoverUntil,time+(a.type==="pillbug"?1450:a.type==="moth"?960:720));
+   if(a.type==="pillbug")a.curlUntil=Math.max(a.curlUntil,time+1700);
+   if(a.type==="ant")a.crumb=false;
+   count++;
+  }
+  return count;
+ }
+ // 60 FPS motion + wing animation; decisions and sensory searches stay 12.5Hz.
+ function integrate(w,time,delta){
+  const dt=clamp(Number(delta)||0,0,50)/1000;
+  if(!dt)return;
+  for(const a of w.creatures){
+   const rolled=a.type==="pillbug"&&time<a.curlUntil;
+   const recovering=time<a.recoverUntil;
+   const factor=1-Math.pow(1-(rolled?.12:.22),dt/.08);
+   a.vx+=((recovering?0:a.targetX)-a.vx)*factor;
+   a.vy+=((recovering?0:a.targetY)-a.vy)*factor;
+   // Explosion momentum is NOT blended away by an AI turning decision.
+   const kx=a.kickX,ky=a.kickY;
+   a.x+=(a.vx+kx)*dt;a.y+=(a.vy+ky)*dt;
+   const drag=Math.pow(a.type==="pillbug"?.88:a.type==="ant"?.84:.86,dt/.08);
+   a.kickX=kx*drag;a.kickY=ky*drag;
+   if(a.type==="moth")a.wing+=dt*23*(time<a.tumbleUntil?.7:1);
+   if(a.x<LIMIT.left+18||a.x>LIMIT.right-18){
+    a.vx*=-.62;a.kickX*=-.55;a.heading=Math.PI-a.heading;
+   }
+   if(a.y<LIMIT.top+18||a.y>LIMIT.bottom-18){
+    a.vy*=-.62;a.kickY*=-.55;a.heading=-a.heading;
+   }
+   a.x=clamp(a.x,LIMIT.left+18,LIMIT.right-18);
+   a.y=clamp(a.y,LIMIT.top+18,LIMIT.bottom-18);
+  }
+ }
+ function step(w,env,time,delta){
+  if(!w||!Array.isArray(w.creatures))return;
+  const ms=clamp(Number(delta)||0,0,50);
+  if(!ms)return;
+  w.acc+=ms;
+  if(w.acc>=TICK){
+   const measured=Math.min(w.acc,160)/1000;
+   w.acc%=TICK;
+   think(w,env||{},time,measured);
+  }
+  integrate(w,time,ms);
  }
  function paint(w,g,time,p){
   if(!w)return 0;
   let painted=0;
   for(const a of w.creatures){
    if(p&&hyp(a.x-p.x,a.y-p.y)>810)continue;
-   const x=Math.round(a.x),y=Math.round(a.y);
+   const tumbling=time<a.tumbleUntil;
+   const x=tumbling?0:Math.round(a.x),y=tumbling?0:Math.round(a.y);
+   if(tumbling){
+    g.save();g.translateCanvas(Math.round(a.x),Math.round(a.y));
+    g.rotateCanvas((a.tumbleUntil-time)*(a.type==="pillbug"?.024:a.type==="ant"?.035:.019));
+   }
    // Tiny pixel-built silhouettes: few draws, still readable at 0.8 camera.
    if(a.type==="ant"){
     const flip=Math.cos(a.heading)>=0?1:-1;
@@ -237,6 +292,7 @@
     g.fillStyle(0x4b728f,.8);g.fillRect(x-1,y-8,1,4);g.fillRect(x+1,y-8,1,4);
     g.fillStyle(0xe6f9fe,.66);g.fillRect(x-1,y-2,2,2);
    }
+   if(tumbling)g.restore();
    painted++;
   }
   return painted;
@@ -245,5 +301,5 @@
   pillbugs:w.creatures.filter(a=>a.type==="pillbug").length,moths:w.creatures.filter(a=>a.type==="moth").length,
   alarmed:w.creatures.filter(a=>a.alarm>.3).length,curled:w.creatures.filter(a=>a.type==="pillbug"&&a.curlUntil>0).length,
   recycled:w.recycled,steps:w.steps}:null;}
- return Object.freeze({reset,step,paint,snapshot,MAX,TICK});
+ return Object.freeze({reset,step,impulse,paint,snapshot,MAX,TICK});
 });
