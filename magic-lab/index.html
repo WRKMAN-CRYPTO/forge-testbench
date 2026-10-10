@@ -1076,9 +1076,9 @@ class Lab extends Phaser.Scene{
    g.lineBetween(x,y-31,x,y+31);
   }
  }
- enterRegion(code){
+ enterRegion(code,version=Regions?.VERSION){
   if(!Regions||!Regions.valid(code))return false;
-  this.region=Regions.make(code);this.sectorIndex=0;
+  this.region=Regions.make(code,version);this.sectorIndex=0;
   this.travelLock=this.time.now+1100;
   this.resetLab();
   markGateVisit(code,0);
@@ -1139,7 +1139,7 @@ class Lab extends Phaser.Scene{
   if(Elements)Elements.reset(this);
   // Same reset lifetime as physical objects; visual residents are inexpensive
   // kinematic actors, not 18 additional Matter collision pairs on a phone.
-  this.wildlife=Wildlife?Wildlife.reset(this.player.x,this.player.y):null;
+  this.wildlife=Wildlife?Wildlife.reset(this.player.x,this.player.y,this.region ? (this.region.seed ^ Math.imul(this.sectorIndex+1,0x9e3779b1))>>>0 : 310031):null;
   this.wildlifeTick=0;
   this.wildlifeTelemetryStep=-1;
   this.wildlifeEnvironment=null;
@@ -1767,6 +1767,7 @@ refreshWheel();
 /* Build 033 / Dialing, travel journal and modal UI; separate from physics. */
 const gateOverlay=$("gateOverlay"),gateDigits=[],gateJournalKey="wrkman-arcane-lab033-gate-journal-v1";
 let gateJournal=[];
+let gateDialVersion=Regions?.VERSION||1;
 try{
  const stored=JSON.parse(gameStorage.getItem(gateJournalKey)||"[]");
  if(Array.isArray(stored))gateJournal=stored.filter(v=>v&&Regions?.valid(v.code)&&Array.isArray(v.visited)).slice(0,24);
@@ -1775,7 +1776,8 @@ function persistGateJournal(){try{gameStorage.setItem(gateJournalKey,JSON.string
 function markGateVisit(code,index){
  if(!Regions?.valid(code)||index<0||index>4)return;
  let entry=gateJournal.find(v=>v.code===code);
- if(!entry){entry={code,visited:[],last:0};gateJournal.unshift(entry);}
+ if(!entry){entry={code,version:Regions.VERSION,visited:[],last:0};gateJournal.unshift(entry);}
+ if(!Number.isInteger(entry.version))entry.version=Regions.VERSION;
  if(!entry.visited.includes(index))entry.visited.push(index);
  entry.last=Date.now();
  gateJournal.sort((a,b)=>b.last-a.last);
@@ -1792,6 +1794,7 @@ function renderGateJournal(){
   btn.title="Load saved glyphs for region "+entry.code;
   btn.addEventListener("click",()=>{
    gateDigits.splice(0,gateDigits.length,...entry.code.split(""));
+   gateDialVersion=entry.version||Regions.VERSION;
    renderGateDial();
    $("gateMessage").textContent="ADDRESS RECALLED • "+entry.visited.length+" of 5 arenas discovered";
   });
@@ -1815,7 +1818,7 @@ function renderGateDial(){
  const current=scene?.region;
  $("gateHome").hidden=!current;
  if(gateDigits.length===6){
-  $("gateMessage").textContent="ADDRESS "+gateDigits.join("")+" • "+(gateJournal.some(x=>x.code===gateDigits.join(""))?"KNOWN REGION":"UNCHARTED REGION");
+  $("gateMessage").textContent="ADDRESS "+gateDigits.join("")+" • V"+gateDialVersion+" • "+(gateJournal.some(x=>x.code===gateDigits.join(""))?"KNOWN REGION":"UNCHARTED REGION");
  }else $("gateMessage").textContent="DIAL "+(6-gateDigits.length)+" MORE GLYPH"+(6-gateDigits.length===1?"":"S");
 }
 if(Regions){
@@ -1824,7 +1827,7 @@ if(Regions){
   key.textContent=Regions.GLYPHS[i];key.setAttribute("aria-label","Add glyph "+(i+1));
   key.addEventListener("click",()=>{
    if(gateDigits.length>=6)return;
-   gateDigits.push(String(i));renderGateDial();
+   gateDigits.push(String(i));gateDialVersion=Regions.VERSION;renderGateDial();
   });
   $("gateKeys").append(key);
  }
@@ -1844,27 +1847,29 @@ function openGate(){
  gateOverlay.hidden=false;
  scene.scene.pause();
  gateDigits.splice(0,gateDigits.length,...(scene.region?.address.split("")||[]));
+ gateDialVersion=scene.region?.version||Regions.VERSION;
  renderGateDial();renderGateJournal();
  $("gateDone").focus({preventScroll:true});
 }
 $("gateMenuOpen").addEventListener("click",openGate);
 $("gateNearby").addEventListener("click",openGate);
 $("gateDone").addEventListener("click",()=>closeGate());
-$("gateBack").addEventListener("click",()=>{gateDigits.pop();renderGateDial();});
-$("gateClear").addEventListener("click",()=>{gateDigits.length=0;renderGateDial();});
+$("gateBack").addEventListener("click",()=>{gateDigits.pop();gateDialVersion=Regions?.VERSION||1;renderGateDial();});
+$("gateClear").addEventListener("click",()=>{gateDigits.length=0;gateDialVersion=Regions?.VERSION||1;renderGateDial();});
 $("gateTravel").addEventListener("click",()=>{
  if(gateDigits.length!==6||!Regions)return;
  const address=gateDigits.join("");
  closeGate(false);
- if(scene.enterRegion(address))scene.scene.resume();
+ try{if(scene.enterRegion(address,gateDialVersion))scene.scene.resume();}
+ catch(error){announce("GATE ERROR • "+String(error?.message||error));scene.scene.resume();}
 });
 $("gateHome").addEventListener("click",()=>{
  closeGate(false);scene?.returnHome();scene?.scene.resume();
 });
 gateOverlay.addEventListener("keydown",e=>{
  if(e.key==="Escape"){e.preventDefault();e.stopPropagation();closeGate();}
- else if(e.key==="Backspace"){e.preventDefault();gateDigits.pop();renderGateDial();}
- else if(/^[0-7]$/.test(e.key)&&gateDigits.length<6){gateDigits.push(e.key);renderGateDial();}
+ else if(e.key==="Backspace"){e.preventDefault();gateDigits.pop();gateDialVersion=Regions?.VERSION||1;renderGateDial();}
+ else if(/^[0-7]$/.test(e.key)&&gateDigits.length<6){gateDigits.push(e.key);gateDialVersion=Regions?.VERSION||1;renderGateDial();}
 });
 renderGateDial();
 renderGateJournal();
