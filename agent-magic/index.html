@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#081016">
+<title>WRKMAN | Agent Magic Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#081016;--panel:#0f1821;--panel2:#12202a;--line:#28404c;--ink:#ecf3f4;--muted:#9ab0b6;--green:#a9f1a6;--blue:#9aceed;--violet:#d0a3ff;--gold:#f1d18e;--pink:#ff96d2}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{background:radial-gradient(ellipse at 50% -30%,#173138 0,transparent 55%),linear-gradient(180deg,#081016 0,#081016 100%)}
+button,input,select{font:inherit}button{cursor:pointer;color:inherit;touch-action:manipulation}
+main{max-width:1100px;margin:0 auto;padding:16px 14px calc(24px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;gap:12px;margin-bottom:14px}.mark{width:54px;height:54px;border:2px solid var(--green);border-radius:14px;display:grid;place-items:center;color:var(--green);font-size:28px;font-weight:950;box-shadow:0 0 26px #91ec9936}.word{font-size:12px;letter-spacing:2.4px;font-weight:850;color:var(--green)}h1{margin:1px 0 0;font-size:clamp(28px,5vw,40px);line-height:1;font-weight:920;letter-spacing:.4px}.ver{margin-left:auto;border:1px solid var(--line);padding:8px 12px;border-radius:99px;color:var(--muted);font-size:11px;letter-spacing:1px}
+.lede{font-size:13px;color:var(--muted);line-height:1.6;margin:0 0 14px;max-width:850px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;min-width:0}.stage-top{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid #1d3340}.status{font-size:10px;letter-spacing:1.5px;font-weight:850;color:var(--green)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);margin-right:8px}.note{font-size:11px;color:var(--muted)}.stage{position:relative;height:clamp(360px,64dvh,720px);background:#0a141b}.stage canvas{display:block;width:100%;height:100%}.hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);padding:8px 12px;border-radius:999px;background:#071118d0;border:1px solid #ffffff22;color:#d3e1e3bb;font-size:10px;white-space:nowrap;pointer-events:none;backdrop-filter:blur(4px)}
+.phase{padding:11px 14px;border-top:1px solid #1d3340;background:#0c1720}.phase-row{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:1.2px;font-weight:850;color:#c7ded4}.phase-row strong{color:var(--green);letter-spacing:1.5px}.pct{margin-left:auto;color:#a9c1c6;font-variant-numeric:tabular-nums}.bar{height:6px;background:#233b46;border-radius:99px;overflow:hidden;margin:8px 0 7px}.bar>div{width:0;height:100%;background:linear-gradient(90deg,#5a94aa,#a9f1a6,#f1c18e,#ff96d2);box-shadow:0 0 14px #91ec9980}.desc{font-size:10px;line-height:1.45;color:#8aa6ad}
+.panel{padding:13px;background:var(--panel)}.mini{font-size:10px;letter-spacing:1.35px;font-weight:850;color:var(--muted);text-transform:uppercase;margin-bottom:8px}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:14px}.stat{background:var(--panel2);border:1px solid #30424c;padding:11px 8px;border-radius:11px;text-align:center}.stat .value{font-size:22px;font-weight:900;letter-spacing:-.6px;font-variant-numeric:tabular-nums}.stat .label{font-size:9px;color:#99b0b8;letter-spacing:1px;margin-top:4px}
+.control{margin-bottom:14px}.ctl-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:750;margin-bottom:7px}.ctl-head output{color:var(--green);font-variant-numeric:tabular-nums}input[type=range],select{width:100%}input[type=range]{accent-color:var(--green)}.ends{display:flex;justify-content:space-between;color:#77919a;font-size:10px;margin-top:3px}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:7px}.btn{border:1px solid #42515a;border-radius:11px;background:#1d2f39;padding:11px 8px;font-size:12px;font-weight:850}.btn.primary{background:var(--green);color:#102018;border-color:var(--green)}.btn.full{grid-column:span 2}.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px}.tab{font-size:11px;padding:10px 4px;border-radius:10px;border:1px solid #384952;background:#15242d;color:#acc1c6;font-weight:800}.tab.active{background:#a9f1a6;color:#102018;border-color:#a9f1a6}.readout{border-top:1px solid #263844;margin-top:14px;padding-top:11px;font-size:11px;color:#9eb4bb;line-height:1.6}.palette{display:flex;gap:7px;margin-top:10px}.palette span{height:4px;flex:1;border-radius:99px}.palette span:nth-child(1){background:var(--blue)}.palette span:nth-child(2){background:var(--violet)}.palette span:nth-child(3){background:var(--gold)}.palette span:nth-child(4){background:var(--pink)}
+@media (max-width:780px){.layout{grid-template-columns:1fr}.stage{height:clamp(360px,58dvh,620px)}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="mark">W</div>
+  <div>
+    <div class="word">WRKMAN LABS / MAGIC STUDY 01</div>
+    <h1>AGENT·MAGIC</h1>
+  </div>
+  <div class="ver">v0.1</div>
+</header>
+<p class="lede">A focused spell experiment. Not general image reconstruction. A swarm of hexagonal agents manifests magic through five stages: disturbance, gathering, formation, resolution, and dissolution.</p>
+<div class="layout">
+  <section class="card">
+    <div class="stage-top">
+      <div class="status"><span class="dot"></span><span id="statusText">SPELL ACTIVE</span></div>
+      <div class="note" id="spellNote">ARCANE ORB</div>
+    </div>
+    <div class="stage" id="stage"><canvas id="view"></canvas><div class="hint">Tap to perturb. Drag to steer the spell.</div></div>
+    <div class="phase">
+      <div class="phase-row"><span>◎</span><strong id="phaseLabel">01 / DISTURBANCE</strong><span class="pct" id="phasePct">0%</span></div>
+      <div class="bar"><div id="phaseBar"></div></div>
+      <div class="desc" id="phaseDesc">Reality jitters and loose particles wake up.</div>
+    </div>
+  </section>
+  <aside class="card panel">
+    <div class="mini">Spell Forms</div>
+    <div class="tabs" id="spellTabs">
+      <button class="tab active" data-spell="orb">ORB</button>
+      <button class="tab" data-spell="ward">WARD</button>
+      <button class="tab" data-spell="sigil">SIGIL</button>
+      <button class="tab" data-spell="summon">SUMMON</button>
+    </div>
+    <div class="mini">Live Spell State</div>
+    <div class="stats">
+      <div class="stat"><div class="value" id="agentCount">0</div><div class="label">HEX AGENTS</div></div>
+      <div class="stat"><div class="value" id="fps">0</div><div class="label">FPS</div></div>
+      <div class="stat"><div class="value" id="densityValue">0%</div><div class="label">DENSITY</div></div>
+      <div class="stat"><div class="value" id="stabilityValue">0%</div><div class="label">STABILITY</div></div>
+    </div>
+    <div class="buttons" style="margin-bottom:14px">
+      <button id="castBtn" class="btn primary">✦ CAST</button>
+      <button id="dissolveBtn" class="btn">◌ DISSOLVE</button>
+      <button id="pulseBtn" class="btn">◉ AUTO CAST OFF</button>
+      <button id="pauseBtn" class="btn">Ⅱ PAUSE</button>
+    </div>
+    <div class="control"><div class="ctl-head"><label for="budget">Swarm size</label><output id="budgetOut">2200</output></div><input id="budget" type="range" min="500" max="8000" step="100" value="2200"><div class="ends"><span>SPARSE</span><span>DENSE</span></div></div>
+    <div class="control"><div class="ctl-head"><label for="cohesion">Cohesion</label><output id="cohesionOut">60%</output></div><input id="cohesion" type="range" min="0" max="100" value="60"><div class="ends"><span>WILD</span><span>DISCIPLINED</span></div></div>
+    <div class="control"><div class="ctl-head"><label for="shimmer">Shimmer</label><output id="shimmerOut">55%</output></div><input id="shimmer" type="range" min="0" max="100" value="55"><div class="ends"><span>STEADY</span><span>UNSTABLE</span></div></div>
+    <div class="control"><div class="ctl-head"><label for="intensity">Intensity</label><output id="intensityOut">70%</output></div><input id="intensity" type="range" min="0" max="100" value="70"><div class="ends"><span>SUBTLE</span><span>BRUTAL</span></div></div>
+    <div class="control"><div class="ctl-head"><label for="freedom">Agent freedom</label><output id="freedomOut">35%</output></div><input id="freedom" type="range" min="0" max="100" value="35"><div class="ends"><span>ANCHORED</span><span>EXPLORING</span></div></div>
+    <div class="control"><div class="ctl-head"><label for="tint">Color family</label></div>
+      <select id="tint" style="background:#13202a;color:var(--ink);border:1px solid #32414a;border-radius:10px;padding:10px 11px">
+        <option value="arcane">Arcane (blue-violet)</option>
+        <option value="healing">Healing (green-gold)</option>
+        <option value="void">Void (violet-pink)</option>
+        <option value="solar">Solar (gold-rose)</option>
+      </select>
+    </div>
+    <div class="readout" id="readout">A swarm gathers to form an arcane orb.</div>
+    <div class="palette"><span></span><span></span><span></span><span></span></div>
+  </aside>
+</div>
+</main>
+<script>
+(()=>{
+const $=q=>document.querySelector(q), canvas=$('#view'), ctx=canvas.getContext('2d'), stage=$('#stage');
+let W=0,H=0, last=0, fps=0, paused=false, resizeTimer=0;
+const TAU=Math.PI*2, HEX=Math.sqrt(3)/2;
+const PHASES=[
+  ['disturbance',1.2,'01 / DISTURBANCE','Reality jitters and loose particles wake up.'],
+  ['gathering',3.4,'02 / GATHERING','Agents converge toward a magical center of purpose.'],
+  ['formation',5.8,'03 / FORMATION','A rough magical body starts to emerge.'],
+  ['resolution',8.3,'04 / RESOLUTION','Edges sharpen and the spell stabilizes into intent.'],
+  ['dissolution',10.3,'05 / DISSOLUTION','The form breaks and the swarm returns to loose fragments.']
+];
+const state={spell:'orb',tint:'arcane',phaseClock:0,cycle:10.3,casting:true,auto:false,pointer:null,agents:[],budget:2200,cohesion:60,shimmer:55,intensity:70,freedom:35,density:0,stability:0,castCount:0};
+const palettes={
+  arcane:[[120,190,255],[160,120,255],[230,200,255],[110,255,235]],
+  healing:[[120,255,170],[165,255,120],[255,230,120],[200,255,220]],
+  void:[[120,100,170],[190,100,255],[255,120,220],[70,40,120]],
+  solar:[[255,215,120],[255,150,120],[255,245,210],[255,190,160]]
+};
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function lerp(a,b,t){return a+(b-a)*t}
+function mix(a,b,t){return [lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)]}
+function smooth(x){x=clamp(x,0,1);return x*x*(3-2*x)}
+function easeOut(x){x=clamp(x,0,1);return 1-Math.pow(1-x,3)}
+function easeInOut(x){x=clamp(x,0,1);return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2}
+function phaseData(){const t=state.phaseClock;for(let i=0;i<PHASES.length;i++){if(t<PHASES[i][1])return {name:PHASES[i][0],label:PHASES[i][2],desc:PHASES[i][3],end:PHASES[i][1],start:i?PHASES[i-1][1]:0,index:i};}return {name:'dissolution',label:PHASES[4][2],desc:PHASES[4][3],start:PHASES[3][1],end:state.cycle,index:4}}
+function currentStrength(){const t=state.phaseClock;if(t<1.2)return .08+smooth(t/1.2)*.12; if(t<3.4)return .2+smooth((t-1.2)/2.2)*.35; if(t<5.8)return .55+smooth((t-3.4)/2.4)*.23; if(t<8.3)return .78+smooth((t-5.8)/2.5)*.18; return 1-smooth((t-8.3)/2)*.92}
+function currentShimmer(){const base=state.shimmer/100; const t=state.phaseClock; const dissolve=t>8.3? smooth((t-8.3)/2):0; return clamp(base*(.4 + dissolve*.8) + (1-currentStrength())*.25,0,1)}
+function currentRadius(){return Math.min(W,H)*(.14 + state.intensity/100*.07)}
+function center(){return state.pointer? [state.pointer.x,state.pointer.y] : [W*.5,H*.48]}
+function targetField(x,y){const [cx,cy]=center(); const dx=x-cx, dy=y-cy, r=Math.hypot(dx,dy)||1, ang=Math.atan2(dy,dx);
+  const power=currentStrength(), rad=currentRadius();
+  if(state.spell==='orb'){
+    const core=Math.exp(-(r*r)/(rad*rad*0.85));
+    const shell=Math.exp(-Math.pow((r-rad*.88)/(rad*.18),2))*0.9;
+    const wisps=(Math.sin(ang*6 + state.phaseClock*2.2)*.5+.5)*Math.exp(-Math.pow((r-rad*.65)/(rad*.35),2));
+    return clamp(core*1.2 + shell + wisps*.45,0,1)*power;
+  }
+  if(state.spell==='ward'){
+    const ring=Math.exp(-Math.pow((r-rad)/(rad*.12),2))*1.2;
+    const inner=Math.exp(-Math.pow((r-rad*.72)/(rad*.2),2))*0.45;
+    const lattice=(Math.cos(ang*8+state.phaseClock*1.4)*.5+.5)*Math.exp(-Math.pow((r-rad)/(rad*.22),2))*0.45;
+    return clamp(ring+inner+lattice,0,1)*power;
+  }
+  if(state.spell==='sigil'){
+    const ring1=Math.exp(-Math.pow((r-rad*.92)/(rad*.08),2))*1.1;
+    const ring2=Math.exp(-Math.pow((r-rad*.55)/(rad*.06),2))*0.8;
+    const spokes=(Math.max(0,Math.cos(ang*6))*Math.exp(-Math.pow((r-rad*.74)/(rad*.28),2)))*0.9;
+    const tri=Math.max(0,Math.cos(ang*3+Math.PI*.5))*Math.exp(-Math.pow((r-rad*.74)/(rad*.18),2))*0.8;
+    const centerGlyph=Math.exp(-(r*r)/(rad*rad*0.15))*0.9;
+    return clamp(ring1+ring2+spokes+tri+centerGlyph,0,1)*power;
+  }
+  // summon: simplified familiar silhouette
+  const sx=dx/(rad*1.05), sy=dy/(rad*1.05);
+  const head=((sx*sx)+(sy+.15)*(sy+.15)/1.05<.23)?1:0;
+  const body=(((sx*0.9)*(sx*0.9))+((sy-.15)*(sy-.15))/1.55<.28)?1:0;
+  const earL=(((sx+.28)*(sx+.28))/0.03+((sy+.36)*(sy+.36))/0.08<1)?1:0;
+  const earR=(((sx-.28)*(sx-.28))/0.03+((sy+.36)*(sy+.36))/0.08<1)?1:0;
+  const tail=((((sx+.55)*(sx+.55))/0.08)+(((sy-.05+Math.sin(sx*6+state.phaseClock*2)*.07)*(sy-.05+Math.sin(sx*6+state.phaseClock*2)*.07))/0.18)<1)?1:0;
+  const shape=Math.max(head,body,earL,earR,tail);
+  const glow=Math.exp(-Math.pow((r-rad*.82)/(rad*.19),2))*0.55;
+  return clamp(shape*.95 + glow,0,1)*power;
+}
+function tintColor(t){ const p=palettes[state.tint]; const t2=clamp(t,0,1); if(t2<.34)return mix(p[0],p[1],t2/.34); if(t2<.67)return mix(p[1],p[2],(t2-.34)/.33); return mix(p[2],p[3],(t2-.67)/.33)}
+function noise(x,y){ return (Math.sin(x*12.9898+y*78.233)*43758.5453)%1 }
+function addAgent(){
+  const [cx,cy]=center(); const spread=Math.max(W,H)*.55; const ang=Math.random()*TAU; const rr=Math.pow(Math.random(),.7)*spread;
+  const x=cx+Math.cos(ang)*rr, y=cy+Math.sin(ang)*rr;
+  const col=tintColor(Math.random());
+  state.agents.push({x,y,vx:0,vy:0,size:4+Math.random()*4,energy:0,color:col,seed:Math.random()*999,homeX:x,homeY:y,phaseOffset:Math.random()*TAU});
+ }
+function ensureAgents(){ while(state.agents.length<state.budget)addAgent(); if(state.agents.length>state.budget)state.agents.length=state.budget; }
+function resize(){ const rect=stage.getBoundingClientRect(); const nw=Math.max(260,Math.round(rect.width)), nh=Math.max(320,Math.round(rect.height)); if(nw===W&&nh===H)return; W=nw; H=nh; canvas.width=W; canvas.height=H; }
+function cast(){ state.phaseClock=0; state.casting=true; state.castCount++; $('#statusText').textContent='SPELL ACTIVE'; }
+function dissolve(){ state.phaseClock=8.35; state.casting=true; }
+function switchSpell(name){ state.spell=name; $('#spellNote').textContent=name.toUpperCase(); cast(); }
+function updateUI(){ const pd=phaseData(); const totalPct=Math.round(clamp(state.phaseClock/state.cycle,0,1)*100); $('#phaseLabel').textContent=pd.label; $('#phasePct').textContent=totalPct+'%'; $('#phaseBar').style.width=totalPct+'%'; $('#phaseDesc').textContent=pd.desc; $('#agentCount').textContent=state.agents.length.toLocaleString(); $('#fps').textContent=Math.round(fps); $('#densityValue').textContent=Math.round(state.density*100)+'%'; $('#stabilityValue').textContent=Math.round(state.stability*100)+'%'; $('#readout').textContent=`${state.spell[0].toUpperCase()+state.spell.slice(1)} spell · ${state.agents.length} agents · cohesion ${state.cohesion}% · shimmer ${state.shimmer}% · cast #${state.castCount}. Magic forms through disturbance, gathering, formation, resolution, and dissolution.`; $('#pulseBtn').textContent=state.auto?'◉ AUTO CAST ON':'◌ AUTO CAST OFF'; $('#pauseBtn').textContent=paused?'▶ RESUME':'Ⅱ PAUSE'; }
+function hex(x,y,r){ ctx.beginPath(); for(let i=0;i<6;i++){ const a=TAU*i/6 + Math.PI/6; const px=x+Math.cos(a)*r, py=y+Math.sin(a)*r; if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py); } ctx.closePath(); }
+function step(dt){ ensureAgents(); if(state.casting){ state.phaseClock+=dt; if(state.phaseClock>=state.cycle){ state.phaseClock=state.cycle; state.casting=false; $('#statusText').textContent='SPELL STABLE'; if(state.auto)setTimeout(()=>cast(),700);} } else if(state.auto){ state.phaseClock+=dt*.25; if(state.phaseClock>=state.cycle+.6)cast(); }
+  const [cx,cy]=center(); const strength=currentStrength(); const shimmer=currentShimmer(); const freedom=state.freedom/100; const cohesion=state.cohesion/100;
+  let totalEnergy=0, totalStable=0;
+  for(let i=0;i<state.agents.length;i++){
+    const a=state.agents[i];
+    const dx=a.x-cx, dy=a.y-cy, r=Math.hypot(dx,dy)||1, ang=Math.atan2(dy,dx);
+    const field=targetField(a.x,a.y);
+    // numerical gradient
+    const eps=8;
+    const gx=targetField(a.x+eps,a.y)-targetField(a.x-eps,a.y);
+    const gy=targetField(a.x,a.y+eps)-targetField(a.x,a.y-eps);
+    const gl=Math.hypot(gx,gy)||1;
+    const nx=gx/gl, ny=gy/gl, tx=-ny, ty=nx;
+    let fx=0, fy=0;
+    const pull=(.05 + field*.42)*( .45 + state.intensity/100*.8 );
+    fx += nx*pull*10; fy += ny*pull*10; // climb into field
+    const tangential=(state.spell==='sigil'||state.spell==='ward'? .55:.25) * (state.cohesion/100)*strength;
+    fx += tx*Math.sin(a.seed*1.7 + state.phaseClock*2 + r*.02)*tangential*8;
+    fy += ty*Math.cos(a.seed*1.3 + state.phaseClock*2 + r*.02)*tangential*8;
+    // spell specific secondary forces
+    if(state.spell==='orb'){
+      fx += -dx/r * Math.max(0,(r-currentRadius()*.9))*0.012*cohesion*40;
+      fy += -dy/r * Math.max(0,(r-currentRadius()*.9))*0.012*cohesion*40;
+    } else if(state.spell==='ward'){
+      const ringTarget=currentRadius(); const diff=(ringTarget-r); fx += -dx/r * (-diff)*0.016*28; fy += -dy/r * (-diff)*0.016*28;
+    } else if(state.spell==='sigil'){
+      const ringTarget=(Math.sin(ang*3+state.phaseClock*.8)>0? currentRadius()*.92: currentRadius()*.55); const diff=(ringTarget-r); fx += dx/r * diff*.016*20; fy += dy/r * diff*.016*20;
+    } else if(state.spell==='summon'){
+      const sway=Math.sin(state.phaseClock*2 + a.seed)*.7; fx += sway*.12; fy += Math.cos(state.phaseClock*2.2+a.seed)*.06;
+    }
+    // pointer steering / disturbance
+    if(state.pointer){ const pdx=state.pointer.x-a.x, pdy=state.pointer.y-a.y, pr=Math.hypot(pdx,pdy)||1; fx += pdx/pr * 0.07 * (1+freedom); fy += pdy/pr * 0.07 * (1+freedom); }
+    // free shimmer / loose particles
+    fx += Math.cos(a.phaseOffset + state.phaseClock*4.2 + a.seed)* shimmer * (1.5+freedom*2.5);
+    fy += Math.sin(a.phaseOffset + state.phaseClock*4.8 + a.seed)* shimmer * (1.5+freedom*2.5);
+    const damping= .83 + cohesion*.12 - freedom*.08;
+    a.vx=(a.vx + fx*dt*60)*damping;
+    a.vy=(a.vy + fy*dt*60)*damping;
+    a.x += a.vx; a.y += a.vy;
+    // soft containment
+    if(a.x<4||a.x>W-4)a.vx*=-.72; if(a.y<4||a.y>H-4)a.vy*=-.72; a.x=clamp(a.x,4,W-4); a.y=clamp(a.y,4,H-4);
+    a.energy = field;
+    const targetSize = lerp(2.5, 6.8, clamp(field*.8 + strength*.5,0,1));
+    a.size = lerp(a.size, targetSize, .15);
+    const col = tintColor(clamp(field*.75 + (Math.sin(state.phaseClock*2+a.seed)+1)*.08 + .14,0,1));
+    a.color = col;
+    totalEnergy += field;
+    totalStable += 1 - clamp((Math.abs(a.vx)+Math.abs(a.vy))/10,0,1);
+  }
+  state.density = clamp(totalEnergy/state.agents.length*1.6,0,1);
+  state.stability = clamp(totalStable/state.agents.length,0,1);
+}
+function drawBackdrop(){ ctx.clearRect(0,0,W,H); const g=ctx.createRadialGradient(W*.5,H*.45,10,W*.5,H*.48,Math.max(W,H)*.65); g.addColorStop(0,'#0e1a23'); g.addColorStop(1,'#081016'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
+function drawSpell(){
+  const [cx,cy]=center(); const strength=currentStrength(); const rad=currentRadius();
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  // field hint glow
+  const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,rad*1.45); const p=palettes[state.tint]; glow.addColorStop(0,`rgba(${p[0][0]},${p[0][1]},${p[0][2]},${.08+.22*strength})`); glow.addColorStop(.55,`rgba(${p[1][0]},${p[1][1]},${p[1][2]},${.06+.15*strength})`); glow.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(cx,cy,rad*1.45,0,TAU); ctx.fill();
+  // agents
+  for(const a of state.agents){ const alpha=clamp(.05 + a.energy*.95 + currentStrength()*.18, .08, .98); ctx.fillStyle=`rgba(${a.color[0]|0},${a.color[1]|0},${a.color[2]|0},${alpha})`; hex(a.x,a.y,a.size); ctx.fill(); }
+  // special overlays
+  ctx.strokeStyle=`rgba(${p[2][0]},${p[2][1]},${p[2][2]},${.15+.3*strength})`; ctx.lineWidth=1.2;
+  if(state.spell==='sigil' || state.spell==='ward'){ ctx.beginPath(); ctx.arc(cx,cy,rad*(state.spell==='ward'?1:.92),0,TAU); ctx.stroke(); }
+  if(state.spell==='sigil'){ ctx.beginPath(); ctx.arc(cx,cy,rad*.55,0,TAU); ctx.stroke(); for(let i=0;i<6;i++){ const a=i*TAU/6-Math.PI/2; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*rad*.56, cy+Math.sin(a)*rad*.56); ctx.lineTo(cx+Math.cos(a)*rad*.92, cy+Math.sin(a)*rad*.92); ctx.stroke(); } }
+  if(state.spell==='orb'){ ctx.beginPath(); ctx.arc(cx,cy,rad*.18,0,TAU); ctx.fillStyle=`rgba(${p[3][0]},${p[3][1]},${p[3][2]},${.35+.35*strength})`; ctx.fill(); }
+  ctx.restore();
+}
+function tick(now){ if(!last)last=now; const dt=Math.min((now-last)/1000,.05); last=now; if(!paused)step(dt); fps=fps*.9 + (dt?1/dt:60)*.1; drawBackdrop(); drawSpell(); updateUI(); requestAnimationFrame(tick); }
+// controls
+for(const id of ['budget','cohesion','shimmer','intensity','freedom']){ const el=$('#'+id); const out=$('#'+id+'Out'); el.addEventListener('input',()=>{ state[id]=Number(el.value); out.textContent=id==='budget'?Number(el.value).toLocaleString():el.value+'%'; ensureAgents(); }); }
+$('#tint').addEventListener('change',e=>{ state.tint=e.target.value; });
+$('#castBtn').addEventListener('click',cast); $('#dissolveBtn').addEventListener('click',dissolve); $('#pulseBtn').addEventListener('click',()=>{ state.auto=!state.auto; updateUI(); }); $('#pauseBtn').addEventListener('click',()=>{ paused=!paused; updateUI(); });
+for(const btn of document.querySelectorAll('.tab')) btn.addEventListener('click',()=>{ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b===btn)); switchSpell(btn.dataset.spell); });
+function pointerPos(e){ const r=canvas.getBoundingClientRect(); return {x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height)}; }
+stage.addEventListener('pointerdown',e=>{ stage.setPointerCapture?.(e.pointerId); state.pointer=pointerPos(e); });
+stage.addEventListener('pointermove',e=>{ if(e.buttons){ state.pointer=pointerPos(e); } });
+stage.addEventListener('pointerup',()=>{ state.pointer=null; });
+stage.addEventListener('pointerleave',()=>{ state.pointer=null; });
+window.addEventListener('resize',()=>{ clearTimeout(resizeTimer); resizeTimer=setTimeout(resize,120); });
+resize(); ensureAgents(); cast(); requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
