@@ -31,23 +31,30 @@ function spawn(s,type,x,y){
  s.combat.enemies.push(enemy);
  return enemy;
 }
-function reset(s){
+function reset(s,layout=null){
  // Reset is invoked only after old Matter bodies are removed by Lab.resetLab.
+ // Region layouts are generated from a versioned glyph seed. The original
+ // 032 lab without a layout is unchanged, including all starting enemies.
  s.combat={
   hp:100,kills:0,invulnUntil:0,enemyShots:0,
   enemies:[],fields:[],pending:[],seen:new Map(),
   relic:true,damageEvents:0,pairCollisions:new Map(),impactFX:[],blastFX:[],lastShake:-1000,wallHits:0,collisionHits:0,pillars:[],debris:[],pendingRuptures:[],playerKnock:{x:0,y:0},playerStaggerUntil:0,playerHurtAt:-9999,playerHurtDir:{x:0,y:0}
  };
- spawn(s,"charger",585,205);
- spawn(s,"charger",620,410);
- spawn(s,"wisp",760,174);
- spawn(s,"wisp",753,426);
- // Keep starting props clear of the four original crate locations.
- pillar(s,371,165);pillar(s,694,362);pillar(s,377,457);
- // A little loose rubble gives wells something to play with even before
- // the first pillar breaks.
- for(const [x,y,r] of [[322,247,9],[785,304,11],[570,465,8],[316,401,7]]){
-  rubble(s,x,y,r,0,0);
+ if(layout){
+  // Sector zero is a genuinely safe sanctuary (zero enemy spawns).
+  for(const e of layout.enemies||[])spawn(s,e.type,e.x,e.y);
+  for(const p of layout.pillar||[])pillar(s,p.x,p.y);
+  for(const d of layout.debris||[])rubble(s,d.x,d.y,d.r,0,0);
+ }else{
+  spawn(s,"charger",585,205);
+  spawn(s,"charger",620,410);
+  spawn(s,"wisp",760,174);
+  spawn(s,"wisp",753,426);
+  // Preserve original lab targets and fracture-physics landmarks.
+  pillar(s,371,165);pillar(s,694,362);pillar(s,377,457);
+  for(const [x,y,r] of [[322,247,9],[785,304,11],[570,465,8],[316,401,7]]){
+   rubble(s,x,y,r,0,0);
+  }
  }
  heads(s);
 }
