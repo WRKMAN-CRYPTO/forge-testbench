@@ -199,6 +199,20 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 029 • Corner spell orb + 90° quarter-fan
+
+Mobile field feedback: the full 360° spell wheel occupied too much combat area. The desired layout is a **bottom-right CAST orb**, six equipped spells in a 90° sector opening up/left, with **DASH just left of the orb and never obscured**, even during selection.
+
+- Moved the orb's real CSS position, not just the wheel dock: the 238×238 dock is bottom/right 6px (plus CSS safe areas); the 68px orb is inset 14px from the dock bottom/right, leaving the orb center 48px from either dock edge.
+- Converted each equipped rune from centered ring coordinates to **two arcs of three** relative to the **actual orb center**, not the former center of the dock. Inner radius 112px, outer radius 165px; angles -90°, -120° and -150° occupy the upper-left quarter of the orb. The two bands keep a minimum center spacing of 53px for the 44px buttons.
+- The expanded wheel shows a light **quarter-sector background** instead of a full circle. The small readout stays available to screen readers but no longer draws another piece of chrome over the fan.
+- Dash is a fixed 68×58px button left of the orb (130px CSS right inset and 21px bottom inset, both with safe areas), at a vertical position that avoids all six slot targets even when a rune scales to 1.12×. Its z-index remains above the wheel. Touch gestures released in the Dash lane cancel without firing or selecting a rune.
+- The `spell-loadout.js` module and inlined fallback now share the same six `pos()` coordinates and quarter-sector `gesture()` rules. Invalid saved data still falls back to the same six equipped spells, and the **spell-loadout localStorage key is unchanged**, preserving player choices.
+- Standard gesture flow is untouched: tap orb to quick-cast; hold/slide up/left and release to select; place targeted spells via arena tap; pressing Dash still calls existing `scene.dash()`. Scene physics, material reactions, Spellbook, dyed skins, camera, touch-to-world aiming, and HUD remain unchanged.
+- Validation: **52 passing spell-wheel/unit tests** (including fan shape, six directions, minimum spacing, non-overlap with Dash, cancel zones, saved loadout compatibility); **29 elemental tests**. Simulated phone/desktop startup with the real game modules both render `LAB RUN:A`, spawn 22 objects, successfully activate Dash and the outer fan Spark slot, cancel an attempted Dash-lane selection, and open Spellbook.
+
+**Field test:** open `magic-lab/?v=029` in phone landscape, move with your left thumb, press the bottom-right orb with your right thumb, slide up/left to a rune and release. Test the inner and outer leftmost runes, then Dash immediately left of the orb. There should be no Dash obstruction when the quarter-fan is expanded. Confirm skins/hues and Spellbook still work. These are deterministic tests, not a substitute for real iOS Safari feel.
+
 ## Build 028 • Game-first HUD (mobile-inspired cleanup)
 
 Inspired by two handheld dungeon games: preserve a **large, readable world** and keep the on-screen input controls recognizable via quiet cyan/gold accents, without adopting the other game's green palette. Build 028 is an **interface-only redesign**, not a combat or camera change.
