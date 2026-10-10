@@ -199,6 +199,26 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 031 • The World Has Residents
+
+The first SPARK-DRAWER-inspired ambient life pass introduces **18 tiny, low-pixel wildlife residents** to the existing arena: **8 ants**, **5 pillbugs**, **5 moths**. They are intentionally **not enemies**, do not have health bars, do not count toward KOs, and keep wandering when the player does nothing.
+
+### Living behaviors
+
+- **Ants**: independently wander, pause, sometimes carry a three-pixel crumb, flee nearby moving objects or shocks, and transmit temporary alarm through nearby ants. They can later resume ordinary life; they are not spawned or despawned by spells.
+- **Pillbugs**: wander deliberately, curl when disturbed, and retain momentum when nearby forces or obstacles knock them around. They uncurl after a short protective period.
+- **Moths**: tiny animated wings, gentle interest in light and warmth, avoidance of dangerously hot regions and bright blasts, fluttering movement and chill-related slowing.
+- All residents observe an environmental **sensory snapshot** provided by the scene: moving Matter bodies, player movement, heat/cold zones, steam temperature, flashes, traveling impact rings, obstacle positions, and accelerations. The pure wildlife module has **no knowledge of spell IDs**.
+- Residents have bounded-world motion and gentle obstacle avoidance/contact. They are cheap **kinematic micro-actors** drawn into the world using Phaser Graphics, **not 18 new Matter rigid bodies**. Future passes can add targeted physical coupling once the phone performance is proven.
+- **Active resident cap 18** with deterministic per-world local RNG, ~80ms sensing ticks (12.5Hz) and player-proximity render culling. Far-off residents can be reused around new areas when exploring, without growing the population. No saved data, network calls or extra spritesheets.
+- Optional `wildlife.js?v=031` loaded independently; if unavailable the game plays normally and LAB TELEMETRY displays **WILDLIFE OFF**. Otherwise telemetry shows 18. Reset creates a new 18-creature population.
+- Module and deterministic behavior tests: `wildlife.tests.js`, **25 passed**, including independent wandering, alarm transmission, pillbug curling/acceleration, moth thermal reactions, finite bounds, rendering budgets and replenishment. Existing `spell-loadout.tests.js` (**52**) and `elements.tests.js` (**29**) remain unchanged.
+- Full game startup and ~2-second simulated render/update smoke checks passed with both phone ENVELOP and desktop FIT, as well as phone fallback when wildlife script is absent. All retained 22 physical actors; camera stays zoomed to `0.8`, Dash, wheel, Spellbook, cast coordinates and reset passed.
+
+### Field test
+
+Open **`magic-lab/?v=031`** in landscape. Stand still for 30 seconds and look for ants carrying crumbs, rounded pillbugs pausing or curling, and tiny cyan moths fluttering. Walk slowly toward them, then try Flame nearby, Frost, Gravity, and a blast. Some will investigate, some flee, and others might continue wandering. Expand **☰ → LAB TELEMETRY** to see **WILDLIFE 18** without cluttering the game HUD. Please observe frame rate and visibility on a real phone; automated tests cannot substitute for this.
+
 ## Build 030 • 25% wider camera view
 
 Player request: zoom the following camera out approximately 25% to see more combat arena at once, without enlarging or changing the underlying physics world.
