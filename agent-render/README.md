@@ -1,4 +1,4 @@
-# WRKMAN Agent-Render v0.2 · Focus Engine
+# WRKMAN Agent-Render v0.2.1 · Scroll-safe Focus Engine
 
 A phone-first experimental 2D renderer in one self-contained HTML file. Hexagonal rendering agents sample an independent procedural scene or an imported image. Larger agents provide coverage; smaller agents split to refine details, drift locally, and can merge back when appropriate.
 
@@ -15,6 +15,12 @@ https://wrkman-crypto.github.io/forge-testbench/agent-render/
 - **Pause**: stop/restart animation manually. While held, the same button releases the hold.
 
 Also includes adjustable detail threshold, population budget, freedom, wireframe, reference view, compare view, and file import. No network or runtime dependencies; local image import stays on the user's device.
+
+## v0.2.1 mobile scroll fix
+
+- The stage now uses `svh` (stable viewport height) rather than `dvh`. iOS Safari address-bar movements cannot repeatedly resize the scene.
+- Actual geometry changes preserve the agent population, split lineage, RGB estimates, focus progress, and held/paused state. Only first startup initializes a new swarm.
+- Vertical touch gestures can scroll the page. A tap or sideways gesture intentionally disturbs the swarm.
 
 ## Architectural boundary
 
