@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 029</title>
+<title>WRKMAN | Magic Physics Laboratory 030</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -579,7 +579,7 @@ header .actions{display:flex;gap:6px}
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 029 • QUARTER-FAN</span></div>
+   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 030 • WIDER VIEW</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
     <button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button>
@@ -860,10 +860,14 @@ class Lab extends Phaser.Scene{
   // player object is recreated by RESET and by some future respawn flows.
   this.cameraFocus={x:254,y:305};
   this.cameras.main.setBounds(MAP.left,MAP.top,MAP.right-MAP.left,MAP.bottom-MAP.top);
-  // Landscape phones show less vertical arena. Start following after only
-  // 24 logical pixels of vertical travel, while retaining lateral freedom.
-  // A faster Y lerp keeps threats ahead in view without snapping or shaking.
-  this.cameras.main.setDeadzone(180,48);
+  // Build 030: 0.8x camera zoom gives 1.25x visible field in BOTH axes
+  // (960x600 logical view now covers about 1200x750 world units).
+  // Zoom belongs to Phaser's camera, not canvas CSS: Matter dimensions
+  // stay fixed and Camera.getWorldPoint stays accurate for aimed spells.
+  this.cameras.main.setZoom(.8);
+  // Slightly tighten the follow deadzone at the new zoom to retain the
+  // earlier horizontal chase and quick vertical reaction from Build 025.
+  this.cameras.main.setDeadzone(144,38);
   this.cameras.main.setScroll(0,0);
   this.cameras.main.startFollow(this.cameraFocus,false,.20,.34);
   this.matter.world.setBounds(MINX,MINY,MAXX-MINX,MAXY-MINY,34,true,true,true,true);
