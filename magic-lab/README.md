@@ -199,6 +199,20 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 032 • Little Bodies, Big Consequences
+
+Mobile field feedback: the ambient residents felt alive, but motion was visibly **stepped** and the residents **did not physically react to explosions**.
+
+- Separated the 18 wildlife actors into **perception/decision updates at 80ms (~12.5 Hz)** versus **position, inertial displacement, and moth wing animation updated on every rendered game frame**. The scene probes Matter motion, temperature, light, obstacles and wind/forces only on the throttled sensory clock, retaining its mobile performance budget.
+- Removed per-frame `Math.round` of creature positions. The creatures keep their original few-pixel visual shapes, but translation may use subpixel world coordinates, reducing jerky stair-step travel after the zoomed-out camera.
+- Added a `Wildlife.impulse(world,x,y,radius,energy,time)` API that transfers **instant radial knockback independent of perceptions or AI decisions**. It uses outward direction and distance falloff, handles exact-center cases deterministically, and gives separate ant, pillbug, and moth momentum. Knockback velocity is separate from steering velocity, decays continuously, and cannot be canceled by the next low-frequency decision.
+- Added **tumble and recovery windows**: ants briefly tumble and drop crumbs, pillbugs curl and roll, moths spin and regain stable flight. These windows drive restrained rotated pixel shapes, not expensive skeleton animation.
+- The existing **`Combat.blast`** now calls the optional `scene.impulseWildlife` bridge for every explosion, including chained detonations. No changes to damage, enemy physics, explosion radius, world zoom, spells, HUD, or arena. The hook is guarded: missing wildlife cannot stop combat.
+- **42 wildlife tests pass**, including sub-80ms movement, no excess perception ticks, direct impulse while senses sleep, corner-case exact-center impulse, forced tumbling, recovery and inertia decay, range bounds and fractional drawing. All **52 spell-wheel** and **29 elemental** tests pass (**123 total**).
+- Integrated simulated gameplay checks pass on both phone ENVELOP and desktop FIT, plus the optional-wildlife-unavailable phone fallback. In-game detonations were verified to knock a nearby resident back, spin it, move it in subsequent frames, and preserve all 22 pre-existing Matter actors, 18 wildlife and 0.8x camera.
+
+**Field test:** `magic-lab/?v=032` in phone landscape. Stand still and observe ants and moths moving across the floor with less visible stepping. Approach a resident and cast **Detonation next to it**. Ants should tumble, pillbugs curl and roll, and moths be displaced. Try blasting a group, then waiting for them to return to ordinary wandering. Keep an eye on FPS and thumb controls. **Next development focus: the arena**, after real-device feedback.
+
 ## Build 031 • The World Has Residents
 
 The first SPARK-DRAWER-inspired ambient life pass introduces **18 tiny, low-pixel wildlife residents** to the existing arena: **8 ants**, **5 pillbugs**, **5 moths**. They are intentionally **not enemies**, do not have health bars, do not count toward KOs, and keep wandering when the player does nothing.
