@@ -199,6 +199,19 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 030 • 25% wider camera view
+
+Player request: zoom the following camera out approximately 25% to see more combat arena at once, without enlarging or changing the underlying physics world.
+
+- **Phaser camera zoom: `0.8`**. With the unchanged logical view of 960×600, the camera sees roughly **1200×750 world units** at once, i.e., 25% more width and height and about 56% more area. It renders characters and objects at 80% of their previous display size.
+- Phaser's own `setZoom(.8)` is used, **not** CSS canvas scaling or a change to `Phaser.Scale.ENVELOP`, because touch/click targeting relies on `camera.getWorldPoint` after the camera pans or zooms.
+- Tightens deadzone from 180×48 to **144×38** logical pixels, keeping early horizontal and vertical chase responsive as the camera zoom changes. Follow interpolation stays unchanged at **X .20 / Y .34**.
+- Existing world bounds, Matter bodies, spell positions, six-rune 90° wheel, Dash, HUD, saved Hue Forge palettes and Spellbook loadout are not modified.
+- Tested with actual game/combat/material modules and a saved dyed wizard-06 profile in simulated phone ENVELOP and desktop FIT setups. Both spawned 22 physical actors, started and rendered `LAB RUN:A`, asserted `zoom=.8` and deadzone values, and confirmed mouse and phone touch aim after camera scroll used zoom-adjusted world-space coordinates.
+- Deterministic suites: **52 spell-wheel tests passed** and **29 elemental tests passed**.
+
+**Field test:** open `magic-lab/?v=030` in landscape, approach a Charger and check that you can see more of the enemy movement and arena in all directions. Use Spark or Gravity at a distant target after moving the camera; verify casts follow finger position, and test fast up/down movement to judge chase responsiveness. Actual Safari render feel remains to be confirmed on-device.
+
 ## Build 029 • Corner spell orb + 90° quarter-fan
 
 Mobile field feedback: the full 360° spell wheel occupied too much combat area. The desired layout is a **bottom-right CAST orb**, six equipped spells in a 90° sector opening up/left, with **DASH just left of the orb and never obscured**, even during selection.
