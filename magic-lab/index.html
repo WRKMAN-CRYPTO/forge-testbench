@@ -565,6 +565,56 @@ header .actions{display:flex;gap:6px}
  #dash{bottom:calc(21px + env(safe-area-inset-bottom))!important}
 }
 
+
+/* 033 / The First Gate. Mobile-landscape first; never covers joystick during play. */
+#regionTitle{position:absolute;left:9px;top:10px;z-index:7;pointer-events:none;
+ font:800 10px/1.25 ui-monospace,monospace;color:#f5d39a;max-width:34%;
+ padding:6px 9px;background:#061726dc;border:1px solid #8bc4d077;border-radius:9px;
+ text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+#gateNearby,#portalNearby{position:absolute;left:50%;transform:translateX(-50%);z-index:9;
+ border:1px solid #b4d9df88;border-radius:22px;background:#102e43f0;color:#ffe1a9;
+ font:900 11px/1 ui-monospace,monospace;padding:9px 14px;white-space:nowrap}
+#gateNearby{top:43px;box-shadow:0 0 18px #61c9f344}
+#portalNearby{top:46px;pointer-events:none;color:#b9f3f3;background:#0d2836cf}
+#gateNearby[hidden],#portalNearby[hidden],#regionTitle[hidden],#gateOverlay[hidden]{display:none!important}
+#gateOverlay{position:fixed;inset:0;z-index:200;background:#030912ed;
+ display:flex;align-items:center;justify-content:center;padding:8px;
+ backdrop-filter:blur(7px);touch-action:pan-y}
+#gatePanel{width:min(750px,98vw);max-height:calc(100dvh - 16px);overflow-y:auto;
+ border:1px solid #83bac8ac;border-radius:16px;background:linear-gradient(150deg,#183044,#091824 70%);
+ box-shadow:0 18px 80px #000d;padding:12px;display:grid;gap:9px}
+.gateHeading{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.gateHeading strong{color:#ffdaa0;letter-spacing:.13em;font-size:14px}
+.gateHeading small{display:block;color:#a5c2d0;font-size:10px}
+#gatePanel button{min-height:33px;border:1px solid #638da4;border-radius:9px;background:#1b354b;
+ color:#f8e6c2;font:800 12px/1.15 ui-monospace,monospace;padding:7px 9px}
+#gatePanel button:active{background:#315772}
+#gatePanel button:disabled{opacity:.45}
+.gateDialRow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
+.gateSlot{display:grid;place-items:center;height:39px;border:1px solid #729dae66;
+ background:#061823;border-radius:9px;color:#f9dca6;font-size:25px}
+.gateKeys{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px}
+#gatePanel .gateRune{font:900 24px/1 ui-monospace,monospace;color:#b6f0f4;height:43px;padding:6px 0}
+.gateActions{display:flex;gap:7px;flex-wrap:wrap}
+.gateActions button{flex:1;white-space:nowrap}
+#gatePanel #gateTravel{background:#355d62;border-color:#90d8d6;color:#fff0c0;flex:2}
+.gateMessage{color:#a4bfcc;font-size:11px;min-height:13px}
+.gateJournalTop{display:flex;justify-content:space-between;gap:8px;align-items:center;
+ color:#f4d69e;font:900 10px/1.2 ui-monospace,monospace}
+.gateJournalTop span{color:#a6c1cb;font-weight:500}
+#gateJournal{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;max-height:112px;overflow:auto}
+#gateJournal button{text-align:left;min-width:0;font-size:10px;padding:6px 9px;min-height:30px;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#gatePanel .gateDescription{font-size:11px;color:#c0d6e0;line-height:1.35}
+@media(pointer:coarse) and (orientation:landscape) and (max-height:400px){
+ #gatePanel{padding:9px;gap:5px}
+ .gateSlot{height:32px;font-size:22px}
+ #gatePanel .gateRune{height:34px;font-size:20px}
+ #gatePanel button{min-height:29px;padding:5px 8px}
+ #gateJournal{max-height:62px}
+ .gateDescription{display:none}
+}
+
 </style>
 </head>
 <body>
@@ -581,6 +631,7 @@ header .actions{display:flex;gap:6px}
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
    <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 033 • THE FIRST GATE</span></div>
    <div class="menuActionGrid">
+    <button class="minibtn" id="gateMenuOpen" type="button">✧ DIAL GATE</button>
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
     <button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button>
     <button class="minibtn" id="hueOpen" type="button">🎨 HUES</button>
@@ -613,7 +664,7 @@ header .actions{display:flex;gap:6px}
  </div>
 </header>
 <div id="menuShield" hidden aria-hidden="true"></div>
-<div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP ORB TO FIRE</div>
+<div id="stageWrap"><div id="stage"></div><div id="regionTitle" hidden></div><button id="gateNearby" type="button" hidden>✧ DIAL GATE</button><div id="portalNearby" hidden></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP ORB TO FIRE</div>
 <button class="minibtn" id="dash" type="button" aria-label="Dash in movement direction">DASH</button>
 <div id="wheelDock" aria-label="Six-slot quarter-fan spell selector">
  <div id="wheelSlots" role="group" aria-label="Equipped spells"></div>
@@ -621,7 +672,7 @@ header .actions{display:flex;gap:6px}
   <span id="wheelGlyph" aria-hidden="true">✦</span><span id="wheelName">BOLT</span>
  </button>
  <div id="wheelReadout" aria-live="polite">HOLD + SLIDE TO EQUIP</div>
-</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div>
 </div>
 <!-- The wardrobe is a separate presentation layer, never a gameplay control. -->
@@ -685,6 +736,26 @@ header .actions{display:flex;gap:6px}
    <div class="hueInfo" id="hueInfo">Pick a hue to recolor the chosen fabric.</div>
    <button type="button" class="hueSecondary hueCopy" id="hueCopy">COPY LOOK</button>
   </div>
+ </div>
+</div>
+<!-- 033 / Gate coordinates identify regions, not individual combat rooms. -->
+<div id="gateOverlay" role="dialog" aria-modal="true" aria-labelledby="gateTitle" hidden>
+ <div id="gatePanel">
+  <div class="gateHeading"><div><strong id="gateTitle">W / THE FIRST GATE</strong>
+   <small>Six ordered glyphs • one permanent regional address • generator v1</small></div>
+   <button id="gateDone" type="button">CLOSE ✕</button></div>
+  <div class="gateDialRow" id="gateSlots" role="group" aria-label="Six glyph address slots"></div>
+  <div class="gateKeys" id="gateKeys" role="group" aria-label="Available gate glyphs"></div>
+  <div class="gateActions">
+   <button id="gateBack" type="button">⌫ ERASE</button>
+   <button id="gateClear" type="button">CLEAR</button>
+   <button id="gateTravel" type="button" disabled>✧ ENGAGE</button>
+   <button id="gateHome" type="button" hidden>⌂ HOME LAB</button>
+  </div>
+  <div class="gateMessage" id="gateMessage" role="status">Dial six runes to discover a region.</div>
+  <div class="gateJournalTop">TRAVEL JOURNAL <span id="gateCount">0 ADDRESSES</span></div>
+  <div id="gateJournal" role="group" aria-label="Previously visited regions"></div>
+  <div class="gateDescription">Each sequence creates a reproducible region with a safe arrival sanctuary and four connected arenas. Walk into the glowing edge portals to explore. Dial the same glyphs to return to the same original geography. Changes made to physical objects do not persist yet.</div>
  </div>
 </div>
 <div id="rotationGate" role="status" aria-label="Rotate your phone to landscape">
@@ -1031,13 +1102,17 @@ class Lab extends Phaser.Scene{
  }
  checkTravel(time){
   const gateAvailable=!this.region||this.sectorIndex===0;
+  $("portalNearby").hidden=true;
   $("gateNearby").hidden=!gateAvailable||!started||
    Math.hypot(this.player.x-Regions.GATE.x,this.player.y-Regions.GATE.y)>115;
   if(!this.region||time<this.travelLock||!$("gateOverlay").hidden)return false;
   for(const portal of Regions.portals(this.region,this.sectorIndex)){
-   if(Math.hypot(this.player.x-portal.x,this.player.y-portal.y)<43){
-    return this.enterSector(portal.to);
+   const distance=Math.hypot(this.player.x-portal.x,this.player.y-portal.y);
+   if(distance<110){
+    $("portalNearby").hidden=false;
+    $("portalNearby").textContent="✧ "+portal.name.toUpperCase()+" • STEP INSIDE";
    }
+   if(distance<43)return this.enterSector(portal.to);
   }
   return false;
  }
@@ -1081,6 +1156,7 @@ class Lab extends Phaser.Scene{
   $("regionTitle").hidden=!sector;
   $("regionTitle").textContent=sector?"✧ "+this.region.address+" / "+sector.name:"";
   $("gateNearby").hidden=true;
+  $("portalNearby").hidden=true;
   announce(sector?"ARENA RESET • "+sector.name:"LAB RESET • Gravity, motion, and materials are live.");
  }
  addCrate(x,y,quiet=false){
@@ -1686,6 +1762,112 @@ bookOverlay.addEventListener("keydown",e=>{
  if(e.key==="Escape"){e.preventDefault();e.stopPropagation();closeSpellbook();}
 });
 refreshWheel();
+
+
+/* Build 033 / Dialing, travel journal and modal UI; separate from physics. */
+const gateOverlay=$("gateOverlay"),gateDigits=[],gateJournalKey="wrkman-arcane-lab033-gate-journal-v1";
+let gateJournal=[];
+try{
+ const stored=JSON.parse(gameStorage.getItem(gateJournalKey)||"[]");
+ if(Array.isArray(stored))gateJournal=stored.filter(v=>v&&Regions?.valid(v.code)&&Array.isArray(v.visited)).slice(0,24);
+}catch(_){}
+function persistGateJournal(){try{gameStorage.setItem(gateJournalKey,JSON.stringify(gateJournal.slice(0,24)));}catch(_){}}
+function markGateVisit(code,index){
+ if(!Regions?.valid(code)||index<0||index>4)return;
+ let entry=gateJournal.find(v=>v.code===code);
+ if(!entry){entry={code,visited:[],last:0};gateJournal.unshift(entry);}
+ if(!entry.visited.includes(index))entry.visited.push(index);
+ entry.last=Date.now();
+ gateJournal.sort((a,b)=>b.last-a.last);
+ gateJournal.length=Math.min(gateJournal.length,24);
+ persistGateJournal();
+ if(!gateOverlay.hidden)renderGateJournal();
+}
+function renderGateJournal(){
+ const box=$("gateJournal");box.replaceChildren();
+ $("gateCount").textContent=gateJournal.length+" ADDRESSES";
+ for(const entry of gateJournal.slice(0,12)){
+  const btn=document.createElement("button");btn.type="button";
+  btn.textContent=entry.code.split("").map(d=>Regions.GLYPHS[Number(d)]).join(" ")+"  •  "+entry.visited.length+"/5";
+  btn.title="Load saved glyphs for region "+entry.code;
+  btn.addEventListener("click",()=>{
+   gateDigits.splice(0,gateDigits.length,...entry.code.split(""));
+   renderGateDial();
+   $("gateMessage").textContent="ADDRESS RECALLED • "+entry.visited.length+" of 5 arenas discovered";
+  });
+  box.append(btn);
+ }
+ if(!gateJournal.length){
+  const msg=document.createElement("span");msg.className="gateMessage";
+  msg.textContent="No discoveries yet. Your first region is waiting.";
+  box.append(msg);
+ }
+}
+function renderGateDial(){
+ const box=$("gateSlots");box.replaceChildren();
+ for(let i=0;i<6;i++){
+  const cell=document.createElement("span");cell.className="gateSlot";
+  cell.textContent=gateDigits[i]===undefined?"·":Regions?.GLYPHS[Number(gateDigits[i])];
+  cell.setAttribute("aria-label","Rune "+(i+1)+(gateDigits[i]===undefined?" empty":" "+cell.textContent));
+  box.append(cell);
+ }
+ $("gateTravel").disabled=gateDigits.length!==6||!Regions;
+ const current=scene?.region;
+ $("gateHome").hidden=!current;
+ if(gateDigits.length===6){
+  $("gateMessage").textContent="ADDRESS "+gateDigits.join("")+" • "+(gateJournal.some(x=>x.code===gateDigits.join(""))?"KNOWN REGION":"UNCHARTED REGION");
+ }else $("gateMessage").textContent="DIAL "+(6-gateDigits.length)+" MORE GLYPH"+(6-gateDigits.length===1?"":"S");
+}
+if(Regions){
+ for(let i=0;i<Regions.GLYPHS.length;i++){
+  const key=document.createElement("button");key.type="button";key.className="gateRune";
+  key.textContent=Regions.GLYPHS[i];key.setAttribute("aria-label","Add glyph "+(i+1));
+  key.addEventListener("click",()=>{
+   if(gateDigits.length>=6)return;
+   gateDigits.push(String(i));renderGateDial();
+  });
+  $("gateKeys").append(key);
+ }
+}
+function closeGate(activate=true){
+ if(gateOverlay.hidden)return;
+ gateOverlay.hidden=true;
+ if(activate&&started&&$("gameMenu").hidden&&
+    $("skinOverlay").hidden&&$("hueOverlay").hidden&&$("spellbookOverlay").hidden&&
+    !$("instructions").classList.contains("show"))scene?.scene.resume();
+}
+function openGate(){
+ if(!started||!scene||!Regions)return;
+ if(!$("gameMenu").hidden)closeGameMenu(false,false);
+ wheelTouchId=null;wheelMouseId=null;wheelHide();
+ neutralStick();joyTouchId=null;joyPointer=null;
+ gateOverlay.hidden=false;
+ scene.scene.pause();
+ gateDigits.splice(0,gateDigits.length,...(scene.region?.address.split("")||[]));
+ renderGateDial();renderGateJournal();
+ $("gateDone").focus({preventScroll:true});
+}
+$("gateMenuOpen").addEventListener("click",openGate);
+$("gateNearby").addEventListener("click",openGate);
+$("gateDone").addEventListener("click",()=>closeGate());
+$("gateBack").addEventListener("click",()=>{gateDigits.pop();renderGateDial();});
+$("gateClear").addEventListener("click",()=>{gateDigits.length=0;renderGateDial();});
+$("gateTravel").addEventListener("click",()=>{
+ if(gateDigits.length!==6||!Regions)return;
+ const address=gateDigits.join("");
+ closeGate(false);
+ if(scene.enterRegion(address))scene.scene.resume();
+});
+$("gateHome").addEventListener("click",()=>{
+ closeGate(false);scene?.returnHome();scene?.scene.resume();
+});
+gateOverlay.addEventListener("keydown",e=>{
+ if(e.key==="Escape"){e.preventDefault();e.stopPropagation();closeGate();}
+ else if(e.key==="Backspace"){e.preventDefault();gateDigits.pop();renderGateDial();}
+ else if(/^[0-7]$/.test(e.key)&&gateDigits.length<6){gateDigits.push(e.key);renderGateDial();}
+});
+renderGateDial();
+renderGateJournal();
 
 $("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");scene?.scene.resume();if($("labState").textContent==="READY")$("labState").textContent="START";announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
 $("notes").onclick=()=>{$("instructions").classList.add("show");};
