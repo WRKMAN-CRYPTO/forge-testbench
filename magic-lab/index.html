@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 032</title>
+<title>WRKMAN | Magic Physics Laboratory 033</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -579,7 +579,7 @@ header .actions{display:flex;gap:6px}
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 032 • SMOOTH WILDLIFE</span></div>
+   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 033 • THE FIRST GATE</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
     <button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button>
@@ -695,11 +695,12 @@ header .actions{display:flex;gap:6px}
   <small>If it stays upright, turn off Portrait Orientation Lock.</small>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
-<script src="./combat.js?v=032"></script>
+<script src="./combat.js?v=033"></script>
 <script src="./elements.js?v=023"></script>
 <script src="./hue-forge.js?v=012"></script>
 <script src="./spell-loadout.js?v=029"></script>
 <script src="./wildlife.js?v=032"></script>
+<script src="./region-gate.js?v=033"></script>
 <script>
 (()=>{
 "use strict";
@@ -818,13 +819,14 @@ if(!window.Phaser||!window.WRKMAN_COMBAT){$("missing").style.display="block";$("
 const Combat=window.WRKMAN_COMBAT;
 const Elements=window.WRKMAN_ELEMENTS||null; // optional so core gameplay survives a failed download
 const Wildlife=window.WRKMAN_WILDLIFE||null; // optional ambient world, never required for combat
+const Regions=window.WRKMAN_REGIONS||null; // optional canonical region generator
 const MatterBody=Phaser.Physics.Matter.Matter.Body;
 class Lab extends Phaser.Scene{
  preload(){
   // CRITICAL: the level must never wait on optional character cosmetics.
   // Asset downloads begin only AFTER the playable world exists.
  }
- constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];}
+ constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];this.region=null;this.sectorIndex=0;this.travelLock=0;}
  create(){
   try {
   scene=this;
@@ -1003,6 +1005,42 @@ class Lab extends Phaser.Scene{
    g.lineBetween(x,y-31,x,y+31);
   }
  }
+ enterRegion(code){
+  if(!Regions||!Regions.valid(code))return false;
+  this.region=Regions.make(code);this.sectorIndex=0;
+  this.travelLock=this.time.now+1100;
+  this.resetLab();
+  markGateVisit(code,0);
+  announce("GATE OPEN • "+this.region.sectors[0].name+" • "+code);
+  return true;
+ }
+ enterSector(next){
+  if(!this.region||!Number.isInteger(next)||!this.region.sectors[this.sectorIndex].links.includes(next))return false;
+  this.sectorIndex=next;this.travelLock=this.time.now+1100;
+  this.resetLab();
+  markGateVisit(this.region.address,next);
+  announce("REGION "+this.region.address+" • "+this.region.sectors[next].name);
+  return true;
+ }
+ returnHome(){
+  if(!this.region)return false;
+  this.region=null;this.sectorIndex=0;this.travelLock=this.time.now+1100;
+  this.resetLab();
+  announce("GATE CLOSED • Returned to the original laboratory.");
+  return true;
+ }
+ checkTravel(time){
+  const gateAvailable=!this.region||this.sectorIndex===0;
+  $("gateNearby").hidden=!gateAvailable||!started||
+   Math.hypot(this.player.x-Regions.GATE.x,this.player.y-Regions.GATE.y)>115;
+  if(!this.region||time<this.travelLock||!$("gateOverlay").hidden)return false;
+  for(const portal of Regions.portals(this.region,this.sectorIndex)){
+   if(Math.hypot(this.player.x-portal.x,this.player.y-portal.y)<43){
+    return this.enterSector(portal.to);
+   }
+  }
+  return false;
+ }
  resetLab(){
   for(const p of [...this.projectiles,...this.actors])this.matter.world.remove(p.body);
   this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];
@@ -1013,11 +1051,16 @@ class Lab extends Phaser.Scene{
   const d=this.matter.add.circle(704,304,30,{frictionAir:.07,restitution:.8,density:.006,slop:.02});
   d.gameTag="dummy";this.dummy={body:d,r:30};
   this.actors.push(this.dummy);
-  [[452,244],[539,346],[470,411],[618,222]].forEach(([x,y])=>this.addCrate(x,y,true));
-  // Small props in the outer pads let players test physics far off-screen.
-  [[-470,205],[-350,280],[1280,210],[1410,310],[485,-270],
-   [550,835]].forEach(([x,y])=>this.addCrate(x,y,true));
-  Combat.reset(this);
+  const sector=this.region?.sectors[this.sectorIndex]||null;
+  if(sector){
+   for(const c of sector.crate)this.addCrate(c.x,c.y,true);
+   // Physical pillars, rubble and enemies are generated by Combat.reset.
+  }else{
+   [[452,244],[539,346],[470,411],[618,222]].forEach(([x,y])=>this.addCrate(x,y,true));
+   [[-470,205],[-350,280],[1280,210],[1410,310],[485,-270],
+    [550,835]].forEach(([x,y])=>this.addCrate(x,y,true));
+  }
+  Combat.reset(this,sector);
   if(Elements)Elements.reset(this);
   // Same reset lifetime as physical objects; visual residents are inexpensive
   // kinematic actors, not 18 additional Matter collision pairs on a phone.
@@ -1029,7 +1072,16 @@ class Lab extends Phaser.Scene{
   this.updateHeads();
   $("healthFill").style.width="100%";
   $("phaseStatus").textContent=Elements?"DRY":"OFF";
-  announce("LAB RESET • Gravity, motion, and materials are live.");
+  // The persistent floor graphics are rebuilt only on travel/reset.
+  if(this.g){
+   this.g.clear();
+   if(sector)Regions.drawFloor(this.g,sector,Regions.portals(this.region,this.sectorIndex));
+   else this.drawFloor();
+  }
+  $("regionTitle").hidden=!sector;
+  $("regionTitle").textContent=sector?"✧ "+this.region.address+" / "+sector.name:"";
+  $("gateNearby").hidden=true;
+  announce(sector?"ARENA RESET • "+sector.name:"LAB RESET • Gravity, motion, and materials are live.");
  }
  addCrate(x,y,quiet=false){
   if(this.actors.filter(a=>a.body?.gameTag==="crate").length>=16)return;
@@ -1210,6 +1262,7 @@ class Lab extends Phaser.Scene{
   this.player.x=clamp(nextX,MINX+20,MAXX-20);
   this.player.y=clamp(nextY,MINY+20,MAXY-20);
   Combat.resolvePlayerEnvironment(this,time);
+  if(Regions&&this.checkTravel(time))return;
   if(this.cameraFocus){this.cameraFocus.x=this.player.x;this.cameraFocus.y=this.player.y;}
   if(combat){
    const drag=Math.pow(.855,t);
@@ -1298,6 +1351,13 @@ class Lab extends Phaser.Scene{
    g.lineStyle(6*(1-p)+1,r.c,(1-p)*.85);g.strokeCircle(r.x,r.y,12+p*197);}
   if(Elements&&this.elementWorld)Elements.paint(this,g,time);
   Combat.paint(this,g,time);
+  if(Regions){
+   if(this.region){
+    for(const portal of Regions.portals(this.region,this.sectorIndex))
+     Regions.drawPortal(g,portal,time);
+    if(this.sectorIndex===0)Regions.drawGate(g,time);
+   }else Regions.drawGate(g,time);
+  }
   if(Wildlife&&this.wildlife)Wildlife.paint(this.wildlife,g,time,this.player);
   for(const a of this.actors){
    const b=a.body,x=b.position.x,y=b.position.y;
