@@ -199,6 +199,36 @@ walking animation or direction-aware sprite set**.
 - The visual skin is not yet a complete directional sprite or character animation. Chosen candidates can later be redrawn for walk, dash, recoil, cast, and multiplayer readability.
 - **Spell-Language remains dormant and unconnected.**
 
+## Build 033 • The First Gate / deterministic regions
+
+Arcane Lab now has **Stargate-inspired six-glyph navigation**. Every **ordered six-rune address identifies a reproducible region**, rather than a single arena. Region generator `region-gate.js` is a standalone deterministic module with **v1 geography frozen by golden tests** and no network, DOM dependency or unseeded randomness.
+
+### How to play
+
+1. Enter the original lab. Find the large glowing circular gate a short distance to the **left of your starting position**, or tap **☰ → ✧ DIAL GATE**.
+2. Tap **six glyphs in order**, then **✧ ENGAGE**. An example address is **☼ ◇ ☽ ✦ ≋ △** (`012345` internally). The number strings are internal identifiers, not a second keypad requirement.
+3. You appear in the **Arrival Sanctuary**, a safe chamber without enemy spawns. Your region address and current arena appear unobtrusively at the top left.
+4. Walk along a marked path to a glowing **edge portal**, which transports you to one of **four nearby arenas**. The arenas form a **bidirectional connected graph**, including return portals, with seeded obstacles and enemy encounters. When you approach an exit, a small label names its destination.
+5. Use **✧ DIAL GATE** again to explore a different address. The gate panel's **TRAVEL JOURNAL** shows recently discovered addresses and how many of each region's five areas you have explored. Tap a journal entry to recall its six glyphs, then ENGAGE. The **⌂ HOME LAB** button always restores the original training laboratory.
+
+### Generation and continuity
+
+- **Same address → same region seed → same arenas, landmarks, colors, enemies and portal graph**. Individual arenas can be rebuilt when traveling through their portal. A golden test checks pinned numeric coordinates so geography cannot change accidentally.
+- Each region has an arrival sanctuary and four linked areas: **Wildwood, Ruins, Caverns and Battle Grounds**, with seeded biome colors, physical crates/pillars/rubble and seeded enemy placements. The first region is an intentionally focused foundation; a richer arena designer and ecological distribution come next.
+- **Home is not a glyph address.** Even `000000` is a valid discoverable region. The original lab remains accessible through HOME LAB.
+- The generator version belongs to every saved discovery (`version:1`). Later versions should keep v1 working and add new versions explicitly; never silently reroll existing places.
+- **Journal-only persistence for now.** Addresses, area discovery and last visit save locally (up to 24 recent addresses). Broken terrain, defeated enemies, dropped objects and HP **do not persist** across arena re-entry. Collaborative multiplayer and synchronized histories are future work, not implied by this build.
+- Regions reuse the original Matter, elemental, combat, magic, wildlife, input, 0.8× camera and wheel systems. Region wilderness population layout derives from the same seeded address and sector index. Spawn and travel portals have deliberate obstacle clearance.
+- `region-gate.js?v=033` is optional: if unavailable, the original laboratory still boots and its magic works; the dialer remains inactive.
+
+### Tests and field verification
+
+- `region-gate.tests.js`: **169 passing checks**, including deterministic identities and specific pinned v1 landmark positions, graph connectivity, clear safe spawns, finite portal locations, palettes, encounter budgets, strict six-glyph validation and rendering budgets.
+- Existing `wildlife.tests.js` (**42**), `spell-loadout.tests.js` (**52**), `elements.tests.js` (**29**), total **292** automated module checks.
+- Simulated **phone ENVELOP** and **desktop FIT** integration both passed **six-key dialing → safe sanctuary → walk into neighboring arena → follow return portal → same region → Home Lab**, while preserving existing saved wardrobe and 22 original home actors. Optional missing region module phone boot also passed. Final validation on physical iPhone remains important.
+
+**Play:** `https://wrkman-crypto.github.io/forge-testbench/magic-lab/?v=033`
+
 ## Build 032 • Little Bodies, Big Consequences
 
 Mobile field feedback: the ambient residents felt alive, but motion was visibly **stepped** and the residents **did not physically react to explosions**.
