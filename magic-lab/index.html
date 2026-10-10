@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 027</title>
+<title>WRKMAN | Magic Physics Laboratory 028</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -405,12 +405,148 @@ header .actions{display:flex;gap:6px}
  #dash{bottom:calc(10px + env(safe-area-inset-bottom) + (216px - 64px) / 2)}
 }
 
+/* 028 / GAME-FIRST HUD: readable world, unobtrusive cyan and warm gold. */
+#shell{position:relative}
+#gameTopbar{position:absolute!important;z-index:20;top:0;left:0;right:0;width:100%;
+ margin:0;display:flex;justify-content:space-between;align-items:flex-start;min-height:0;
+ padding:calc(7px + env(safe-area-inset-top)) calc(9px + env(safe-area-inset-right)) 0 calc(9px + env(safe-area-inset-left));
+ background:transparent!important;pointer-events:none}
+#healthHud{pointer-events:none;width:clamp(140px,22vw,202px);padding:5px 7px;
+ min-height:43px;background:linear-gradient(130deg,#081b2de9,#173d4fba);
+ border:1px solid #88c5d69c;border-radius:10px;box-shadow:0 3px 12px #0006;
+ backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.healthMain{height:17px;display:flex;align-items:center;gap:5px}
+.healthHeart{font-size:18px;line-height:1;color:#fa8493;text-shadow:0 0 7px #f04e645e}
+.healthTrack{height:10px;min-width:28px;flex:1;background:#28101ec4;border:1px solid #a46873a6;
+ overflow:hidden;border-radius:4px}
+#healthFill{height:100%;width:100%;background:linear-gradient(90deg,#a72e4c,#f2778d);
+ transition:width .15s ease;box-shadow:0 0 7px #f77997}
+.healthMain b{color:#ffdfd8;font:900 10px ui-monospace,monospace;min-width:32px;text-align:right}
+.healthMeta{display:flex;justify-content:space-between;gap:8px;padding-top:3px;
+ font:850 9px/1 ui-monospace,monospace;color:#afdce9}
+.healthMeta b{color:#f5d99b}
+.menuRoot{position:relative;pointer-events:auto}
+#gameMenuToggle{display:grid;place-items:center;width:41px;height:41px;min-height:0;
+ padding:0;background:#112f43bd;color:#edf7f6;border:1px solid #9cd5dbac;
+ border-radius:11px;font-size:24px;line-height:1;box-shadow:0 2px 9px #0007;
+ touch-action:manipulation}
+#gameMenuToggle[aria-expanded=true]{color:#ffe1a2;background:#2f4c5b;border-color:#ffcf8b}
+#gameMenu[hidden],#menuShield[hidden]{display:none!important}
+#menuShield{position:fixed;inset:0;z-index:19;background:#04111d9c;touch-action:none}
+#gameMenu{position:absolute;z-index:21;right:0;top:45px;pointer-events:auto;
+ width:min(350px,calc(100vw - 18px));
+ max-height:calc(100dvh - 50px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+ overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;
+ display:flex;flex-direction:column;gap:7px;padding:9px;border:1px solid #78a5b8;
+ border-radius:12px;background:linear-gradient(140deg,#173548f7,#091927f9);
+ box-shadow:0 15px 43px #000e}
+.menuHeader{display:flex;align-items:center;justify-content:space-between;gap:5px;
+ border-bottom:1px solid #54788a9b;padding-bottom:6px}
+.menuHeader strong{font:950 12px ui-monospace,monospace;letter-spacing:.11em;color:#f8d49a}
+.menuHeader span{font:800 8px ui-monospace,monospace;white-space:nowrap;color:#a3c6d4}
+.menuActionGrid,.menuSettingGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.menuActionGrid button,.menuSettingGrid button{min-height:36px;min-width:0;padding:4px;
+ color:#ebf5f5;border:1px solid #668da1;border-radius:8px;
+ background:#1c4055c7;font:900 10px/1.25 ui-monospace,monospace;
+ white-space:normal;touch-action:manipulation}
+.menuActionGrid #reset{border-color:#c19a6c;color:#ffe2b0}
+.menuPrefs{display:flex;flex-direction:column;gap:4px}
+.menuCaption{font:850 9px ui-monospace,monospace;letter-spacing:.09em;color:#b1d5e0}
+.menuSettingGrid button{min-height:30px;font-size:9px;background:#102e44b9}
+.menuDiagnostics{padding-top:5px;border-top:1px solid #456f8188}
+.menuDiagnostics summary{cursor:pointer;color:#addde9;font:850 10px ui-monospace,monospace}
+#gameMenu #heads{position:static!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));
+ width:auto!important;height:auto!important;overflow:visible;pointer-events:auto;
+ margin:7px 0 0;padding:0;gap:4px;background:transparent}
+#gameMenu #heads .pill{display:flex!important;justify-content:space-between;gap:3px;
+ border:1px solid #45677a;background:#091c2dcb;border-radius:6px;padding:3px 5px;
+ min-width:0;font:800 9px ui-monospace,monospace;color:#adccd8}
+#gameMenu #heads .pill b{color:#f9da9d}
+#menuStatus{min-height:15px;border-top:1px solid #55738791;padding-top:5px;
+ font:800 9px/1.25 ui-monospace,monospace;color:#b3d1dc}
+#shell:not(.hints-on) #castHint:not(.target-hint){display:none!important}
+#castHint{left:auto!important;right:calc(8px + env(safe-area-inset-right))!important;
+ top:auto!important;bottom:calc(223px + env(safe-area-inset-bottom))!important;
+ transform:none!important;max-width:216px;border-color:#77bac5a1;
+ background:#091d2fc9;color:#e0f1ee;font-size:9px;padding:4px 7px}
+#shell.quiet-controls #joystick{opacity:.76;background:#2d718521;box-shadow:none}
+#shell.quiet-controls #stick{background:#91c5d05c;box-shadow:0 0 10px #5dbbdb38}
+#shell.quiet-controls #dash{background:#42372ebc;box-shadow:0 2px 9px #0009}
+#shell.quiet-controls #wheelHub{background:radial-gradient(circle at 34% 20%,#3c6174d9,#143043d9 72%,#081d32d9)}
+#shell.quiet-controls #joystick:active,#shell.quiet-controls #dash:active,#shell.quiet-controls #wheelHub:active{opacity:1}
+#joystick:after{display:none!important}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:600px){
+ #gameTopbar{z-index:20;min-height:0;padding:calc(4px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 0 calc(8px + env(safe-area-inset-left));background:transparent!important}
+ #healthHud{width:clamp(136px,21vw,170px);min-height:38px;padding:4px 6px;border-radius:9px}
+ .healthMain{height:15px;gap:4px}.healthHeart{font-size:15px}.healthTrack{height:9px}
+ .healthMain b{min-width:28px;font-size:9px}.healthMeta{font-size:8px;padding-top:3px}
+ #gameMenuToggle{width:38px;height:38px;font-size:22px}
+ #gameMenu{top:40px;width:min(315px,calc(100vw - 16px));padding:7px;gap:5px;
+ max-height:calc(100dvh - 45px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+ .menuActionGrid,.menuSettingGrid{gap:4px}
+ .menuActionGrid button{min-height:31px;font-size:9px;padding:3px}
+ .menuSettingGrid button{min-height:27px}
+ #joystick{width:clamp(80px,24dvh,112px);height:clamp(80px,24dvh,112px);
+  border-color:#a0d2e276;background:#70b7d11c}
+ #stick{left:28%;top:28%;width:44%;height:44%}
+ #dash{width:68px;height:60px;font-size:11px;
+  right:calc(6px + env(safe-area-inset-right) + 216px + 13px);
+  bottom:calc(10px + env(safe-area-inset-bottom) + (216px - 60px) / 2)}
+ #wheelHub{width:62px;height:62px}
+ #castHint{right:calc(6px + env(safe-area-inset-right))!important;bottom:calc(224px + env(safe-area-inset-bottom))!important;max-width:195px;font-size:8px}
+}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:380px){
+ #gameMenu{gap:4px;padding:6px}
+ .menuActionGrid button{min-height:28px}
+}
+
 </style>
 </head>
 <body>
 <div id="shell">
-<header><div class="brand"><strong>W</strong>RKMAN / ARCANE LAB <span>BUILD 027 • DASH + WHEEL</span></div><div class="actions"><button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button><button class="minibtn" id="hueOpen" type="button">🎨 HUES</button><button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button><button class="minibtn" id="notes">HOW TO</button><button class="minibtn" id="copy">COPY BUILD</button><button class="minibtn" id="reset">RESET</button></div></header>
-<div id="heads"><div class="pill combatPill">HP <b id="playerHP">100%</b></div><div class="pill combatPill">FOES <b id="enemies">4</b></div><div class="pill combatPill">KOs <b id="kills">0</b></div><div class="pill">DUMMY <b id="hp">100%</b></div><div class="pill">DEFLECTIONS <b id="bends">0</b></div><div class="pill">IMPACTS <b id="hits">0</b></div><div class="pill">STONE <b id="pillars">3</b></div><div class="pill">LAB <b id="labState">BOOT</b></div><div class="pill" id="phasePill">PHASE <b id="phaseStatus">DRY</b></div><div class="pill">DATA <b id="profileMode">SAVED</b></div><div class="pill">MODE <b>SOLO / LOCAL</b></div></div>
+<header id="gameTopbar">
+ <div id="healthHud" role="group" aria-label="Health and enemies">
+  <div class="healthMain"><span class="healthHeart" aria-hidden="true">♥</span>
+   <div class="healthTrack" role="meter" aria-label="Health"><div id="healthFill"></div></div>
+   <b id="playerHP">100%</b></div>
+  <div class="healthMeta"><span>FOES <b id="enemies">4</b></span><span>✧ <b id="phaseStatus">DRY</b></span></div>
+ </div>
+ <div id="menuRoot" class="menuRoot">
+  <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
+  <div id="gameMenu" role="group" aria-label="Game menu" hidden>
+   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 028 • FIELD HUD</span></div>
+   <div class="menuActionGrid">
+    <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
+    <button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button>
+    <button class="minibtn" id="hueOpen" type="button">🎨 HUES</button>
+    <button class="minibtn" id="notes" type="button">HOW TO PLAY</button>
+    <button class="minibtn" id="copy" type="button">COPY BUILD</button>
+    <button class="minibtn" id="reset" type="button">RESET ARENA</button>
+   </div>
+   <div class="menuPrefs"><span class="menuCaption">DISPLAY SETTINGS</span>
+    <div class="menuSettingGrid">
+     <button id="menuHintToggle" type="button" aria-pressed="false">CAST HINTS: OFF</button>
+     <button id="menuControlToggle" type="button" aria-pressed="true">CONTROLS: SOFT</button>
+    </div>
+   </div>
+   <details class="menuDiagnostics">
+    <summary>LAB TELEMETRY</summary>
+    <div id="heads">
+     <div class="pill">KOs <b id="kills">0</b></div>
+     <div class="pill">DUMMY <b id="hp">100%</b></div>
+     <div class="pill">DEFLECTIONS <b id="bends">0</b></div>
+     <div class="pill">IMPACTS <b id="hits">0</b></div>
+     <div class="pill">STONE <b id="pillars">3</b></div>
+     <div class="pill">LAB <b id="labState">BOOT</b></div>
+     <div class="pill">DATA <b id="profileMode">SAVED</b></div>
+     <div class="pill">MODE <b>SOLO / LOCAL</b></div>
+    </div>
+   </details>
+   <div id="menuStatus" role="status" aria-live="polite">YOUR WORLD. YOUR RULES.</div>
+  </div>
+ </div>
+</header>
+<div id="menuShield" hidden aria-hidden="true"></div>
 <div id="stageWrap"><div id="stage"></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP ORB TO FIRE</div>
 <button class="minibtn" id="dash" type="button" aria-label="Dash in movement direction">DASH</button>
 <div id="wheelDock" aria-label="Six-slot spell wheel">
@@ -577,7 +713,10 @@ let equipped=Loadout.read(gameStorage);
 // strength from earlier builds. No gameplay changes or saved-value deletion.
 let selected=equipped[0],power=Math.min(10,Math.max(1,Number(gameStorage.getItem(recipeKey))||5)),scene=null,started=false;
 const touches={x:0,y:0};
-const announce=msg=>{$("log").textContent=msg;};
+const announce=msg=>{
+ $("log").textContent=msg;
+ $("menuStatus").textContent=msg;
+};
 $("profileMode").textContent=freshProfile?"FRESH TEST":"SAVED";
 
 // Make failures readable on-screen, including exceptions caught by Phaser.
@@ -600,6 +739,7 @@ function selectSpell(type){
  $("wheelName").textContent=spellInfo[type].name.split(" ")[0];
  $("castHint").textContent=spellInfo[type].name+
    (spellInfo[type].button==="target"?" • TAP ARENA TO PLACE":" • TAP ORB TO CAST");
+ $("castHint").classList.toggle("target-hint",spellInfo[type].button==="target");
  for(const el of $("wheelSlots").children)el.classList.toggle("selected",el.dataset.spell===type);
 }
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
@@ -622,7 +762,7 @@ class Lab extends Phaser.Scene{
   // Start with our built-in vector wizard. Art upgrades asynchronously;
   // failure cannot interrupt enemy spawning, input, or combat setup.
   this.playerSkinSprite=null;
-  this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show")||!$("skinOverlay").hidden||!$("spellbookOverlay").hidden)return;
+  this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show")||!$("skinOverlay").hidden||!$("spellbookOverlay").hidden||!$("gameMenu").hidden)return;
    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
    if(["1","2","3","4","5","6"].includes(e.key))selectSpell(equipped[Number(e.key)-1]);
    if(e.key.toLowerCase()==="b")openSpellbook();
@@ -806,6 +946,7 @@ class Lab extends Phaser.Scene{
   Combat.reset(this);
   if(Elements)Elements.reset(this);
   this.updateHeads();
+  $("healthFill").style.width="100%";
   $("phaseStatus").textContent=Elements?"DRY":"OFF";
   announce("LAB RESET • Gravity, motion, and materials are live.");
  }
@@ -973,6 +1114,9 @@ class Lab extends Phaser.Scene{
   }
   if(Elements&&this.elementWorld)Elements.step(this,time,delta,Combat);
   Combat.step(this,time,delta);
+  // UI-only health meter, independent of damage and physical simulation.
+  if((this.hudFrame=(this.hudFrame||0)+1)%4===0)
+   $("healthFill").style.width=clamp(Number(this.combat?.hp??100),0,100)+"%";
   if(Elements&&this.elementWorld&&this.elementWorldFrame++%15===0){
    const phase=Elements.snapshot(this);
    $("phaseStatus").textContent=phase.clouds?"VAPOR "+phase.clouds:phase.frozen?"ICE "+phase.frozen:"DRY";
@@ -1154,7 +1298,7 @@ function wheelPoint(){
  return {x:r.left+r.width/2,y:r.top+r.height/2};
 }
 function wheelShow(){
- if(!$("spellbookOverlay").hidden||!started)return false;
+ if(!$("spellbookOverlay").hidden||!$("gameMenu").hidden||!started)return false;
  wheelDock.classList.add("open");
  wheelHub.setAttribute("aria-expanded","true");
  $("wheelReadout").textContent="SLIDE TO A RUNE";
@@ -1322,7 +1466,7 @@ function closeSpellbook(){
  if(bookOverlay.hidden)return;
  bookOverlay.hidden=true;
  scene?.scene.resume();
- $("spellbookOpen").focus({preventScroll:true});
+ $("gameMenuToggle").focus({preventScroll:true});
 }
 $("spellbookOpen").addEventListener("click",openSpellbook);
 $("spellbookDone").addEventListener("click",closeSpellbook);
@@ -1337,7 +1481,7 @@ bookOverlay.addEventListener("keydown",e=>{
 });
 refreshWheel();
 
-$("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");if($("labState").textContent==="READY")$("labState").textContent="START";announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
+$("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");scene?.scene.resume();if($("labState").textContent==="READY")$("labState").textContent="START";announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
 $("notes").onclick=()=>{$("instructions").classList.add("show");};
 $("reset").onclick=()=>{scene?.resetLab();};
 bindInstantPress($("dash"),()=>scene?.dash());
@@ -1350,6 +1494,69 @@ $("copy").onclick=async()=>{
  try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
  catch(_){announce("Clipboard unavailable; open this page in a secure browser context.");}
 };
+// 028 / Game menu owns the utility controls. Enemies remain paused
+// while it is open. Switching into Spellbook/Skins/Hues transfers that pause
+// without re-enabling enemy AI between overlays.
+const menuPanel=$("gameMenu"),menuCover=$("menuShield"),menuButton=$("gameMenuToggle");
+const uiKey="wrkman-arcane-lab028-ui-settings-v1";
+let uiHints=false,uiSoft=true;
+try{
+ const val=JSON.parse(gameStorage.getItem(uiKey)||"null");
+ if(val&&typeof val==="object"){
+  if(typeof val.hints==="boolean")uiHints=val.hints;
+  if(typeof val.soft==="boolean")uiSoft=val.soft;
+ }
+}catch(_){}
+function renderGameSettings(){
+ $("shell").classList.toggle("hints-on",uiHints);
+ $("shell").classList.toggle("quiet-controls",uiSoft);
+ $("menuHintToggle").textContent="CAST HINTS: "+(uiHints?"ON":"OFF");
+ $("menuControlToggle").textContent="CONTROLS: "+(uiSoft?"SOFT":"BOLD");
+ $("menuHintToggle").setAttribute("aria-pressed",String(uiHints));
+ $("menuControlToggle").setAttribute("aria-pressed",String(uiSoft));
+}
+function saveGameSettings(){
+ gameStorage.setItem(uiKey,JSON.stringify({hints:uiHints,soft:uiSoft}));
+ renderGameSettings();
+}
+renderGameSettings();
+$("menuHintToggle").addEventListener("click",()=>{uiHints=!uiHints;saveGameSettings();});
+$("menuControlToggle").addEventListener("click",()=>{uiSoft=!uiSoft;saveGameSettings();});
+function closeGameMenu(resume=true,focus=false){
+ if(menuPanel.hidden)return;
+ menuPanel.hidden=true;menuCover.hidden=true;
+ menuButton.setAttribute("aria-expanded","false");
+ menuButton.setAttribute("aria-label","Open game menu");
+ if(resume&&$("skinOverlay").hidden&&$("hueOverlay").hidden&&$("spellbookOverlay").hidden&&
+    !$("instructions").classList.contains("show"))scene?.scene.resume();
+ if(focus)menuButton.focus({preventScroll:true});
+}
+function openGameMenu(){
+ if(!menuPanel.hidden)return;
+ menuPanel.hidden=false;menuCover.hidden=false;
+ menuButton.setAttribute("aria-expanded","true");
+ menuButton.setAttribute("aria-label","Close game menu");
+ wheelTouchId=null;wheelMouseId=null;wheelHide();
+ scene?.scene.pause();
+ neutralStick();joyTouchId=null;joyPointer=null;
+}
+menuButton.addEventListener("click",()=>{
+ if(menuPanel.hidden)openGameMenu();else closeGameMenu(true,true);
+});
+menuCover.addEventListener("click",()=>closeGameMenu(true,true));
+document.addEventListener("keydown",e=>{
+ if(e.key==="Escape"&&!menuPanel.hidden){
+  e.stopPropagation();e.preventDefault();closeGameMenu(true,true);
+ }
+});
+// Capture runs before each existing action handler. Do not resume for a
+// nested overlay, but do for reset, which is an immediate world action.
+for(const id of ["spellbookOpen","skinsOpen","hueOpen","notes"]){
+ $(id).addEventListener("click",()=>closeGameMenu(false,false),true);
+}
+$("reset").addEventListener("click",()=>closeGameMenu(true,false),true);
+// Copy remains in the open menu so its actual success or failure can be
+// reported by the existing clipboard promise to menuStatus.
 // Wardrobe: state is presentation-only; user picks and favorites are local.
 const skinOverlay=$("skinOverlay"),skinGrid=$("skinGrid");
 function refreshSkinUI(){
@@ -1399,7 +1606,7 @@ function openSkinOverlay(){
 function closeSkinOverlay(){
  skinOverlay.hidden=true;
  scene?.scene.resume();
- $("skinsOpen").focus({preventScroll:true});
+ $("gameMenuToggle").focus({preventScroll:true});
 }
 for(let n=1;n<=SKIN_COUNT;n++){
  const slot=document.createElement("div");slot.className="skinSlot";slot.dataset.skin=String(n);
@@ -1582,7 +1789,7 @@ function openHueForge(){
 function closeHueForge(){
  hueOverlay.hidden=true;
  scene?.scene.resume();
- $("hueOpen").focus({preventScroll:true});
+ $("gameMenuToggle").focus({preventScroll:true});
 }
 
 const joy=$("joystick"),stick=$("stick");
@@ -1636,7 +1843,7 @@ addEventListener("blur",()=>{joyPointer=null;joyTouchId=null;neutralStick();});
 // Capture canvas touches directly so Phaser's pointer management cannot
 // eat the second thumb while the first is held on the external joystick.
 $("stage").addEventListener("touchstart",e=>{
- if(!started||!scene||$("instructions").classList.contains("show")||!$("skinOverlay").hidden)return;
+ if(!started||!scene||$("instructions").classList.contains("show")||!$("skinOverlay").hidden||!$("gameMenu").hidden||!$("spellbookOverlay").hidden||!$("hueOverlay").hidden)return;
  const canvas=$("stage").querySelector("canvas");
  if(!canvas)return;
  const r=canvas.getBoundingClientRect();
