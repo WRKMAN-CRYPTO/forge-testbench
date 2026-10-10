@@ -235,7 +235,8 @@
  }
  function step(w,env,time,delta){
   if(!w||!Array.isArray(w.creatures))return;
-  const ms=clamp(Number(delta)||0,0,50);
+  // Accept batched simulation ticks, but cap position integration per frame.
+  const ms=clamp(Number(delta)||0,0,160);
   if(!ms)return;
   w.acc+=ms;
   if(w.acc>=TICK){
