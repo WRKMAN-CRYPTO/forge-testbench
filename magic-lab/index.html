@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 030</title>
+<title>WRKMAN | Magic Physics Laboratory 031</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -579,7 +579,7 @@ header .actions{display:flex;gap:6px}
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 030 • WIDER VIEW</span></div>
+   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 031 • WILDLIFE</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
     <button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button>
@@ -602,6 +602,7 @@ header .actions{display:flex;gap:6px}
      <div class="pill">DEFLECTIONS <b id="bends">0</b></div>
      <div class="pill">IMPACTS <b id="hits">0</b></div>
      <div class="pill">STONE <b id="pillars">3</b></div>
+     <div class="pill">WILDLIFE <b id="wildlifeCount">0</b></div>
      <div class="pill">LAB <b id="labState">BOOT</b></div>
      <div class="pill">DATA <b id="profileMode">SAVED</b></div>
      <div class="pill">MODE <b>SOLO / LOCAL</b></div>
@@ -620,7 +621,7 @@ header .actions{display:flex;gap:6px}
   <span id="wheelGlyph" aria-hidden="true">✦</span><span id="wheelName">BOLT</span>
  </button>
  <div id="wheelReadout" aria-live="polite">HOLD + SLIDE TO EQUIP</div>
-</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div>
 </div>
 <!-- The wardrobe is a separate presentation layer, never a gameplay control. -->
@@ -698,6 +699,7 @@ header .actions{display:flex;gap:6px}
 <script src="./elements.js?v=023"></script>
 <script src="./hue-forge.js?v=012"></script>
 <script src="./spell-loadout.js?v=029"></script>
+<script src="./wildlife.js?v=031"></script>
 <script>
 (()=>{
 "use strict";
@@ -815,6 +817,7 @@ const color={bolt:0xffdc8d,well:0xb994ff,pulse:0x84ecdb,frost:0x96d8ff,flame:0xf
 if(!window.Phaser||!window.WRKMAN_COMBAT){$("missing").style.display="block";$("missing").textContent="The game engine or combat module did not load. Please reload with a connection.";return;}
 const Combat=window.WRKMAN_COMBAT;
 const Elements=window.WRKMAN_ELEMENTS||null; // optional so core gameplay survives a failed download
+const Wildlife=window.WRKMAN_WILDLIFE||null; // optional ambient world, never required for combat
 const MatterBody=Phaser.Physics.Matter.Matter.Body;
 class Lab extends Phaser.Scene{
  preload(){
@@ -1016,6 +1019,11 @@ class Lab extends Phaser.Scene{
    [550,835]].forEach(([x,y])=>this.addCrate(x,y,true));
   Combat.reset(this);
   if(Elements)Elements.reset(this);
+  // Same reset lifetime as physical objects; visual residents are inexpensive
+  // kinematic actors, not 18 additional Matter collision pairs on a phone.
+  this.wildlife=Wildlife?Wildlife.reset(this.player.x,this.player.y):null;
+  this.wildlifeTick=0;
+  $("wildlifeCount").textContent=this.wildlife?this.wildlife.creatures.length:"OFF";
   this.updateHeads();
   $("healthFill").style.width="100%";
   $("phaseStatus").textContent=Elements?"DRY":"OFF";
@@ -1132,6 +1140,47 @@ class Lab extends Phaser.Scene{
   const l=Math.hypot(x,y);if(l>1){x/=l;y/=l;}
   return {x,y};
  }
+ // World-to-senses adapter. Residents never receive spell names.
+ // All observations come from physical motion, thermal regions, light,
+ // moving air and obstacles, with finite samples per tick.
+ sampleWildlifeEnvironment(){
+  const p=this.player;
+  const actors=[...this.actors,...this.projectiles];
+  const motions=[],obstacles=[];
+  for(const a of actors){
+   const b=a.body,pt=b?.position;
+   if(!pt||b.labAlive===false||a.alive===false)continue;
+   if(Math.abs(pt.x-p.x)>820||Math.abs(pt.y-p.y)>700)continue;
+   const speed=b.speed??Math.hypot(b.velocity?.x||0,b.velocity?.y||0);
+   if(speed>1.6&&motions.length<25){
+    motions.push({x:pt.x,y:pt.y,speed,range:80+Math.min(90,speed*8)});
+   }
+   if(obstacles.length<32&&b.gameTag!=="bolt"&&b.gameTag!=="ember"){
+    obstacles.push({x:pt.x,y:pt.y,radius:a.r||(b.gameTag==="crate"?25:20)});
+   }
+  }
+  // The player's body is a visible mover, not an abstract hostility trigger.
+  const playerSpeed=Math.hypot(p.vx,p.vy);
+  if(playerSpeed>1)motions.push({x:p.x,y:p.y,speed:playerSpeed*1.8,range:70});
+  const thermals=[],lights=[],shocks=[],forces=[];
+  for(const f of this.combat?.fields||[]){
+   thermals.push({x:f.x,y:f.y,radius:f.r,heat:1});
+   lights.push({x:f.x,y:f.y,radius:f.r*.8,intensity:.50});
+  }
+  for(const f of this.frosts)thermals.push({x:f.x,y:f.y,radius:f.r,heat:-.88});
+  for(const c of this.elementWorld?.clouds||[]){
+   if(thermals.length<14)thermals.push({x:c.x,y:c.y,radius:c.radius,heat:Math.max(0,(c.heat-20)/110)});
+  }
+  for(const f of this.elementWorld?.flashes||[]){
+   if(lights.length<14)lights.push({x:f.x,y:f.y,radius:Math.min(125,f.r),intensity:1});
+  }
+  for(const ring of this.rings){
+   if(shocks.length<12)shocks.push({x:ring.x,y:ring.y,radius:Math.min(220,90+(this.time.now-ring.born)*.35),strength:.90});
+  }
+  for(const well of this.wells)
+   if(forces.length<6)forces.push({x:well.x,y:well.y,radius:well.r,strength:1.5});
+  return {player:{x:p.x,y:p.y},motions,obstacles,thermals,lights,shocks,forces};
+ }
  update(time,delta){
   if(!started){
    if(!$("instructions").classList.contains("show")){
@@ -1185,6 +1234,18 @@ class Lab extends Phaser.Scene{
   }
   if(Elements&&this.elementWorld)Elements.step(this,time,delta,Combat);
   Combat.step(this,time,delta);
+  if(Wildlife&&this.wildlife){
+   // Perception environment sampled about 12 times/second, rather than
+   // duplicating all bodies' expensive collision or sensory calculations at 60.
+   this.wildlifeTick+=delta;
+   if(this.wildlifeTick>=80){
+    const elapsed=Math.min(this.wildlifeTick,160);
+    this.wildlifeTick=0;
+    Wildlife.step(this.wildlife,this.sampleWildlifeEnvironment(),time,elapsed);
+    if(this.wildlife.steps%24===0)
+     $("wildlifeCount").textContent=Wildlife.snapshot(this.wildlife).total;
+   }
+  }
   // UI-only health meter, independent of damage and physical simulation.
   if((this.hudFrame=(this.hudFrame||0)+1)%4===0)
    $("healthFill").style.width=clamp(Number(this.combat?.hp??100),0,100)+"%";
@@ -1226,6 +1287,7 @@ class Lab extends Phaser.Scene{
    g.lineStyle(6*(1-p)+1,r.c,(1-p)*.85);g.strokeCircle(r.x,r.y,12+p*197);}
   if(Elements&&this.elementWorld)Elements.paint(this,g,time);
   Combat.paint(this,g,time);
+  if(Wildlife&&this.wildlife)Wildlife.paint(this.wildlife,g,time,this.player);
   for(const a of this.actors){
    const b=a.body,x=b.position.x,y=b.position.y;
    if(["enemy","pillar","debris"].includes(b.gameTag))continue; // Drawn by Combat.paint.
