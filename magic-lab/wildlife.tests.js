@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 031 / Wildlife deterministic regression tests
+/* WRKMAN ARCANE LAB 032 / Wildlife deterministic regression tests
  * node magic-lab/wildlife.tests.js
  */
 "use strict";
@@ -30,7 +30,7 @@ expect("pillbug curls",bug.curlUntil>1000);
 const pulled=W.reset(),roll=pulled.creatures.find(a=>a.type==="pillbug");
 roll.x=100;roll.y=100;
 W.step(pulled,{...empty,forces:[{x:170,y:100,radius:180,strength:2}]},1000,80);
-expect("motion force accelerates pillbug",roll.vx>0);
+expect("motion force accelerates pillbug",roll.kickX>0);
 expect("force makes pillbug curl",roll.curlUntil>1000);
 const moths=W.reset(),moth=moths.creatures.find(a=>a.type==="moth");
 moth.x=100;moth.y=100;moth.heading=0;moth.turnAt=Infinity;
@@ -66,4 +66,49 @@ const gfx=new Proxy({},{get(){return ()=>{draws++;return gfx}}});
 expect("tiny creatures visible",W.paint(start,gfx,20000,empty.player)>0);
 expect("limited low-pixel rendering",draws<18*28);
 expect("no spells or enemies in world module",!/bolt|detonate|spell|damage|hitEnemy|healthbar/i.test(require("fs").readFileSync(__dirname+"/wildlife.js","utf8").replace(/\/\*[\s\S]*?\*\//g,"").replace(/\/\/[^\n]*/g,"")));
-console.log("Wildlife 031: "+total+" tests passed");
+// Build 032: split 12.5Hz senses from frame-rate positional integration.
+const smooth=W.reset(),a0=smooth.creatures[0];
+a0.x=100;a0.y=100;a0.vx=60;a0.vy=0;a0.targetX=60;a0.targetY=0;
+a0.turnAt=Infinity;
+const beforeSmooth=a0.x;
+for(let t=16;t<=64;t+=16){
+ W.step(smooth,{...empty,player:{x:300,y:300}},t,16);
+ expect("subframe movement "+t,a0.x>beforeSmooth+(t-16)*.010);
+}
+expect("no sense tick before 80ms",smooth.steps===0);
+W.step(smooth,empty,80,16);
+expect("first sense tick after 80ms",smooth.steps===1);
+const tumble=W.reset(),center=tumble.creatures[0];
+center.x=100;center.y=100;
+const noCast={x:center.x,y:center.y};
+const affected=W.impulse(tumble,noCast.x,noCast.y,146,110,1000);
+expect("blast hits wildlife without senses",affected>0&&tumble.steps===0);
+expect("exact-center blast has outward vector",Math.hypot(center.kickX,center.kickY)>10);
+expect("blast sets tumble",center.tumbleUntil>1000&&center.recoverUntil>1000);
+const xBefore=center.x,yBefore=center.y;
+W.step(tumble,empty,1016,16);
+expect("blast moves before next sense tick",Math.hypot(center.x-xBefore,center.y-yBefore)>1);
+const pb=W.reset(),curled=pb.creatures.find(c=>c.type==="pillbug");
+curled.x=100;curled.y=100;
+W.impulse(pb,80,100,148,115,1000);
+expect("blast rolls pillbug",curled.curlUntil>1000&&curled.kickX>0);
+const mothFlight=W.reset(),flier=mothFlight.creatures.find(c=>c.type==="moth");
+flier.x=100;flier.y=100;
+W.impulse(mothFlight,85,100,148,115,1000);
+expect("moth blown off course",flier.kickX>0&&flier.tumbleUntil>1000);
+const limited=W.reset(),far=limited.creatures[0];
+far.x=1000;far.y=1000;
+const farKick=far.kickX;
+W.impulse(limited,50,50,120,100,1000);
+expect("outside blast radius unaffected",far.kickX===farKick);
+for(let t=1016;t<4500;t+=16)W.step(tumble,empty,t,16);
+expect("knockback inertia settles",Math.hypot(center.kickX,center.kickY)<1);
+expect("tumble expires",center.tumbleUntil<4500&&center.recoverUntil<4500);
+const graphicsOps=[];
+const graphics=new Proxy({},{get(_target,k){return (...args)=>{graphicsOps.push([k,...args]);return graphics;}}});
+const rotating=W.reset(),rot=rotating.creatures[0];rot.x=111.33;rot.y=199.67;
+W.impulse(rotating,99,199,120,105,400);
+W.paint(rotating,graphics,450,{x:111,y:199});
+expect("tumble renders rotation",graphicsOps.some(op=>op[0]==="rotateCanvas"));
+expect("render preserves fractional coordinates",graphicsOps.some(op=>op[0]==="translateCanvas"&&Math.abs(op[1]-Math.round(op[1]))>.001));
+console.log("Wildlife 032: "+total+" tests passed");
