@@ -94,7 +94,8 @@
  }
  function step(w,env,time,delta){
   if(!w||!Array.isArray(w.creatures))return;
-  w.acc+=clamp(Number(delta)||0,0,50);
+  // Scene sends measured time from its 80ms sampler; cap stalls, not ticks.
+  w.acc+=clamp(Number(delta)||0,0,160);
   if(w.acc<TICK)return;
   const dt=Math.min(w.acc,160)/1000;
   w.acc=0;w.steps++;
