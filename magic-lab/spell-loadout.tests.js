@@ -41,4 +41,33 @@ expect("small motion cast",L.gesture(13,7).action==="cast");
 expect("neutral gap cancels",L.gesture(43,0).action==="cancel");
 expect("far-away drag cancels",L.gesture(300,0).action==="cancel");
 expect("all icons defined",L.LIBRARY.every(x=>L.GLYPH[x]));
-console.log("Spell Wheel 026: "+total+" tests passed");
+// Build 029: the right-thumb gesture must stay inside a corner quarter-fan.
+expect("quarter-fan six slots",L.FAN.length===6);
+expect("all runes in upper-left quarter",L.FAN.every(({degrees})=>degrees>=-180&&degrees<=-90));
+expect("fan contains exactly two radial bands",new Set(L.FAN.map(p=>p.radius)).size===2);
+expect("same saved loadout version across wheel redesign",L.KEY==="wrkman-arcane-lab026-spell-loadout-v1");
+expect("gesture over Dash does not choose a rune",L.gesture(-110,5).action==="cancel");
+expect("right drag cancels",L.gesture(115,0).action==="cancel");
+expect("down drag cancels",L.gesture(0,115).action==="cancel");
+expect("swipe farther away cancels",L.gesture(-280,-150).action==="cancel");
+let minSpacing=Infinity;
+for(let i=0;i<6;i++)for(let j=i+1;j<6;j++){
+ const a=L.pos(i),b=L.pos(j);
+ minSpacing=Math.min(minSpacing,Math.hypot(a.x-b.x,a.y-b.y));
+}
+expect("runes have room for 44px hit targets",minSpacing>51);
+const runes=L.FAN.map((_,i)=>L.pos(i));
+const hub={x:190,y:190},width=238,height=238,halfRune=44*1.12/2;
+expect("runes stay inside 238px dock",runes.every(p=>hub.x+p.x-halfRune>=0&&hub.x+p.x+halfRune<=width&&hub.y+p.y-halfRune>=0&&hub.y+p.y+halfRune<=height));
+// Reference hub center as (0,0), Dash is left/down so two rectangles cannot
+// overlap, including the highlight-scale allowance on the slot nearest Dash.
+const dash={x0:-144,x1:-76,y0:-24,y1:34};
+const overlap=(p,r=halfRune)=>!(p.x+r<dash.x0||p.x-r>dash.x1||p.y+r<dash.y0||p.y-r>dash.y1);
+expect("expanded fan never covers Dash",runes.every(p=>!overlap(p)));
+expect("fan is not full-circle",runes.every(p=>p.y<0&&p.x<=0.001));
+// Finger tolerance should accept small off-center motions, not just exact pixels.
+for(let i=0;i<6;i++){
+ const p=L.pos(i);
+ expect("off-center drag selects rune "+i,L.gesture(p.x-3,p.y-3).index===i);
+}
+console.log("Spell Wheel 029: "+total+" tests passed");
