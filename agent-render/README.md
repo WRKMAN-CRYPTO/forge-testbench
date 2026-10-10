@@ -1,33 +1,30 @@
-# WRKMAN Agent-Render v0.4 · 16K Stress Test
+# WRKMAN Agent-Render v0.5 · Contour Seek
 
-Mobile-first experimental adaptive hexagonal-agent renderer. No sprite sheets: agents independently reconstruct either a procedural flower or an imported image by sampling a separate reference scene.
+A mobile-first experimental hex-agent renderer. The underlying flower/photo remains independent: agents sample the scene, move, divide, merge, and paint the displayed image.
 
 ## Launch
 
-Open `index.html` directly in a browser. No build step, server, network connection, or dependencies. For GitHub Pages use `agent-render/index.html`.
+Open `index.html` in a browser or use GitHub Pages under `agent-render/`. Works without libraries or servers after it loads. For imported photos, choose **IMPORT AN IMAGE**; the photo stays in browser memory and is not uploaded.
 
-## v0.4 changes
+## New in v0.5
 
-- Raise adjustable **Agent budget** from 2,200 to **16,000**.
-- When budget is at least 6,000, unlock an additional generation of micro-hexagons, with radii below 1 CSS pixel.
-- Population-aware simulation cadence: 30, 20, 15, or 12 updates/second depending on population.
-- Stagger expensive scene sampling across cohorts at large populations (half, third or quarter of agents each update); preserve last sampled colors between updates.
-- Cap high-density rendered redraws to avoid using every animation frame at 16K; FPS readout reflects actual redraw rate.
-- Bound population growth per simulation step; accelerate births for large requested budgets.
-- Cache the painter's layer order until the topology changes, instead of scanning the full agent set five times per draw.
-- Keep v0.3 Edge priority, EDGES inspector, reconstruction focus sequence, image import, and scrolling protection.
+- **Contour seeking** control (0–100%) makes agents estimate local edge direction and search for better placements around that edge. Movement is still governed by **Agent freedom**. 0% freedom anchors their positions.
+- Hex samplers estimate a *signed boundary normal* from paired opposite color/luminance probes at two radii. This distinguishes directed boundaries from symmetric texture.
+- Boundary-following agents nudge toward the side whose color matches the agent's center and glide gently along the edge tangent. A soft home tether and sibling repulsion preserve coverage.
+- Split clusters may rotate their offspring ring relative to the detected boundary, allowing different placement of micro-hexes around curved outlines.
+- More center-weighted paint along strong edges limits gray color bleeding in lettering and gauge tick marks; turning Contour seeking down restores much of the previous painterly color fit.
+- **FLOW** inspection view overlays sparse normal and tangent markers on the actual hexagons. Green strokes show the local tangent; peach strokes show the estimated normal.
+- Retains Focus Engine, 16,000-agent ceiling, high-density cadence / staggered sampling, scroll-safe sizing, image import, hold, pulse, and comparison views.
 
-## What to test
+## Suggested gauge test
 
-Import a high-resolution logo, set Detail hunger and Edge priority high, then raise Agent budget progressively to 16,000. Compare Agents and Truth. Watch measured FPS and device temperature. Switch back to a small budget if interactions begin to lag.
+Import a photo of a pressure gauge, set 100% Detail hunger, 75–100% Edge priority, Contour seeking around 65–80%, and Agent freedom around 30–50%. First test with 1,600–3,200 agents, then gradually increase to 16,000 if the phone handles it. Toggle AGENTS / TRUTH / COMPARE / FLOW. Try Contour seeking at 0% and 80% to evaluate whether it improves the specific image.
 
-**16,000 is a cap, not a guarantee of 16,000 visible agents in every image.** The renderer splits where its local evidence warrants new detail. Expect frame rates to drop when tens of thousands of tiny shapes are drawn. Actual phone performance varies by device and browser.
+## Limits
 
-## Verification (desktop Chromium mobile emulation)
+- This is still an experimental painter, not vector tracing, text OCR, or a guarantee of legible fine numerals. There are no hidden pixel or sprite overlays in the AGENTS view.
+- Orientation sampling works best on coherent edges; it may be weaker around highly textured regions, junctions, or tiny features below a hexagon's sampling radius.
+- Very high agent budgets are CPU-intensive and may heat phones or reduce frame rates. Stop or lower the budget if performance suffers.
+- Full scene sampling is retained for live flowers; static imported photos receive the same agent-based reconstruction as the procedural reference.
 
-- Imported lettering stress fixture reached **15,998** live agents at 100% detail/edge settings, without script errors.
-- Rendering averaged about **15 FPS** at that density in emulation, which is not a claim about real iPhone performance.
-- Reducing Agent budget to **220** retired excess agents and allowed browser rendering to return to approximately 60 FPS.
-- Scrolling, viewport-height change, landscape rotation and held-image focus all preserved existing agents and focus state.
-
-No scene or physics simulation depends on the rendering agents. The underlying scene stays separate.
+Everything drawn is still a hexagon agent; reference imagery only supplies sample colors and gradients.
