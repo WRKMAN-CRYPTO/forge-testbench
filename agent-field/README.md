@@ -1,4 +1,4 @@
-# WRKMAN Agent·Field v0.1
+# WRKMAN Agent·Field v0.2
 
 Standalone phone-first programmable magic behavior-field lab. This is an experiment, **not integrated with the roguelike or the existing Agent·Magic build**.
 
@@ -23,6 +23,10 @@ Paint white, three grays, black, or magenta, with an adjustable brush. Preset ge
 
 ## Architecture and limitations
 
-The field contains instructions rather than rendered frames. Rendering remains a swarm of independent hexagon agents. A local finite-difference gradient steers valid-cell motion; movement inside masked cells is inertial. For experiments, stage-boundary behavior currently wraps at canvas edges. There is no promise of global route-finding through arbitrary disconnected fields or mathematically guaranteed convergence, and all motion rules are experimental.
+The field contains instructions rather than rendered frames. Rendering remains a swarm of independent hexagon agents. A local finite-difference gradient steers valid-cell motion; movement inside masked cells is inertial. **v0.2 open-boundary physics:** stage edges no longer wrap, bounce, or respawn agents. When a normalized position leaves `[0, 1)` on either axis, sampling returns `valid:false` (no instructions), and the agent continues moving offscreen with existing momentum and mild damping. Agents may re-enter naturally if their trajectory permits it. They remain simulated but are culled from offscreen rendering, with an **OFFSCREEN** counter showing how many are currently outside the visible canvas. **RESEED** returns all agents to the defined starting cells. There is no promise of global route-finding through arbitrary disconnected fields or mathematically guaranteed convergence, and all motion rules are experimental.
 
 This first pass isn't a complete compiler for spell behavior. It establishes a small, portable interface for later spell configuration while keeping the original Agent·Magic and roguelike untouched.
+
+## Regression check (v0.2)
+
+Chromium mobile-sized headless test verified out-of-bounds field sampling returns no instruction, agents retain positions below 0 and above 1 rather than wrapping, offscreen counter matches simulation state, and RESEED restores agents to the stage. No page errors observed. Physical iPhone performance should still be checked.
