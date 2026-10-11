@@ -186,7 +186,13 @@
    }
    g.fillStyle(col,alpha);
    if(cfg.texture==='leaf'){
-    const theta=Math.atan2(a.vy,a.vx);
+    // Leaf facing follows the real world-space trajectory after rotating
+    // World Emission's local field frame toward the wizard's aim.
+    const vx=st.delivery==='world'?
+     a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
+    const vy=st.delivery==='world'?
+     a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
+    const theta=Math.atan2(vy,vx);
     const nx=Math.cos(theta),ny=Math.sin(theta),px=-ny,py=nx;
     const tip={x:x+nx*r*1.65,y:y+ny*r*1.65},base={x:x-nx*r*1.45,y:y-ny*r*1.45};
     g.fillPoints([{x:base.x,y:base.y},{x:x+px*r*.7,y:y+py*r*.7},
