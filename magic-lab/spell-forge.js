@@ -40,7 +40,7 @@
   const find=()=>library.items.find(i=>i.id===library.selected)||library.items[0];
   const saveLibrary=()=>{try{storage.setItem(KEY,JSON.stringify(library));return true}catch(_){return false}};
   let item=find(),draft=clone(item.recipe),heal=item.heal,dirty=false,brush='white',brushRadius=1,gray=128;
-  let undo=[],activePointer=null,dragStart=null,painting=false,particles=[],previewStarts=[],previewClock=0,prevFrame=0,rafId=0,opened=false,previewPopulation=600;
+  let undo=[],activePointer=null,dragStart=null,painting=false,particles=[],previewStarts=[],previewClock=0,prevFrame=0,rafId=0,opened=false,previewPopulation=600,previewFrames=0;
   const style=document.createElement('style');style.textContent=`
 #forgeOverlay[hidden]{display:none!important}#forgeOverlay{position:fixed;inset:0;z-index:90;background:#030911f2;color:#f6ead2;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;font:13px/1.35 system-ui,-apple-system,sans-serif}
 #forgeOverlay *,#forgeOverlay *:before{box-sizing:border-box}#forgeOverlay button,#forgeOverlay select,#forgeOverlay input{font:inherit}#forgeOverlay button{cursor:pointer;touch-action:manipulation}
@@ -54,7 +54,7 @@
 #forgeOverlay input,#forgeOverlay select{width:100%;min-width:0;border:1px solid #52707d;border-radius:7px;padding:7px;color:#f4f0e4;background:#162a38;outline-offset:2px}
 #forgeOverlay input[type=range]{padding:0;accent-color:#cfdb99}#forgeOverlay input[type=checkbox]{width:auto;accent-color:#bcd89b}
 #forgeOverlay .sf-canvas{width:100%;max-width:300px;aspect-ratio:1/1;display:block;margin:auto;background:#ff00ff;border-radius:6px;border:1px solid #697c81;image-rendering:pixelated;touch-action:none;cursor:crosshair}
-#forgeOverlay .sf-preview{width:100%;max-width:300px;aspect-ratio:1/1;display:block;margin:auto;background:#101822;border:1px solid #465967;border-radius:6px}
+#forgeOverlay .sf-preview{width:100%;max-width:300px;aspect-ratio:360/500;display:block;margin:auto;background:#101822;border:1px solid #465967;border-radius:6px}
 #forgeOverlay .sf-tools{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
 #forgeOverlay .sf-tools button{padding:5px 1px;font-size:11px;min-height:32px}
 #forgeOverlay .sf-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
@@ -81,7 +81,7 @@
      <div class="sf-actions"><button id="sfUndo">↶ UNDO</button><button id="sfClear">CLEAR TO MAGENTA</button><button id="sfRing">◯ RING STARTER</button><button id="sfCurtain">☷ CURTAIN STARTER</button></div>
      <div class="sf-caption">White starts · gray guides · black sinks · magenta releases. Gradient tool: drag a line from white toward black.</div>
     </section>
-    <section class="sf-box"><h3>02 / SHAPE & LINK</h3><canvas id="sfPreview" width="300" height="300" class="sf-preview" aria-label="Animated preview of the field"></canvas><div class="sf-flex"><span class="sf-caption" id="sfPreviewMeta">PHYSICS 037</span><button id="sfReseed" type="button">↻ RESEED PREVIEW</button></div><label>PREVIEW SIMULATION<select id="sfPreviewCount"><option value="140">140 · LIGHT</option><option value="600" selected>600 · STANDARD</option><option value="1200">1,200</option><option value="2400">2,400 · HEAVY</option><option value="6000">6,000 · EXPERIMENTAL</option></select></label>
+    <section class="sf-box"><h3>02 / SHAPE & LINK</h3><canvas id="sfPreview" width="360" height="500" class="sf-preview" aria-label="Animated preview of the field"></canvas><div class="sf-flex"><span class="sf-caption" id="sfPreviewMeta">PHYSICS 037</span><button id="sfReseed" type="button">↻ RESEED PREVIEW</button></div><label>PREVIEW SIMULATION<select id="sfPreviewCount"><option value="140">140 · LIGHT</option><option value="600" selected>600 · STANDARD</option><option value="1200">1,200</option><option value="2400">2,400 · HEAVY</option><option value="6000">6,000 · EXPERIMENTAL</option></select></label>
      <label>SPELL NAME <input id="sfName" maxlength="48" autocomplete="off" spellcheck="false" placeholder="Name your creation"></label>
      <div class="sf-flex"><label>PALETTE<select id="sfPalette"><option value="flame">🔥 FLAME</option><option value="arcane">✦ ARCANE</option><option value="healing">♥ HEALING</option><option value="void">◈ VOID</option></select></label><label>MATERIAL<select id="sfTexture"><option value="flat">⬡ FLAT HEX</option><option value="leaf">🍃 LEAF</option></select></label></div>
      <label>DELIVERY<select id="sfDelivery"><option value="aura">◯ AURA · FOLLOW ME</option><option value="world">↗ WORLD EMISSION · RELEASE AT AIM</option><option value="placed">⌖ PLACED FIELD · TAP LOCATION</option></select></label>
@@ -126,7 +126,7 @@
   // population changes density, never steering, momentum or lifetimes.
   function resetParticles(){
    particles=[];previewStarts=Motion.startingCells(draft.values);
-   previewClock=0;prevFrame=0;
+   previewClock=0;previewFrames=0;prevFrame=0;
    $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+previewPopulation+' AGENTS';
   }
   const pals={flame:['#dc4329','#fc9135','#ffe0a3'],arcane:['#5d8ff4','#bd82ef','#f0d4ff'],healing:['#49c7a0','#aee989','#f4f2a2'],void:['#63449e','#b54acb','#ff90d1']};
@@ -138,17 +138,27 @@
    const total=previewPopulation;
    while(particles.length<total)particles.push(Motion.spawn(draft.values,previewStarts));
    const stats=Motion.stepSwarm(particles,draft.values,cfg,dt,360,500,previewClock);
-   pc.fillStyle='#081724';pc.fillRect(0,0,300,300);
-   pc.strokeStyle='#34535d88';pc.lineWidth=1;pc.beginPath();pc.arc(150,150,123,0,TAU);pc.stroke();
-   for(const a of particles){
+   if(++previewFrames%3===0)for(const a of particles){
+    a.tail.push([a.x,a.y]);if(a.tail.length>5)a.tail.shift();
+   }
+   const w=preview.width,h=preview.height;
+   pc.fillStyle='#081724';pc.fillRect(0,0,w,h);
+   pc.strokeStyle='#34535d88';pc.lineWidth=1;pc.beginPath();pc.ellipse(w*.5,h*.5,w*.42,h*.42,0,0,TAU);pc.stroke();
+   const step=Math.max(1,Math.ceil(particles.length/1400));
+   for(let ix=0;ix<particles.length;ix+=step){
+    const a=particles[ix];
     // Don't recycle travelers; pixels that escape remain alive offscreen.
     if(a.x<-.08||a.x>1.08||a.y<-.08||a.y>1.08)continue;
-    const sampled=Motion.sample(draft.values,a.x,a.y);
     const t=clamp(a.progress||0,0,1),shade=cfg.mode==='ab'?t:.44;
     pc.fillStyle=colors[shade<.34?0:shade<.7?1:2];
     pc.globalAlpha=.35+.45*cfg.light/100;
+    const px=a.x*w,py=a.y*h,rad=cfg.texture==='leaf'?2.4:2;
+    if(a.tail.length){pc.strokeStyle=colors[shade<.34?0:shade<.7?1:2];pc.lineWidth=.65;pc.globalAlpha=.085;
+     pc.beginPath();pc.moveTo(a.tail[0][0]*w,a.tail[0][1]*h);
+     for(const pt of a.tail)pc.lineTo(pt[0]*w,pt[1]*h);
+     pc.lineTo(px,py);pc.stroke();pc.globalAlpha=.35+.45*cfg.light/100;
+    }
     pc.beginPath();
-    const px=a.x*300,py=a.y*300,rad=cfg.texture==='leaf'?2.4:2;
     if(cfg.texture==='leaf'){
      pc.ellipse(px,py,rad*1.2,rad*.55,Math.atan2(a.vy,a.vx),0,TAU);
     }else{
@@ -161,7 +171,7 @@
     pc.fill();
    }
    pc.globalAlpha=1;
-   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+stats.offscreen+' OFFSCREEN / '+total;
+   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+total+' LIVE / '+Math.ceil(total/step)+' DRAW · '+stats.offscreen+' OUT';
    rafId=requestAnimationFrame(tick);
   }
   $('sfReseed').addEventListener('click',()=>{resetParticles();status('Fresh agents seeded. Same field laws, new starting conditions.')});
