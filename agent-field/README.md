@@ -1,25 +1,29 @@
-# WRKMAN Agent·Field v0.3 | Leaf Material
+# WRKMAN Agent·Field v0.4 | Stone Range
 
-A standalone, mobile-first 32×32 grayscale behavior-map interpreter for freely moving hexagonal rendering agents. The spell field is a 1,024-cell instruction surface, not a sprite animation. The roguelike and Agent·Magic are not modified.
+A mobile-first, standalone programmable hex-agent laboratory, with a separate **Stone Range** tab for firing the current field at breakable targets. The roguelike is not modified.
 
-## What is new in v0.3
+## Use it
 
-- **Hex surface** selector: FLAT or LEAF, with LEAF selected initially. Existing palette choices still work.
-- **Leaf material** has a shaded body, a midrib, small angled veins, and subtle speckling. Larger hexes follow agent movement orientation. Tiny hexes are rendered with their texture detail naturally reduced by scale.
-- **Shared raster textures** are cached by palette, progression shade, and minor pattern variant; no per-agent gradient creation or clipping each frame. An enlarged material preview makes the tiny textures inspectable on phones.
-- **Saved format stays `WRKMAN_AGENT_FIELD_V1`.** A new optional `settings.texture` property persists through SAVE LOCALLY, EXPORT JSON, and import. Legacy saves with no texture setting remain valid.
-- Agents continue to leave the viewport without wrapping. Offscreen physics, FF00FF free-space behavior, all four palettes, five map generators, and field editing are retained.
+1. Go to **FIELD EDITOR**. Paint a 32 × 32 field with grayscale instructions or magenta (`#FF00FF`, instruction-free). Adjust swarm population, palette, motion, and surface texture. You may also import a previously saved JSON/PNG field.
+2. Switch to **STONE RANGE** at the top of the page. Your current field/settings automatically become the source for the next shot.
+3. Tap a stone to select it and press **CAST FIELD**. The agent swarm travels through the range while continuing to sample the same grayscale behavior rules inside the casting frame.
+4. Individual moving hexes can strike the stones. Rocks crack as health drops, and shattered rocks break into physics-driven fragments. Damage persists across casts.
+5. Press **REBUILD STONES** to reset the targets or return to **FIELD EDITOR** to change your spell. Field edits don't reset the range.
 
-## Live
+## Design notes
 
-https://wrkman-crypto.github.io/forge-testbench/agent-field/?v=0.3
+- There are five stones with different durability, selection highlights, health bars, and cumulative damage.
+- Stones respond to actual per-agent proximity collisions, with one registered strike per agent per stone per cast. This is not an automatic timed explosion.
+- Both 32 × 32 field sampling and directional gradient logic are shared with the field editor. The range animates the cast as a flying swarm, whose internal behavior is driven by a snapshot of the exact current field and settings.
+- The casting frame is a first-pass game-facing delivery mechanism. It's not intended to claim that every field is inherently a projectile. Future delivery styles can reuse the same field interpreter.
+- Every cast uses the currently selected population, including 6,000 if requested. At high agent counts, actual mobile performance depends on hardware and browser.
+- Switching tabs pauses the inactive canvas, so the expensive renderers do not run together. Existing open-world behavior and offscreen accounting on the field-editor tab remain intact.
+- The existing local SAVE / LOAD and portable JSON/PNG functionality are unchanged. The target range resets on reload and is not stored with the field.
 
-## Local tests
+## Files
 
-- JavaScript syntax validated with Node.js.
-- Headless Chromium mobile-viewport smoke test: leaf default, preview, switching flat/leaf, all 6,000 agents, palette changes, save/import round trip, magenta-gap sampling, offscreen sampling, zero page JS errors.
-- The local Chromium FPS measurement is not a reliable prediction of physical iPhone performance. Compare LEAF and FLAT on the same device and map to gauge material overhead.
+- `index.html`: Entire self-contained application. Open from GitHub Pages or a compatible browser.
 
-## Notes
+## Checks
 
-A grayscale cell can be a value from 0 to 255; -1 is the JSON encoding of the exact `#FF00FF` no-guidance key color. The behavior map remains separate from the rendered material. Materials never paint magenta onto the visible swarm unless a deliberately chosen appearance requests it.
+Headless Chromium tests with a phone-sized viewport covered: switching editor/range/editor without losing the field, applying the custom Magenta Gap field and settings to a live cast, rendering with 1,200 and 6,000 hex agents, registering impacts and shattered stones, waiting for spell completion, and rebuilding intact rocks. No page JavaScript errors were observed. A real iPhone performance pass is still needed.
