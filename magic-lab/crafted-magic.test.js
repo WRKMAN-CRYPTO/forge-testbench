@@ -1,0 +1,33 @@
+/* Run: node magic-lab/crafted-magic.test.js */
+'use strict';
+const assert=require('node:assert/strict');
+const C=require('./crafted-magic.js'),L=require('./spell-loadout.js');
+const map=new Map(),storage={getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v)};
+const recipe=C.normalize(C.starter());
+assert.equal(recipe.values.length,1024);
+assert.equal(C.sample(recipe.values,-1,.5),null);
+const free=C.normalize({...recipe,values:Array(1024).fill(-1)});
+assert.equal(C.sample(free.values,.5,.5),null);
+assert.throws(()=>C.normalize({...recipe,values:Array(1024).fill(999)}));
+C.save(storage,recipe);
+assert.equal(C.read(storage).name,'FIRE RING');
+map.set(C.SOURCE_KEY,JSON.stringify({...recipe,name:'MY FIELD'}));
+assert.equal(C.fromForge(storage).name,'MY FIELD');
+assert.equal(L.LIBRARY.includes('crafted'),true);
+assert.equal(L.DEFAULT.length,6);
+assert.equal(L.valid(L.assign(L.DEFAULT,2,'crafted')),true);
+const makeScene=()=>({time:{now:1000},player:{x:230,y:280},combat:{hp:50,enemies:[]},rings:[]});
+let s=makeScene();
+assert.equal(C.start(s,recipe,true),true);
+for(let i=0;i<700;i++){const t=1000+i*16.667;s.time.now=t;if(i===300)s.player.x=400;C.step(s,t,16.667,{hitEnemy(){}})}
+assert.equal(C.snapshot(s).pulses,3);
+assert.equal(s.combat.hp,65);
+const g={fillStyle(){},fillPoints(){},lineStyle(){},lineBetween(){},strokeCircle(){}};
+C.draw(s,g,12650);
+C.step(s,15000,16.667,{});
+assert.equal(C.snapshot(s).active,false);
+s=makeScene();C.start(s,recipe,false);
+for(let i=0;i<700;i++)C.step(s,1000+i*16.667,16.667,{});
+assert.equal(C.snapshot(s).pulses,0);
+assert.equal(s.combat.hp,50);
+console.log('Build 034 crafted field tests PASSED');
