@@ -8,7 +8,8 @@
  else if(root)root.WRKMAN_FIELD_IMPACTS=api;
 })(typeof globalThis==='object'?globalThis:null,function(){
  'use strict';
- const CELL=96;
+ const CELL=96,KEY_ORIGIN=65536,KEY_SPAN=131072;
+ const key=(x,y)=>(x+KEY_ORIGIN)*KEY_SPAN+(y+KEY_ORIGIN);
  // Relative movement catches both fast particles and moving targets.
  // Returns first intersection fraction or null.
  function sweep(ax,ay,bx,by,cx,cy,dx,dy,r){
@@ -42,42 +43,53 @@
   }
   cast.targetPrev=next;return list;
  }
- function process(scene,cast,time,Combat,fromCenter,project){
+ function process(scene,cast,time,Combat,fromCenter){
   cast.impactFX=cast.impactFX||[];
   cast.impactFX=cast.impactFX.filter(f=>time-f.born<300);
   if(!Combat)return 0;
   const all=targets(scene,cast);
   if(!all.length)return 0;
-  const grid=new Map();
+  const grid=new Map();let gridMinX=Infinity,gridMinY=Infinity,gridMaxX=-Infinity,gridMaxY=-Infinity;
   for(const t of all){
    const r=t.r+3;
    const x0=Math.floor((Math.min(t.from.x,t.to.x)-r)/CELL);
    const x1=Math.floor((Math.max(t.from.x,t.to.x)+r)/CELL);
    const y0=Math.floor((Math.min(t.from.y,t.to.y)-r)/CELL);
    const y1=Math.floor((Math.max(t.from.y,t.to.y)+r)/CELL);
+   gridMinX=Math.min(gridMinX,x0);gridMaxX=Math.max(gridMaxX,x1);
+   gridMinY=Math.min(gridMinY,y0);gridMaxY=Math.max(gridMaxY,y1);
    for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){
-    const key=x+','+y,bucket=grid.get(key);
-    if(bucket)bucket.push(t);else grid.set(key,[t]);
+    const bin=key(x,y),bucket=grid.get(bin);
+    if(bucket)bucket.push(t);else grid.set(bin,[t]);
    }
   }
   const agents=cast.agents;
+  const world=cast.delivery==='world';
+  const originX=world?cast.spawnX:.5,originY=world?cast.spawnY:.5;
+  const xx=world?cast.right.x*cast.worldW:cast.scale;
+  const yx=world?cast.forward.x*cast.worldH:0;
+  const xy=world?cast.right.y*cast.worldW:0;
+  const yy=world?cast.forward.y*cast.worldH:cast.scale;
   let remaining=0,seq=0,consumed=0;
   for(let i=0;i<agents.length;i++){
    const a=agents[i];
-   const before=project(cast,a,a.prevX,a.prevY,fromCenter);
-   const after=project(cast,a);
-   const x0=Math.floor(Math.min(before.x,after.x)/CELL);
-   const x1=Math.floor(Math.max(before.x,after.x)/CELL);
-   const y0=Math.floor(Math.min(before.y,after.y)/CELL);
-   const y1=Math.floor(Math.max(before.y,after.y)/CELL);
+   const bx=a.prevX-originX,by=a.prevY-originY;
+   const fx=a.x-originX,fy=a.y-originY;
+   const ax=fromCenter.x+bx*xx+by*yx,ay=fromCenter.y+bx*xy+by*yy;
+   const tx=cast.center.x+fx*xx+fy*yx,ty=cast.center.y+fx*xy+fy*yy;
+   const x0=Math.floor(Math.min(ax,tx)/CELL);
+   const x1=Math.floor(Math.max(ax,tx)/CELL);
+   const y0=Math.floor(Math.min(ay,ty)/CELL);
+   const y1=Math.floor(Math.max(ay,ty)/CELL);
+   if(x1<gridMinX||x0>gridMaxX||y1<gridMinY||y0>gridMaxY){agents[remaining++]=a;continue}
    const stamp=++seq;
    let first=null,earliest=Infinity;
    for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){
-    const bucket=grid.get(x+','+y);
+    const bucket=grid.get(key(x,y));
     if(!bucket)continue;
     for(const t of bucket){
      if(t.seen===stamp)continue;t.seen=stamp;
-     const hit=sweep(before.x,before.y,after.x,after.y,
+     const hit=sweep(ax,ay,tx,ty,
       t.from.x,t.from.y,t.to.x,t.to.y,t.r+3);
      if(hit!==null&&hit<earliest){earliest=hit;first=t}
     }
@@ -87,8 +99,8 @@
    // One small impact mark per subset. Never one Phaser emitter per agent.
    if(first.impacts<=3&&cast.impactFX.length<96){
     cast.impactFX.push({
-     x:before.x+(after.x-before.x)*earliest,
-     y:before.y+(after.y-before.y)*earliest,
+     x:ax+(tx-ax)*earliest,
+     y:ay+(ty-ay)*earliest,
      born:time,color:first.kind==='enemy'?0xffa768:0xe2d5b0});
    }
   }
