@@ -1,19 +1,23 @@
-# WRKMAN Agent·Magic v0.2 — Bound Light
+# WRKMAN Agent·Magic v0.3
 
-Independent experimental spell-rendering lab. **Not connected to the roguelike.**
+Standalone, phone-first experimental magic renderer built from moving hexagonal agents. No roguelike integration yet.
 
-Four forms: Orb, Ward, Sigil, Summon. Five phases: Disturbance → Gathering → Formation → Resolution → Dissolution.
+## Try it
 
-## What changed in v0.2
-- **Light budget** slider (0–100%). Replaces additive `lighter` compositing with bounded `source-over` colors and a gentle backdrop glow.
-- **Four structural roles**: core, shell, filament, and drifting fragments. The spell shape is still composed of moving hexagonal agents, not sprites.
-- **Structure** slider independent of the original **Cohesion** and **Agent freedom** controls, letting a low-cohesion swarm keep a recognizable formation.
-- **Real dissolution**: agents inherit outward velocities, scatter beyond the spell field, shrink, and lose opacity; they remain gone until Cast or Auto Cast.
-- No timer-based surprise recasts; auto casting waits after dissolution and respects pause. Scroll-safe mobile layout and viewport resize preserves agent positions.
-- Rendering stats now refresh about five times per second rather than rewriting the DOM on every animation frame.
+Open `index.html` using GitHub Pages at `https://wrkman-crypto.github.io/forge-testbench/agent-magic/`.
 
-## Stress tests
-Test with 8,000 hexes, Solar palette, Cohesion 7%, Shimmer 0%, Intensity 0%, Agent freedom 0%, and alternate Light budget extremes. A screen full of near-white pixels should no longer result simply from agent overlap.
+## Spell forms
 
-## Files
-`index.html` is standalone and all JavaScript is inline for GitHub Pages. `magic.js` is an accompanying source copy for inspection.
+- **Orb**: glowing arcane formation.
+- **Ward**: defensive ring.
+- **Sigil**: forms and **holds indefinitely** until `ACTIVATE` triggers its final dissolution; `DISSOLVE` also releases it.
+- **Summon**: spirit-familiar silhouette assembled by the swarm.
+- **Fireball**: charge and hold at formation, tap or drag on the stage to aim, then press `ACTIVATE` to launch, trail embers, and burst. You can also `DISSOLVE` directly.
+
+## Controls
+
+Cast, Activate, Dissolve, Auto Cast, Pause, Swarm size (500–8,000), Light budget, Structure, Cohesion, Shimmer, Intensity, Agent freedom, and color family (including Flame).
+
+## Notes
+
+`index.html` is self-contained and is the runnable GitHub Pages entry point. `magic.js` is a readable copy of the inline JavaScript for inspection. Rendering uses bounded source-over light, with each agent's position and contribution modeled independently. The project is an experimental visual study, not yet a game effect pipeline.
