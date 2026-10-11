@@ -1,4 +1,4 @@
-/* WRKMAN Arcane Lab 034 / crafted field interpreter + linked events
+/* WRKMAN Arcane Lab 036 / delivered field interpreter + linked events
    Pure module: no DOM/Phaser requirement at load time. */
 (function(root,factory){
  const api=factory(); if(typeof module==='object'&&module.exports)module.exports=api;
@@ -19,7 +19,7 @@
   const values=raw.values.map((v,i)=>{if(!Number.isInteger(v)||(v!==MASK&&(v<0||v>255)))throw Error('Invalid cell '+i);return v});
   const s=raw.settings||{},n=(k,d)=>Number.isFinite(s[k])?clamp(s[k],0,100):d;
   return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:String(raw.name||'CRAFTED FIELD').slice(0,48),values,
-   settings:{mode:s.mode==='a'?'a':'ab',palette:palettes[s.palette]?s.palette:'flame',texture:s.texture==='leaf'?'leaf':'flat',population:Number.isFinite(s.population)?Math.round(clamp(s.population,200,6000)):1200,swirl:n('swirl',26),momentum:n('momentum',62),light:n('light',62)}};
+   settings:{mode:s.mode==='a'?'a':'ab',palette:palettes[s.palette]?s.palette:'flame',texture:s.texture==='leaf'?'leaf':'flat',population:Number.isFinite(s.population)?Math.round(clamp(s.population,200,6000)):1200,delivery:['aura','projectile','placed'].includes(s.delivery)?s.delivery:'aura',swirl:n('swirl',26),momentum:n('momentum',62),light:n('light',62)}};
  }
  function read(storage){try{const v=storage?.getItem(SAVE_KEY);return v?normalize(JSON.parse(v)):normalize(starter())}catch(_){return normalize(starter())}}
  function fromForge(storage){const x=storage?.getItem(SOURCE_KEY);if(!x)throw Error('No saved field. Save one in Agent Field or import JSON.');return normalize(JSON.parse(x))}
@@ -49,12 +49,24 @@
   const th=Math.random()*TAU,v=.7+Math.random()*1.2;
   return {x,y,vx:Math.cos(th)*v,vy:Math.sin(th)*v,seed:Math.random()*TAU,progress:0};
  }
- function start(scene,recipe,healLinked=true){
+ function start(scene,recipe,healLinked=true,target=null){
   if(scene.craftedAura)return false;
   const cfg=normalize(recipe),starts=[],hi=Math.max(0,...cfg.values);
   for(let i=0;i<1024;i++)if(cfg.values[i]>=Math.max(0,hi-50))starts.push(i);
-  const now=scene.time.now;
-  const st={recipe:cfg,starts,agents:[],born:now,expires:now+14000,nextHeal:now+3000,healLinked:!!healLinked,lastHits:new Map(),healFX:[],pulses:0,collisions:0};
+  const now=scene.time.now,delivery=cfg.settings.delivery,p=scene.player,aim=scene.aim||{x:1,y:0};
+  const wanted=target&&Number.isFinite(target.x)&&Number.isFinite(target.y)?target:{x:p.x+aim.x*420,y:p.y+aim.y*420};
+  const dx=wanted.x-p.x,dy=wanted.y-p.y,len=Math.hypot(dx,dy);
+  const ux=len>12?dx/len:aim.x,uy=len>12?dy/len:aim.y;
+  const reach=Math.min(520,Math.max(80,len));
+  // Only the delivery anchor moves. The painted field remains untouched.
+  const center=delivery==='aura'?{x:p.x,y:p.y}:delivery==='placed'?
+   {x:clamp(wanted.x,-780,1740),y:clamp(wanted.y,-500,1100)}:
+   {x:p.x+ux*22,y:p.y+uy*22};
+  const dest={x:clamp(p.x+ux*reach,-780,1740),y:clamp(p.y+uy*reach,-500,1100)};
+  const duration=delivery==='aura'?14000:delivery==='placed'?9000:5300;
+  const st={recipe:cfg,starts,agents:[],born:now,expires:now+duration,nextHeal:now+3000,
+   healLinked:!!healLinked,lastHits:new Map(),healFX:[],pulses:0,collisions:0,
+   delivery,center,dest,arrived:delivery!=='projectile',scale:delivery==='projectile'?174:delivery==='placed'?260:290};
   const limit=Math.min(360,Math.max(130,Math.round(cfg.settings.population*.18)));
   for(let i=0;i<limit;i++)st.agents.push(makeAgent(st));
   scene.craftedAura=st;return true;
@@ -64,6 +76,13 @@
   const st=scene.craftedAura;if(!st)return;
   if(time>=st.expires){stop(scene);return}
   const cfg=st.recipe.settings,vals=st.recipe.values,dt=clamp(delta/16.667,0,2),swirl=cfg.swirl/100,momentum=cfg.momentum/100;
+  if(st.delivery==='aura'){st.center.x=scene.player.x;st.center.y=scene.player.y}
+  else if(st.delivery==='projectile'&&!st.arrived){
+   const dx=st.dest.x-st.center.x,dy=st.dest.y-st.center.y,d=Math.hypot(dx,dy);
+   const travel=Math.min(d,410*clamp(delta,0,50)/1000);
+   if(d<1||travel>=d){st.center.x=st.dest.x;st.center.y=st.dest.y;st.arrived=true}
+   else {st.center.x+=dx/d*travel;st.center.y+=dy/d*travel}
+  }
   for(let i=0;i<st.agents.length;i++){
    const a=st.agents[i],v=sample(vals,a.x,a.y);
    if(v===null){a.vx*=Math.pow(.997,dt);a.vy*=Math.pow(.997,dt)}
@@ -90,15 +109,29 @@
    if(scene.rings&&scene.rings.length>36)scene.rings.shift();
   }
   st.healFX=st.healFX.filter(p=>time-p.born<600);
+  const center=st.center,scale=st.scale;
   if(Combat?.hitEnemy&&scene.combat?.enemies){
-   const p=scene.player;
    for(const e of scene.combat.enemies){
     if(!e.alive||time<(st.lastHits.get(e.id)||0)+480)continue;
-    const pos=e.body?.position;if(!pos||Math.hypot(pos.x-p.x,pos.y-p.y)>225)continue;
+    const pos=e.body?.position;if(!pos||Math.hypot(pos.x-center.x,pos.y-center.y)>scale*.76+e.r)continue;
     for(const a of st.agents){
-     const x=p.x+(a.x-.5)*290,y=p.y+(a.y-.5)*290;
+     const x=center.x+(a.x-.5)*scale,y=center.y+(a.y-.5)*scale;
      if(Math.hypot(x-pos.x,y-pos.y)<(e.r||18)+3){
       Combat.hitEnemy(scene,e,5,'crafted-field');st.lastHits.set(e.id,time);st.collisions++;break;
+     }
+    }
+   }
+  }
+  // Existing fracture physics, no per-particle Matter bodies.
+  if(Combat?.damagePillar&&scene.combat?.pillars){
+   for(const rock of scene.combat.pillars){
+    const key='stone:'+rock.id,pos=rock.body?.position;
+    if(!rock.alive||!pos||time<(st.lastHits.get(key)||0)+520||
+       Math.hypot(pos.x-center.x,pos.y-center.y)>scale*.76+rock.r)continue;
+    for(const a of st.agents){
+     const x=center.x+(a.x-.5)*scale,y=center.y+(a.y-.5)*scale;
+     if(Math.hypot(x-pos.x,y-pos.y)<rock.r+3){
+      Combat.damagePillar(scene,rock,7,'crafted-field');st.lastHits.set(key,time);st.collisions++;break;
      }
     }
    }
@@ -107,9 +140,9 @@
  function hex(g,x,y,r){const pts=[];for(let i=0;i<6;i++){const th=i*TAU/6+Math.PI/6;pts.push({x:x+Math.cos(th)*r,y:y+Math.sin(th)*r})}g.fillPoints(pts,true)}
  function draw(scene,g,time){
   const st=scene.craftedAura;if(!st)return;
-  const p=scene.player,cfg=st.recipe.settings,colors=palettes[cfg.palette],alpha=.29+cfg.light/100*.46;
+  const p=st.center,cfg=st.recipe.settings,colors=palettes[cfg.palette],alpha=.29+cfg.light/100*.46;
   for(const a of st.agents){
-   const x=p.x+(a.x-.5)*290,y=p.y+(a.y-.5)*290,t=cfg.mode==='ab'?a.progress:.44;
+   const x=p.x+(a.x-.5)*st.scale,y=p.y+(a.y-.5)*st.scale,t=cfg.mode==='ab'?a.progress:.44;
    const c=t<.5?colors[0].map((v,j)=>lerp(v,colors[1][j],t*2)):colors[1].map((v,j)=>lerp(v,colors[2][j],(t-.5)*2));
    const col=(Math.round(c[0])<<16)|(Math.round(c[1])<<8)|Math.round(c[2]);
    const r=Math.max(.8,(cfg.mode==='ab'?1.2+2*a.progress:2.5)+.25*Math.sin(time*.004+a.seed));
@@ -123,6 +156,6 @@
     g.fillStyle(i%2?0x8ce8b7:0xcfffe0,(1-q)*.9);hex(g,pulse.x+Math.cos(a)*r,pulse.y+Math.sin(a)*r,2.3*(1-q)+.4)}
   }
  }
- const snapshot=scene=>{const s=scene.craftedAura;return s?{active:true,name:s.recipe.name,agents:s.agents.length,healLinked:s.healLinked,pulses:s.pulses,collisions:s.collisions}:{active:false}};
+ const snapshot=scene=>{const s=scene.craftedAura;return s?{active:true,name:s.recipe.name,delivery:s.delivery,center:{...s.center},arrived:s.arrived,agents:s.agents.length,healLinked:s.healLinked,pulses:s.pulses,collisions:s.collisions}:{active:false}};
  return Object.freeze({SAVE_KEY,SOURCE_KEY,starter,normalize,read,fromForge,save,sample,start,stop,step,draw,snapshot});
 });
