@@ -1,4 +1,4 @@
-/* WRKMAN Arcane Lab 038 / World Emission
+/* WRKMAN Arcane Lab 039 / Solid World Impacts
  * Exactly the same 32x32 field physics as Agent Field. Casting transforms
  * coordinates into world space; it never steers individual agent velocities.
  * Game damage, durations, rendering budgets, and linked events are separate.
@@ -12,6 +12,8 @@
  'use strict';
  const Motion=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_PHYSICS:null;
  if(!Motion)throw Error('Canonical field physics 037 is missing');
+ const Impacts=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_IMPACTS:null;
+ if(!Impacts)throw Error('Field collision kernel 039 is missing');
  const N=32,MASK=-1,TAU=Math.PI*2,SAVE_KEY='wrkman-arcane-lab034-crafted-field-v1',SOURCE_KEY='wrkman-agent-field-v1';
  const palettes={arcane:[[92,139,244],[176,121,250],[223,193,255]],flame:[[208,65,39],[253,126,49],[255,213,105]],healing:[[66,184,144],[144,231,119],[240,235,149]],void:[[100,67,157],[179,72,199],[255,134,202]]};
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t;
@@ -49,13 +51,13 @@
   let x=0,y=0;for(const i of st.starts){x+=(i%N+.5)/N;y+=(Math.floor(i/N)+.5)/N}
   return {x:x/st.starts.length,y:y/st.starts.length};
  }
- function worldPosition(st,a,x=a.x,y=a.y){
+ function worldPosition(st,a,x=a.x,y=a.y,center=st.center){
   if(st.delivery==='world'){
    const dx=(x-st.spawnX)*st.worldW,dy=(y-st.spawnY)*st.worldH;
-   return {x:st.center.x+dx*st.right.x+dy*st.forward.x,
-           y:st.center.y+dx*st.right.y+dy*st.forward.y};
+   return {x:center.x+dx*st.right.x+dy*st.forward.x,
+           y:center.y+dx*st.right.y+dy*st.forward.y};
   }
-  return {x:st.center.x+(x-.5)*st.scale,y:st.center.y+(y-.5)*st.scale};
+  return {x:center.x+(x-.5)*st.scale,y:center.y+(y-.5)*st.scale};
  }
  function start(scene,recipe,healLinked=true,target=null){
   const cfg=normalize(recipe),starts=Motion.startingCells(cfg.values);
@@ -75,10 +77,10 @@
    {x:p.x+forward.x*30,y:p.y+forward.y*30};
   const duration=delivery==='world'?22000:delivery==='aura'?14000:9000;
   const st={recipe:cfg,starts,agents:[],born:now,expires:now+duration,nextHeal:now+3000,
-   healLinked:!!healLinked,lastHits:new Map(),healFX:[],pulses:0,collisions:0,
+   healLinked:!!healLinked,healFX:[],impactFX:[],pulses:0,collisions:0,consumed:0,targetPrev:new Map(),
    delivery,center,forward,right,scale:delivery==='placed'?260:290,
    worldW:360,worldH:500,motionTime:0,free:0,offscreen:0,spawnX:.5,spawnY:.5,
-   rendered:0,collisionInterval:100,nextContact:now,frames:0};
+   rendered:0,frames:0};
   const origin=spawnCenter(st);st.spawnX=origin.x;st.spawnY=origin.y;
   // Full requested population. There are no phantom agents replaced at
   // the draw budget. Every agent runs the original simulator each update.
@@ -92,7 +94,9 @@
   if(time>=st.expires){st.expired=true;return}
   const cfg=st.recipe.settings,dtSeconds=clamp(delta,0,50)/1000;
   st.motionTime+=dtSeconds;st.frames++;
+  const previousCenter={...st.center};
   if(st.delivery==='aura'){st.center.x=scene.player.x;st.center.y=scene.player.y}
+  for(const agent of st.agents){agent.prevX=agent.x;agent.prevY=agent.y}
   const stats=Motion.stepSwarm(st.agents,st.recipe.values,cfg,dtSeconds,st.worldW,st.worldH,st.motionTime);
   st.free=stats.free;st.offscreen=stats.offscreen;
   // Open-boundary agents are never recycled. Short-lived trails are only
@@ -110,40 +114,7 @@
    if(scene.rings&&scene.rings.length>36)scene.rings.shift();
   }
   st.healFX=st.healFX.filter(p=>time-p.born<600);
-  // Throttle collisions as a GAME concern only. Every simulated particle
-  // remains eligible. One contact per target per cooldown, no Matter body
-  // allocation for each hex.
-  if(time<st.nextContact||!Combat)return;
-  st.nextContact=time+st.collisionInterval;
-  const targets=[];
-  if(Combat.hitEnemy&&scene.combat?.enemies){
-   for(const e of scene.combat.enemies){
-    if(e.alive&&e.body?.position&&time>=(st.lastHits.get('e'+e.id)||0)+480)
-     targets.push({key:'e'+e.id,position:e.body.position,r:e.r||18,object:e,type:'enemy'});
-   }
-  }
-  if(Combat.damagePillar&&scene.combat?.pillars){
-   for(const rock of scene.combat.pillars){
-    if(rock.alive&&rock.body?.position&&time>=(st.lastHits.get('s'+rock.id)||0)+520)
-     targets.push({key:'s'+rock.id,position:rock.body.position,r:rock.r||29,object:rock,type:'stone'});
-   }
-  }
-  if(!targets.length)return;
-  const pending=targets.slice();
-  const useCull=st.delivery!=='world',margin=st.scale*.8;
-  for(let i=0;i<st.agents.length&&pending.length;i++){
-   const a=st.agents[i];
-   const pt=worldPosition(st,a);
-   for(let j=pending.length-1;j>=0;j--){
-    const t=pending[j],pos=t.position,reach=t.r+3;
-    if(useCull&&(Math.abs(pos.x-st.center.x)>margin+t.r||Math.abs(pos.y-st.center.y)>margin+t.r))continue;
-    const dx=pt.x-pos.x,dy=pt.y-pos.y;
-    if(Math.abs(dx)>reach||Math.abs(dy)>reach||dx*dx+dy*dy>reach*reach)continue;
-    if(t.type==='enemy')Combat.hitEnemy(scene,t.object,5,'crafted-field');
-    else Combat.damagePillar(scene,t.object,7,'crafted-field');
-    st.lastHits.set(t.key,time);st.collisions++;pending.splice(j,1);
-   }
-  }
+  Impacts.process(scene,st,time,Combat,previousCenter,worldPosition);
  }
  function step(scene,time,delta,Combat){
   if(scene.craftedAura){stepOne(scene,scene.craftedAura,time,delta,Combat);
@@ -202,6 +173,11 @@
    visible++;
   }
   st.rendered=visible;
+  for(const impact of st.impactFX){
+   const t=clamp((time-impact.born)/300,0,1);
+   g.lineStyle(1.8,impact.color,(1-t)*.78);
+   g.strokeCircle(impact.x,impact.y,2+t*14);
+  }
   for(const pulse of st.healFX){
    const q=clamp((time-pulse.born)/600,0,1);
    g.lineStyle(2.2,0x82e9b0,(1-q)*.8);g.strokeCircle(pulse.x,pulse.y,15+q*58);
@@ -222,7 +198,7 @@
    rendered:active.reduce((n,c)=>n+c.rendered,0),
    renderBudget:active.reduce((n,c)=>n+c.recipe.settings.renderLimit,0),
    healLinked:active.some(c=>c.healLinked),pulses:active.reduce((n,c)=>n+c.pulses,0),
-   collisions:active.reduce((n,c)=>n+c.collisions,0),free:active.reduce((n,c)=>n+c.free,0),
+   collisions:active.reduce((n,c)=>n+c.collisions,0),consumed:active.reduce((n,c)=>n+c.consumed,0),free:active.reduce((n,c)=>n+c.free,0),
    offscreen:active.reduce((n,c)=>n+c.offscreen,0),physics:Motion.VERSION,
    spawn:{x:s.spawnX,y:s.spawnY},direction:{...s.forward}
   };
