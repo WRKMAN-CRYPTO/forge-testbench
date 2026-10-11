@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 036 / in-game Spell Forge with spell delivery
+/* WRKMAN ARCANE LAB 037 / in-game Spell Forge with canonical preview
  * Field geometry remains the same portable WRKMAN_AGENT_FIELD_V1 recipe.
  * Editor and spell library never require Phaser; the game supplies pause/equip hooks.
  */
@@ -9,6 +9,8 @@
  else if(root)root.WRKMAN_SPELL_FORGE=api;
 })(typeof globalThis==='object'?globalThis:null,function(){
  'use strict';
+ const Motion=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_PHYSICS:null;
+ if(!Motion)throw Error('Shared field physics 037 missing');
  const KEY='wrkman-arcane-lab035-spell-library-v1',N=32,TAU=Math.PI*2,MAX_SPELLS=24;
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
  const $=(id)=>document.getElementById(id);
@@ -38,7 +40,7 @@
   const find=()=>library.items.find(i=>i.id===library.selected)||library.items[0];
   const saveLibrary=()=>{try{storage.setItem(KEY,JSON.stringify(library));return true}catch(_){return false}};
   let item=find(),draft=clone(item.recipe),heal=item.heal,dirty=false,brush='white',brushRadius=1,gray=128;
-  let undo=[],activePointer=null,dragStart=null,painting=false,particles=[],prevFrame=0,rafId=0,opened=false;
+  let undo=[],activePointer=null,dragStart=null,painting=false,particles=[],previewStarts=[],previewClock=0,prevFrame=0,rafId=0,opened=false;
   const style=document.createElement('style');style.textContent=`
 #forgeOverlay[hidden]{display:none!important}#forgeOverlay{position:fixed;inset:0;z-index:90;background:#030911f2;color:#f6ead2;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;font:13px/1.35 system-ui,-apple-system,sans-serif}
 #forgeOverlay *,#forgeOverlay *:before{box-sizing:border-box}#forgeOverlay button,#forgeOverlay select,#forgeOverlay input{font:inherit}#forgeOverlay button{cursor:pointer;touch-action:manipulation}
@@ -71,7 +73,7 @@
   document.head.append(style);
   const overlay=document.createElement('div');overlay.id='forgeOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','sfHeading');
   overlay.innerHTML=`<div class="sf-shell">
-   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>036 · SHAPE + DELIVERY</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
+   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>037 · SHARED PHYSICS</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
    <div class="sf-grid">
     <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><canvas id="sfMap" width="320" height="320" class="sf-canvas" aria-label="32 by 32 instruction field; drag to draw"></canvas>
      <div class="sf-tools" id="sfTools"><button data-brush="white" class="active" title="White, high instruction value">⬜</button><button data-brush="gray" title="Gray, adjustable value">◧</button><button data-brush="black" title="Black, low instruction value">⬛</button><button data-brush="mask" title="Magenta, no instruction">🟪</button><button data-brush="line" title="Drag a white-to-black gradient line">↘</button></div>
@@ -79,7 +81,7 @@
      <div class="sf-actions"><button id="sfUndo">↶ UNDO</button><button id="sfClear">CLEAR TO MAGENTA</button><button id="sfRing">◯ RING STARTER</button><button id="sfCurtain">☷ CURTAIN STARTER</button></div>
      <div class="sf-caption">White starts · gray guides · black sinks · magenta releases. Gradient tool: drag a line from white toward black.</div>
     </section>
-    <section class="sf-box"><h3>02 / SHAPE & LINK</h3><canvas id="sfPreview" width="300" height="300" class="sf-preview" aria-label="Animated preview of the field"></canvas>
+    <section class="sf-box"><h3>02 / SHAPE & LINK</h3><canvas id="sfPreview" width="300" height="300" class="sf-preview" aria-label="Animated preview of the field"></canvas><div class="sf-flex"><span class="sf-caption" id="sfPreviewMeta">PHYSICS 037 · 140 AGENTS</span><button id="sfReseed" type="button">↻ RESEED PREVIEW</button></div>
      <label>SPELL NAME <input id="sfName" maxlength="48" autocomplete="off" spellcheck="false" placeholder="Name your creation"></label>
      <div class="sf-flex"><label>PALETTE<select id="sfPalette"><option value="flame">🔥 FLAME</option><option value="arcane">✦ ARCANE</option><option value="healing">♥ HEALING</option><option value="void">◈ VOID</option></select></label><label>MATERIAL<select id="sfTexture"><option value="flat">⬡ FLAT HEX</option><option value="leaf">🍃 LEAF</option></select></label></div>
      <label>DELIVERY<select id="sfDelivery"><option value="aura">◯ AURA · FOLLOW ME</option><option value="projectile">➤ PROJECTILE · FLY TOWARD AIM</option><option value="placed">⌖ PLACED FIELD · TAP LOCATION</option></select></label>
@@ -118,10 +120,49 @@
   function storeDraft(){draft=engine.normalize(draft);item.recipe=clone(draft);item.heal=heal;dirty=false;const good=saveLibrary();$('sfDirty').textContent=good?'SAVED':'SESSION';$('sfDirty').style.color=good?'#9be6b7':'#ffd89b';refreshLibrary();return good}
   function select(id){if(dirty)storeDraft();library.selected=id;item=find();draft=clone(item.recipe);heal=item.heal;undo=[];saveLibrary();refreshFields();refreshLibrary();status('Loaded '+item.recipe.name+'. Edit it or equip it.')}
   function add(recipe,label){if(library.items.length>=MAX_SPELLS){status('Library full: delete a spell before adding more.');return false}if(dirty)storeDraft();const entry={id:uid(),recipe:engine.normalize(recipe),heal:heal};library.items.push(entry);library.selected=entry.id;item=entry;draft=clone(entry.recipe);undo=[];dirty=false;saveLibrary();refreshLibrary();refreshFields();status(label||'New spell ready.');return true}
-  function resetParticles(){particles=[];prevFrame=0}
+  // Preview and world use the identical 32x32 interpreter. Lower preview
+  // population changes density, never steering, momentum or lifetimes.
+  function resetParticles(){
+   particles=[];previewStarts=Motion.startingCells(draft.values);
+   previewClock=0;prevFrame=0;
+   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · 140 AGENTS';
+  }
   const pals={flame:['#dc4329','#fc9135','#ffe0a3'],arcane:['#5d8ff4','#bd82ef','#f0d4ff'],healing:['#49c7a0','#aee989','#f4f2a2'],void:['#63449e','#b54acb','#ff90d1']};
-  function particle(){let starts=[];for(let i=0;i<1024;i++)if(draft.values[i]>=205)starts.push(i);const i=starts.length?starts[Math.floor(Math.random()*starts.length)]:Math.floor(Math.random()*1024);const a=Math.random()*TAU;return {x:(i%N+.1+Math.random()*.8)/N,y:(Math.floor(i/N)+.1+Math.random()*.8)/N,vx:Math.cos(a)*.0017,vy:Math.sin(a)*.0017,phase:Math.random()*TAU}}
-  function tick(now){if(!opened)return;const dt=clamp((now-(prevFrame||now))/16.667,.25,2);prevFrame=now;pc.fillStyle='#081724';pc.fillRect(0,0,300,300);pc.strokeStyle='#34535d88';pc.lineWidth=1;pc.beginPath();pc.arc(150,150,123,0,TAU);pc.stroke();const s=draft.settings,cols=pals[s.palette]||pals.flame;while(particles.length<140)particles.push(particle());for(const a of particles){const x=a.x,y=a.y,eps=.018,sample=engine.sample;const center=sample(draft.values,x,y);if(center!==null){const left=sample(draft.values,x-eps,y),right=sample(draft.values,x+eps,y),top=sample(draft.values,x,y-eps),bottom=sample(draft.values,x,y+eps);let gx=(right??center)-(left??center),gy=(bottom??center)-(top??center),l=Math.hypot(gx,gy)||1;const swirl=s.swirl/100,guide=.00017;const cx=-gx/l,cy=-gy/l;a.vx+=(cx-cy*swirl)*guide*dt;a.vy+=(cy+cx*swirl)*guide*dt;}const drag=.91+s.momentum*.00085;a.vx*=Math.pow(drag,dt);a.vy*=Math.pow(drag,dt);a.x+=a.vx*dt;a.y+=a.vy*dt;if(a.x<-.16||a.x>1.16||a.y<-.16||a.y>1.16)Object.assign(a,particle());let t=clamp(1-(center??128)/255,0,1);pc.fillStyle=cols[t<.34?0:t<.7?1:2];pc.globalAlpha=.35+.45*s.light/100;pc.beginPath();const px=a.x*300,py=a.y*300,rad=s.texture==='leaf'?2.4:2;if(s.texture==='leaf'){pc.ellipse(px,py,rad*1.2,rad*.55,Math.atan2(a.vy,a.vx),0,TAU)}else{for(let n=0;n<6;n++){const th=n*TAU/6;const xx=px+Math.cos(th)*rad,yy=py+Math.sin(th)*rad;if(n===0)pc.moveTo(xx,yy);else pc.lineTo(xx,yy)}pc.closePath()}pc.fill()}pc.globalAlpha=1;rafId=requestAnimationFrame(tick)}
+  function tick(now){
+   if(!opened)return;
+   const dt=prevFrame?clamp((now-prevFrame)/1000,0,.05):1/60;
+   prevFrame=now;previewClock+=dt;
+   const cfg=draft.settings,colors=pals[cfg.palette]||pals.flame;
+   const total=140;
+   while(particles.length<total)particles.push(Motion.spawn(draft.values,previewStarts));
+   const stats=Motion.stepSwarm(particles,draft.values,cfg,dt,360,500,previewClock);
+   pc.fillStyle='#081724';pc.fillRect(0,0,300,300);
+   pc.strokeStyle='#34535d88';pc.lineWidth=1;pc.beginPath();pc.arc(150,150,123,0,TAU);pc.stroke();
+   for(const a of particles){
+    // Don't recycle travelers; pixels that escape remain alive offscreen.
+    if(a.x<-.08||a.x>1.08||a.y<-.08||a.y>1.08)continue;
+    const sampled=Motion.sample(draft.values,a.x,a.y);
+    const t=clamp(a.progress||0,0,1),shade=cfg.mode==='ab'?t:.44;
+    pc.fillStyle=colors[shade<.34?0:shade<.7?1:2];
+    pc.globalAlpha=.35+.45*cfg.light/100;
+    pc.beginPath();
+    const px=a.x*300,py=a.y*300,rad=cfg.texture==='leaf'?2.4:2;
+    if(cfg.texture==='leaf'){
+     pc.ellipse(px,py,rad*1.2,rad*.55,Math.atan2(a.vy,a.vx),0,TAU);
+    }else{
+     for(let i=0;i<6;i++){
+      const th=i*TAU/6,xx=px+Math.cos(th)*rad,yy=py+Math.sin(th)*rad;
+      if(i===0)pc.moveTo(xx,yy);else pc.lineTo(xx,yy);
+     }
+     pc.closePath();
+    }
+    pc.fill();
+   }
+   pc.globalAlpha=1;
+   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+stats.offscreen+' OFFSCREEN / '+total;
+   rafId=requestAnimationFrame(tick);
+  }
+  $('sfReseed').addEventListener('click',()=>{resetParticles();status('Fresh agents seeded. Same field laws, new starting conditions.')});
   $('sfTools').addEventListener('click',e=>{const b=e.target.closest('button[data-brush]');if(!b)return;brush=b.dataset.brush;for(const n of $('sfTools').querySelectorAll('button'))n.classList.toggle('active',n===b)});
   $('sfGray').addEventListener('input',e=>{gray=Number(e.target.value);$('sfGrayVal').textContent=gray});
   $('sfRadius').addEventListener('input',e=>{brushRadius=Number(e.target.value);$('sfRadiusVal').textContent=brushRadius});
