@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a1019">
+<title>WRKMAN | Agent Field Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#0a1019;--panel:#121f2c;--panel2:#172a39;--line:#334b58;--text:#edf7f4;--muted:#a0b8bd;--mint:#aff5b4;--pink:#ff00ff}
+*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;background:radial-gradient(ellipse at top,#163037,var(--bg) 68%);min-height:100svh}button,select,input{font:inherit}button{cursor:pointer;touch-action:manipulation}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+main{max-width:1190px;margin:auto;padding:16px 13px calc(25px + env(safe-area-inset-bottom))}header{display:flex;align-items:center;gap:11px;margin-bottom:13px}.mark{width:44px;height:44px;border:2px solid var(--mint);border-radius:11px;display:grid;place-items:center;color:var(--mint);font-size:25px;font-weight:950}.brand{font-size:10px;letter-spacing:2px;font-weight:850;color:var(--mint)}h1{font-size:clamp(25px,5vw,36px);line-height:1.1;margin:2px 0;font-weight:920;letter-spacing:.4px}.version{margin-left:auto;font-size:11px;letter-spacing:1px;border:1px solid var(--line);padding:6px 9px;border-radius:100px;color:var(--muted)}.intro{font-size:12px;color:var(--muted);line-height:1.55;margin:0 0 13px}
+.layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.9fr);gap:13px}.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;overflow:hidden;min-width:0}.heading{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;gap:10px;border-bottom:1px solid #263b49}.kicker{font-size:10px;letter-spacing:1.4px;font-weight:850;color:var(--mint)}.caption{font-size:10px;color:var(--muted)}.stage{position:relative;height:clamp(340px,63svh,665px);background:#080f19;touch-action:pan-y;overflow:hidden}.stage canvas{display:block;width:100%;height:100%}.hint{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);pointer-events:none;background:#07121ad9;border:1px solid #344753;border-radius:99px;padding:6px 10px;font-size:10px;color:#c2d5d9;white-space:nowrap}.stats{display:flex;justify-content:space-around;gap:7px;padding:9px;border-top:1px solid #2b404a;background:#0d1923}.stat{text-align:center;flex:1}.stat b{font-size:17px;font-variant-numeric:tabular-nums}.stat small{display:block;text-transform:uppercase;letter-spacing:1px;font-size:9px;color:var(--muted)}.actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:10px}.btn{border:1px solid #405767;background:#1e3341;padding:10px 7px;border-radius:9px;font-size:11px;font-weight:800;color:var(--text)}.btn.primary{background:var(--mint);border-color:var(--mint);color:#102117}.btn.pressed{background:#314f47;border-color:var(--mint);color:var(--mint)}.btn:disabled{opacity:.45}.log{color:var(--muted);font-size:11px;line-height:1.5;padding:0 12px 12px;min-height:26px}
+.editor{padding:12px}.mini{font-size:10px;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted);font-weight:850;margin:3px 0 8px}.map-wrap{display:flex;justify-content:center}.map{display:block;width:min(100%,360px);aspect-ratio:1;image-rendering:pixelated;touch-action:none;border:1px solid #627785;background:#ff00ff;border-radius:5px}.legend{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin:9px 0 12px}.legend span{display:inline-flex;align-items:center;gap:5px}.swatch{width:11px;height:11px;border:1px solid #adb9bc55;display:inline-block;border-radius:2px}.brushes{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:9px}.brush{height:39px;border:1px solid #647581;background:#182833;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:850;color:#c7d4d3}.brush.active{outline:2px solid var(--mint);outline-offset:1px}.dot-swatch{width:18px;height:18px;border-radius:4px;border:1px solid #d4d4d46e}.brush.magenta{background:#451546}.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}.control{margin:11px 0}.control-head{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:750;gap:10px;margin-bottom:4px}.control output{color:var(--mint);font-variant-numeric:tabular-nums}input[type=range]{width:100%;accent-color:var(--mint);height:28px;margin:0}select{border:1px solid #405767;border-radius:8px;background:#182a37;color:var(--text);padding:10px 8px;width:100%;min-width:0}.subactions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}.subactions .btn{min-height:39px}.import{display:none}.note{font-size:11px;color:var(--muted);margin:9px 0;line-height:1.55}.footer{font-size:11px;color:#8aa8ad;margin-top:13px;line-height:1.6}.footer strong{color:#c7eacc}
+@media(max-width:790px){.layout{grid-template-columns:1fr}.stage{height:clamp(340px,57svh,590px)}main{max-width:520px}.map{width:min(100%,345px)}}
+@media(prefers-reduced-motion:reduce){.stage{scroll-behavior:auto}}
+</style>
+</head>
+<body><main>
+<header><div class="mark">W</div><div><div class="brand">WRKMAN LABS / BEHAVIOR FIELD 01</div><h1>AGENT·FIELD</h1></div><span class="version">v0.1</span></header>
+<p class="intro">Programmable magic, not painted animation. A 32 × 32 field guides a moving population of hexagonal rendering agents. White starts the journey, black ends it, and magenta means no instructions.</p>
+<div class="layout">
+  <section class="card">
+    <div class="heading"><span class="kicker">LIVE HEX SWARM</span><span class="caption" id="stageLabel">GRAVITY WELL</span></div>
+    <div class="stage" id="stage"><canvas id="view" aria-label="Animated hexagonal agents following a behavior map"></canvas><div class="hint">Canvas is the result. Paint instructions on the map →</div></div>
+    <div class="stats"><div class="stat"><b id="countStat">0</b><small>agents</small></div><div class="stat"><b id="fpsStat">0</b><small>FPS</small></div><div class="stat"><b id="freeStat">0</b><small>free-space agents</small></div><div class="stat"><b id="arrivedStat">0</b><small>near finish</small></div></div>
+    <div class="actions">
+      <button class="btn primary" id="release">↻ RESEED</button>
+      <button class="btn" id="pause">Ⅱ PAUSE</button>
+      <button class="btn" id="overlay" aria-pressed="false">▦ SHOW FIELD</button>
+    </div>
+    <div class="log" id="status">Agents search for lower grayscale values. Pink regions do not steer them.</div>
+  </section>
+  <section class="card"><div class="heading"><span class="kicker">32 × 32 FIELD EDITOR</span><span class="caption">1,024 programmable cells</span></div><div class="editor">
+    <div class="map-wrap"><canvas id="map" class="map" width="320" height="320" aria-label="Paintable grayscale behavior map"></canvas></div>
+    <div class="legend"><span><i class="swatch" style="background:#fff"></i>255 START</span><span><i class="swatch" style="background:#555"></i>TRANSIT</span><span><i class="swatch" style="background:#000"></i>0 FINISH</span><span><i class="swatch" style="background:#ff00ff"></i>FF00FF FREE</span></div>
+    <div class="mini">Paint behavior values</div>
+    <div class="brushes" id="brushes">
+      <button class="brush active" data-value="255" title="White / start"><span class="dot-swatch" style="background:white"></span></button>
+      <button class="brush" data-value="192" title="192"><span class="dot-swatch" style="background:#c0c0c0"></span></button>
+      <button class="brush" data-value="128" title="128"><span class="dot-swatch" style="background:#808080"></span></button>
+      <button class="brush" data-value="64" title="64"><span class="dot-swatch" style="background:#404040"></span></button>
+      <button class="brush" data-value="0" title="Black / finish"><span class="dot-swatch" style="background:#000"></span></button>
+      <button class="brush magenta" data-value="-1" title="FF00FF / no field"><span class="dot-swatch" style="background:#ff00ff"></span></button>
+    </div>
+    <div class="two">
+      <div class="control" style="margin:0"><div class="control-head"><label for="value">Exact value</label><output id="valueOut">255</output></div><input id="value" type="range" min="0" max="255" value="255"></div>
+      <div class="control" style="margin:0"><div class="control-head"><label for="brushSize">Brush radius</label><output id="brushOut">1</output></div><input id="brushSize" type="range" min="1" max="5" value="1"></div>
+    </div>
+    <div class="mini" style="margin-top:13px">Field generator</div>
+    <div class="two"><select id="preset" aria-label="Field generator preset"><option value="well">GRAVITY WELL</option><option value="spiral">SPIRAL GATE</option><option value="gap">MAGENTA GAP</option><option value="sigil">SIGIL CIRCUIT</option><option value="blank">BLANK / FREE</option></select><button class="btn primary" id="generate">✦ GENERATE</button></div>
+    <div class="mini" style="margin-top:13px">Agent interpretation</div>
+    <div class="two"><select id="mode" aria-label="Field interpretation"><option value="a">A: FOLLOW FIELD</option><option value="ab">A+B: FIELD + BEHAVIOR</option></select><select id="palette" aria-label="Magic palette"><option value="arcane">ARCANE</option><option value="flame">FLAME</option><option value="healing">HEALING</option><option value="void">VOID</option></select></div>
+    <div class="two" style="margin-top:8px"><div class="control"><div class="control-head"><label for="population">Population</label><output id="populationOut">1,200</output></div><input id="population" type="range" min="200" max="6000" step="200" value="1200"></div><div class="control"><div class="control-head"><label for="swirl">Swirl</label><output id="swirlOut">26%</output></div><input id="swirl" type="range" min="0" max="100" value="26"></div></div>
+    <div class="two"><div class="control"><div class="control-head"><label for="momentum">Momentum</label><output id="momentumOut">62%</output></div><input id="momentum" type="range" min="0" max="100" value="62"></div><div class="control"><div class="control-head"><label for="light">Light budget</label><output id="lightOut">62%</output></div><input id="light" type="range" min="0" max="100" value="62"></div></div>
+    <div class="mini">Save your spell instructions</div>
+    <div class="subactions"><button class="btn" id="save">↧ SAVE LOCALLY</button><button class="btn" id="load">↥ LOAD SAVED</button><button class="btn" id="export">⇩ EXPORT JSON</button><button class="btn" id="importBtn">⇧ IMPORT JSON/PNG</button></div><input class="import" id="importFile" type="file" accept=".json,.png,image/png,application/json">
+    <p class="note">Magenta is truly instruction-free: an agent keeps moving under its own momentum and may enter another grayscale island. No pink is drawn into the spell. In A+B mode the grayscale progression also changes hex size, color, and speed.</p>
+  </div></section>
+</div>
+<p class="footer"><strong>Architecture:</strong> This field is a control surface, not a sprite. The visible spell is composed of moving hex agents. The editor and simulation share a portable 1,024-value map. Separate experimental lab, no roguelike integration.</p>
+</main>
+<script>
+(()=>{'use strict';
+const $=s=>document.querySelector(s), N=32, TOTAL=N*N, MASK=-1, TAU=Math.PI*2;
+const mapCanvas=$('#map'), mctx=mapCanvas.getContext('2d',{willReadFrequently:true}), canvas=$('#view'), ctx=canvas.getContext('2d'), stage=$('#stage');
+const S={field:new Int16Array(TOTAL),brush:255,brushSize:1,mode:'a',palette:'arcane',population:1200,swirl:26,momentum:62,light:62,agents:[],paused:false,overlay:false,last:0,time:0,fps:0,frame:0,freeCount:0,nearCount:0,startCells:[],maxValue:255,dragging:false,resizeTimer:0,name:'GRAVITY WELL',dirty:true,status:'',motionClock:0};
+const palette={arcane:[[92,139,244],[176,121,250],[223,193,255]],flame:[[208,65,39],[253,126,49],[255,213,105]],healing:[[66,184,144],[144,231,119],[240,235,149]],void:[[100,67,157],[179,72,199],[255,134,202]]};
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)), lerp=(a,b,t)=>a+(b-a)*t, smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t)}, rand=(a,b)=>a+Math.random()*(b-a);
+const choose=arr=>arr[(Math.random()*arr.length)|0];
+function setStatus(msg){S.status=msg;$('#status').textContent=msg}
+function toCell(cx,cy){return S.field[cy*N+cx]}
+function drawMap(){
+  const d=mctx.createImageData(N,N);
+  for(let i=0;i<TOTAL;i++){const v=S.field[i],k=i*4; if(v===MASK){d.data[k]=255;d.data[k+1]=0;d.data[k+2]=255}else{d.data[k]=v;d.data[k+1]=v;d.data[k+2]=v}d.data[k+3]=255}
+  const tiny=document.createElement('canvas');tiny.width=N;tiny.height=N;tiny.getContext('2d').putImageData(d,0,0);
+  mctx.imageSmoothingEnabled=false;mctx.clearRect(0,0,320,320);mctx.drawImage(tiny,0,0,320,320);
+  mctx.strokeStyle='#ffffff18';mctx.lineWidth=.5;for(let i=0;i<=N;i+=4){mctx.beginPath();mctx.moveTo(i*10,0);mctx.lineTo(i*10,320);mctx.moveTo(0,i*10);mctx.lineTo(320,i*10);mctx.stroke()}
+  S.dirty=false;
+}
+function preset(name){
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const dx=x-15.5,dy=y-15.5,d=Math.hypot(dx,dy);let v=MASK;
+    if(name==='well'){if(d<14.6)v=Math.round(clamp(d/14.6*255,0,255));}
+    else if(name==='spiral'){
+      const a=Math.atan2(dy,dx),r=d+.9*Math.sin(a*3+d*.75);if(d<14.6){v=Math.round(clamp(r/14.6*238,0,255));if(d<1.5)v=0;}
+    }else if(name==='gap'){
+      // A pair of islands: the first directs agents rightward; a 4-cell magenta gap separates them.
+      const inBand=y>7&&y<25; if(inBand&&x<14)v=Math.round(clamp(255-x*12,0,255));
+      if(inBand&&x>=18)v=Math.round(clamp(140-(x-18)*10.5,0,255));
+      if(inBand&&x>=28)v=0;
+    }else if(name==='sigil'){
+      if(d<14.7){const angle=Math.atan2(dy,dx), ring=Math.abs(d-10);
+        const radial=Math.abs(Math.sin(angle*6))*2;v=Math.round(clamp(Math.min(ring*32,Math.abs(d-5.2)*31+radial*3,d*15),0,255));
+        if(d<1.7)v=0;
+      }
+    }else{v=MASK}
+    S.field[y*N+x]=v;
+  }
+  const label={well:'GRAVITY WELL',spiral:'SPIRAL GATE',gap:'MAGENTA GAP',sigil:'SIGIL CIRCUIT',blank:'BLANK / FREE'};
+  S.name=label[name]||'CUSTOM FIELD';$('#stageLabel').textContent=S.name;
+  rebuildStartCells();drawMap();reseed();
+}
+function rebuildStartCells(){
+  S.startCells=[];let high=-1, valid=[];
+  for(let i=0;i<TOTAL;i++){let v=S.field[i];if(v>=0){valid.push(i);high=Math.max(high,v);}}
+  S.maxValue=high;
+  const threshold=Math.max(0,high-50);
+  for(const i of valid){if(S.field[i]>=threshold)S.startCells.push(i)}
+}
+function sampleField(nx,ny){
+  const cx=clamp(nx*N,0,N-.0001),cy=clamp(ny*N,0,N-.0001);
+  const i=Math.floor(cx),j=Math.floor(cy);
+  if(toCell(i,j)===MASK)return {valid:false,value:null};
+  // Mask takes precedence. Renormalize only over valid grayscale neighbors, never blend magenta into values.
+  const fx=cx-i,fy=cy-j;let sum=0,weight=0;
+  for(let oy=0;oy<=1;oy++)for(let ox=0;ox<=1;ox++){
+    const x=Math.min(N-1,i+ox),y=Math.min(N-1,j+oy),v=toCell(x,y);
+    if(v===MASK)continue;
+    const w=(ox?fx:1-fx)*(oy?fy:1-fy);sum+=v*w;weight+=w;
+  }
+  return {valid:true,value:weight?sum/weight:toCell(i,j)};
+}
+function gradient(nx,ny,value){
+  // Central differences never use masked neighbors to invent a gradient across empty space.
+  const e=0.72/N, a=sampleField(nx+e,ny), b=sampleField(nx-e,ny), c=sampleField(nx,ny+e), d=sampleField(nx,ny-e);
+  let gx=0,gy=0;
+  if(a.valid&&b.valid)gx=(a.value-b.value)*.5;
+  else if(a.valid)gx=a.value-value;
+  else if(b.valid)gx=value-b.value;
+  if(c.valid&&d.valid)gy=(c.value-d.value)*.5;
+  else if(c.valid)gy=c.value-value;
+  else if(d.valid)gy=value-d.value;
+  const len=Math.hypot(gx,gy);return len>0.00001?[-gx/len,-gy/len,len]:[0,0,0];
+}
+function mapPoint(i){const x=i%N,y=(i/N)|0;return {x:(x+rand(.1,.9))/N,y:(y+rand(.1,.9))/N}}
+function spawnAgent(i){let p;if(S.startCells.length){p=mapPoint(choose(S.startCells))}else{p={x:Math.random(),y:Math.random()}};
+  const angle=rand(0,TAU),speed=rand(.7,1.9);return {x:p.x,y:p.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,seed:Math.random()*TAU,home:i,phase:0,progress:0,free:false,tail:[],age:0};
+}
+function reseed(){S.agents=Array.from({length:S.population},(_,i)=>spawnAgent(i));S.time=0;S.frame=0;S.freeCount=0;S.nearCount=0;setStatus('Swarm reseeded. Follow the grayscale descent, or coast through magenta without instructions.');}
+function resize(){const r=stage.getBoundingClientRect(),w=Math.max(260,Math.round(r.width)),h=Math.max(300,Math.round(r.height));if(canvas.width===w&&canvas.height===h)return;canvas.width=w;canvas.height=h;}
+function update(dt){
+  S.time+=dt;S.frame++;const timeScale=clamp(dt*60,0,2), momentum=S.momentum/100, swirl=S.swirl/100;
+  let free=0,near=0;const leap=1000/60;
+  for(const a of S.agents){
+    a.age+=dt;
+    const here=sampleField(a.x,a.y);a.free=!here.valid;
+    if(!here.valid){free++;a.vx*=Math.pow(.997,timeScale);a.vy*=Math.pow(.997,timeScale);}
+    else{
+      const v=here.value,progress=clamp(1-v/255,0,1),[gx,gy,mag]=gradient(a.x,a.y,v);
+      a.progress=lerp(a.progress,progress,.15);
+      if(v<22)near++;
+      const curl=swirl*(.26+progress*.45),clock=S.time*(.7+progress*1.6);
+      const tangentX=-gy,tangentY=gx;
+      let ax=gx*.28+tangentX*curl+Math.cos(a.seed+clock)*(.012+.025*swirl);
+      let ay=gy*.28+tangentY*curl+Math.sin(a.seed+clock)*(.012+.025*swirl);
+      if(mag<.001){ // Local minimum: keep a small restless orbit, not a freeze frame.
+        const theta=a.seed+S.time*(1.1+.8*swirl);
+        ax+=Math.cos(theta)*(.012+.025*swirl);ay+=Math.sin(theta)*(.012+.025*swirl);
+      }
+      a.vx+=ax*timeScale; a.vy+=ay*timeScale;
+      // Damp guided motion, but allow useful momentum across disconnected regions.
+      const drag=.885+momentum*.095;
+      a.vx*=Math.pow(drag,timeScale);a.vy*=Math.pow(drag,timeScale);
+      const speedLimit=(S.mode==='ab'?1.8+2.2*(1-progress):3.2)+momentum*1.8;
+      const s=Math.hypot(a.vx,a.vy);if(s>speedLimit){a.vx*=speedLimit/s;a.vy*=speedLimit/s;}
+    }
+    a.x+=a.vx*timeScale/(canvas.width||360);a.y+=a.vy*timeScale/(canvas.height||500);
+    // Coordinates are normalized. Wrap only at true canvas edges, never at magenta.
+    if(a.x<0)a.x+=1; if(a.x>1)a.x-=1; if(a.y<0)a.y+=1; if(a.y>1)a.y-=1;
+    if(S.frame%3===0){a.tail.push([a.x,a.y]);if(a.tail.length>5)a.tail.shift();}
+  }
+  S.freeCount=free;S.nearCount=near;
+}
+function drawHex(x,y,r){ctx.beginPath();for(let k=0;k<6;k++){const ang=TAU*k/6+Math.PI/6;const xx=x+Math.cos(ang)*r,yy=y+Math.sin(ang)*r;k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);}ctx.closePath();}
+function draw(){
+  const w=canvas.width,h=canvas.height;ctx.fillStyle='#09111c';ctx.fillRect(0,0,w,h);
+  const bg=ctx.createRadialGradient(w*.5,h*.5,0,w*.5,h*.5,Math.max(w,h)*.72);
+  bg.addColorStop(0,'#182532');bg.addColorStop(1,'#09111c');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+  if(S.overlay){ctx.save();ctx.globalAlpha=.23;for(let y=0;y<N;y++)for(let x=0;x<N;x++){const v=toCell(x,y);ctx.fillStyle=v<0?'#ff00ff':`rgb(${v},${v},${v})`;ctx.fillRect(x/N*w,y/N*h,w/N+1,h/N+1);}ctx.restore();}
+  const colors=palette[S.palette],light=.14+S.light/100*.84;ctx.save();
+  for(const a of S.agents){
+    const p=clamp(a.progress,0,1), t=S.mode==='ab'?p:.44;
+    const c0=colors[0],c1=colors[1],c2=colors[2];const col=t<.5?c0.map((n,i)=>lerp(n,c1[i],t*2)):c1.map((n,i)=>lerp(n,c2[i],(t-.5)*2));
+    const r=(S.mode==='ab'?1.2+3.1*p:2.8)+(Math.sin(S.time*3.3+a.seed)*.28);
+    if(a.tail.length){ctx.beginPath();ctx.moveTo(a.tail[0][0]*w,a.tail[0][1]*h);for(let k=1;k<a.tail.length;k++)ctx.lineTo(a.tail[k][0]*w,a.tail[k][1]*h);ctx.strokeStyle=`rgba(${col.map(Math.round).join(',')},${(.075*light).toFixed(3)})`;ctx.lineWidth=r*.6;ctx.stroke();}
+    ctx.fillStyle=`rgba(${col.map(Math.round).join(',')},${(.18+light*.63).toFixed(3)})`;drawHex(a.x*w,a.y*h,r);ctx.fill();
+  }ctx.restore();
+}
+function updateUI(){if(S.frame%10!==0)return;$('#countStat').textContent=S.agents.length.toLocaleString();$('#fpsStat').textContent=Math.round(S.fps);$('#freeStat').textContent=S.freeCount.toLocaleString();$('#arrivedStat').textContent=S.nearCount.toLocaleString();}
+function tick(now){if(!S.last)S.last=now;const dt=Math.min((now-S.last)/1000,.06);S.last=now;
+  if(!S.paused)update(dt);S.fps=S.fps*.92+(dt?1/dt:60)*.08;draw();updateUI();requestAnimationFrame(tick);
+}
+function paintAt(e){const rect=mapCanvas.getBoundingClientRect(),col=Math.floor((e.clientX-rect.left)*N/rect.width),row=Math.floor((e.clientY-rect.top)*N/rect.height);if(col<0||col>=N||row<0||row>=N)return;
+  let modified=false;for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(Math.hypot(x-col,y-row)<S.brushSize-.1){const index=y*N+x;if(S.field[index]!==S.brush){S.field[index]=S.brush;modified=true;}}
+  if(modified){S.name='CUSTOM FIELD';$('#stageLabel').textContent=S.name;S.dirty=true;drawMap();rebuildStartCells();setStatus('Field edited. Moving agents read the new instructions immediately; RESEED to respawn at the new white starts.');}
+}
+for(const btn of document.querySelectorAll('.brush'))btn.addEventListener('click',()=>{S.brush=Number(btn.dataset.value);document.querySelectorAll('.brush').forEach(x=>x.classList.toggle('active',x===btn));$('#value').value=S.brush===-1?255:S.brush;$('#valueOut').textContent=S.brush===-1?'FREE':S.brush;});
+$('#value').addEventListener('input',e=>{S.brush=Number(e.target.value);$('#valueOut').textContent=S.brush;document.querySelectorAll('.brush').forEach(x=>x.classList.toggle('active',Number(x.dataset.value)===S.brush));});
+$('#brushSize').addEventListener('input',e=>{S.brushSize=Number(e.target.value);$('#brushOut').textContent=S.brushSize;});
+mapCanvas.addEventListener('pointerdown',e=>{e.preventDefault();S.dragging=true;mapCanvas.setPointerCapture?.(e.pointerId);paintAt(e)});
+mapCanvas.addEventListener('pointermove',e=>{if(S.dragging){e.preventDefault();paintAt(e)}});
+const stopPainting=()=>{S.dragging=false};mapCanvas.addEventListener('pointerup',stopPainting);mapCanvas.addEventListener('pointercancel',stopPainting);
+$('#generate').addEventListener('click',()=>preset($('#preset').value));$('#release').addEventListener('click',reseed);
+$('#pause').addEventListener('click',()=>{S.paused=!S.paused;$('#pause').textContent=S.paused?'▶ RESUME':'Ⅱ PAUSE';setStatus(S.paused?'Swarm paused. Field remains editable.':'Swarm resumed.');});
+$('#overlay').addEventListener('click',()=>{S.overlay=!S.overlay;$('#overlay').classList.toggle('pressed',S.overlay);$('#overlay').setAttribute('aria-pressed',String(S.overlay));$('#overlay').textContent=S.overlay?'▦ HIDE FIELD':'▦ SHOW FIELD';});
+for(const key of ['mode','palette'])$('#'+key).addEventListener('change',e=>{S[key]=e.target.value;});
+for(const key of ['population','swirl','momentum','light'])$('#'+key).addEventListener('input',e=>{S[key]=Number(e.target.value);$('#'+key+'Out').textContent=key==='population'?S[key].toLocaleString():S[key]+'%';if(key==='population')reseed();});
+function config(){return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:S.name,values:Array.from(S.field),settings:{mode:S.mode,palette:S.palette,population:S.population,swirl:S.swirl,momentum:S.momentum,light:S.light}};}
+function save(){try{localStorage.setItem('wrkman-agent-field-v1',JSON.stringify(config()));setStatus('Field and settings saved locally on this device.');}catch(e){setStatus('Local storage unavailable. EXPORT JSON instead.')}}
+function importConfig(obj){if(!obj||obj.width!==N||obj.height!==N||!Array.isArray(obj.values)||obj.values.length!==TOTAL)throw Error('Expected a 32 × 32 map containing 1,024 values.');
+  const next=new Int16Array(TOTAL);for(let i=0;i<TOTAL;i++){const v=obj.values[i];if(!Number.isInteger(v)||(v!==MASK&&(v<0||v>255)))throw Error('Invalid pixel at '+i);next[i]=v;}
+  S.field=next;S.name=typeof obj.name==='string'?obj.name.slice(0,48):'IMPORTED FIELD';
+  const settings=obj.settings||{};for(const k of ['mode','palette','population','swirl','momentum','light'])if(settings[k]!=null){if(k==='mode' && ['a','ab'].includes(settings[k]))S[k]=settings[k];else if(k==='palette'&&palette[settings[k]])S[k]=settings[k];else if(!['mode','palette'].includes(k)&&Number.isFinite(settings[k]))S[k]=clamp(Math.round(settings[k]),k==='population'?200:0,k==='population'?6000:100);}
+  $('#stageLabel').textContent=S.name;for(const key of ['mode','palette','population','swirl','momentum','light']){$('#'+key).value=S[key];if($('#'+key+'Out'))$('#'+key+'Out').textContent=key==='population'?S[key].toLocaleString():S[key]+'%';}
+  rebuildStartCells();drawMap();reseed();setStatus('Map imported. White is start, black is destination, and FF00FF remains no-instruction space.');
+}
+$('#save').addEventListener('click',save);
+$('#load').addEventListener('click',()=>{try{const s=localStorage.getItem('wrkman-agent-field-v1');if(!s){setStatus('No local field saved yet.');return;}importConfig(JSON.parse(s))}catch(e){setStatus('Unable to load: '+e.message)}});
+$('#export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(config(),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='WRKMAN-agent-field-32x32.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);setStatus('Exported portable 32×32 behavior map as JSON.');});
+$('#importBtn').addEventListener('click',()=>$('#importFile').click());
+$('#importFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{
+  if(f.type==='image/png'||/\.png$/i.test(f.name)){
+    const bmp=await createImageBitmap(f),c=document.createElement('canvas');c.width=N;c.height=N;const ct=c.getContext('2d');ct.imageSmoothingEnabled=false;ct.drawImage(bmp,0,0,N,N);const d=ct.getImageData(0,0,N,N).data;const values=[];
+    for(let i=0;i<TOTAL;i++){const k=i*4,r=d[k],g=d[k+1],b=d[k+2];values.push(r===255&&g===0&&b===255?MASK:Math.round(.2126*r+.7152*g+.0722*b));}if(bmp.close)bmp.close();importConfig({width:N,height:N,values,name:f.name});
+  }else importConfig(JSON.parse(await f.text()));
+ }catch(err){setStatus('Import failed: '+err.message)}finally{e.target.value=''}});
+window.addEventListener('resize',()=>{clearTimeout(S.resizeTimer);S.resizeTimer=setTimeout(resize,140)});
+resize();preset('well');requestAnimationFrame(tick);
+window.AgentFieldDiagnostics={getState:()=>({agents:S.agents.length,free:S.freeCount,near:S.nearCount,paused:S.paused,mode:S.mode,maskCells:Array.from(S.field).filter(v=>v<0).length,name:S.name,time:S.time}),sample:(x,y)=>sampleField(x,y),setPreset:preset,reseed,importConfig,getAgent:(i=0)=>({...S.agents[i]}),config};
+})();
+</script></body></html>
