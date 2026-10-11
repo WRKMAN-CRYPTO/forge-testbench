@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 038 / world-emission Spell Forge
+/* WRKMAN ARCANE LAB 040 / precision-map Spell Forge
  * Field geometry remains the same portable WRKMAN_AGENT_FIELD_V1 recipe.
  * Editor and spell library never require Phaser; the game supplies pause/equip hooks.
  */
@@ -11,6 +11,8 @@
  'use strict';
  const Motion=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_PHYSICS:null;
  if(!Motion)throw Error('Shared field physics 037 missing');
+ const Viewport=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_VIEWPORT:null;
+ if(!Viewport)throw Error('Precision field viewport 040 missing');
  const KEY='wrkman-arcane-lab035-spell-library-v1',N=32,TAU=Math.PI*2,MAX_SPELLS=24;
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
  const $=(id)=>document.getElementById(id);
@@ -41,6 +43,8 @@
   const saveLibrary=()=>{try{storage.setItem(KEY,JSON.stringify(library));return true}catch(_){return false}};
   let item=find(),draft=clone(item.recipe),heal=item.heal,dirty=false,brush='white',brushRadius=1,gray=128;
   let undo=[],activePointer=null,dragStart=null,painting=false,particles=[],previewStarts=[],previewClock=0,prevFrame=0,rafId=0,opened=false,previewPopulation=600,previewFrames=0;
+   const view=Viewport.create();let panMode=false,selectedCell={x:16,y:16},gesture=null,strokeBefore=null,strokeWasDirty=false,strokeChanged=false;
+   const pointers=new Map();
   const style=document.createElement('style');style.textContent=`
 #forgeOverlay[hidden]{display:none!important}#forgeOverlay{position:fixed;inset:0;z-index:90;background:#030911f2;color:#f6ead2;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;font:13px/1.35 system-ui,-apple-system,sans-serif}
 #forgeOverlay *,#forgeOverlay *:before{box-sizing:border-box}#forgeOverlay button,#forgeOverlay select,#forgeOverlay input{font:inherit}#forgeOverlay button{cursor:pointer;touch-action:manipulation}
@@ -54,6 +58,16 @@
 #forgeOverlay input,#forgeOverlay select{width:100%;min-width:0;border:1px solid #52707d;border-radius:7px;padding:7px;color:#f4f0e4;background:#162a38;outline-offset:2px}
 #forgeOverlay input[type=range]{padding:0;accent-color:#cfdb99}#forgeOverlay input[type=checkbox]{width:auto;accent-color:#bcd89b}
 #forgeOverlay .sf-canvas{width:100%;max-width:300px;aspect-ratio:1/1;display:block;margin:auto;background:#ff00ff;border-radius:6px;border:1px solid #697c81;image-rendering:pixelated;touch-action:none;cursor:crosshair}
+#forgeOverlay .sf-map-heading{display:flex;justify-content:space-between;gap:6px;align-items:center;font:800 11px/1.3 ui-monospace,monospace;color:#d9f1dc}
+#forgeOverlay .sf-map-heading strong{color:#ffe2aa}
+#forgeOverlay .sf-zoom{display:grid;grid-template-columns:43px 1fr 43px minmax(86px,1.1fr);gap:5px}
+#forgeOverlay .sf-zoom button{min-height:40px;padding:5px 3px;white-space:nowrap}
+#forgeOverlay .sf-precise{display:flex;gap:9px;align-items:stretch}
+#forgeOverlay .sf-overview{width:88px;height:88px;flex:0 0 88px;touch-action:manipulation;image-rendering:pixelated;background:#ff00ff;border:1px solid #829ca4;border-radius:5px;cursor:crosshair}
+#forgeOverlay .sf-nudge{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;flex:1}
+#forgeOverlay .sf-nudge button{min-height:40px;padding:3px;font:850 15px system-ui}
+#forgeOverlay .sf-nudge .sf-stamp{grid-column:span 2;font:800 10px system-ui;background:#746343;color:#fff0c3;border-color:#e0c18b}
+#forgeOverlay .sf-nudge .sf-empty{pointer-events:none;opacity:0}
 #forgeOverlay .sf-preview{width:100%;max-width:300px;aspect-ratio:360/500;display:block;margin:auto;background:#101822;border:1px solid #465967;border-radius:6px}
 #forgeOverlay .sf-tools{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
 #forgeOverlay .sf-tools button{padding:5px 1px;font-size:11px;min-height:32px}
@@ -73,9 +87,15 @@
   document.head.append(style);
   const overlay=document.createElement('div');overlay.id='forgeOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','sfHeading');
   overlay.innerHTML=`<div class="sf-shell">
-   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>038 · WORLD EMISSION</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
+   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>040 · PRECISION FORGE</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
    <div class="sf-grid">
-    <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><canvas id="sfMap" width="320" height="320" class="sf-canvas" aria-label="32 by 32 instruction field; drag to draw"></canvas>
+    <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><div class="sf-map-heading"><span id="sfMapCoords">CELL 16,16 · MAGENTA</span><strong id="sfZoomValue">1×</strong></div>
+     <canvas id="sfMap" width="320" height="320" tabindex="0" class="sf-canvas" aria-label="32 by 32 instruction field. Zoom in, draw, or use arrows and Stamp Cell for exact placement"></canvas>
+     <div class="sf-zoom"><button id="sfZoomOut" type="button" aria-label="Zoom out">−</button><button id="sfZoomReset" type="button">1× RESET</button><button id="sfZoomIn" type="button" aria-label="Zoom in">＋</button><button id="sfPanMode" type="button" aria-pressed="false">✥ MOVE</button></div>
+     <div class="sf-precise"><canvas id="sfOverview" width="96" height="96" class="sf-overview" aria-label="Full field overview; tap to center zoomed map"></canvas>
+      <div class="sf-nudge"><span class="sf-empty"></span><button data-nudge="0,-1" type="button" aria-label="Select cell above">↑</button><span class="sf-empty"></span><span class="sf-empty"></span><span class="sf-empty"></span><button data-nudge="-1,0" type="button" aria-label="Select cell left">←</button><button class="sf-stamp" id="sfStamp" type="button">⬡ STAMP CELL</button><button data-nudge="1,0" type="button" aria-label="Select cell right">→</button><span class="sf-empty"></span><button data-nudge="0,1" type="button" aria-label="Select cell below">↓</button></div>
+     </div>
+     <div class="sf-caption">ZOOM with +/− or pinch. Drag to paint, switch to MOVE to pan, or tap the overview to jump. Nudge arrows choose one exact cell; STAMP paints it. Nothing changes in your saved 32×32 field until you paint.</div>
      <div class="sf-tools" id="sfTools"><button data-brush="white" class="active" title="White, high instruction value">⬜</button><button data-brush="gray" title="Gray, adjustable value">◧</button><button data-brush="black" title="Black, low instruction value">⬛</button><button data-brush="mask" title="Magenta, no instruction">🟪</button><button data-brush="line" title="Drag a white-to-black gradient line">↘</button></div>
      <div class="sf-flex"><label>GRAY <span id="sfGrayVal">128</span><input type="range" id="sfGray" min="1" max="254" value="128"/></label><label>BRUSH SIZE <span id="sfRadiusVal">1</span><input type="range" id="sfRadius" min="1" max="4" value="1"/></label></div>
      <div class="sf-actions"><button id="sfUndo">↶ UNDO</button><button id="sfClear">CLEAR TO MAGENTA</button><button id="sfRing">◯ RING STARTER</button><button id="sfCurtain">☷ CURTAIN STARTER</button></div>
@@ -103,7 +123,7 @@
    </div>
   </div>`;
   document.body.append(overlay);
-  const map=$('sfMap'),preview=$('sfPreview'),mc=map.getContext('2d'),pc=preview.getContext('2d');
+  const map=$('sfMap'),overview=$('sfOverview'),preview=$('sfPreview'),mc=map.getContext('2d'),oc=overview.getContext('2d'),pc=preview.getContext('2d');
   function status(msg){$('sfStatus').textContent=msg}
   function mark(){dirty=true;$('sfDirty').textContent='UNSAVED';$('sfDirty').style.color='#ffc7a0';resetParticles()}
   function checkpoint(){undo.push(draft.values.slice());if(undo.length>24)undo.shift()}
