@@ -13,6 +13,8 @@
  if(!Motion)throw Error('Shared field physics 037 missing');
  const Viewport=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_VIEWPORT:null;
  if(!Viewport)throw Error('Precision field viewport 040 missing');
+ const Precision=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_PRECISION:null;
+ if(!Precision)throw Error('Precision touch editor 040 missing');
  const KEY='wrkman-arcane-lab035-spell-library-v1',N=32,TAU=Math.PI*2,MAX_SPELLS=24;
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
  const $=(id)=>document.getElementById(id);
@@ -131,12 +133,13 @@
   function stamp(cx,cy,v){for(let dy=-brushRadius+1;dy<brushRadius;dy++)for(let dx=-brushRadius+1;dx<brushRadius;dx++)if(dx*dx+dy*dy<(brushRadius-.15)**2)setCell(cx+dx,cy+dy,v)}
   function value(){return brush==='white'?255:brush==='black'?0:brush==='mask'?-1:gray}
   function line(x1,y1,x2,y2,gradient){const steps=Math.max(1,Math.max(Math.abs(x2-x1),Math.abs(y2-y1))*2);for(let i=0;i<=steps;i++){const t=i/steps;stamp(Math.round(x1+(x2-x1)*t),Math.round(y1+(y2-y1)*t),gradient?Math.round(255*(1-t)):value())}}
-  function paintMap(){const w=map.width/N;for(let y=0;y<N;y++)for(let x=0;x<N;x++){const v=draft.values[y*N+x];mc.fillStyle=v<0?'#ff00ff':`rgb(${v},${v},${v})`;mc.fillRect(x*w,y*w,w+.1,w+.1)}mc.strokeStyle='#17232933';mc.lineWidth=.5;mc.beginPath();for(let n=1;n<N;n++){mc.moveTo(n*w,0);mc.lineTo(n*w,map.height);mc.moveTo(0,n*w);mc.lineTo(map.width,n*w)}mc.stroke()}
-  function pointerCell(e){const r=map.getBoundingClientRect();return {x:clamp(Math.floor((e.clientX-r.left)/r.width*N),0,N-1),y:clamp(Math.floor((e.clientY-r.top)/r.height*N),0,N-1)}}
-  function down(e){if(e.button!==undefined&&e.button!==0)return;e.preventDefault();if(activePointer!==null)return;const p=pointerCell(e);activePointer=e.pointerId;dragStart=p;checkpoint();painting=true;try{map.setPointerCapture(e.pointerId)}catch(_){}if(brush!=='line'){stamp(p.x,p.y,value());paintMap();mark()}}
-  function move(e){if(activePointer!==e.pointerId||!painting)return;e.preventDefault();const p=pointerCell(e);if(brush==='line'){paintMap();mc.strokeStyle='#ffdc74';mc.lineWidth=3;mc.beginPath();mc.moveTo((dragStart.x+.5)*10,(dragStart.y+.5)*10);mc.lineTo((p.x+.5)*10,(p.y+.5)*10);mc.stroke()}else{line(dragStart.x,dragStart.y,p.x,p.y,false);dragStart=p;paintMap();mark()}}
-  function up(e){if(activePointer!==e.pointerId)return;e.preventDefault();if(brush==='line'){const p=pointerCell(e);line(dragStart.x,dragStart.y,p.x,p.y,true);paintMap();mark()}activePointer=null;dragStart=null;painting=false;try{map.releasePointerCapture(e.pointerId)}catch(_){}}
-  map.addEventListener('pointerdown',down);map.addEventListener('pointermove',move);map.addEventListener('pointerup',up);map.addEventListener('pointercancel',up);
+  // Precision editor owns viewport, pinch/pan and hit-testing; recipe
+  // mutation stays in this file. The old 1x brush workflow remains intact.
+  const editor=Precision.install({
+   map,overview,root:overlay,values:()=>draft.values,
+   stamp,line,value,brush:()=>brush,checkpoint,undo,mark,status
+  });
+  function paintMap(){editor.paintMap()}
   function refreshFields(){const s=draft.settings;$('sfName').value=draft.name;$('sfPalette').value=s.palette;$('sfTexture').value=s.texture;$('sfMode').value=s.mode;$('sfDelivery').value=s.delivery||'aura';$('sfRenderLimit').value=String([600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.renderLimit)<Math.abs(a-s.renderLimit)?b:a));$('sfPopulation').value=String([200,600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.population)<Math.abs(a-s.population)?b:a));for(const n of ['Swirl','Momentum','Light']){$('sf'+n).value=s[n.toLowerCase()];$('sf'+n+'Val').textContent=String(s[n.toLowerCase()])}$('sfHeal').checked=heal;paintMap();resetParticles();$('sfDirty').textContent='SAVED';$('sfDirty').style.color='#9be6b7'}
   function refreshLibrary(){const el=$('sfLibrary');el.replaceChildren();$('sfCount').textContent=library.items.length+'/'+MAX_SPELLS;for(const v of library.items){const b=document.createElement('button');b.type='button';b.className=v.id===library.selected?'active':'';const icon=document.createElement('span');icon.style.flex='0 0 auto';icon.textContent='⬡';const title=document.createElement('span');title.textContent=v.recipe.name;const link=document.createElement('small');link.textContent=(v.recipe.settings.delivery==='world'?'↗':v.recipe.settings.delivery==='placed'?'⌖':'◯')+(v.heal?' ♥':'');b.append(icon,title,link);b.addEventListener('click',()=>select(v.id));el.append(b)}}
   function storeDraft(){draft=engine.normalize(draft);item.recipe=clone(draft);item.heal=heal;dirty=false;const good=saveLibrary();$('sfDirty').textContent=good?'SAVED':'SESSION';$('sfDirty').style.color=good?'#9be6b7':'#ffd89b';refreshLibrary();return good}
