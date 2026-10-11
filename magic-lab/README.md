@@ -1,3 +1,5 @@
+**Latest experimental build: 034 / CRAFTED MAGIC.** 32×32 Agent·Field recipes can now be synced/imported, equipped as ⬡ BOUND FIELD, cast as a moving aura, and linked to Minor Heal every three seconds. See [CRAFTED-MAGIC.md](./CRAFTED-MAGIC.md). Original spells and Stargate region navigation remain intact.
+
 # WRKMAN Magic Physics Laboratory 001
 
 A tiny playable spell-interaction sandbox powered by **Phaser 3.90.0** and **Matter.js**. Created as the first experiment toward a PC + mobile online co-op action roguelike.
