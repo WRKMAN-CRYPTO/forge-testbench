@@ -20,7 +20,7 @@ main{max-width:1190px;margin:auto;padding:16px 13px calc(25px + env(safe-area-in
 </style>
 </head>
 <body><main>
-<header><div class="mark">W</div><div><div class="brand">WRKMAN LABS / BEHAVIOR FIELD 01</div><h1>AGENT·FIELD</h1></div><span class="version">v0.4</span></header>
+<header><div class="mark">W</div><div><div class="brand">WRKMAN LABS / BEHAVIOR FIELD 01</div><h1>AGENT·FIELD</h1></div><span class="version">v0.5</span></header>
 <nav class="lab-tabs" role="tablist" aria-label="Agent Field modes">
  <button type="button" id="tabEditor" role="tab" aria-selected="true" aria-controls="editorPanel" class="lab-tab active">✦ FIELD EDITOR</button>
  <button type="button" id="tabRange" role="tab" aria-selected="false" aria-controls="rangePanel" class="lab-tab">◈ STONE RANGE</button>
@@ -80,11 +80,14 @@ main{max-width:1190px;margin:auto;padding:16px 13px calc(25px + env(safe-area-in
   </div>
   <div class="range-help"><div class="range-help-icon">◈</div><div><strong>This is your actual field, not a canned projectile.</strong> The agents fly together toward the selected stone while continuing to follow the 32 × 32 instructions inside the spell. Hit detection happens per moving hex; stones keep their damage between casts.<div class="range-tip">Want another pattern? Switch to FIELD EDITOR, draw it, and return. Your stones will still be here.</div></div></div>
 </section>
-<p class="footer"><strong>Architecture:</strong> This field is a control surface, not a sprite. The visible spell is composed of moving hex agents. The editor and simulation share a portable 1,024-value map. Separate experimental lab, no roguelike integration.</p>
+<p class="footer"><strong>Architecture:</strong> This field is a control surface, not a sprite. The visible spell is composed of moving hex agents. The editor and simulation share a portable 1,024-value map. Shared canonical physics powers the editor, Stone Range, Spell Forge preview and roguelike.</p>
 </main>
+<script src="../field-physics.js?v=037"></script>
 <script>
 (()=>{'use strict';
 const $=s=>document.querySelector(s), N=32, TOTAL=N*N, MASK=-1, TAU=Math.PI*2;
+ const Motion=window.WRKMAN_FIELD_PHYSICS;
+ if(!Motion)throw Error('Shared field physics 037 is missing. Reload online to update this laboratory.');
 const mapCanvas=$('#map'), mctx=mapCanvas.getContext('2d',{willReadFrequently:true}), canvas=$('#view'), ctx=canvas.getContext('2d'), stage=$('#stage');
 const S={field:new Int16Array(TOTAL),brush:255,brushSize:1,mode:'a',palette:'arcane',texture:'leaf',population:1200,swirl:26,momentum:62,light:62,agents:[],paused:false,overlay:false,last:0,time:0,fps:0,frame:0,freeCount:0,nearCount:0,offscreenCount:0,startCells:[],maxValue:255,dragging:false,resizeTimer:0,name:'GRAVITY WELL',dirty:true,status:'',motionClock:0};
 const palette={arcane:[[92,139,244],[176,121,250],[223,193,255]],flame:[[208,65,39],[253,126,49],[255,213,105]],healing:[[66,184,144],[144,231,119],[240,235,149]],void:[[100,67,157],[179,72,199],[255,134,202]]};
@@ -126,79 +129,23 @@ function preset(name){
   rebuildStartCells();drawMap();reseed();refreshRangeFieldLabel();
 }
 function rebuildStartCells(){
-  S.startCells=[];let high=-1, valid=[];
-  for(let i=0;i<TOTAL;i++){let v=S.field[i];if(v>=0){valid.push(i);high=Math.max(high,v);}}
-  S.maxValue=high;
-  const threshold=Math.max(0,high-50);
-  for(const i of valid){if(S.field[i]>=threshold)S.startCells.push(i)}
-}
-function sampleField(nx,ny,field=S.field){
-  // The field exists only within the map. Outside the canvas there is no guidance,
-  // exactly as in magenta free space. Do not clamp offscreen samples to edge cells.
-  if(!Number.isFinite(nx)||!Number.isFinite(ny)||nx<0||nx>=1||ny<0||ny>=1)return {valid:false,value:null};
-  const cx=nx*N,cy=ny*N;
-  const i=Math.floor(cx),j=Math.floor(cy);
-  if(toCell(i,j,field)===MASK)return {valid:false,value:null};
-  // Mask takes precedence. Renormalize only over valid grayscale neighbors, never blend magenta into values.
-  const fx=cx-i,fy=cy-j;let sum=0,weight=0;
-  for(let oy=0;oy<=1;oy++)for(let ox=0;ox<=1;ox++){
-    const x=Math.min(N-1,i+ox),y=Math.min(N-1,j+oy),v=toCell(x,y,field);
-    if(v===MASK)continue;
-    const w=(ox?fx:1-fx)*(oy?fy:1-fy);sum+=v*w;weight+=w;
-  }
-  return {valid:true,value:weight?sum/weight:toCell(i,j,field)};
-}
-function gradient(nx,ny,value,field=S.field){
-  // Central differences never use masked neighbors to invent a gradient across empty space.
-  const e=0.72/N, a=sampleField(nx+e,ny,field), b=sampleField(nx-e,ny,field), c=sampleField(nx,ny+e,field), d=sampleField(nx,ny-e,field);
-  let gx=0,gy=0;
-  if(a.valid&&b.valid)gx=(a.value-b.value)*.5;
-  else if(a.valid)gx=a.value-value;
-  else if(b.valid)gx=value-b.value;
-  if(c.valid&&d.valid)gy=(c.value-d.value)*.5;
-  else if(c.valid)gy=c.value-value;
-  else if(d.valid)gy=value-d.value;
-  const len=Math.hypot(gx,gy);return len>0.00001?[-gx/len,-gy/len,len]:[0,0,0];
-}
+  S.startCells=Motion.startingCells(S.field);
+  S.maxValue=Math.max(-1,...S.field);
+ }
+function sampleField(nx,ny,field=S.field){return Motion.sample(field,nx,ny)}
+function gradient(nx,ny,value,field=S.field){return Motion.gradient(field,nx,ny,value)}
 function mapPoint(i){const x=i%N,y=(i/N)|0;return {x:(x+rand(.1,.9))/N,y:(y+rand(.1,.9))/N}}
-function spawnAgent(i){let p;if(S.startCells.length){p=mapPoint(choose(S.startCells))}else{p={x:Math.random(),y:Math.random()}};
-  const angle=rand(0,TAU),speed=rand(.7,1.9);return {x:p.x,y:p.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,seed:Math.random()*TAU,home:i,phase:0,progress:0,free:false,tail:[],age:0};
-}
+function spawnAgent(i){return Motion.spawn(S.field,S.startCells,Math.random,i)}
 function reseed(){S.agents=Array.from({length:S.population},(_,i)=>spawnAgent(i));S.time=0;S.frame=0;S.freeCount=0;S.nearCount=0;S.offscreenCount=0;setStatus('Swarm reseeded. No edge walls: agents can drift offscreen and stay out there.');}
 function resize(){const r=stage.getBoundingClientRect(),w=Math.max(260,Math.round(r.width)),h=Math.max(300,Math.round(r.height));if(canvas.width===w&&canvas.height===h)return;canvas.width=w;canvas.height=h;}
 function update(dt){
-  S.time+=dt;S.frame++;const timeScale=clamp(dt*60,0,2), momentum=S.momentum/100, swirl=S.swirl/100;
-  let free=0,near=0,offscreen=0;
-  for(const a of S.agents){
-    a.age+=dt;
-    const here=sampleField(a.x,a.y);a.free=!here.valid;
-    if(!here.valid){free++;a.vx*=Math.pow(.997,timeScale);a.vy*=Math.pow(.997,timeScale);}
-    else{
-      const v=here.value,progress=clamp(1-v/255,0,1),[gx,gy,mag]=gradient(a.x,a.y,v);
-      a.progress=lerp(a.progress,progress,.15);
-      if(v<22)near++;
-      const curl=swirl*(.26+progress*.45),clock=S.time*(.7+progress*1.6);
-      const tangentX=-gy,tangentY=gx;
-      let ax=gx*.28+tangentX*curl+Math.cos(a.seed+clock)*(.012+.025*swirl);
-      let ay=gy*.28+tangentY*curl+Math.sin(a.seed+clock)*(.012+.025*swirl);
-      if(mag<.001){ // Local minimum: keep a small restless orbit, not a freeze frame.
-        const theta=a.seed+S.time*(1.1+.8*swirl);
-        ax+=Math.cos(theta)*(.012+.025*swirl);ay+=Math.sin(theta)*(.012+.025*swirl);
-      }
-      a.vx+=ax*timeScale; a.vy+=ay*timeScale;
-      // Damp guided motion, but allow useful momentum across disconnected regions.
-      const drag=.885+momentum*.095;
-      a.vx*=Math.pow(drag,timeScale);a.vy*=Math.pow(drag,timeScale);
-      const speedLimit=(S.mode==='ab'?1.8+2.2*(1-progress):3.2)+momentum*1.8;
-      const s=Math.hypot(a.vx,a.vy);if(s>speedLimit){a.vx*=speedLimit/s;a.vy*=speedLimit/s;}
-    }
-    a.x+=a.vx*timeScale/(canvas.width||360);a.y+=a.vy*timeScale/(canvas.height||500);
-    // Open world: offscreen agents remain alive at their true positions. No wrap, bounce or respawn.
-    if(a.x<0||a.x>=1||a.y<0||a.y>=1)offscreen++;
-    if(S.frame%3===0){a.tail.push([a.x,a.y]);if(a.tail.length>5)a.tail.shift();}
+  S.time+=dt;S.frame++;
+  const stats=Motion.stepSwarm(S.agents,S.field,S,dt,canvas.width||360,canvas.height||500,S.time);
+  S.freeCount=stats.free;S.nearCount=stats.near;S.offscreenCount=stats.offscreen;
+  if(S.frame%3===0)for(const a of S.agents){
+   a.tail.push([a.x,a.y]);if(a.tail.length>5)a.tail.shift();
   }
-  S.freeCount=free;S.nearCount=near;S.offscreenCount=offscreen;
-}
+ }
 function drawHex(x,y,r,c=ctx){c.beginPath();for(let k=0;k<6;k++){const ang=TAU*k/6+Math.PI/6;const xx=x+Math.cos(ang)*r,yy=y+Math.sin(ang)*r;k?c.lineTo(xx,yy):c.moveTo(xx,yy);}c.closePath();}
 // Leaf material is rasterized once per palette / progress shade / variant.
 // 6,000 agents can then share tiny sprites instead of allocating gradients and
@@ -377,24 +324,9 @@ function castCenter(shot){
   return {x:lerp(shot.from.x,shot.toward.x,progress),y:lerp(shot.from.y,shot.toward.y,progress)-Math.sin(Math.PI*t)*R.h*.054};
 }
 function stepRangeAgent(a,shot,dt){
-  const s=shot.settings,field=shot.field,timeScale=clamp(dt*60,0,2),momentum=s.momentum/100,swirl=s.swirl/100;
-  const here=sampleField(a.x,a.y,field);a.free=!here.valid;
-  if(!here.valid){a.vx*=Math.pow(.997,timeScale);a.vy*=Math.pow(.997,timeScale);}
-  else{
-    const v=here.value,progress=clamp(1-v/255,0,1),[gx,gy,mag]=gradient(a.x,a.y,v,field);
-    a.progress=lerp(a.progress,progress,.15);
-    const curl=swirl*(.26+progress*.45),clock=R.time*(.7+progress*1.6);
-    let ax=gx*.28-gy*curl+Math.cos(a.seed+clock)*(.012+.025*swirl);
-    let ay=gy*.28+gx*curl+Math.sin(a.seed+clock)*(.012+.025*swirl);
-    if(mag<.001){const theta=a.seed+R.time*(1.1+.8*swirl);ax+=Math.cos(theta)*(.012+.025*swirl);ay+=Math.sin(theta)*(.012+.025*swirl);}
-    a.vx+=ax*timeScale;a.vy+=ay*timeScale;
-    const drag=.885+momentum*.095;a.vx*=Math.pow(drag,timeScale);a.vy*=Math.pow(drag,timeScale);
-    const speedLimit=(s.mode==='ab'?1.8+2.2*(1-progress):3.2)+momentum*1.8;
-    const speed=Math.hypot(a.vx,a.vy);if(speed>speedLimit){a.vx*=speedLimit/speed;a.vy*=speedLimit/speed;}
-  }
-  // Range field uses the same 360x500 reference geometry as the editor simulation.
-  a.x+=a.vx*timeScale/360;a.y+=a.vy*timeScale/500;
-}
+  // Canonical engine: the same sampling, acceleration and open boundaries.
+  Motion.stepAgent(a,shot.field,shot.settings,dt,360,500,R.time);
+ }
 function breakRock(rock,hitX,hitY){
   if(rock.dead)return;
   rock.hp=0;rock.dead=true;R.broken++;
@@ -558,6 +490,6 @@ $('#importFile').addEventListener('change',async e=>{const f=e.target.files?.[0]
  }catch(err){setStatus('Import failed: '+err.message)}finally{e.target.value=''}});
 window.addEventListener('resize',()=>{clearTimeout(S.resizeTimer);S.resizeTimer=setTimeout(resize,140)});
 resize();preset('well');updateMaterialPreview();resizeRange();resetRocks();refreshRangeFieldLabel();requestAnimationFrame(tick);
-window.AgentFieldDiagnostics={getState:()=>({agents:S.agents.length,free:S.freeCount,near:S.nearCount,offscreen:S.offscreenCount,paused:S.paused,mode:S.mode,texture:S.texture,maskCells:Array.from(S.field).filter(v=>v<0).length,name:S.name,time:S.time}),sample:(x,y)=>sampleField(x,y),setPreset:preset,reseed,importConfig,getAgent:(i=0)=>({...S.agents[i]}),config,range:()=>rangeDiagnostics(),cast:castCurrentField,resetRocks,switchTab};
+window.AgentFieldDiagnostics={getState:()=>({agents:S.agents.length,free:S.freeCount,near:S.nearCount,offscreen:S.offscreenCount,paused:S.paused,mode:S.mode,texture:S.texture,maskCells:Array.from(S.field).filter(v=>v<0).length,name:S.name,time:S.time,physics:Motion.VERSION}),sample:(x,y)=>sampleField(x,y),setPreset:preset,reseed,importConfig,getAgent:(i=0)=>({...S.agents[i]}),config,range:()=>rangeDiagnostics(),cast:castCurrentField,resetRocks,switchTab};
 })();
 </script></body></html>
