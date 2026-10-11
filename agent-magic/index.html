@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#081016">
-<title>WRKMAN | Agent Magic Lab v0.3.1</title>
+<title>WRKMAN | Agent Magic Lab v0.3.2 v0.3.1</title>
 <style>
 :root{color-scheme:dark;--bg:#081016;--panel:#0f1821;--panel2:#12202a;--line:#28404c;--ink:#ecf3f4;--muted:#9ab0b6;--green:#a9f1a6;--blue:#9aceed;--violet:#d0a3ff;--gold:#f1d18e;--pink:#ff96d2}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -29,16 +29,16 @@ header{display:flex;align-items:center;gap:12px;margin-bottom:14px}.mark{width:5
     <div class="word">WRKMAN LABS / MAGIC STUDY 01</div>
     <h1>AGENT·MAGIC</h1>
   </div>
-  <div class="ver">v0.3.1</div>
+  <div class="ver">v0.3.2</div>
 </header>
-<p class="lede">The swarm can now build a projectile spell. Sigils can hold until activation. Fireball charges until launch. Other spells hold their completed forms until activation; Auto Cast releases them automatically.</p>
+<p class="lede">A spell made of living hexagons. Casting controls when magic forms and releases; a separate living-motion clock keeps every held spell moving. Fireball now burns, flies, and sheds a real hex trail.</p>
 <div class="layout">
   <section class="card">
     <div class="stage-top">
       <div class="status"><span class="dot"></span><span id="statusText">SPELL ACTIVE</span></div>
       <div class="note" id="spellNote">ARCANE ORB</div>
     </div>
-    <div class="stage" id="stage"><canvas id="view"></canvas><div class="hint">Tap to stir. Drag to aim fireball / steer magic.</div></div>
+    <div class="stage" id="stage"><canvas id="view"></canvas><div class="hint">Tap to stir. Drag sideways to aim fireball.</div></div>
     <div class="phase">
       <div class="phase-row"><span>◎</span><strong id="phaseLabel">01 / DISTURBANCE</strong><span class="pct" id="phasePct">0%</span></div>
       <div class="bar"><div id="phaseBar"></div></div>
@@ -114,8 +114,8 @@ const DISSOLVE_AT=8.3, CYCLE=10.7;
 let W=0,H=0,last=0,fps=0,paused=false,resizeTimer=0;
 const st={spell:'orb',tint:'arcane',phaseClock:0,casting:true,auto:false,pointer:null,agents:[],budget:2200,
   cohesion:60,shimmer:55,intensity:70,freedom:35,light:55,structure:70,density:0,stability:0,castCount:0,cooldown:0,
-  activated:false,holdReady:false,holdElapsed:0,fireStart:{x:0,y:0},fireTarget:{x:0,y:0}};
-const AgentMagicDiagnostics={state:st, cast:()=>cast(), activate:()=>activate(), dissolve:()=>dissolve(), step:dt=>step(dt), changeSpell:name=>changeSpell(name)}; window.AgentMagicDiagnostics=AgentMagicDiagnostics;
+  activated:false,holdReady:false,holdElapsed:0,motionClock:0,fireStart:{x:0,y:0},fireTarget:{x:0,y:0}};
+const AgentMagicDiagnostics={state:st, cast:()=>cast(), activate:()=>activate(), dissolve:()=>dissolve(), step:dt=>step(dt), render:()=>{draw();updateUI();}, changeSpell:name=>changeSpell(name)}; window.AgentMagicDiagnostics=AgentMagicDiagnostics;
 const center=()=>[W*.5,H*.48];
 const baseRadius=()=>Math.min(W,H)*(st.spell==='fireball' ? (.09+st.intensity*.0006) : (.14+st.intensity*.0007));
 const releaseProgress=()=>smooth((st.phaseClock-DISSOLVE_AT)/(CYCLE-DISSOLVE_AT));
@@ -134,7 +134,7 @@ function ensureAgents(){while(st.agents.length<st.budget)st.agents.push(spawn(st
 function resize(){const r=stage.getBoundingClientRect(), nw=Math.max(260,Math.round(r.width)), nh=Math.max(320,Math.round(r.height)); if(nw===W&&nh===H)return; const ow=W,oh=H; W=nw; H=nh; canvas.width=nw; canvas.height=nh; if(ow&&oh){const sx=nw/ow, sy=nh/oh; for(const a of st.agents){a.x*=sx;a.y*=sy;a.vx*=sx;a.vy*=sy;} if(st.pointer){st.pointer.x*=sx;st.pointer.y*=sy;} st.fireStart.x*=sx;st.fireStart.y*=sy;st.fireTarget.x*=sx;st.fireTarget.y*=sy;}}
 function setupFireballAim(){ st.fireStart={x:W*.28,y:H*.60}; st.fireTarget=st.pointer ? {x:st.pointer.x,y:st.pointer.y} : {x:W*.78,y:H*.34}; }
 function cast(){
-  ensureAgents(); st.phaseClock=0; st.casting=true; st.cooldown=0; st.castCount++; st.holdReady=false; st.holdElapsed=0;
+  ensureAgents(); st.phaseClock=0; st.motionClock=0; st.casting=true; st.cooldown=0; st.castCount++; st.holdReady=false; st.holdElapsed=0;
   st.activated=false; if(st.spell==='fireball') setupFireballAim();
   for(const a of st.agents){a.released=false;a.opacity=Math.min(a.opacity,.14);a.lit*=.35; if(!a.vx&&!a.vy){a.vx=Math.cos(a.theta)*.3;a.vy=Math.sin(a.theta)*.3;}}
   $('#statusText').textContent='SPELL ACTIVE'; updateActivateBtn();
@@ -148,15 +148,20 @@ function activate(){
 }
 function dissolve(){ if(st.phaseClock>=CYCLE)return; st.phaseClock=Math.max(DISSOLVE_AT+.02, st.phaseClock); st.casting=true; st.activated=true; st.holdReady=false; st.holdElapsed=0; for(const a of st.agents)a.released=false; updateActivateBtn(); }
 function changeSpell(name){ st.spell=name; $('#spellNote').textContent=name.toUpperCase(); if(name==='fireball' && ['arcane','healing','void','solar'].includes(st.tint)){$('#tint').value='flame'; st.tint='flame';} cast(); }
+// Spell flight is independent from the perpetual internal motion of the hex swarm.
+function firePathAt(u){
+  u=clamp(u,0,1);
+  const {x:sx,y:sy}=st.fireStart, {x:tx,y:ty}=st.fireTarget;
+  const arcY=Math.sin(u*PI)*Math.min(H*.20,Math.hypot(tx-sx,ty-sy)*.18);
+  return [mix(sx,tx,easeOut(u)),mix(sy,ty,easeOut(u))-arcY];
+}
 function currentSpellCenter(){
   if(st.spell!=='fireball') return center();
-  const t=st.phaseClock, launch=clamp((t-5.8)/(DISSOLVE_AT-5.8),0,1), [sx,sy]=[st.fireStart.x,st.fireStart.y], [tx,ty]=[st.fireTarget.x,st.fireTarget.y];
-  if(!st.activated || t<5.8) return [sx,sy];
-  const arcY=Math.sin(launch*PI) * Math.min(H*.20, Math.hypot(tx-sx,ty-sy)*.18);
-  return [mix(sx,tx,easeOut(launch)), mix(sy,ty,easeOut(launch)) - arcY];
+  const launch=st.activated?clamp((st.phaseClock-5.8)/(DISSOLVE_AT-5.8),0,1):0;
+  return firePathAt(launch);
 }
 function fireDirection(){const dx=st.fireTarget.x-st.fireStart.x, dy=st.fireTarget.y-st.fireStart.y, d=Math.hypot(dx,dy)||1; return {ux:dx/d, uy:dy/d};}
-function shape(a,t,r){
+function shape(a,t,r,flight){
   const role=a.role, z=a.z, th=a.theta; let x=0,y=0;
   if(st.spell==='orb'){
     const rot=.1*Math.sin(t*.45+a.seed), rr=role===0?r*(.02+Math.sqrt(z)*.43):role===1?r*(.78+z*.22):role===2?r*(.45+z*.43):r*(1.15+z*.55);
@@ -172,17 +177,48 @@ function shape(a,t,r){
     else if(role===1){const rr=r*Math.sqrt(z)*.49; x=Math.cos(th)*rr*.75; y=r*.23+Math.sin(th)*rr*.95;}
     else if(role===2){const ear=a.i%2===0?-1:1, yy=r*(-.35-.48*((z*3.7)%1)); x=ear*r*(.26-.08*((z*3.7)%1))+Math.cos(th)*r*.065; y=yy+Math.sin(th)*r*.05;}
     else{const yy=r*(.35+.13*Math.sin(th+z*7)); x=-r*(.42+z*.46); y=yy-r*.24*Math.sin(z*TAU+t*.3);}    
-  } else { // fireball
-    const dir=fireDirection(), ux=dir.ux, uy=dir.uy, tx=-uy, ty=ux; const launch=st.activated?clamp((t-5.8)/(DISSOLVE_AT-5.8),0,1):0; const charge=clamp(t/5.8,0,1);
-    if(role===0){ const rr=r*(.02+Math.sqrt(z)*.26); const ang=th+t*2.6*a.spin; x=Math.cos(ang)*rr; y=Math.sin(ang)*rr; }
-    else if(role===1){ const rr=r*(.42+z*.16); const ang=th+t*(1.4+launch*4.2)*a.spin; x=Math.cos(ang)*rr; y=Math.sin(ang)*rr; }
-    else if(role===2){ const trail=r*(.25 + z*.95)*(launch*.9 + charge*.25); const sway=Math.sin(z*21+t*8+a.seed)*r*.12; x = -ux*trail + tx*sway; y = -uy*trail + ty*sway; }
-    else { const burst = launch>0? launch : charge*.2; const rr=r*(.8+z*.75)*burst; const ang=th+t*2.4*a.spin; x=Math.cos(ang)*rr+(-ux)*r*.2*launch; y=Math.sin(ang)*rr+(-uy)*r*.2*launch; }
+  } else { // FIREBALL: core convection, orbiting shell, licking flames, escaping embers.
+    const {ux,uy,px,py,launch}=flight, tx=-uy, ty=ux;
+    const heat=.65+st.intensity*.0035, fluid=.32+st.shimmer*.004+st.freedom*.003;
+    if(role===0){ // thermal convection coils through the bright central core
+      const ang=th+t*(1.35+2.0*heat)*a.spin + Math.sin(t*1.6+a.seed)*.33;
+      const rr=r*(.04+Math.sqrt(z)*(.34+.10*Math.sin(t*2+a.seed)));
+      x=Math.cos(ang)*rr + tx*Math.sin(t*2.7+a.seed)*r*.06;
+      y=Math.sin(ang)*rr - Math.cos(t*1.7+a.seed)*r*.09*fluid;
+    } else if(role===1){ // hot shell flows endlessly around its own boundary
+      const ang=th+t*(.72+2.1*fluid)*a.spin + .08*Math.sin(t*5+a.seed);
+      const rr=r*(.44+z*.18 + .07*Math.sin(ang*7-t*3.2+a.seed));
+      x=Math.cos(ang)*rr; y=Math.sin(ang)*rr;
+    } else if(role===2){ // flame tongues that become true agent-built trails during flight
+      if(launch>.015){
+        const lag=Math.min(launch, .04+z*.55), tail=firePathAt(Math.max(0,launch-lag));
+        const whip=Math.sin(t*(5+fluid*4)+z*17+a.seed)*r*(.08+.21*z);
+        x=tail[0]-px+tx*whip; y=tail[1]-py+ty*whip;
+      } else {
+        const ang=th+t*(.6+fluid*1.9)*a.spin;
+        const flicker=Math.sin(t*(4+3*fluid)+z*23+a.seed);
+        const rr=r*(.48+z*.42 + Math.max(0,flicker)*.21);
+        x=Math.cos(ang)*rr + (-ux)*r*.1*z; y=Math.sin(ang)*rr + (-uy)*r*.1*z;
+      }
+    } else { // embers detach and tumble in the moving wake
+      if(launch>.035){
+        const lag=Math.min(launch,.14+z*.83),point=firePathAt(Math.max(0,launch-lag));
+        const spread=r*(.22+z*.62)*Math.sin(t*(2.8+2*fluid)+a.seed);
+        x=point[0]-px+tx*spread-ux*r*.08*z;
+        y=point[1]-py+ty*spread-uy*r*.08*z;
+      } else {
+        const ang=th+t*(1.6+fluid*2)*a.spin;
+        const rr=r*(.68+z*.72+Math.sin(t*3+a.seed)*.08);
+        x=Math.cos(ang)*rr; y=Math.sin(ang)*rr;
+      }
+    }
   }
   return [x,y];
 }
 function step(dt){
   ensureAgents();
+  // Time-dependent particle forces never stall at a lifecycle hold point.
+  st.motionClock+=dt;
   const holdAt=holdThreshold();
   if(st.casting){
     if(!st.activated){
@@ -191,7 +227,7 @@ function step(dt){
       if(st.phaseClock>=holdAt){
         st.phaseClock=holdAt;
         st.holdReady=true;
-        $('#statusText').textContent=st.spell==='fireball'?'FIREBALL CHARGED':`${st.spell.toUpperCase()} HELD`;
+        $('#statusText').textContent=st.spell==='fireball'?'FIREBALL CHARGED · CHURNING':`${st.spell.toUpperCase()} HELD · LIVING`;
         if(st.auto){
           st.holdElapsed+=dt;
           if(st.holdElapsed>=2.2) activate();
@@ -203,15 +239,29 @@ function step(dt){
     }
   } else if(st.auto){st.cooldown+=dt;if(st.cooldown>1.1)cast();}
   const [cx,cy]=currentSpellCenter(), r=baseRadius(), g=stageGrowth(), release=releaseProgress(), structure=st.structure*.01, cohesion=st.cohesion*.01, shimmer=st.shimmer*.01, freedom=st.freedom*.01, intensity=st.intensity*.01;
-  const t=st.phaseClock, dt60=Math.min(dt*60,2.5), basePull=.0026+.008*structure+.012*cohesion, pull=basePull*(.3+g*1.35);
+  const t=st.motionClock, dt60=Math.min(dt*60,2.5), basePull=.0026+.008*structure+.012*cohesion, pull=basePull*(.3+g*1.35);
+  const dir=st.spell==='fireball'?fireDirection():null;
+  const launch=st.spell==='fireball'&&st.activated?clamp((st.phaseClock-5.8)/(DISSOLVE_AT-5.8),0,1):0;
+  const flight=dir?{...dir,px:cx,py:cy,launch}:null;
   let ene=0, stable=0;
   for(const a of st.agents){
-    const [sx,sy]=shape(a,t,r), destX=cx+sx, destY=cy+sy, aura=Math.sin(t*2.7+a.seed+sx*.015)*(.25+shimmer*.75), arc=a.theta+t*.11*a.spin, swirl=(.006+freedom*.03+shimmer*.014)*(a.role===1?1.2:.6);
+    const [sx,sy]=shape(a,t,r,flight), destX=cx+sx, destY=cy+sy, aura=Math.sin(t*2.7+a.seed+sx*.015)*(.25+shimmer*.75), arc=a.theta+t*.11*a.spin, swirl=(.006+freedom*.03+shimmer*.014)*(a.role===1?1.2:.6);
     if(release>0){
       if(!a.released){ a.released=true; const dx=a.x-cx, dy=a.y-cy, len=Math.hypot(dx,dy)||1, blast=2.2+4*intensity+(a.role===3?3:0); a.scatterX=dx/len*blast-Math.sin(arc)*2.1*a.spin; a.scatterY=dy/len*blast+Math.cos(arc)*2.1*a.spin; a.vx+=a.scatterX; a.vy+=a.scatterY; }
       a.vx=(a.vx+a.scatterX*.016*dt60+Math.cos(a.seed+t*3)*.02*dt60)*.985; a.vy=(a.vy+a.scatterY*.016*dt60+Math.sin(a.seed+t*2)*.02*dt60)*.985;
     } else {
-      const wander=(1-g)*.60 + freedom*.18 + shimmer*.27; let fx=(destX-a.x)*pull + Math.cos(arc+a.seed)*wander + Math.cos(arc+PI/2)*swirl*r*.01; let fy=(destY-a.y)*pull + Math.sin(arc+a.seed)*wander + Math.sin(arc+PI/2)*swirl*r*.01;
+      const wander=(1-g)*.60 + freedom*.18 + shimmer*.27;
+      let fx=(destX-a.x)*pull + Math.cos(arc+a.seed)*wander + Math.cos(arc+PI/2)*swirl*r*.01;
+      let fy=(destY-a.y)*pull + Math.sin(arc+a.seed)*wander + Math.sin(arc+PI/2)*swirl*r*.01;
+      if(st.spell==='fireball'){
+        const dx=a.x-cx,dy=a.y-cy,len=Math.hypot(dx,dy)||1;
+        const convect=(.12+.22*shimmer+.16*freedom)*(a.role===0?1.65:a.role===1?1.05:.8);
+        fx+=-dy/len*convect*a.spin;
+        fy+= dx/len*convect*a.spin - Math.max(0,.075*st.intensity*.01);
+        const turbulence=.20+.55*shimmer+.26*freedom;
+        fx+=Math.sin(t*6+a.seed+dy*.028)*turbulence*.21;
+        fy+=Math.cos(t*5.4+a.seed+dx*.023)*turbulence*.21;
+      }
       if(st.pointer && st.spell!=='fireball'){ const dx=st.pointer.x-a.x, dy=st.pointer.y-a.y, dist=Math.hypot(dx,dy)||1; fx+=dx/dist*.9; fy+=dy/dist*.9; }
       a.vx=(a.vx+fx*dt60)*(.77+.13*cohesion); a.vy=(a.vy+fy*dt60)*(.77+.13*cohesion);
     }
@@ -228,11 +278,10 @@ function draw(){
   backdrop(); const release=releaseProgress(), g=stageGrowth(), light=st.light*.01, p=palettes[st.tint], [cx,cy]=currentSpellCenter(), r=baseRadius(); const coreRGB=p.map(rgb=>rgb.map(v=>Math.round(mix(v*.58,v*.97,.10+.85*light))));
   const glowPower=(.04+.21*light)*g*(1-release)*(1-release), color=p[0]; if(glowPower>.001){ const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.8); glow.addColorStop(0,`rgba(${color[0]},${color[1]},${color[2]},${glowPower})`); glow.addColorStop(.55,`rgba(${color[0]},${color[1]},${color[2]},${glowPower*.35})`); glow.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(cx,cy,r*1.8,0,TAU); ctx.fill(); }
   if(st.spell==='fireball'){
-    const dir=fireDirection(), launch=st.activated?clamp((st.phaseClock-5.8)/(DISSOLVE_AT-5.8),0,1):0, [sx,sy]=[st.fireStart.x,st.fireStart.y];
-    if(launch>0 && release===0){ const trail=ctx.createLinearGradient(sx,sy,cx,cy); trail.addColorStop(0,`rgba(${p[1][0]},${p[1][1]},${p[1][2]},0)`); trail.addColorStop(.5,`rgba(${p[2][0]},${p[2][1]},${p[2][2]},${.10+.12*light})`); trail.addColorStop(1,`rgba(${p[0][0]},${p[0][1]},${p[0][2]},${.24+.15*light})`); ctx.strokeStyle=trail; ctx.lineWidth=Math.max(6,r*.25); ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(cx,cy); ctx.stroke(); }
+    // Flight trail is now made from actual moving role-2/3 hex agents, no synthetic stroke.
     if(release>0){ const burst=ctx.createRadialGradient(cx,cy,0,cx,cy,r*(1.4+release*2.2)); burst.addColorStop(0,`rgba(${p[3][0]},${p[3][1]},${p[3][2]},${.18*(1-release)})`); burst.addColorStop(.7,`rgba(${p[1][0]},${p[1][1]},${p[1][2]},${.12*(1-release)})`); burst.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=burst; ctx.beginPath(); ctx.arc(cx,cy,r*(1.4+release*2.2),0,TAU); ctx.fill(); }
   }
-  for(const a of st.agents){ if(a.opacity<.004||a.radius<.3||a.x<-20||a.y<-20||a.x>W+20||a.y>H+20) continue; const rgb=coreRGB[a.role], v=.85+(.12*st.shimmer*.01)*Math.sin(a.seed+st.phaseClock*4), alpha=clamp(a.opacity*(.68+1.10*light)*v,0,.68); ctx.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha.toFixed(3)})`; hex(a.x,a.y,a.radius); ctx.fill(); }
+  for(const a of st.agents){ if(a.opacity<.004||a.radius<.3||a.x<-20||a.y<-20||a.x>W+20||a.y>H+20) continue; const rgb=coreRGB[a.role], v=.85+(.12*st.shimmer*.01)*Math.sin(a.seed+st.motionClock*4), alpha=clamp(a.opacity*(.68+1.10*light)*v,0,.68); ctx.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha.toFixed(3)})`; hex(a.x,a.y,a.radius); ctx.fill(); }
   if(st.spell==='sigil' && (st.holdReady || (!st.activated && st.phaseClock>=DISSOLVE_AT-.01))){ ctx.strokeStyle=`rgba(${p[2][0]},${p[2][1]},${p[2][2]},.18)`; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,r*.92,0,TAU); ctx.stroke(); }
 }
 function updateActivateBtn(){
@@ -246,15 +295,15 @@ function updateUI(){
   const progress=st.activated?clamp((st.phaseClock-holdAt)/(CYCLE-holdAt),0,1):clamp(st.phaseClock/holdAt,0,1);
   const totalPct=Math.round(progress*100);
   const activeLabel=st.spell==='fireball'&&st.phaseClock<DISSOLVE_AT?'05 / FIREBALL IN FLIGHT':'05 / FINAL RELEASE';
-  $('#phaseLabel').textContent=holding?(st.spell==='fireball'?'05 / CHARGED · HELD':'05 / FORMED · HELD'):(st.activated?activeLabel:pd[2]);
+  $('#phaseLabel').textContent=holding?(st.spell==='fireball'?'05 / CHARGED · BURNING':'05 / FORMED · LIVING'):(st.activated?activeLabel:pd[2]);
   $('#phasePct').textContent=holding?'READY':totalPct+'%';
   $('#phaseBar').style.width=totalPct+'%';
-  $('#phaseDesc').textContent=holding?(st.spell==='fireball'?'Fireball charged. Tap LAUNCH to fly, trail, and burst.':'Form stabilized. Tap ACTIVATE for final release.'):(st.activated?(st.spell==='fireball'?'Fireball in motion or bursting.':'Final activation releases the spell.'):pd[3]);
+  $('#phaseDesc').textContent=holding?(st.spell==='fireball'?'Charged and burning: the hexes churn until LAUNCH.':'Held form, living hexes. ACTIVATE for final release.'):(st.activated?(st.spell==='fireball'?'Fireball in motion or bursting.':'Final activation releases the spell.'):pd[3]);
   $('#agentCount').textContent=st.agents.length.toLocaleString(); $('#fps').textContent=Math.round(fps); $('#densityValue').textContent=Math.round(st.density*100)+'%'; $('#stabilityValue').textContent=Math.round(st.stability*100)+'%';
   $('#pulseBtn').textContent=st.auto?'◉ AUTO CAST ON':'◌ AUTO CAST OFF'; $('#pauseBtn').textContent=paused?'▶ RESUME':'Ⅱ PAUSE';
   for(const id of ['budget','light','structure','cohesion','shimmer','intensity','freedom']) $('#'+id+'Out').textContent=id==='budget'?st.budget.toLocaleString():st[id]+'%';
   const mode=holding?'held and active':st.activated?(releaseProgress()>0?'releasing':'activated'):'forming';
-  $('#readout').textContent=`${st.spell[0].toUpperCase()+st.spell.slice(1)} spell · ${st.agents.length} agents · ${mode} · light ${st.light}% · structure ${st.structure}% · cast #${st.castCount}. ${st.auto?'Auto Cast will activate after the hold.':'Spells remain formed until ACTIVATE or DISSOLVE.'}`;
+  $('#readout').textContent=`${st.spell[0].toUpperCase()+st.spell.slice(1)} spell · ${st.agents.length} agents · ${mode} · light ${st.light}% · structure ${st.structure}% · motion ${st.motionClock.toFixed(1)}s · cast #${st.castCount}. ${st.auto?'Auto Cast will activate after the hold.':'Agents keep moving during the hold; ACTIVATE or DISSOLVE when ready.'}`;
   updateActivateBtn();
 }
 function tick(now){ if(!last)last=now; const dt=Math.min((now-last)/1000,.05); last=now; if(!paused) step(dt); fps=fps*.9 + (dt?1/dt:60)*.1; draw(); updateUI(); requestAnimationFrame(tick); }
