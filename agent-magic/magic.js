@@ -22,13 +22,15 @@ const DISSOLVE_AT=8.3, CYCLE=10.7;
 let W=0,H=0,last=0,fps=0,paused=false,resizeTimer=0;
 const st={spell:'orb',tint:'arcane',phaseClock:0,casting:true,auto:false,pointer:null,agents:[],budget:2200,
   cohesion:60,shimmer:55,intensity:70,freedom:35,light:55,structure:70,density:0,stability:0,castCount:0,cooldown:0,
-  activated:true,holdReady:false,fireStart:{x:0,y:0},fireTarget:{x:0,y:0}};
-const AgentMagicDiagnostics={state:st}; window.AgentMagicDiagnostics=AgentMagicDiagnostics;
+  activated:false,holdReady:false,holdElapsed:0,fireStart:{x:0,y:0},fireTarget:{x:0,y:0}};
+const AgentMagicDiagnostics={state:st, cast:()=>cast(), activate:()=>activate(), dissolve:()=>dissolve(), step:dt=>step(dt), changeSpell:name=>changeSpell(name)}; window.AgentMagicDiagnostics=AgentMagicDiagnostics;
 const center=()=>[W*.5,H*.48];
 const baseRadius=()=>Math.min(W,H)*(st.spell==='fireball' ? (.09+st.intensity*.0006) : (.14+st.intensity*.0007));
 const releaseProgress=()=>smooth((st.phaseClock-DISSOLVE_AT)/(CYCLE-DISSOLVE_AT));
 const stageGrowth=()=>{const t=st.phaseClock;if(t<1.2)return .03+smooth(t/1.2)*.10; if(t<3.4)return .13+smooth((t-1.2)/2.2)*.50; if(t<5.8)return .63+smooth((t-3.4)/2.4)*.31; return .94+smooth((Math.min(t,8.3)-5.8)/2.5)*.06;};
-function holdThreshold(){ return st.spell==='sigil' ? DISSOLVE_AT : st.spell==='fireball' ? 5.8 : null; }
+// Formation completes at 54% of the old timeline for Fireball and 78% for all other spells.
+// These are HOLD points, not automatic stop/dissolve commands.
+function holdThreshold(){ return st.spell==='fireball' ? 5.8 : DISSOLVE_AT; }
 function phaseInfo(){for(const p of PHASES){if(st.phaseClock<p[1])return p;}return PHASES[4];}
 function spawn(i){
   const [cx,cy]=center(), angle=i*PHI+Math.random()*.35, rr=(.24+Math.sqrt(Math.random())*.92)*Math.max(W,H)*.52;
@@ -40,13 +42,19 @@ function ensureAgents(){while(st.agents.length<st.budget)st.agents.push(spawn(st
 function resize(){const r=stage.getBoundingClientRect(), nw=Math.max(260,Math.round(r.width)), nh=Math.max(320,Math.round(r.height)); if(nw===W&&nh===H)return; const ow=W,oh=H; W=nw; H=nh; canvas.width=nw; canvas.height=nh; if(ow&&oh){const sx=nw/ow, sy=nh/oh; for(const a of st.agents){a.x*=sx;a.y*=sy;a.vx*=sx;a.vy*=sy;} if(st.pointer){st.pointer.x*=sx;st.pointer.y*=sy;} st.fireStart.x*=sx;st.fireStart.y*=sy;st.fireTarget.x*=sx;st.fireTarget.y*=sy;}}
 function setupFireballAim(){ st.fireStart={x:W*.28,y:H*.60}; st.fireTarget=st.pointer ? {x:st.pointer.x,y:st.pointer.y} : {x:W*.78,y:H*.34}; }
 function cast(){
-  ensureAgents(); st.phaseClock=0; st.casting=true; st.cooldown=0; st.castCount++; st.holdReady=false;
-  st.activated=!(st.spell==='sigil' || st.spell==='fireball'); if(st.spell==='fireball') setupFireballAim();
+  ensureAgents(); st.phaseClock=0; st.casting=true; st.cooldown=0; st.castCount++; st.holdReady=false; st.holdElapsed=0;
+  st.activated=false; if(st.spell==='fireball') setupFireballAim();
   for(const a of st.agents){a.released=false;a.opacity=Math.min(a.opacity,.14);a.lit*=.35; if(!a.vx&&!a.vy){a.vx=Math.cos(a.theta)*.3;a.vy=Math.sin(a.theta)*.3;}}
   $('#statusText').textContent='SPELL ACTIVE'; updateActivateBtn();
 }
-function activate(){ if(!(st.spell==='sigil'||st.spell==='fireball')) return; st.activated=true; st.holdReady=false; if(st.spell==='fireball'&&st.phaseClock<5.8)st.phaseClock=5.8; if(st.spell==='sigil'&&st.phaseClock<DISSOLVE_AT)st.phaseClock=DISSOLVE_AT; $('#statusText').textContent='SPELL ACTIVE'; updateActivateBtn(); }
-function dissolve(){ if(st.phaseClock>=CYCLE)return; st.phaseClock=Math.max(DISSOLVE_AT+.02, st.phaseClock); st.casting=true; st.activated=true; st.holdReady=false; for(const a of st.agents)a.released=false; updateActivateBtn(); }
+function activate(){
+  // Deliberate final activation: Fireball launches, every other spell releases.
+  if(st.activated || !st.casting) return;
+  st.activated=true; st.holdReady=false; st.holdElapsed=0;
+  st.phaseClock=Math.max(st.phaseClock,holdThreshold());
+  $('#statusText').textContent=st.spell==='fireball'?'FIREBALL LAUNCHED':'SPELL ACTIVATED'; updateActivateBtn();
+}
+function dissolve(){ if(st.phaseClock>=CYCLE)return; st.phaseClock=Math.max(DISSOLVE_AT+.02, st.phaseClock); st.casting=true; st.activated=true; st.holdReady=false; st.holdElapsed=0; for(const a of st.agents)a.released=false; updateActivateBtn(); }
 function changeSpell(name){ st.spell=name; $('#spellNote').textContent=name.toUpperCase(); if(name==='fireball' && ['arcane','healing','void','solar'].includes(st.tint)){$('#tint').value='flame'; st.tint='flame';} cast(); }
 function currentSpellCenter(){
   if(st.spell!=='fireball') return center();
@@ -85,9 +93,23 @@ function step(dt){
   ensureAgents();
   const holdAt=holdThreshold();
   if(st.casting){
-    if(holdAt!=null && !st.activated && st.phaseClock>=holdAt){ st.phaseClock=holdAt; st.holdReady=true; $('#statusText').textContent=st.spell==='fireball'?'READY TO LAUNCH':'SIGIL HELD'; }
-    else { st.phaseClock=Math.min(CYCLE, st.phaseClock+dt); if(holdAt!=null && !st.activated && st.phaseClock>=holdAt){ st.phaseClock=holdAt; st.holdReady=true; $('#statusText').textContent=st.spell==='fireball'?'READY TO LAUNCH':'SIGIL HELD'; } else if(st.phaseClock>=CYCLE){ st.casting=false; st.cooldown=0; $('#statusText').textContent='SPELL DISSOLVED'; } }
-  } else if(st.auto){ st.cooldown+=dt; if(st.cooldown>1.1) cast(); }
+    if(!st.activated){
+      // All forms have a stable charging phase. No more surprise dissolves at 78%.
+      st.phaseClock=Math.min(holdAt, st.phaseClock+dt);
+      if(st.phaseClock>=holdAt){
+        st.phaseClock=holdAt;
+        st.holdReady=true;
+        $('#statusText').textContent=st.spell==='fireball'?'FIREBALL CHARGED':`${st.spell.toUpperCase()} HELD`;
+        if(st.auto){
+          st.holdElapsed+=dt;
+          if(st.holdElapsed>=2.2) activate();
+        }
+      }
+    } else {
+      st.phaseClock=Math.min(CYCLE,st.phaseClock+dt);
+      if(st.phaseClock>=CYCLE){st.casting=false;st.cooldown=0;$('#statusText').textContent='SPELL DISSOLVED';}
+    }
+  } else if(st.auto){st.cooldown+=dt;if(st.cooldown>1.1)cast();}
   const [cx,cy]=currentSpellCenter(), r=baseRadius(), g=stageGrowth(), release=releaseProgress(), structure=st.structure*.01, cohesion=st.cohesion*.01, shimmer=st.shimmer*.01, freedom=st.freedom*.01, intensity=st.intensity*.01;
   const t=st.phaseClock, dt60=Math.min(dt*60,2.5), basePull=.0026+.008*structure+.012*cohesion, pull=basePull*(.3+g*1.35);
   let ene=0, stable=0;
@@ -121,8 +143,28 @@ function draw(){
   for(const a of st.agents){ if(a.opacity<.004||a.radius<.3||a.x<-20||a.y<-20||a.x>W+20||a.y>H+20) continue; const rgb=coreRGB[a.role], v=.85+(.12*st.shimmer*.01)*Math.sin(a.seed+st.phaseClock*4), alpha=clamp(a.opacity*(.68+1.10*light)*v,0,.68); ctx.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha.toFixed(3)})`; hex(a.x,a.y,a.radius); ctx.fill(); }
   if(st.spell==='sigil' && (st.holdReady || (!st.activated && st.phaseClock>=DISSOLVE_AT-.01))){ ctx.strokeStyle=`rgba(${p[2][0]},${p[2][1]},${p[2][2]},.18)`; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,r*.92,0,TAU); ctx.stroke(); }
 }
-function updateActivateBtn(){ const b=$('#activateBtn'); if(st.spell==='sigil'||st.spell==='fireball'){ b.disabled=false; b.style.opacity='1'; b.textContent=st.holdReady ? (st.spell==='fireball' ? '⚡ LAUNCH' : '⚡ ACTIVATE') : '⚡ ACTIVATE'; } else { b.disabled=true; b.style.opacity='.5'; b.textContent='⚡ ACTIVATE'; } }
-function updateUI(){ const pd=phaseInfo(), totalPct=Math.round(clamp(st.phaseClock/CYCLE,0,1)*100); $('#phaseLabel').textContent=pd[2]; $('#phasePct').textContent=totalPct+'%'; $('#phaseBar').style.width=totalPct+'%'; $('#phaseDesc').textContent=(st.holdReady&& !st.activated) ? (st.spell==='fireball' ? 'The fireball is fully gathered. Activate to launch it.' : 'The sigil is fully formed and held. Activate for the final release.') : pd[3]; $('#agentCount').textContent=st.agents.length.toLocaleString(); $('#fps').textContent=Math.round(fps); $('#densityValue').textContent=Math.round(st.density*100)+'%'; $('#stabilityValue').textContent=Math.round(st.stability*100)+'%'; $('#pulseBtn').textContent=st.auto?'◉ AUTO CAST ON':'◌ AUTO CAST OFF'; $('#pauseBtn').textContent=paused?'▶ RESUME':'Ⅱ PAUSE'; $('#budgetOut').textContent=st.budget.toLocaleString(); $('#lightOut').textContent=st.light+'%'; $('#structureOut').textContent=st.structure+'%'; $('#cohesionOut').textContent=st.cohesion+'%'; $('#shimmerOut').textContent=st.shimmer+'%'; $('#intensityOut').textContent=st.intensity+'%'; $('#freedomOut').textContent=st.freedom+'%'; const mode = st.holdReady && !st.activated ? 'held' : (releaseProgress()>0?'dissolving':'forming'); $('#readout').textContent=`${st.spell[0].toUpperCase()+st.spell.slice(1)} spell · ${st.agents.length} agents · ${mode} · light ${st.light}% · structure ${st.structure}% · cast #${st.castCount}. ${st.spell==='fireball' ? 'Gather, aim, launch, burst.' : st.spell==='sigil' ? 'The sigil can hold until final activation.' : 'Magic forms through disturbance, gathering, formation, resolution, and dissolution.'}`; updateActivateBtn(); }
+function updateActivateBtn(){
+  const b=$('#activateBtn');
+  b.disabled=st.activated || !st.casting;
+  b.style.opacity=b.disabled?'.5':'1';
+  b.textContent=st.spell==='fireball' ? (st.holdReady?'🔥 LAUNCH':'⚡ LAUNCH EARLY') : (st.holdReady?'⚡ ACTIVATE':'⚡ ACTIVATE EARLY');
+}
+function updateUI(){
+  const pd=phaseInfo(), holdAt=holdThreshold(), holding=st.holdReady&&!st.activated;
+  const progress=st.activated?clamp((st.phaseClock-holdAt)/(CYCLE-holdAt),0,1):clamp(st.phaseClock/holdAt,0,1);
+  const totalPct=Math.round(progress*100);
+  const activeLabel=st.spell==='fireball'&&st.phaseClock<DISSOLVE_AT?'05 / FIREBALL IN FLIGHT':'05 / FINAL RELEASE';
+  $('#phaseLabel').textContent=holding?(st.spell==='fireball'?'05 / CHARGED · HELD':'05 / FORMED · HELD'):(st.activated?activeLabel:pd[2]);
+  $('#phasePct').textContent=holding?'READY':totalPct+'%';
+  $('#phaseBar').style.width=totalPct+'%';
+  $('#phaseDesc').textContent=holding?(st.spell==='fireball'?'Fireball charged. Tap LAUNCH to fly, trail, and burst.':'Form stabilized. Tap ACTIVATE for final release.'):(st.activated?(st.spell==='fireball'?'Fireball in motion or bursting.':'Final activation releases the spell.'):pd[3]);
+  $('#agentCount').textContent=st.agents.length.toLocaleString(); $('#fps').textContent=Math.round(fps); $('#densityValue').textContent=Math.round(st.density*100)+'%'; $('#stabilityValue').textContent=Math.round(st.stability*100)+'%';
+  $('#pulseBtn').textContent=st.auto?'◉ AUTO CAST ON':'◌ AUTO CAST OFF'; $('#pauseBtn').textContent=paused?'▶ RESUME':'Ⅱ PAUSE';
+  for(const id of ['budget','light','structure','cohesion','shimmer','intensity','freedom']) $('#'+id+'Out').textContent=id==='budget'?st.budget.toLocaleString():st[id]+'%';
+  const mode=holding?'held and active':st.activated?(releaseProgress()>0?'releasing':'activated'):'forming';
+  $('#readout').textContent=`${st.spell[0].toUpperCase()+st.spell.slice(1)} spell · ${st.agents.length} agents · ${mode} · light ${st.light}% · structure ${st.structure}% · cast #${st.castCount}. ${st.auto?'Auto Cast will activate after the hold.':'Spells remain formed until ACTIVATE or DISSOLVE.'}`;
+  updateActivateBtn();
+}
 function tick(now){ if(!last)last=now; const dt=Math.min((now-last)/1000,.05); last=now; if(!paused) step(dt); fps=fps*.9 + (dt?1/dt:60)*.1; draw(); updateUI(); requestAnimationFrame(tick); }
 for(const id of ['budget','light','structure','cohesion','shimmer','intensity','freedom']){ const el=$('#'+id); el.addEventListener('input',()=>{ st[id]=Number(el.value); if(id==='budget') ensureAgents(); }); }
 $('#tint').addEventListener('change',e=>{ st.tint=e.target.value; });
