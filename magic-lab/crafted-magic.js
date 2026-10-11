@@ -114,7 +114,7 @@
    if(scene.rings&&scene.rings.length>36)scene.rings.shift();
   }
   st.healFX=st.healFX.filter(p=>time-p.born<600);
-  Impacts.process(scene,st,time,Combat,previousCenter,worldPosition);
+  Impacts.process(scene,st,time,Combat,previousCenter);
  }
  function step(scene,time,delta,Combat){
   if(scene.craftedAura){stepOne(scene,scene.craftedAura,time,delta,Combat);
