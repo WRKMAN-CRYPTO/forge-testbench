@@ -1,4 +1,4 @@
-/* WRKMAN / ARCANE LAB 029 — six-slot loadout + quarter-fan aiming, independent of combat.
+/* WRKMAN / ARCANE LAB 034 — six-slot loadout + quarter-fan aiming, independent of combat.
  * No browser APIs here. UI and persistence are consumers of this module.
  */
 (function(root,factory){
@@ -9,9 +9,9 @@
 })(typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
  const KEY="wrkman-arcane-lab026-spell-loadout-v1";
- const LIBRARY=Object.freeze(["bolt","well","pulse","frost","flame","detonate","lightning"]);
+ const LIBRARY=Object.freeze(["bolt","well","pulse","frost","flame","detonate","lightning","crafted"]);
  const DEFAULT=Object.freeze(["bolt","well","frost","flame","detonate","lightning"]);
- const GLYPH=Object.freeze({bolt:"✦",well:"◉",pulse:"◎",frost:"❄",flame:"♨",detonate:"✹",lightning:"⚡"});
+ const GLYPH=Object.freeze({bolt:"✦",well:"◉",pulse:"◎",frost:"❄",flame:"♨",detonate:"✹",lightning:"⚡",crafted:"⬡"});
  const SLOT_COUNT=6;
  function valid(slots){
   return Array.isArray(slots)&&slots.length===SLOT_COUNT&&
