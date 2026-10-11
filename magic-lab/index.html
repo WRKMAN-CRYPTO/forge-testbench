@@ -1405,7 +1405,7 @@ class Lab extends Phaser.Scene{
   }
   if(Elements&&this.elementWorld)Elements.step(this,time,delta,Combat);
   Combat.step(this,time,delta);
-  if(Crafted)Crafted.step(this,time,delta,Combat);
+  if(Crafted)Crafted.step(this,this.time.now,delta,Combat);
   if(Wildlife&&this.wildlife){
    // World probes + instincts stay ~12.5Hz on the phone. Movement and
    // ballistic knockback integrate every rendered frame, independently.
@@ -1432,12 +1432,12 @@ class Lab extends Phaser.Scene{
   if(this.removal.length){const dead=new Set(this.removal);for(const b of dead)this.matter.world.remove(b);this.projectiles=this.projectiles.filter(p=>!dead.has(p.body));this.actors=this.actors.filter(a=>!dead.has(a.body));this.combat.enemies=this.combat.enemies.filter(e=>!dead.has(e.body));this.removal=[];}
   this.fx=this.fx.filter(p=>{p.x+=p.vx*t;p.y+=p.vy*t;p.vx*=.96;p.vy*=.96;p.life-=delta;return p.life>0;});
   this.renderWorld(time);
-  if(this.craftedDraw){this.craftedDraw.clear();if(Crafted)Crafted.draw(this,this.craftedDraw,time);}
+  if(this.craftedDraw){this.craftedDraw.clear();if(Crafted)Crafted.draw(this,this.craftedDraw,this.time.now);}
   if(this.craftedAura){
    $("craftHud").hidden=false;
    if((this.craftedHudTick=(this.craftedHudTick||0)+1)%18===0){
     const aura=Crafted.snapshot(this);
-    $("craftHud").textContent="⬡ "+aura.name+" · "+Math.ceil((this.craftedAura.expires-time)/1000)+"s · "+(aura.healLinked?"♥ "+aura.pulses:"LINK OFF");
+    $("craftHud").textContent="⬡ "+aura.name+" · "+Math.ceil((this.craftedAura.expires-this.time.now)/1000)+"s · "+(aura.healLinked?"♥ "+aura.pulses:"LINK OFF");
    }
   }else $("craftHud").hidden=true;
   if(!this.renderedFrame){
