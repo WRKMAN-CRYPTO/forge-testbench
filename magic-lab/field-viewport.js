@@ -31,8 +31,10 @@
    return fit();
   }
   function zoomStep(direction,nx=.5,ny=.5){
-   const options=[1,2,4,8],index=options.findIndex(z=>z>=view.zoom-1e-6);
-   return setZoom(options[clamp(index+(direction>0?1:-1),0,options.length-1)],nx,ny);
+   const options=[1,2,4,8];
+   const level=direction>0?(options.find(z=>z>view.zoom+1e-6)??8):
+    (options.filter(z=>z<view.zoom-1e-6).pop()??1);
+   return setZoom(level,nx,ny);
   }
   function panPixels(dx,dy,width,height){
    view.x-=dx/Math.max(1,width)*(N/view.zoom);
