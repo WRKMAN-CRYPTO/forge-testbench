@@ -1,6 +1,6 @@
-# WRKMAN Agent·Field v0.4 | Stone Range
+# WRKMAN Agent·Field v0.5 | Shared Field Physics
 
-A mobile-first, standalone programmable hex-agent laboratory, with a separate **Stone Range** tab for firing the current field at breakable targets. The roguelike is not modified.
+A mobile-first, standalone programmable hex-agent laboratory, with a separate **Stone Range** tab for firing the current field at breakable targets. The editor, Stone Range, in-game Spell Forge preview and roguelike now share the canonical field movement module.
 
 ## Use it
 
@@ -14,7 +14,7 @@ A mobile-first, standalone programmable hex-agent laboratory, with a separate **
 
 - There are five stones with different durability, selection highlights, health bars, and cumulative damage.
 - Stones respond to actual per-agent proximity collisions, with one registered strike per agent per stone per cast. This is not an automatic timed explosion.
-- Both 32 × 32 field sampling and directional gradient logic are shared with the field editor. The range animates the cast as a flying swarm, whose internal behavior is driven by a snapshot of the exact current field and settings.
+- Both 32 × 32 field sampling and directional gradient logic are shared with the field editor, the game and its Spell Forge preview through `../field-physics.js` (Build 037). The range animates the cast as a flying swarm, whose internal behavior is driven by a snapshot of the exact current field and settings.
 - The casting frame is a first-pass game-facing delivery mechanism. It's not intended to claim that every field is inherently a projectile. Future delivery styles can reuse the same field interpreter.
 - Every cast uses the currently selected population, including 6,000 if requested. At high agent counts, actual mobile performance depends on hardware and browser.
 - Switching tabs pauses the inactive canvas, so the expensive renderers do not run together. Existing open-world behavior and offscreen accounting on the field-editor tab remain intact.
@@ -22,8 +22,13 @@ A mobile-first, standalone programmable hex-agent laboratory, with a separate **
 
 ## Files
 
-- `index.html`: Entire self-contained application. Open from GitHub Pages or a compatible browser.
+- `index.html`: Editor and Stone Range interface (served from GitHub Pages).\n- `../field-physics.js`: Canonical movement interpreter used across both laboratories and the roguelike. The HTML requires this script.
 
 ## Checks
 
 Headless Chromium tests with a phone-sized viewport covered: switching editor/range/editor without losing the field, applying the custom Magenta Gap field and settings to a live cast, rendering with 1,200 and 6,000 hex agents, registering impacts and shattered stones, waiting for spell completion, and rebuilding intact rocks. No page JavaScript errors were observed. A real iPhone performance pass is still needed.
+## Shared physics (v0.5)
+
+The updated editor and Stone Range call the same dependency-free 32×32 interpreter as roguelike Build 037. Agents move through grayscale gradients and instruction-free magenta space according to the exact v0.4 field equations. Offscreen agents are **not** recycled, wrapped, or clamped. The editor continues to use its physical canvas dimensions; Stone Range and game use a 360×500 simulation reference. Delivery and rendering aspect ratios can still differ without changing the actual instruction physics.
+
+Regression comparisons against the v0.4 equations produced no difference over 53,760 agent-frames. Mobile performance requires device playtesting.
