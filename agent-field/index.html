@@ -16,13 +16,13 @@ main{max-width:1190px;margin:auto;padding:16px 13px calc(25px + env(safe-area-in
 </style>
 </head>
 <body><main>
-<header><div class="mark">W</div><div><div class="brand">WRKMAN LABS / BEHAVIOR FIELD 01</div><h1>AGENT·FIELD</h1></div><span class="version">v0.1</span></header>
-<p class="intro">Programmable magic, not painted animation. A 32 × 32 field guides a moving population of hexagonal rendering agents. White starts the journey, black ends it, and magenta means no instructions.</p>
+<header><div class="mark">W</div><div><div class="brand">WRKMAN LABS / BEHAVIOR FIELD 01</div><h1>AGENT·FIELD</h1></div><span class="version">v0.2</span></header>
+<p class="intro">Programmable magic, not painted animation. A 32 × 32 field guides a moving population of hexagonal rendering agents. White starts the journey, black ends it, and magenta means no instructions. The swarm is free to leave the canvas; RESEED brings it back.</p>
 <div class="layout">
   <section class="card">
     <div class="heading"><span class="kicker">LIVE HEX SWARM</span><span class="caption" id="stageLabel">GRAVITY WELL</span></div>
     <div class="stage" id="stage"><canvas id="view" aria-label="Animated hexagonal agents following a behavior map"></canvas><div class="hint">Canvas is the result. Paint instructions on the map →</div></div>
-    <div class="stats"><div class="stat"><b id="countStat">0</b><small>agents</small></div><div class="stat"><b id="fpsStat">0</b><small>FPS</small></div><div class="stat"><b id="freeStat">0</b><small>free-space agents</small></div><div class="stat"><b id="arrivedStat">0</b><small>near finish</small></div></div>
+    <div class="stats"><div class="stat"><b id="countStat">0</b><small>agents</small></div><div class="stat"><b id="fpsStat">0</b><small>FPS</small></div><div class="stat"><b id="freeStat">0</b><small>free-space agents</small></div><div class="stat"><b id="arrivedStat">0</b><small>near finish</small></div><div class="stat"><b id="offscreenStat">0</b><small>offscreen</small></div></div>
     <div class="actions">
       <button class="btn primary" id="release">↻ RESEED</button>
       <button class="btn" id="pause">Ⅱ PAUSE</button>
@@ -54,7 +54,7 @@ main{max-width:1190px;margin:auto;padding:16px 13px calc(25px + env(safe-area-in
     <div class="two"><div class="control"><div class="control-head"><label for="momentum">Momentum</label><output id="momentumOut">62%</output></div><input id="momentum" type="range" min="0" max="100" value="62"></div><div class="control"><div class="control-head"><label for="light">Light budget</label><output id="lightOut">62%</output></div><input id="light" type="range" min="0" max="100" value="62"></div></div>
     <div class="mini">Save your spell instructions</div>
     <div class="subactions"><button class="btn" id="save">↧ SAVE LOCALLY</button><button class="btn" id="load">↥ LOAD SAVED</button><button class="btn" id="export">⇩ EXPORT JSON</button><button class="btn" id="importBtn">⇧ IMPORT JSON/PNG</button></div><input class="import" id="importFile" type="file" accept=".json,.png,image/png,application/json">
-    <p class="note">Magenta is truly instruction-free: an agent keeps moving under its own momentum and may enter another grayscale island. No pink is drawn into the spell. In A+B mode the grayscale progression also changes hex size, color, and speed.</p>
+    <p class="note">Magenta is truly instruction-free: an agent keeps moving under its own momentum and may enter another grayscale island. There are no invisible canvas walls: agents can fly offscreen, remain alive, and continue drifting beyond the map. Tap RESEED to bring them back. No pink is drawn into the spell. In A+B mode the grayscale progression also changes hex size, color, and speed.</p>
   </div></section>
 </div>
 <p class="footer"><strong>Architecture:</strong> This field is a control surface, not a sprite. The visible spell is composed of moving hex agents. The editor and simulation share a portable 1,024-value map. Separate experimental lab, no roguelike integration.</p>
@@ -63,7 +63,7 @@ main{max-width:1190px;margin:auto;padding:16px 13px calc(25px + env(safe-area-in
 (()=>{'use strict';
 const $=s=>document.querySelector(s), N=32, TOTAL=N*N, MASK=-1, TAU=Math.PI*2;
 const mapCanvas=$('#map'), mctx=mapCanvas.getContext('2d',{willReadFrequently:true}), canvas=$('#view'), ctx=canvas.getContext('2d'), stage=$('#stage');
-const S={field:new Int16Array(TOTAL),brush:255,brushSize:1,mode:'a',palette:'arcane',population:1200,swirl:26,momentum:62,light:62,agents:[],paused:false,overlay:false,last:0,time:0,fps:0,frame:0,freeCount:0,nearCount:0,startCells:[],maxValue:255,dragging:false,resizeTimer:0,name:'GRAVITY WELL',dirty:true,status:'',motionClock:0};
+const S={field:new Int16Array(TOTAL),brush:255,brushSize:1,mode:'a',palette:'arcane',population:1200,swirl:26,momentum:62,light:62,agents:[],paused:false,overlay:false,last:0,time:0,fps:0,frame:0,freeCount:0,nearCount:0,offscreenCount:0,startCells:[],maxValue:255,dragging:false,resizeTimer:0,name:'GRAVITY WELL',dirty:true,status:'',motionClock:0};
 const palette={arcane:[[92,139,244],[176,121,250],[223,193,255]],flame:[[208,65,39],[253,126,49],[255,213,105]],healing:[[66,184,144],[144,231,119],[240,235,149]],void:[[100,67,157],[179,72,199],[255,134,202]]};
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)), lerp=(a,b,t)=>a+(b-a)*t, smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t)}, rand=(a,b)=>a+Math.random()*(b-a);
 const choose=arr=>arr[(Math.random()*arr.length)|0];
@@ -108,7 +108,10 @@ function rebuildStartCells(){
   for(const i of valid){if(S.field[i]>=threshold)S.startCells.push(i)}
 }
 function sampleField(nx,ny){
-  const cx=clamp(nx*N,0,N-.0001),cy=clamp(ny*N,0,N-.0001);
+  // The field exists only within the map. Outside the canvas there is no guidance,
+  // exactly as in magenta free space. Do not clamp offscreen samples to edge cells.
+  if(!Number.isFinite(nx)||!Number.isFinite(ny)||nx<0||nx>=1||ny<0||ny>=1)return {valid:false,value:null};
+  const cx=nx*N,cy=ny*N;
   const i=Math.floor(cx),j=Math.floor(cy);
   if(toCell(i,j)===MASK)return {valid:false,value:null};
   // Mask takes precedence. Renormalize only over valid grayscale neighbors, never blend magenta into values.
@@ -136,11 +139,11 @@ function mapPoint(i){const x=i%N,y=(i/N)|0;return {x:(x+rand(.1,.9))/N,y:(y+rand
 function spawnAgent(i){let p;if(S.startCells.length){p=mapPoint(choose(S.startCells))}else{p={x:Math.random(),y:Math.random()}};
   const angle=rand(0,TAU),speed=rand(.7,1.9);return {x:p.x,y:p.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,seed:Math.random()*TAU,home:i,phase:0,progress:0,free:false,tail:[],age:0};
 }
-function reseed(){S.agents=Array.from({length:S.population},(_,i)=>spawnAgent(i));S.time=0;S.frame=0;S.freeCount=0;S.nearCount=0;setStatus('Swarm reseeded. Follow the grayscale descent, or coast through magenta without instructions.');}
+function reseed(){S.agents=Array.from({length:S.population},(_,i)=>spawnAgent(i));S.time=0;S.frame=0;S.freeCount=0;S.nearCount=0;S.offscreenCount=0;setStatus('Swarm reseeded. No edge walls: agents can drift offscreen and stay out there.');}
 function resize(){const r=stage.getBoundingClientRect(),w=Math.max(260,Math.round(r.width)),h=Math.max(300,Math.round(r.height));if(canvas.width===w&&canvas.height===h)return;canvas.width=w;canvas.height=h;}
 function update(dt){
   S.time+=dt;S.frame++;const timeScale=clamp(dt*60,0,2), momentum=S.momentum/100, swirl=S.swirl/100;
-  let free=0,near=0;const leap=1000/60;
+  let free=0,near=0,offscreen=0;
   for(const a of S.agents){
     a.age+=dt;
     const here=sampleField(a.x,a.y);a.free=!here.valid;
@@ -165,11 +168,11 @@ function update(dt){
       const s=Math.hypot(a.vx,a.vy);if(s>speedLimit){a.vx*=speedLimit/s;a.vy*=speedLimit/s;}
     }
     a.x+=a.vx*timeScale/(canvas.width||360);a.y+=a.vy*timeScale/(canvas.height||500);
-    // Coordinates are normalized. Wrap only at true canvas edges, never at magenta.
-    if(a.x<0)a.x+=1; if(a.x>1)a.x-=1; if(a.y<0)a.y+=1; if(a.y>1)a.y-=1;
+    // Open world: offscreen agents remain alive at their true positions. No wrap, bounce or respawn.
+    if(a.x<0||a.x>=1||a.y<0||a.y>=1)offscreen++;
     if(S.frame%3===0){a.tail.push([a.x,a.y]);if(a.tail.length>5)a.tail.shift();}
   }
-  S.freeCount=free;S.nearCount=near;
+  S.freeCount=free;S.nearCount=near;S.offscreenCount=offscreen;
 }
 function drawHex(x,y,r){ctx.beginPath();for(let k=0;k<6;k++){const ang=TAU*k/6+Math.PI/6;const xx=x+Math.cos(ang)*r,yy=y+Math.sin(ang)*r;k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);}ctx.closePath();}
 function draw(){
@@ -179,6 +182,10 @@ function draw(){
   if(S.overlay){ctx.save();ctx.globalAlpha=.23;for(let y=0;y<N;y++)for(let x=0;x<N;x++){const v=toCell(x,y);ctx.fillStyle=v<0?'#ff00ff':`rgb(${v},${v},${v})`;ctx.fillRect(x/N*w,y/N*h,w/N+1,h/N+1);}ctx.restore();}
   const colors=palette[S.palette],light=.14+S.light/100*.84;ctx.save();
   for(const a of S.agents){
+    // Keep offscreen physics running, but do not waste canvas draw calls on invisible hexes.
+    const x=a.x*w,y=a.y*h;
+    if((x < -12||x>w+12||y < -12||y>h+12)&&
+       a.tail.every(([tx,ty])=>tx*w < -12||tx*w>w+12||ty*h < -12||ty*h>h+12))continue;
     const p=clamp(a.progress,0,1), t=S.mode==='ab'?p:.44;
     const c0=colors[0],c1=colors[1],c2=colors[2];const col=t<.5?c0.map((n,i)=>lerp(n,c1[i],t*2)):c1.map((n,i)=>lerp(n,c2[i],(t-.5)*2));
     const r=(S.mode==='ab'?1.2+3.1*p:2.8)+(Math.sin(S.time*3.3+a.seed)*.28);
@@ -186,7 +193,7 @@ function draw(){
     ctx.fillStyle=`rgba(${col.map(Math.round).join(',')},${(.18+light*.63).toFixed(3)})`;drawHex(a.x*w,a.y*h,r);ctx.fill();
   }ctx.restore();
 }
-function updateUI(){if(S.frame%10!==0)return;$('#countStat').textContent=S.agents.length.toLocaleString();$('#fpsStat').textContent=Math.round(S.fps);$('#freeStat').textContent=S.freeCount.toLocaleString();$('#arrivedStat').textContent=S.nearCount.toLocaleString();}
+function updateUI(){if(S.frame%10!==0)return;$('#countStat').textContent=S.agents.length.toLocaleString();$('#fpsStat').textContent=Math.round(S.fps);$('#freeStat').textContent=S.freeCount.toLocaleString();$('#arrivedStat').textContent=S.nearCount.toLocaleString();$('#offscreenStat').textContent=S.offscreenCount.toLocaleString();}
 function tick(now){if(!S.last)S.last=now;const dt=Math.min((now-S.last)/1000,.06);S.last=now;
   if(!S.paused)update(dt);S.fps=S.fps*.92+(dt?1/dt:60)*.08;draw();updateUI();requestAnimationFrame(tick);
 }
@@ -226,6 +233,6 @@ $('#importFile').addEventListener('change',async e=>{const f=e.target.files?.[0]
  }catch(err){setStatus('Import failed: '+err.message)}finally{e.target.value=''}});
 window.addEventListener('resize',()=>{clearTimeout(S.resizeTimer);S.resizeTimer=setTimeout(resize,140)});
 resize();preset('well');requestAnimationFrame(tick);
-window.AgentFieldDiagnostics={getState:()=>({agents:S.agents.length,free:S.freeCount,near:S.nearCount,paused:S.paused,mode:S.mode,maskCells:Array.from(S.field).filter(v=>v<0).length,name:S.name,time:S.time}),sample:(x,y)=>sampleField(x,y),setPreset:preset,reseed,importConfig,getAgent:(i=0)=>({...S.agents[i]}),config};
+window.AgentFieldDiagnostics={getState:()=>({agents:S.agents.length,free:S.freeCount,near:S.nearCount,offscreen:S.offscreenCount,paused:S.paused,mode:S.mode,maskCells:Array.from(S.field).filter(v=>v<0).length,name:S.name,time:S.time}),sample:(x,y)=>sampleField(x,y),setPreset:preset,reseed,importConfig,getAgent:(i=0)=>({...S.agents[i]}),config};
 })();
 </script></body></html>
