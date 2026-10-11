@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 037 / in-game Spell Forge with canonical preview
+/* WRKMAN ARCANE LAB 038 / world-emission Spell Forge
  * Field geometry remains the same portable WRKMAN_AGENT_FIELD_V1 recipe.
  * Editor and spell library never require Phaser; the game supplies pause/equip hooks.
  */
@@ -40,7 +40,7 @@
   const find=()=>library.items.find(i=>i.id===library.selected)||library.items[0];
   const saveLibrary=()=>{try{storage.setItem(KEY,JSON.stringify(library));return true}catch(_){return false}};
   let item=find(),draft=clone(item.recipe),heal=item.heal,dirty=false,brush='white',brushRadius=1,gray=128;
-  let undo=[],activePointer=null,dragStart=null,painting=false,particles=[],previewStarts=[],previewClock=0,prevFrame=0,rafId=0,opened=false;
+  let undo=[],activePointer=null,dragStart=null,painting=false,particles=[],previewStarts=[],previewClock=0,prevFrame=0,rafId=0,opened=false,previewPopulation=600;
   const style=document.createElement('style');style.textContent=`
 #forgeOverlay[hidden]{display:none!important}#forgeOverlay{position:fixed;inset:0;z-index:90;background:#030911f2;color:#f6ead2;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;font:13px/1.35 system-ui,-apple-system,sans-serif}
 #forgeOverlay *,#forgeOverlay *:before{box-sizing:border-box}#forgeOverlay button,#forgeOverlay select,#forgeOverlay input{font:inherit}#forgeOverlay button{cursor:pointer;touch-action:manipulation}
@@ -73,7 +73,7 @@
   document.head.append(style);
   const overlay=document.createElement('div');overlay.id='forgeOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','sfHeading');
   overlay.innerHTML=`<div class="sf-shell">
-   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>037 · SHARED PHYSICS</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
+   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>038 · WORLD EMISSION</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
    <div class="sf-grid">
     <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><canvas id="sfMap" width="320" height="320" class="sf-canvas" aria-label="32 by 32 instruction field; drag to draw"></canvas>
      <div class="sf-tools" id="sfTools"><button data-brush="white" class="active" title="White, high instruction value">⬜</button><button data-brush="gray" title="Gray, adjustable value">◧</button><button data-brush="black" title="Black, low instruction value">⬛</button><button data-brush="mask" title="Magenta, no instruction">🟪</button><button data-brush="line" title="Drag a white-to-black gradient line">↘</button></div>
@@ -81,12 +81,14 @@
      <div class="sf-actions"><button id="sfUndo">↶ UNDO</button><button id="sfClear">CLEAR TO MAGENTA</button><button id="sfRing">◯ RING STARTER</button><button id="sfCurtain">☷ CURTAIN STARTER</button></div>
      <div class="sf-caption">White starts · gray guides · black sinks · magenta releases. Gradient tool: drag a line from white toward black.</div>
     </section>
-    <section class="sf-box"><h3>02 / SHAPE & LINK</h3><canvas id="sfPreview" width="300" height="300" class="sf-preview" aria-label="Animated preview of the field"></canvas><div class="sf-flex"><span class="sf-caption" id="sfPreviewMeta">PHYSICS 037 · 140 AGENTS</span><button id="sfReseed" type="button">↻ RESEED PREVIEW</button></div>
+    <section class="sf-box"><h3>02 / SHAPE & LINK</h3><canvas id="sfPreview" width="300" height="300" class="sf-preview" aria-label="Animated preview of the field"></canvas><div class="sf-flex"><span class="sf-caption" id="sfPreviewMeta">PHYSICS 037</span><button id="sfReseed" type="button">↻ RESEED PREVIEW</button></div><label>PREVIEW SIMULATION<select id="sfPreviewCount"><option value="140">140 · LIGHT</option><option value="600" selected>600 · STANDARD</option><option value="1200">1,200</option><option value="2400">2,400 · HEAVY</option><option value="6000">6,000 · EXPERIMENTAL</option></select></label>
      <label>SPELL NAME <input id="sfName" maxlength="48" autocomplete="off" spellcheck="false" placeholder="Name your creation"></label>
      <div class="sf-flex"><label>PALETTE<select id="sfPalette"><option value="flame">🔥 FLAME</option><option value="arcane">✦ ARCANE</option><option value="healing">♥ HEALING</option><option value="void">◈ VOID</option></select></label><label>MATERIAL<select id="sfTexture"><option value="flat">⬡ FLAT HEX</option><option value="leaf">🍃 LEAF</option></select></label></div>
-     <label>DELIVERY<select id="sfDelivery"><option value="aura">◯ AURA · FOLLOW ME</option><option value="projectile">➤ PROJECTILE · FLY TOWARD AIM</option><option value="placed">⌖ PLACED FIELD · TAP LOCATION</option></select></label>
-     <div class="sf-caption">Delivery moves the entire 32×32 field through the world. Aura follows you (14s), projectile travels and lingers (5.3s), placed field stays at the tap point (9s). Hex contacts can hurt enemies and fracture stones.</div>
-     <div class="sf-flex"><label>BEHAVIOR<select id="sfMode"><option value="ab">A+B FIELD + BEHAVIOR</option><option value="a">A FOLLOW FIELD</option></select></label><label>AGENTS<select id="sfPopulation"><option value="200">200</option><option value="600">600</option><option value="1200">1200</option><option value="2400">2400</option><option value="6000">6000</option></select></label></div>
+     <label>DELIVERY<select id="sfDelivery"><option value="aura">◯ AURA · FOLLOW ME</option><option value="world">↗ WORLD EMISSION · RELEASE AT AIM</option><option value="placed">⌖ PLACED FIELD · TAP LOCATION</option></select></label>
+     <div class="sf-caption">WORLD EMISSION has no moving container. Your white starting region launches from the caster, oriented toward aim. Every agent then follows your painted field and escapes naturally. 22s life · 360×500 field space. AURA follows you (14s); PLACED FIELD stays where tapped (9s).</div>
+     <div class="sf-flex"><label>BEHAVIOR<select id="sfMode"><option value="ab">A+B FIELD + BEHAVIOR</option><option value="a">A FOLLOW FIELD</option></select></label><label>SIMULATED AGENTS<select id="sfPopulation"><option value="200">200</option><option value="600">600</option><option value="1200">1200</option><option value="2400">2400</option><option value="6000">6000</option></select></label></div>
+     <label>VISIBLE AGENTS / FRAME<select id="sfRenderLimit"><option value="600">600 · FAST</option><option value="1200">1,200 · BALANCED</option><option value="2400">2,400 · HIGH</option><option value="6000">6,000 · ALL (HEAVY)</option></select></label>
+     <div class="sf-caption">All simulated agents keep full physics and can hit things. Display density changes how many are drawn, never how many exist. 6,000 simulated and 6,000 drawn may slow some phones.</div>
      <div class="sf-flex"><label>SWIRL <span id="sfSwirlVal"></span><input id="sfSwirl" type="range" min="0" max="100"></label><label>MOMENTUM <span id="sfMomentumVal"></span><input id="sfMomentum" type="range" min="0" max="100"></label></div>
      <label>LIGHT <span id="sfLightVal"></span><input id="sfLight" type="range" min="0" max="100"></label>
      <div class="sf-link"><label><input id="sfHeal" type="checkbox"> ♥ LINK MINOR HEAL</label><small>Every 3s · self-anchor</small></div>
@@ -95,8 +97,8 @@
     <section class="sf-box sf-library-box"><h3>03 / YOUR SPELLS <span id="sfCount">0</span></h3><div class="sf-library" id="sfLibrary" role="group" aria-label="Saved crafted spells"></div>
      <div class="sf-actions"><button id="sfNew">+ NEW BLANK</button><button id="sfDuplicate">⧉ DUPLICATE</button><button id="sfSave">↧ SAVE</button><button id="sfExport">⇩ EXPORT JSON</button><button id="sfImport">↥ IMPORT JSON</button><button class="danger" id="sfDelete">× DELETE</button></div>
      <input id="sfFile" type="file" accept="application/json,.json" hidden>
-     <div class="sf-status" id="sfStatus" role="status" aria-live="polite">Paint your instructions, then save and equip the result.</div>
-     <div class="sf-caption">Up to 24 named spells on this device. Only one Bound Field is equipped at a time. Saved spells survive travel and reloads; active auras keep their cast-time snapshot.</div>
+     <div class="sf-status" id="sfStatus" role="status" aria-live="polite">Paint your instructions, choose AURA, WORLD EMISSION or PLACED FIELD, then save and equip.</div>
+     <div class="sf-caption">Up to 24 named spells on this device. One crafted spell is equipped at a time. Saved spells survive travel and reloads; active casts keep their snapshot. Old projectile recipes automatically become World Emission. Preview population is separate from spell population.</div>
     </section>
    </div>
   </div>`;
@@ -115,8 +117,8 @@
   function move(e){if(activePointer!==e.pointerId||!painting)return;e.preventDefault();const p=pointerCell(e);if(brush==='line'){paintMap();mc.strokeStyle='#ffdc74';mc.lineWidth=3;mc.beginPath();mc.moveTo((dragStart.x+.5)*10,(dragStart.y+.5)*10);mc.lineTo((p.x+.5)*10,(p.y+.5)*10);mc.stroke()}else{line(dragStart.x,dragStart.y,p.x,p.y,false);dragStart=p;paintMap();mark()}}
   function up(e){if(activePointer!==e.pointerId)return;e.preventDefault();if(brush==='line'){const p=pointerCell(e);line(dragStart.x,dragStart.y,p.x,p.y,true);paintMap();mark()}activePointer=null;dragStart=null;painting=false;try{map.releasePointerCapture(e.pointerId)}catch(_){}}
   map.addEventListener('pointerdown',down);map.addEventListener('pointermove',move);map.addEventListener('pointerup',up);map.addEventListener('pointercancel',up);
-  function refreshFields(){const s=draft.settings;$('sfName').value=draft.name;$('sfPalette').value=s.palette;$('sfTexture').value=s.texture;$('sfMode').value=s.mode;$('sfDelivery').value=s.delivery||'aura';$('sfPopulation').value=String([200,600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.population)<Math.abs(a-s.population)?b:a));for(const n of ['Swirl','Momentum','Light']){$('sf'+n).value=s[n.toLowerCase()];$('sf'+n+'Val').textContent=String(s[n.toLowerCase()])}$('sfHeal').checked=heal;paintMap();resetParticles();$('sfDirty').textContent='SAVED';$('sfDirty').style.color='#9be6b7'}
-  function refreshLibrary(){const el=$('sfLibrary');el.replaceChildren();$('sfCount').textContent=library.items.length+'/'+MAX_SPELLS;for(const v of library.items){const b=document.createElement('button');b.type='button';b.className=v.id===library.selected?'active':'';const icon=document.createElement('span');icon.style.flex='0 0 auto';icon.textContent='⬡';const title=document.createElement('span');title.textContent=v.recipe.name;const link=document.createElement('small');link.textContent=(v.recipe.settings.delivery==='projectile'?'➤':v.recipe.settings.delivery==='placed'?'⌖':'◯')+(v.heal?' ♥':'');b.append(icon,title,link);b.addEventListener('click',()=>select(v.id));el.append(b)}}
+  function refreshFields(){const s=draft.settings;$('sfName').value=draft.name;$('sfPalette').value=s.palette;$('sfTexture').value=s.texture;$('sfMode').value=s.mode;$('sfDelivery').value=s.delivery||'aura';$('sfRenderLimit').value=String([600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.renderLimit)<Math.abs(a-s.renderLimit)?b:a));$('sfPopulation').value=String([200,600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.population)<Math.abs(a-s.population)?b:a));for(const n of ['Swirl','Momentum','Light']){$('sf'+n).value=s[n.toLowerCase()];$('sf'+n+'Val').textContent=String(s[n.toLowerCase()])}$('sfHeal').checked=heal;paintMap();resetParticles();$('sfDirty').textContent='SAVED';$('sfDirty').style.color='#9be6b7'}
+  function refreshLibrary(){const el=$('sfLibrary');el.replaceChildren();$('sfCount').textContent=library.items.length+'/'+MAX_SPELLS;for(const v of library.items){const b=document.createElement('button');b.type='button';b.className=v.id===library.selected?'active':'';const icon=document.createElement('span');icon.style.flex='0 0 auto';icon.textContent='⬡';const title=document.createElement('span');title.textContent=v.recipe.name;const link=document.createElement('small');link.textContent=(v.recipe.settings.delivery==='world'?'↗':v.recipe.settings.delivery==='placed'?'⌖':'◯')+(v.heal?' ♥':'');b.append(icon,title,link);b.addEventListener('click',()=>select(v.id));el.append(b)}}
   function storeDraft(){draft=engine.normalize(draft);item.recipe=clone(draft);item.heal=heal;dirty=false;const good=saveLibrary();$('sfDirty').textContent=good?'SAVED':'SESSION';$('sfDirty').style.color=good?'#9be6b7':'#ffd89b';refreshLibrary();return good}
   function select(id){if(dirty)storeDraft();library.selected=id;item=find();draft=clone(item.recipe);heal=item.heal;undo=[];saveLibrary();refreshFields();refreshLibrary();status('Loaded '+item.recipe.name+'. Edit it or equip it.')}
   function add(recipe,label){if(library.items.length>=MAX_SPELLS){status('Library full: delete a spell before adding more.');return false}if(dirty)storeDraft();const entry={id:uid(),recipe:engine.normalize(recipe),heal:heal};library.items.push(entry);library.selected=entry.id;item=entry;draft=clone(entry.recipe);undo=[];dirty=false;saveLibrary();refreshLibrary();refreshFields();status(label||'New spell ready.');return true}
@@ -125,7 +127,7 @@
   function resetParticles(){
    particles=[];previewStarts=Motion.startingCells(draft.values);
    previewClock=0;prevFrame=0;
-   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · 140 AGENTS';
+   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+previewPopulation+' AGENTS';
   }
   const pals={flame:['#dc4329','#fc9135','#ffe0a3'],arcane:['#5d8ff4','#bd82ef','#f0d4ff'],healing:['#49c7a0','#aee989','#f4f2a2'],void:['#63449e','#b54acb','#ff90d1']};
   function tick(now){
@@ -133,7 +135,7 @@
    const dt=prevFrame?clamp((now-prevFrame)/1000,0,.05):1/60;
    prevFrame=now;previewClock+=dt;
    const cfg=draft.settings,colors=pals[cfg.palette]||pals.flame;
-   const total=140;
+   const total=previewPopulation;
    while(particles.length<total)particles.push(Motion.spawn(draft.values,previewStarts));
    const stats=Motion.stepSwarm(particles,draft.values,cfg,dt,360,500,previewClock);
    pc.fillStyle='#081724';pc.fillRect(0,0,300,300);
@@ -163,12 +165,13 @@
    rafId=requestAnimationFrame(tick);
   }
   $('sfReseed').addEventListener('click',()=>{resetParticles();status('Fresh agents seeded. Same field laws, new starting conditions.')});
+  $('sfPreviewCount').addEventListener('change',e=>{previewPopulation=Number(e.target.value)||600;resetParticles();status('Preview: '+previewPopulation+' independently simulated agents. No recycling.')});
   $('sfTools').addEventListener('click',e=>{const b=e.target.closest('button[data-brush]');if(!b)return;brush=b.dataset.brush;for(const n of $('sfTools').querySelectorAll('button'))n.classList.toggle('active',n===b)});
   $('sfGray').addEventListener('input',e=>{gray=Number(e.target.value);$('sfGrayVal').textContent=gray});
   $('sfRadius').addEventListener('input',e=>{brushRadius=Number(e.target.value);$('sfRadiusVal').textContent=brushRadius});
   $('sfName').addEventListener('input',e=>{draft.name=e.target.value.slice(0,48);mark()});
-  for(const [id,key] of [['sfPalette','palette'],['sfTexture','texture'],['sfMode','mode'],['sfDelivery','delivery'],['sfPopulation','population'],['sfSwirl','swirl'],['sfMomentum','momentum'],['sfLight','light']]){
-   $(id).addEventListener(id.startsWith('sf')&&['swirl','momentum','light'].includes(key)?'input':'change',e=>{draft.settings[key]=['population','swirl','momentum','light'].includes(key)?Number(e.target.value):e.target.value;const label=$('sf'+key[0].toUpperCase()+key.slice(1)+'Val');if(label)label.textContent=e.target.value;mark()});
+  for(const [id,key] of [['sfPalette','palette'],['sfTexture','texture'],['sfMode','mode'],['sfDelivery','delivery'],['sfRenderLimit','renderLimit'],['sfPopulation','population'],['sfSwirl','swirl'],['sfMomentum','momentum'],['sfLight','light']]){
+   $(id).addEventListener(id.startsWith('sf')&&['swirl','momentum','light'].includes(key)?'input':'change',e=>{draft.settings[key]=['population','renderLimit','swirl','momentum','light'].includes(key)?Number(e.target.value):e.target.value;const label=$('sf'+key[0].toUpperCase()+key.slice(1)+'Val');if(label)label.textContent=e.target.value;mark()});
   }
   $('sfHeal').addEventListener('change',e=>{heal=!!e.target.checked;mark()});
   $('sfUndo').addEventListener('click',()=>{if(!undo.length){status('Nothing to undo.');return}draft.values=undo.pop();mark();paintMap()});
