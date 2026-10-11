@@ -13,10 +13,19 @@ main{max-width:1190px;margin:auto;padding:16px 13px calc(25px + env(safe-area-in
 .editor{padding:12px}.mini{font-size:10px;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted);font-weight:850;margin:3px 0 8px}.map-wrap{display:flex;justify-content:center}.map{display:block;width:min(100%,360px);aspect-ratio:1;image-rendering:pixelated;touch-action:none;border:1px solid #627785;background:#ff00ff;border-radius:5px}.legend{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin:9px 0 12px}.legend span{display:inline-flex;align-items:center;gap:5px}.swatch{width:11px;height:11px;border:1px solid #adb9bc55;display:inline-block;border-radius:2px}.brushes{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:9px}.brush{height:39px;border:1px solid #647581;background:#182833;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:850;color:#c7d4d3}.brush.active{outline:2px solid var(--mint);outline-offset:1px}.dot-swatch{width:18px;height:18px;border-radius:4px;border:1px solid #d4d4d46e}.brush.magenta{background:#451546}.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}.control{margin:11px 0}.control-head{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:750;gap:10px;margin-bottom:4px}.control output{color:var(--mint);font-variant-numeric:tabular-nums}input[type=range]{width:100%;accent-color:var(--mint);height:28px;margin:0}select{border:1px solid #405767;border-radius:8px;background:#182a37;color:var(--text);padding:10px 8px;width:100%;min-width:0}.subactions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}.subactions .btn{min-height:39px}.import{display:none}.note{font-size:11px;color:var(--muted);margin:9px 0;line-height:1.55}.footer{font-size:11px;color:#8aa8ad;margin-top:13px;line-height:1.6}.footer strong{color:#c7eacc}
 @media(max-width:790px){.layout{grid-template-columns:1fr}.stage{height:clamp(340px,57svh,590px)}main{max-width:520px}.map{width:min(100%,345px)}}
 @media(prefers-reduced-motion:reduce){.stage{scroll-behavior:auto}}
+[hidden]{display:none!important}
+.lab-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0 14px}.lab-tab{border:1px solid #3b5968;background:#142431;color:#a9c4c8;border-radius:11px;padding:13px 9px;font-size:12px;letter-spacing:.9px;font-weight:850;cursor:pointer}.lab-tab.active{background:#243d3a;color:#c5ffd0;border-color:#adf9b8;box-shadow:inset 0 0 0 1px #80dca344}.lab-tab:focus-visible{outline:2px solid #d6ffbe;outline-offset:3px}
+.range-top{display:flex;gap:12px;align-items:flex-end;justify-content:space-between;margin:6px 2px 14px}.range-top h2{font-weight:950;letter-spacing:1px;margin:3px 0;font-size:clamp(25px,5vw,36px)}.range-top p{color:var(--muted);font-size:12px;line-height:1.5;margin:2px 0;max-width:530px}.range-mini{border:1px solid #395565;background:#162832;padding:9px 10px;border-radius:10px;min-width:154px;text-align:right}.range-mini span{color:var(--mint);font-size:11px;font-weight:850;display:block}.range-mini small{color:#95b2bb;display:block;margin-top:3px;font-size:9px;letter-spacing:.3px}.range-stage{height:clamp(440px,65svh,660px);position:relative;overflow:hidden;touch-action:manipulation;background:#09131a}.range-stage canvas{display:block;width:100%;height:100%;touch-action:manipulation}.range-corner{position:absolute;top:10px;left:12px;color:#75969e;font-size:10px;letter-spacing:1.5px;font-weight:800;pointer-events:none}.range-actions{display:grid;grid-template-columns:1.3fr 1fr;gap:9px;padding:12px}.range-actions .btn{padding:14px 8px;font-size:12px}.range-message{min-height:42px;color:#afc4c8;font-size:12px;padding:0 14px 14px}.range-help{border:1px solid #294c50;background:#102726;border-radius:14px;padding:14px;display:flex;gap:12px;margin-top:13px;color:#c9d9ce;font-size:12px;line-height:1.6}.range-help-icon{font-size:30px;color:var(--mint);flex:none}.range-help strong{color:#b4fbbb}.range-tip{margin-top:7px;color:#a2bdb9}.range-stats .stat b{font-size:20px}
+@media(max-width:790px){.range-top{align-items:flex-start;flex-direction:column;gap:10px}.range-mini{text-align:left;width:100%}.range-stage{height:clamp(420px,64svh,600px)}.range-stats .stat b{font-size:19px}}
 </style>
 </head>
 <body><main>
-<header><div class="mark">W</div><div><div class="brand">WRKMAN LABS / BEHAVIOR FIELD 01</div><h1>AGENT·FIELD</h1></div><span class="version">v0.3</span></header>
+<header><div class="mark">W</div><div><div class="brand">WRKMAN LABS / BEHAVIOR FIELD 01</div><h1>AGENT·FIELD</h1></div><span class="version">v0.4</span></header>
+<nav class="lab-tabs" role="tablist" aria-label="Agent Field modes">
+ <button type="button" id="tabEditor" role="tab" aria-selected="true" aria-controls="editorPanel" class="lab-tab active">✦ FIELD EDITOR</button>
+ <button type="button" id="tabRange" role="tab" aria-selected="false" aria-controls="rangePanel" class="lab-tab">◈ STONE RANGE</button>
+</nav>
+<div id="editorPanel" role="tabpanel" aria-labelledby="tabEditor">
 <p class="intro">Programmable magic, not painted animation. A 32 × 32 field guides a moving population of hexagonal rendering agents. White starts the journey, black ends it, and magenta means no instructions. Now the swarm can also carry surface identity: this pass adds the first textured material, a stylized leaf.</p>
 <div class="layout">
   <section class="card">
@@ -59,6 +68,18 @@ main{max-width:1190px;margin:auto;padding:16px 13px calc(25px + env(safe-area-in
     <p class="note">Magenta is truly instruction-free: an agent keeps moving under its own momentum and may enter another grayscale island. There are no invisible canvas walls: agents can fly offscreen, remain alive, and continue drifting beyond the map. Tap RESEED to bring them back. No pink is drawn into the spell. In A+B mode the grayscale progression also changes hex size, color, speed, and now the visible surface of each hex.</p>
   </div></section>
 </div>
+</div>
+<section id="rangePanel" role="tabpanel" aria-labelledby="tabRange" hidden>
+  <div class="range-top"><div><div class="kicker">WRKMAN TEST RANGE / LIVE TARGETS</div><h2>STONE RANGE</h2><p>Every cast uses your current 32 × 32 field, colors, material, and swarm physics. Tap a stone to aim.</p></div><div class="range-mini"><span id="rangeField">GRAVITY WELL</span><small id="rangeMaterial">ARCANE · LEAF · 1,200 AGENTS</small></div></div>
+  <div class="card">
+    <div class="heading"><span class="kicker">BREAKABLE TARGETS</span><span class="caption" id="rangeHint">TAP A STONE TO TARGET IT</span></div>
+    <div class="range-stage" id="rangeStage"><canvas id="rangeCanvas" aria-label="Casting arena containing five breakable stones"></canvas><div class="range-corner">W / FIELD CAST</div></div>
+    <div class="stats range-stats"><div class="stat"><b id="rockLeft">5</b><small>standing</small></div><div class="stat"><b id="castStat">0</b><small>casts</small></div><div class="stat"><b id="brokenStat">0</b><small>shattered</small></div><div class="stat"><b id="hitStat">0</b><small>agent impacts</small></div></div>
+    <div class="range-actions"><button class="btn primary" id="castSpell">✦ CAST FIELD</button><button class="btn" id="rebuildStones">↻ REBUILD STONES</button></div>
+    <div class="range-message" aria-live="polite" id="rangeStatus">Choose a stone and cast your design. Damaged rocks crack; repeated impacts break them apart.</div>
+  </div>
+  <div class="range-help"><div class="range-help-icon">◈</div><div><strong>This is your actual field, not a canned projectile.</strong> The agents fly together toward the selected stone while continuing to follow the 32 × 32 instructions inside the spell. Hit detection happens per moving hex; stones keep their damage between casts.<div class="range-tip">Want another pattern? Switch to FIELD EDITOR, draw it, and return. Your stones will still be here.</div></div></div>
+</section>
 <p class="footer"><strong>Architecture:</strong> This field is a control surface, not a sprite. The visible spell is composed of moving hex agents. The editor and simulation share a portable 1,024-value map. Separate experimental lab, no roguelike integration.</p>
 </main>
 <script>
@@ -72,7 +93,7 @@ const choose=arr=>arr[(Math.random()*arr.length)|0];
 const mixColor=(rgb,amt)=>rgb.map(v=>clamp(v+amt,0,255));
 const colorString=(rgb,a=1)=>`rgba(${rgb.map(v=>Math.round(v)).join(',')},${a})`;
 function setStatus(msg){S.status=msg;$('#status').textContent=msg}
-function toCell(cx,cy){return S.field[cy*N+cx]}
+function toCell(cx,cy,field=S.field){return field[cy*N+cx]}
 function drawMap(){
   const d=mctx.createImageData(N,N);
   for(let i=0;i<TOTAL;i++){const v=S.field[i],k=i*4; if(v===MASK){d.data[k]=255;d.data[k+1]=0;d.data[k+2]=255}else{d.data[k]=v;d.data[k+1]=v;d.data[k+2]=v}d.data[k+3]=255}
@@ -102,7 +123,7 @@ function preset(name){
   }
   const label={well:'GRAVITY WELL',spiral:'SPIRAL GATE',gap:'MAGENTA GAP',sigil:'SIGIL CIRCUIT',blank:'BLANK / FREE'};
   S.name=label[name]||'CUSTOM FIELD';$('#stageLabel').textContent=S.name;
-  rebuildStartCells();drawMap();reseed();
+  rebuildStartCells();drawMap();reseed();refreshRangeFieldLabel();
 }
 function rebuildStartCells(){
   S.startCells=[];let high=-1, valid=[];
@@ -111,25 +132,25 @@ function rebuildStartCells(){
   const threshold=Math.max(0,high-50);
   for(const i of valid){if(S.field[i]>=threshold)S.startCells.push(i)}
 }
-function sampleField(nx,ny){
+function sampleField(nx,ny,field=S.field){
   // The field exists only within the map. Outside the canvas there is no guidance,
   // exactly as in magenta free space. Do not clamp offscreen samples to edge cells.
   if(!Number.isFinite(nx)||!Number.isFinite(ny)||nx<0||nx>=1||ny<0||ny>=1)return {valid:false,value:null};
   const cx=nx*N,cy=ny*N;
   const i=Math.floor(cx),j=Math.floor(cy);
-  if(toCell(i,j)===MASK)return {valid:false,value:null};
+  if(toCell(i,j,field)===MASK)return {valid:false,value:null};
   // Mask takes precedence. Renormalize only over valid grayscale neighbors, never blend magenta into values.
   const fx=cx-i,fy=cy-j;let sum=0,weight=0;
   for(let oy=0;oy<=1;oy++)for(let ox=0;ox<=1;ox++){
-    const x=Math.min(N-1,i+ox),y=Math.min(N-1,j+oy),v=toCell(x,y);
+    const x=Math.min(N-1,i+ox),y=Math.min(N-1,j+oy),v=toCell(x,y,field);
     if(v===MASK)continue;
     const w=(ox?fx:1-fx)*(oy?fy:1-fy);sum+=v*w;weight+=w;
   }
-  return {valid:true,value:weight?sum/weight:toCell(i,j)};
+  return {valid:true,value:weight?sum/weight:toCell(i,j,field)};
 }
-function gradient(nx,ny,value){
+function gradient(nx,ny,value,field=S.field){
   // Central differences never use masked neighbors to invent a gradient across empty space.
-  const e=0.72/N, a=sampleField(nx+e,ny), b=sampleField(nx-e,ny), c=sampleField(nx,ny+e), d=sampleField(nx,ny-e);
+  const e=0.72/N, a=sampleField(nx+e,ny,field), b=sampleField(nx-e,ny,field), c=sampleField(nx,ny+e,field), d=sampleField(nx,ny-e,field);
   let gx=0,gy=0;
   if(a.valid&&b.valid)gx=(a.value-b.value)*.5;
   else if(a.valid)gx=a.value-value;
@@ -178,7 +199,7 @@ function update(dt){
   }
   S.freeCount=free;S.nearCount=near;S.offscreenCount=offscreen;
 }
-function drawHex(x,y,r){ctx.beginPath();for(let k=0;k<6;k++){const ang=TAU*k/6+Math.PI/6;const xx=x+Math.cos(ang)*r,yy=y+Math.sin(ang)*r;k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);}ctx.closePath();}
+function drawHex(x,y,r,c=ctx){c.beginPath();for(let k=0;k<6;k++){const ang=TAU*k/6+Math.PI/6;const xx=x+Math.cos(ang)*r,yy=y+Math.sin(ang)*r;k?c.lineTo(xx,yy):c.moveTo(xx,yy);}c.closePath();}
 // Leaf material is rasterized once per palette / progress shade / variant.
 // 6,000 agents can then share tiny sprites instead of allocating gradients and
 // clipping paths thousands of times every frame.
@@ -228,16 +249,16 @@ function getLeafSprite(paletteName,t,variant){
   }c.closePath();c.stroke();
   LEAF_SPRITES.set(key,o);return o;
 }
-function drawLeafSurface(a,x,y,r,pal,t,alpha){
+function drawLeafSurface(a,x,y,r,pal,t,alpha,c=ctx){
   const variant=Math.floor((a.seed/TAU)*3)%3;
   const sprite=getLeafSprite(pal,t,variant);
   const size=r*2.38;
-  ctx.save();ctx.translate(x,y);
+  c.save();c.translate(x,y);
   // The fine veins need orientation only when the hex is large enough to see it.
-  if(r>2.2)ctx.rotate(Math.atan2(a.vy,a.vx)+Math.PI/2);
-  ctx.globalAlpha=alpha;
-  ctx.drawImage(sprite,-size*.5,-size*.5,size,size);
-  ctx.restore();
+  if(r>2.2)c.rotate(Math.atan2(a.vy,a.vx)+Math.PI/2);
+  c.globalAlpha=alpha;
+  c.drawImage(sprite,-size*.5,-size*.5,size,size);
+  c.restore();
 }
 function updateMaterialPreview(){
   const cv=$('#leafPreview');if(!cv)return;
@@ -273,11 +294,237 @@ function draw(){
 }
 function updateUI(){if(S.frame%10!==0)return;$('#countStat').textContent=S.agents.length.toLocaleString();$('#fpsStat').textContent=Math.round(S.fps);$('#freeStat').textContent=S.freeCount.toLocaleString();$('#arrivedStat').textContent=S.nearCount.toLocaleString();$('#offscreenStat').textContent=S.offscreenCount.toLocaleString();}
 function tick(now){if(!S.last)S.last=now;const dt=Math.min((now-S.last)/1000,.06);S.last=now;
-  if(!S.paused)update(dt);S.fps=S.fps*.92+(dt?1/dt:60)*.08;draw();updateUI();requestAnimationFrame(tick);
+  if(activeTab==='editor'){if(!S.paused)update(dt);S.fps=S.fps*.92+(dt?1/dt:60)*.08;draw();updateUI();}
+  else {stepRange(dt);drawRange();}
+  requestAnimationFrame(tick);
 }
+// STONE RANGE. The active field is snapshotted for each cast. Agent physics reuses
+// the same sampling/gradient interpreter as the editor, then embeds that field
+// motion inside a traveling casting frame. Stones react to individual hex hits.
+let activeTab='editor';
+const rangeCanvas=$('#rangeCanvas'), rangeCtx=rangeCanvas.getContext('2d'),rangeStage=$('#rangeStage');
+const R={rocks:[],fragments:[],sparks:[],selected:2,shot:null,casts:0,broken:0,hits:0,time:0,frame:0,lastMessage:'',w:0,h:0};
+function refreshRangeFieldLabel(){
+  const n=$('#rangeField');if(!n)return;
+  n.textContent=S.name;
+  $('#rangeMaterial').textContent=`${S.palette.toUpperCase()} · ${S.texture.toUpperCase()} · ${S.population.toLocaleString()} AGENTS`;
+}
+function resizeRange(){
+  const rect=rangeStage.getBoundingClientRect();if(!rect.width||!rect.height)return;
+  const w=Math.max(280,Math.round(rect.width)), h=Math.max(340,Math.round(rect.height));
+  if(w===R.w&&h===R.h)return;
+  R.w=w;R.h=h;rangeCanvas.width=w;rangeCanvas.height=h;
+}
+function makeRock(i,x,y,scale,health){return {id:i,x,y,scale,maxHp:health,hp:health,seed:i*12.91+2.8,flash:0,hitTotal:0,dead:false};}
+function resetRocks(){
+  R.rocks=[makeRock(0,.19,.24,.77,19),makeRock(1,.5,.26,1.06,36),makeRock(2,.81,.24,.85,24),makeRock(3,.30,.52,.92,26),makeRock(4,.70,.52,1.04,34)];
+  R.fragments=[];R.sparks=[];R.broken=0;R.hits=0;R.shot=null;R.selected=1;$('#castSpell').disabled=false;
+  updateRangeUI();setRangeMessage('Fresh stones. Tap a target, then cast the field you designed.');
+}
+function rangeRockRadius(rock){return Math.min(R.w*.081,34)*rock.scale;}
+function rockXY(rock){return {x:rock.x*R.w,y:rock.y*R.h};}
+function rangeTarget(){return R.rocks.find(r=>r.id===R.selected&&!r.dead)||R.rocks.find(r=>!r.dead)||null;}
+function setRangeMessage(text){R.lastMessage=text;$('#rangeStatus').textContent=text;}
+function updateRangeUI(){
+  $('#rockLeft').textContent=R.rocks.filter(r=>!r.dead).length;
+  $('#castStat').textContent=R.casts;
+  $('#brokenStat').textContent=R.broken;
+  $('#hitStat').textContent=R.hits.toLocaleString();
+  const rock=rangeTarget();
+  $('#rangeHint').textContent=rock?`TARGET ${rock.id+1} · ${Math.ceil(rock.hp)} / ${rock.maxHp} HP`:'ALL TARGETS BROKEN';
+}
+function switchTab(tab){
+  if(tab!=='editor'&&tab!=='range')return;
+  activeTab=tab;
+  $('#editorPanel').hidden=tab!=='editor';$('#rangePanel').hidden=tab!=='range';
+  for(const t of ['editor','range']){
+    const el=$('#tab'+(t==='editor'?'Editor':'Range'));
+    el.classList.toggle('active',t===tab);el.setAttribute('aria-selected',String(t===tab));
+  }
+  if(tab==='range'){refreshRangeFieldLabel();resizeRange();updateRangeUI();}
+  else resize();
+}
+$('#tabEditor').addEventListener('click',()=>switchTab('editor'));
+$('#tabRange').addEventListener('click',()=>switchTab('range'));
+function castCurrentField(){
+  if(R.shot){setRangeMessage('One spell at a time. Let this cast complete.');return false;}
+  const target=rangeTarget();if(!target){setRangeMessage('Every stone is broken! Rebuild the range to keep testing.');return false;}
+  const cfg=config();const field=new Int16Array(cfg.values);
+  const agents=Array.from({length:S.population},(_,i)=>{
+    const a=spawnAgent(i);a.trail=[];a.hitMask=0;a.px=0;a.py=0;
+    return a;
+  });
+  const w=R.w,h=R.h;
+  R.shot={time:0,duration:1.48,age:0,from:{x:w*.50,y:h*.88},toward:{x:target.x*w,y:target.y*h},targetId:target.id,
+    field,agents,settings:{...cfg.settings},fieldName:cfg.name,collisions:0};
+  R.casts++;$('#castSpell').disabled=true;
+  setRangeMessage(`Casting ${cfg.name} at Stone ${target.id+1}. Every hex can deliver an impact.`);
+  updateRangeUI();return true;
+}
+$('#castSpell').addEventListener('click',castCurrentField);
+$('#rebuildStones').addEventListener('click',resetRocks);
+rangeCanvas.addEventListener('pointerdown',e=>{
+  const rect=rangeCanvas.getBoundingClientRect();
+  if(!rect.width||!rect.height)return;
+  const x=(e.clientX-rect.left)*R.w/rect.width, y=(e.clientY-rect.top)*R.h/rect.height;
+  let closest=null,near=Infinity;
+  for(const rock of R.rocks){if(rock.dead)continue;const p=rockXY(rock),d=Math.hypot(x-p.x,y-p.y);if(d<near){closest=rock;near=d;}}
+  if(closest){R.selected=closest.id;updateRangeUI();setRangeMessage(`Stone ${closest.id+1} targeted. ${Math.ceil(closest.hp)} HP remaining. Press CAST FIELD.`);}
+});
+function castCenter(shot){
+  const t=clamp(shot.time/shot.duration,0,1);
+  const progress=t*t*(3-2*t);
+  return {x:lerp(shot.from.x,shot.toward.x,progress),y:lerp(shot.from.y,shot.toward.y,progress)-Math.sin(Math.PI*t)*R.h*.054};
+}
+function stepRangeAgent(a,shot,dt){
+  const s=shot.settings,field=shot.field,timeScale=clamp(dt*60,0,2),momentum=s.momentum/100,swirl=s.swirl/100;
+  const here=sampleField(a.x,a.y,field);a.free=!here.valid;
+  if(!here.valid){a.vx*=Math.pow(.997,timeScale);a.vy*=Math.pow(.997,timeScale);}
+  else{
+    const v=here.value,progress=clamp(1-v/255,0,1),[gx,gy,mag]=gradient(a.x,a.y,v,field);
+    a.progress=lerp(a.progress,progress,.15);
+    const curl=swirl*(.26+progress*.45),clock=R.time*(.7+progress*1.6);
+    let ax=gx*.28-gy*curl+Math.cos(a.seed+clock)*(.012+.025*swirl);
+    let ay=gy*.28+gx*curl+Math.sin(a.seed+clock)*(.012+.025*swirl);
+    if(mag<.001){const theta=a.seed+R.time*(1.1+.8*swirl);ax+=Math.cos(theta)*(.012+.025*swirl);ay+=Math.sin(theta)*(.012+.025*swirl);}
+    a.vx+=ax*timeScale;a.vy+=ay*timeScale;
+    const drag=.885+momentum*.095;a.vx*=Math.pow(drag,timeScale);a.vy*=Math.pow(drag,timeScale);
+    const speedLimit=(s.mode==='ab'?1.8+2.2*(1-progress):3.2)+momentum*1.8;
+    const speed=Math.hypot(a.vx,a.vy);if(speed>speedLimit){a.vx*=speedLimit/speed;a.vy*=speedLimit/speed;}
+  }
+  // Range field uses the same 360x500 reference geometry as the editor simulation.
+  a.x+=a.vx*timeScale/360;a.y+=a.vy*timeScale/500;
+}
+function breakRock(rock,hitX,hitY){
+  if(rock.dead)return;
+  rock.hp=0;rock.dead=true;R.broken++;
+  const p=rockXY(rock),size=rangeRockRadius(rock);
+  for(let i=0;i<23;i++){
+    const ang=i*2.39996+rock.seed,rad=size*(.12+.7*Math.sqrt((i+1)/24));
+    const dir=Math.atan2(p.y-hitY,p.x-hitX)+Math.sin(ang)*1.5;
+    const speed=60+((i*37)%110);
+    R.fragments.push({x:p.x+Math.cos(ang)*rad*.5,y:p.y+Math.sin(ang)*rad*.5,
+      vx:Math.cos(dir)*speed+Math.cos(ang)*55,vy:Math.sin(dir)*speed+Math.sin(ang)*55-80,
+      r:3.4+((i*5)%11)*.46,rot:ang,spin:((i%2)?1:-1)*(1+i%4),life:2.7});
+  }
+  for(let i=0;i<25;i++){
+    const angle=Math.random()*TAU;
+    R.sparks.push({x:p.x,y:p.y,vx:Math.cos(angle)*(50+Math.random()*125),vy:Math.sin(angle)*(50+Math.random()*125),life:.65,r:Math.random()*2+1});
+  }
+  const still=R.rocks.filter(r=>!r.dead);
+  if(R.selected===rock.id)R.selected=still.length?still[0].id:rock.id;
+  setRangeMessage(still.length?`STONE ${rock.id+1} SHATTERED! ${still.length} target${still.length===1?'':'s'} left.`:'RANGE CLEARED! All five stones shattered. Rebuild to go again.');
+}
+function stepRange(dt){
+  R.time+=dt;R.frame++;
+  for(const rock of R.rocks)rock.flash=Math.max(0,rock.flash-dt*2.8);
+  const floor=R.h*.88;
+  for(let i=R.fragments.length-1;i>=0;i--){const f=R.fragments[i];f.life-=dt;
+    f.vy+=310*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.rot+=f.spin*dt;
+    if(f.y>floor){f.y=floor;f.vy=-Math.abs(f.vy)*.31;f.vx*=.76;}
+    if(f.life<=0)R.fragments.splice(i,1);
+  }
+  for(let i=R.sparks.length-1;i>=0;i--){const f=R.sparks[i];f.life-=dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.97;f.vy*=.97;if(f.life<=0)R.sparks.splice(i,1);}
+  const shot=R.shot;if(!shot)return;
+  shot.time+=dt;const center=castCenter(shot),w=R.w,h=R.h;
+  const startBloom=clamp(shot.time/.48,0,1),spread=(.10+.72*startBloom)*Math.min(w*.53,195);
+  const active=shot.time<2.75;
+  const newHits=Array.from({length:R.rocks.length},()=>[]);
+  for(const a of shot.agents){
+    stepRangeAgent(a,shot,dt);
+    const x=center.x+(a.x-.5)*spread*2.0,y=center.y+(a.y-.5)*spread*2.0;
+    a.px=x;a.py=y;
+    if(R.frame%3===0){a.trail.push([x,y]);if(a.trail.length>4)a.trail.shift();}
+    if(!active)continue;
+    for(const rock of R.rocks){
+      if(rock.dead||(a.hitMask&(1<<rock.id)))continue;
+      const p=rockXY(rock),rad=rangeRockRadius(rock)+2.8;
+      const dx=x-p.x,dy=y-p.y;
+      if(dx*dx+dy*dy<rad*rad){a.hitMask|=1<<rock.id;newHits[rock.id].push([x,y]);}
+    }
+  }
+  for(const rock of R.rocks){const impacts=newHits[rock.id];if(!impacts.length||rock.dead)continue;
+    rock.hitTotal+=impacts.length;R.hits+=impacts.length;shot.collisions+=impacts.length;
+    const amount=Math.min(5.2,impacts.length*.6);
+    rock.hp=Math.max(0,rock.hp-amount);rock.flash=Math.min(1,rock.flash+.35);
+    const hit=impacts[Math.floor(impacts.length*.5)];
+    for(let k=0;k<Math.min(4,impacts.length);k++){
+      const p=impacts[Math.floor(k*impacts.length/Math.min(4,impacts.length))];
+      R.sparks.push({x:p[0],y:p[1],vx:(Math.random()-.5)*110,vy:(Math.random()-.7)*110,life:.33,r:Math.random()*1.6+.7});
+    }
+    if(rock.hp<=0)breakRock(rock,hit[0],hit[1]);
+  }
+  if(R.sparks.length>190)R.sparks.splice(0,R.sparks.length-190);
+  if(shot.time>3.2){R.shot=null;$('#castSpell').disabled=false;
+    if(shot.collisions===0)setRangeMessage('Cast complete. No hexes struck a stone. Try a different field or choose a closer target.');
+    else if(R.rocks.some(r=>!r.dead))setRangeMessage(`Cast complete: ${shot.collisions.toLocaleString()} hex impacts. Cracked stones keep their damage.`);
+  }
+  if(R.frame%8===0)updateRangeUI();
+}
+function polyRock(ctx,x,y,r,seed,vertices=10){ctx.beginPath();for(let i=0;i<vertices;i++){
+  const a=-Math.PI*.5+i*TAU/vertices,scale=.83+.17*Math.sin(seed+i*3.7),px=x+Math.cos(a)*r*scale,py=y+Math.sin(a)*r*scale;
+  i?ctx.lineTo(px,py):ctx.moveTo(px,py);
+}ctx.closePath();}
+function drawStone(c,rock){
+  if(rock.dead)return;
+  const p=rockXY(rock),x=p.x,y=p.y,r=rangeRockRadius(rock);
+  c.save();c.shadowColor='#000';c.shadowBlur=14;c.shadowOffsetY=7;
+  polyRock(c,x,y,r,rock.seed);const grad=c.createLinearGradient(x-r,y-r,x+r,y+r);
+  grad.addColorStop(0,rock.flash>0?'#f4e4b2':'#a4b2b3');grad.addColorStop(.38,'#697b85');grad.addColorStop(1,'#263841');c.fillStyle=grad;c.fill();
+  c.shadowBlur=0;c.shadowOffsetY=0;
+  c.strokeStyle='#b8c3be';c.lineWidth=1.35;c.stroke();
+  c.beginPath();c.moveTo(x-r*.50,y-r*.36);c.lineTo(x-r*.08,y-r*.58);c.lineTo(x+r*.43,y-r*.19);c.lineTo(x+r*.28,y+r*.13);c.lineTo(x-r*.38,y+r*.12);c.closePath();c.fillStyle='#ffffff12';c.fill();
+  c.beginPath();c.moveTo(x-r*.39,y+r*.17);c.lineTo(x+r*.29,y+r*.16);c.lineTo(x+r*.36,y+r*.47);c.lineTo(x-r*.05,y+r*.6);c.closePath();c.fillStyle='#00000042';c.fill();
+  const damage=1-rock.hp/rock.maxHp;
+  if(damage>.04){c.lineCap='round';c.strokeStyle='#0d1b24';c.lineWidth=1.4+damage*1.2;
+    const branches=1+Math.floor(damage*5);
+    for(let i=0;i<branches;i++){
+      const angle=(rock.seed+i*2.15),ex=x+Math.cos(angle)*r*(.2+damage*.75),ey=y+Math.sin(angle)*r*(.2+damage*.75);
+      c.beginPath();c.moveTo(x+(i-2)*2,y+((i%3)-1)*2);c.lineTo(lerp(x,ex,.49)+Math.sin(i*13)*3,lerp(y,ey,.49));c.lineTo(ex,ey);c.stroke();
+    }
+  }
+  if(rock.flash>.05){polyRock(c,x,y,r,rock.seed);c.fillStyle=`rgba(255,231,170,${rock.flash*.28})`;c.fill();}
+  c.restore();
+  // Health bar doubles as a glanceable crack indicator.
+  const bw=r*1.75,bh=3.5,bx=x-bw/2,by=y+r+8;c.fillStyle='#0c1d26';c.fillRect(bx-1,by-1,bw+2,bh+2);
+  c.fillStyle=damage>.65?'#f08056':damage>.25?'#e5c17d':'#a1e1c1';c.fillRect(bx,by,bw*(rock.hp/rock.maxHp),bh);
+  c.fillStyle='#9ab4b9';c.font='bold 10px system-ui';c.textAlign='center';c.fillText(String(rock.id+1),x,y-r-11);
+}
+function drawRange(){
+  if(!R.w||!R.h)return;const c=rangeCtx,w=R.w,h=R.h;
+  const sky=c.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#091522');sky.addColorStop(.65,'#172a30');sky.addColorStop(1,'#1b252d');c.fillStyle=sky;c.fillRect(0,0,w,h);
+  c.strokeStyle='#48636b1e';c.lineWidth=1;
+  for(let j=0;j<8;j++){const y=h*(.13+j*.1);c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke();}
+  for(let i=0;i<9;i++){const x=w*i/8;c.beginPath();c.moveTo(x,0);c.lineTo(x,h);c.stroke();}
+  // Cavern and fractured floor, decorative only. Collisions are hex/stone, not floor geometry.
+  c.fillStyle='#27333b';c.beginPath();c.moveTo(0,h*.91);for(let i=0;i<13;i++){c.lineTo(w*i/12,h*(.9+.015*Math.sin(i*2.7)));}c.lineTo(w,h);c.lineTo(0,h);c.closePath();c.fill();
+  c.strokeStyle='#49575c';c.lineWidth=2;c.beginPath();c.moveTo(0,h*.90);c.lineTo(w*.38,h*.91);c.lineTo(w*.58,h*.89);c.lineTo(w,h*.9);c.stroke();
+  const source={x:w*.5,y:h*.88};const rock=rangeTarget();
+  if(rock){const p=rockXY(rock),rr=rangeRockRadius(rock);c.save();c.strokeStyle='#b6f6c67a';c.lineWidth=1.5;c.setLineDash([4,7]);c.beginPath();c.arc(p.x,p.y,rr+10+Math.sin(R.time*3)*2,0,TAU);c.stroke();c.setLineDash([]);c.restore();}
+  // Forge sigil at casting origin.
+  c.save();c.translate(source.x,source.y);c.strokeStyle='#a0f3bc99';c.lineWidth=1.5;c.beginPath();c.arc(0,0,17,0,TAU);c.stroke();
+  c.font='900 17px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillStyle='#bffacb';c.fillText('W',0,0);c.restore();
+  for(const st of R.rocks)drawStone(c,st);
+  const shot=R.shot;
+  if(shot){const cfg=shot.settings,colors=palette[cfg.palette],light=.14+cfg.light/100*.84;
+    const fade=clamp((3.2-shot.time)/.75,0,1);const step=Math.max(1,Math.ceil(shot.agents.length/6000));
+    for(let i=0;i<shot.agents.length;i+=step){const a=shot.agents[i],x=a.px,y=a.py;if(x<-20||x>w+20||y<-20||y>h+20)continue;
+      const p=clamp(a.progress,0,1),t=cfg.mode==='ab'?p:.44,r=(cfg.mode==='ab'?1.25+3.05*p:2.85)+Math.sin(R.time*3.3+a.seed)*.20;
+      if(a.trail.length){c.strokeStyle='#ffb87a18';c.lineWidth=.9;c.beginPath();c.moveTo(a.trail[0][0],a.trail[0][1]);for(let j=1;j<a.trail.length;j++)c.lineTo(a.trail[j][0],a.trail[j][1]);c.stroke();}
+      if(cfg.texture==='leaf')drawLeafSurface(a,x,y,r,cfg.palette,t,fade*(.22+light*.73),c);
+      else{const c0=colors[0],c1=colors[1],c2=colors[2];const col=t<.5?c0.map((v,j)=>lerp(v,c1[j],t*2)):c1.map((v,j)=>lerp(v,c2[j],(t-.5)*2));c.fillStyle=`rgba(${col.map(Math.round).join(',')},${(fade*(.18+light*.63)).toFixed(3)})`;drawHex(x,y,r,c);c.fill();}
+    }
+  }
+  for(const f of R.fragments){c.save();c.translate(f.x,f.y);c.rotate(f.rot);c.globalAlpha=clamp(f.life/.8,0,1);c.fillStyle='#819198';c.strokeStyle='#b5c1bd';c.lineWidth=1;c.beginPath();c.moveTo(-f.r,-f.r*.4);c.lineTo(f.r*.35,-f.r);c.lineTo(f.r,f.r*.3);c.lineTo(-f.r*.5,f.r);c.closePath();c.fill();c.stroke();c.restore();}
+  for(const s of R.sparks){c.fillStyle=`rgba(255,187,104,${Math.min(1,s.life*2)})`;c.beginPath();c.arc(s.x,s.y,s.r,0,TAU);c.fill();}
+  if(R.rocks.every(r=>r.dead)){c.fillStyle='#b6f5bc';c.font='900 17px system-ui';c.textAlign='center';c.fillText('RANGE CLEARED',w/2,h*.13);}
+}
+function rangeDiagnostics(){return {activeTab:activeTab,standing:R.rocks.filter(x=>!x.dead).length,casts:R.casts,broken:R.broken,hits:R.hits,selected:R.selected,shot:!!R.shot,shotField:R.shot?.fieldName,shotTexture:R.shot?.settings.texture,agentCount:R.shot?.agents.length||0,rockHp:R.rocks.map(r=>r.hp)};}
+window.addEventListener('resize',()=>{if(activeTab==='range')resizeRange();});
+
 function paintAt(e){const rect=mapCanvas.getBoundingClientRect(),col=Math.floor((e.clientX-rect.left)*N/rect.width),row=Math.floor((e.clientY-rect.top)*N/rect.height);if(col<0||col>=N||row<0||row>=N)return;
   let modified=false;for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(Math.hypot(x-col,y-row)<S.brushSize-.1){const index=y*N+x;if(S.field[index]!==S.brush){S.field[index]=S.brush;modified=true;}}
-  if(modified){S.name='CUSTOM FIELD';$('#stageLabel').textContent=S.name;S.dirty=true;drawMap();rebuildStartCells();setStatus('Field edited. Moving agents read the new instructions immediately; RESEED to respawn at the new white starts.');}
+  if(modified){S.name='CUSTOM FIELD';$('#stageLabel').textContent=S.name;S.dirty=true;drawMap();rebuildStartCells();refreshRangeFieldLabel();setStatus('Field edited. Moving agents read the new instructions immediately; RESEED to respawn at the new white starts.');}
 }
 for(const btn of document.querySelectorAll('.brush'))btn.addEventListener('click',()=>{S.brush=Number(btn.dataset.value);document.querySelectorAll('.brush').forEach(x=>x.classList.toggle('active',x===btn));$('#value').value=S.brush===-1?255:S.brush;$('#valueOut').textContent=S.brush===-1?'FREE':S.brush;});
 $('#value').addEventListener('input',e=>{S.brush=Number(e.target.value);$('#valueOut').textContent=S.brush;document.querySelectorAll('.brush').forEach(x=>x.classList.toggle('active',Number(x.dataset.value)===S.brush));});
@@ -288,8 +535,8 @@ const stopPainting=()=>{S.dragging=false};mapCanvas.addEventListener('pointerup'
 $('#generate').addEventListener('click',()=>preset($('#preset').value));$('#release').addEventListener('click',reseed);
 $('#pause').addEventListener('click',()=>{S.paused=!S.paused;$('#pause').textContent=S.paused?'▶ RESUME':'Ⅱ PAUSE';setStatus(S.paused?'Swarm paused. Field remains editable.':'Swarm resumed.');});
 $('#overlay').addEventListener('click',()=>{S.overlay=!S.overlay;$('#overlay').classList.toggle('pressed',S.overlay);$('#overlay').setAttribute('aria-pressed',String(S.overlay));$('#overlay').textContent=S.overlay?'▦ HIDE FIELD':'▦ SHOW FIELD';});
-for(const key of ['mode','palette','texture'])$('#'+key).addEventListener('change',e=>{S[key]=e.target.value;if(key==='texture')$('#textureOut').textContent=S.texture.toUpperCase();if(key==='palette'||key==='texture')updateMaterialPreview();});
-for(const key of ['population','swirl','momentum','light'])$('#'+key).addEventListener('input',e=>{S[key]=Number(e.target.value);$('#'+key+'Out').textContent=key==='population'?S[key].toLocaleString():S[key]+'%';if(key==='population')reseed();});
+for(const key of ['mode','palette','texture'])$('#'+key).addEventListener('change',e=>{S[key]=e.target.value;if(key==='texture')$('#textureOut').textContent=S.texture.toUpperCase();if(key==='palette'||key==='texture')updateMaterialPreview();refreshRangeFieldLabel();});
+for(const key of ['population','swirl','momentum','light'])$('#'+key).addEventListener('input',e=>{S[key]=Number(e.target.value);$('#'+key+'Out').textContent=key==='population'?S[key].toLocaleString():S[key]+'%';if(key==='population')reseed();refreshRangeFieldLabel();});
 function config(){return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:S.name,values:Array.from(S.field),settings:{mode:S.mode,palette:S.palette,texture:S.texture,population:S.population,swirl:S.swirl,momentum:S.momentum,light:S.light}};}
 function save(){try{localStorage.setItem('wrkman-agent-field-v1',JSON.stringify(config()));setStatus('Field and settings saved locally on this device.');}catch(e){setStatus('Local storage unavailable. EXPORT JSON instead.')}}
 function importConfig(obj){if(!obj||obj.width!==N||obj.height!==N||!Array.isArray(obj.values)||obj.values.length!==TOTAL)throw Error('Expected a 32 × 32 map containing 1,024 values.');
@@ -297,7 +544,7 @@ function importConfig(obj){if(!obj||obj.width!==N||obj.height!==N||!Array.isArra
   S.field=next;S.name=typeof obj.name==='string'?obj.name.slice(0,48):'IMPORTED FIELD';
   const settings=obj.settings||{};for(const k of ['mode','palette','texture','population','swirl','momentum','light'])if(settings[k]!=null){if(k==='mode' && ['a','ab'].includes(settings[k]))S[k]=settings[k];else if(k==='palette'&&palette[settings[k]])S[k]=settings[k];else if(k==='texture'&&['flat','leaf'].includes(settings[k]))S[k]=settings[k];else if(!['mode','palette','texture'].includes(k)&&Number.isFinite(settings[k]))S[k]=clamp(Math.round(settings[k]),k==='population'?200:0,k==='population'?6000:100);}
   $('#stageLabel').textContent=S.name;for(const key of ['mode','palette','texture','population','swirl','momentum','light']){$('#'+key).value=S[key];if($('#'+key+'Out'))$('#'+key+'Out').textContent=key==='population'?S[key].toLocaleString():(key==='texture'?String(S[key]).toUpperCase():S[key]+'%');}
-  updateMaterialPreview();rebuildStartCells();drawMap();reseed();setStatus('Map imported. White is start, black is destination, and FF00FF remains no-instruction space.');
+  updateMaterialPreview();rebuildStartCells();drawMap();reseed();refreshRangeFieldLabel();setStatus('Map imported. White is start, black is destination, and FF00FF remains no-instruction space.');
 }
 $('#save').addEventListener('click',save);
 $('#load').addEventListener('click',()=>{try{const s=localStorage.getItem('wrkman-agent-field-v1');if(!s){setStatus('No local field saved yet.');return;}importConfig(JSON.parse(s))}catch(e){setStatus('Unable to load: '+e.message)}});
@@ -310,7 +557,7 @@ $('#importFile').addEventListener('change',async e=>{const f=e.target.files?.[0]
   }else importConfig(JSON.parse(await f.text()));
  }catch(err){setStatus('Import failed: '+err.message)}finally{e.target.value=''}});
 window.addEventListener('resize',()=>{clearTimeout(S.resizeTimer);S.resizeTimer=setTimeout(resize,140)});
-resize();preset('well');updateMaterialPreview();requestAnimationFrame(tick);
-window.AgentFieldDiagnostics={getState:()=>({agents:S.agents.length,free:S.freeCount,near:S.nearCount,offscreen:S.offscreenCount,paused:S.paused,mode:S.mode,texture:S.texture,maskCells:Array.from(S.field).filter(v=>v<0).length,name:S.name,time:S.time}),sample:(x,y)=>sampleField(x,y),setPreset:preset,reseed,importConfig,getAgent:(i=0)=>({...S.agents[i]}),config};
+resize();preset('well');updateMaterialPreview();resizeRange();resetRocks();refreshRangeFieldLabel();requestAnimationFrame(tick);
+window.AgentFieldDiagnostics={getState:()=>({agents:S.agents.length,free:S.freeCount,near:S.nearCount,offscreen:S.offscreenCount,paused:S.paused,mode:S.mode,texture:S.texture,maskCells:Array.from(S.field).filter(v=>v<0).length,name:S.name,time:S.time}),sample:(x,y)=>sampleField(x,y),setPreset:preset,reseed,importConfig,getAgent:(i=0)=>({...S.agents[i]}),config,range:()=>rangeDiagnostics(),cast:castCurrentField,resetRocks,switchTab};
 })();
 </script></body></html>
