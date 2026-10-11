@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 034</title>
+<title>WRKMAN | Magic Physics Laboratory 035</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -638,10 +638,11 @@ header .actions{display:flex;gap:6px}
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 034 • CRAFTED MAGIC</span></div>
+   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 035 • SPELL FORGE</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="gateMenuOpen" type="button">✧ DIAL GATE</button>
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
+    <button class="minibtn" id="spellForgeOpen" type="button">🔨 SPELL FORGE</button>
     <button class="minibtn" id="craftSync" type="button">⬡ SYNC FIELD</button>
     <button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button>
     <button class="minibtn" id="hueOpen" type="button">🎨 HUES</button>
@@ -655,10 +656,10 @@ header .actions{display:flex;gap:6px}
     <div class="craftActions">
      <button type="button" id="craftHealToggle">HEAL LINK: ON</button>
      <button type="button" id="craftImport">IMPORT JSON</button>
-     <a class="craftLink" href="../agent-field/?v=0.4" target="_blank" rel="noopener noreferrer">OPEN FIELD FORGE ↗</a>
+     <a class="craftLink" href="../agent-field/?v=0.4" target="_blank" rel="noopener noreferrer">FIELD LAB ↗</a>
     </div>
     <input id="craftFile" type="file" accept=".json,application/json" hidden>
-    <div id="craftHelp">Equip ⬡ BOUND FIELD in SPELLBOOK; cast once to surround yourself. Linked Minor Heal pulses every 3s.</div>
+    <div id="craftHelp">Open SPELL FORGE to draw, name, link, and save spells inside the game. ⬡ BOUND FIELD casts the equipped recipe.</div>
    </div>
    <div class="menuPrefs"><span class="menuCaption">DISPLAY SETTINGS</span>
     <div class="menuSettingGrid">
@@ -693,7 +694,7 @@ header .actions{display:flex;gap:6px}
   <span id="wheelGlyph" aria-hidden="true">✦</span><span id="wheelName">BOLT</span>
  </button>
  <div id="wheelReadout" aria-live="polite">HOLD + SLIDE TO EQUIP</div>
-</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse or ⬡ Bound Field.</p><p><b>CRAFTED MAGIC:</b> In ☰ → SYNC FIELD, bring across your last locally saved Agent·Field map (or import its JSON). Equip ⬡ BOUND FIELD in SPELLBOOK and cast from your feet. It follows the wizard for 14 seconds; its 32×32 instructions drive a capped visible hex swarm. Minor Heal is an independent link that pulses at your current position every three seconds while active. Toggle the link in ☰ before casting again. When no recipe is imported, FIRE RING is the starter example.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
+</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show"><div id="modal"><h1>Magic has rules.<br>Let's break some.</h1><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse or ⬡ Bound Field.</p><p><b>CRAFTED MAGIC:</b> In ☰ → SPELL FORGE, paint a 32×32 field, preview its agents, choose materials, name and save spells, then SAVE & EQUIP. The game automatically assigns ⬡ BOUND FIELD to a spell wheel slot. SYNC FIELD and JSON import remain available for outside experiments. Cast Bound Field from your feet. It follows the wizard for 14 seconds; its 32×32 instructions drive a capped visible hex swarm. Minor Heal is an independent link that pulses at your current position every three seconds while active. Toggle the link in ☰ before casting again. When no recipe is imported, FIRE RING is the starter example.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p><button id="begin">ENTER THE LAB →</button></div></div></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div>
 </div>
 <!-- The wardrobe is a separate presentation layer, never a gameplay control. -->
@@ -726,7 +727,7 @@ header .actions{display:flex;gap:6px}
    <section class="bookSection"><h3>SIX EQUIPPED RUNES</h3><div id="bookSlots" class="bookSlots" role="group" aria-label="Six equipped slots"></div></section>
    <section class="bookSection"><h3>KNOWN SPELLS <span id="bookTotal">7</span></h3><div id="bookLibrary" class="bookLibrary" role="group" aria-label="Known spell library"></div></section>
   </div>
-  <div class="bookFoot"><span id="bookStatus">Saved on this device • your robes are untouched</span><button class="minibtn" id="bookDefaults" type="button">RESTORE SIX</button></div>
+  <div class="bookFoot"><span id="bookStatus">Saved on this device • your robes are untouched</span><button class="minibtn" id="bookForgeOpen" type="button">🔨 FORGE</button><button class="minibtn" id="bookDefaults" type="button">RESTORE SIX</button></div>
  </div>
 </div>
 <!-- HUE FORGE 011: isolated dye interface. No changes to the game world. -->
@@ -794,6 +795,7 @@ header .actions{display:flex;gap:6px}
 <script src="./wildlife.js?v=032"></script>
 <script src="./region-gate.js?v=033"></script>
 <script src="./crafted-magic.js?v=034"></script>
+<script src="./spell-forge.js?v=035"></script>
 <script>
 (()=>{
 "use strict";
@@ -1752,7 +1754,7 @@ craftRefresh();
 if(!Crafted){$("craftSync").disabled=true;$("craftHealToggle").disabled=true;$("craftImport").disabled=true;}
 $("craftSync").addEventListener("click",()=>{
  if(!Crafted)return;
- try{craftedRecipe=Crafted.save(gameStorage,Crafted.fromForge(gameStorage));craftRefresh("FIELD SYNCED • Equip ⬡ BOUND FIELD in Spellbook. Next cast uses this recipe.");announce("FIELD SYNCED • "+craftedRecipe.name);}
+ try{craftedRecipe=Crafted.save(gameStorage,Crafted.fromForge(gameStorage));forgeUI?.adopt(craftedRecipe,craftedHealLinked);craftRefresh("FIELD SYNCED • Equip ⬡ BOUND FIELD in Spellbook. Next cast uses this recipe.");announce("FIELD SYNCED • "+craftedRecipe.name);}
  catch(e){craftRefresh(String(e.message||e));}
 });
 $("craftHealToggle").addEventListener("click",()=>{
@@ -1762,7 +1764,7 @@ $("craftHealToggle").addEventListener("click",()=>{
 $("craftImport").addEventListener("click",()=>$("craftFile").click());
 $("craftFile").addEventListener("change",async e=>{
  const f=e.target.files?.[0];if(!f||!Crafted)return;
- try{craftedRecipe=Crafted.save(gameStorage,JSON.parse(await f.text()));craftRefresh("IMPORTED • "+craftedRecipe.name+" • Next cast uses this field.");announce("CRAFTED FIELD IMPORTED");}
+ try{craftedRecipe=Crafted.save(gameStorage,JSON.parse(await f.text()));forgeUI?.adopt(craftedRecipe,craftedHealLinked);craftRefresh("IMPORTED • "+craftedRecipe.name+" • Next cast uses this field.");announce("CRAFTED FIELD IMPORTED");}
  catch(err){craftRefresh("IMPORT FAILED • "+String(err.message||err))}
  finally{e.target.value="";}
 });
@@ -1952,7 +1954,7 @@ $("copy").onclick=async()=>{
   wizardSkin:activeSkin,keeperSkins:[...keepers].sort((a,b)=>a-b),
   spells:equipped.map((id,i)=>({id,slot:i+1})),
   library:spells.slice(),
-  notes:"Six equipped rune slots; eight known spells including the Bound Field recipe; heal link is a timed self-anchored trigger."};
+  notes:"Six equipped rune slots, a portable 32×32 in-game Spell Forge, locally saved recipe library, and the self-anchored timed Minor Heal link."};
  try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
  catch(_){announce("Clipboard unavailable; open this page in a secure browser context.");}
 };
@@ -2017,6 +2019,53 @@ for(const id of ["spellbookOpen","skinsOpen","hueOpen","notes"]){
  $(id).addEventListener("click",()=>closeGameMenu(false,false),true);
 }
 $("reset").addEventListener("click",()=>closeGameMenu(true,false),true);
+
+// 035 / Forge edits portable recipes while the world is paused. Scene spells
+// keep a snapshot made on cast, so editing never mutates an active aura.
+const Forge=window.WRKMAN_SPELL_FORGE||null;
+let forgeUI=null;
+function closeForge(){
+ if(!forgeUI)return;
+ forgeUI.close();
+ if(started&&$("gameMenu").hidden&&$("spellbookOverlay").hidden&&
+    $("skinOverlay").hidden&&$("hueOverlay").hidden&&$("gateOverlay").hidden&&
+    !$("instructions").classList.contains("show"))scene?.scene.resume();
+ $("gameMenuToggle").focus({preventScroll:true});
+}
+function openForge(){
+ if(!started||!scene||!forgeUI){announce("SPELL FORGE UNAVAILABLE • Start the game or reload.");return;}
+ if(!$("gameMenu").hidden)closeGameMenu(false,false);
+ if(!$("spellbookOverlay").hidden)$("spellbookOverlay").hidden=true;
+ wheelTouchId=null;wheelMouseId=null;wheelHide();
+ neutralStick();joyPointer=null;joyTouchId=null;
+ scene.scene.pause();
+ forgeUI.open();
+}
+if(Forge&&Crafted){
+ try{
+  forgeUI=Forge.create({
+   engine:Crafted,storage:gameStorage,
+   getCurrent:()=>craftedRecipe,getHealLinked:()=>craftedHealLinked,
+   onEquip:(recipe,heal)=>{
+    craftedRecipe=Crafted.save(gameStorage,recipe);
+    craftedHealLinked=!!heal;
+    gameStorage.setItem("wrkman-arcane-lab034-heal-linked",String(craftedHealLinked));
+    if(!equipped.includes("crafted")){
+     equipped=Loadout.assign(equipped,5,"crafted");
+     Loadout.write(gameStorage,equipped);
+    }
+    selected="crafted";refreshWheel();refreshSpellbook();craftRefresh(
+     "EQUIPPED • "+craftedRecipe.name+" · "+(craftedHealLinked?"MINOR HEAL / 3s":"HEAL LINK OFF"));
+    announce("FORGED • "+craftedRecipe.name+" • CAST VIA ⬡ BOUND FIELD");
+   },
+   onClose:closeForge
+  });
+ }catch(e){announce("SPELL FORGE SETUP FAILED • "+String(e.message||e));}
+}
+$("spellForgeOpen").addEventListener("click",openForge);
+$("bookForgeOpen").addEventListener("click",openForge);
+if(!forgeUI){$("spellForgeOpen").disabled=true;$("bookForgeOpen").disabled=true;}
+
 // Copy remains in the open menu so its actual success or failure can be
 // reported by the existing clipboard promise to menuStatus.
 // Wardrobe: state is presentation-only; user picks and favorites are local.
