@@ -58,8 +58,13 @@
   return {x:st.center.x+(x-.5)*st.scale,y:st.center.y+(y-.5)*st.scale};
  }
  function start(scene,recipe,healLinked=true,target=null){
-  if(scene.craftedAura)return false;
   const cfg=normalize(recipe),starts=Motion.startingCells(cfg.values);
+  const existing=(scene.craftedShots||[]).reduce((n,cast)=>n+cast.agents.length,0)+
+   (scene.craftedAura?.agents.length||0);
+  if(existing+cfg.settings.population>6000)return false;
+  if(cfg.settings.delivery==='world'){
+   if((scene.craftedShots||[]).length>=3)return false;
+  }else if(scene.craftedAura)return false;
   const now=scene.time.now,delivery=cfg.settings.delivery,p=scene.player,aim=scene.aim||{x:1,y:0};
   const wanted=target&&Number.isFinite(target.x)&&Number.isFinite(target.y)?target:{x:p.x+aim.x*420,y:p.y+aim.y*420};
   const dx=wanted.x-p.x,dy=wanted.y-p.y,len=Math.hypot(dx,dy);
@@ -78,12 +83,13 @@
   // Full requested population. There are no phantom agents replaced at
   // the draw budget. Every agent runs the original simulator each update.
   for(let i=0;i<cfg.settings.population;i++)st.agents.push(makeAgent(st,i));
-  scene.craftedAura=st;return true;
+  if(delivery==='world'){if(!scene.craftedShots)scene.craftedShots=[];scene.craftedShots.push(st)}
+  else scene.craftedAura=st;
+  return true;
  }
- function stop(scene){scene.craftedAura=null}
- function step(scene,time,delta,Combat){
-  const st=scene.craftedAura;if(!st)return;
-  if(time>=st.expires){stop(scene);return}
+ function stop(scene,onlyAura=false){scene.craftedAura=null;if(!onlyAura)scene.craftedShots=[]}
+ function stepOne(scene,st,time,delta,Combat){
+  if(time>=st.expires){st.expired=true;return}
   const cfg=st.recipe.settings,dtSeconds=clamp(delta,0,50)/1000;
   st.motionTime+=dtSeconds;st.frames++;
   if(st.delivery==='aura'){st.center.x=scene.player.x;st.center.y=scene.player.y}
@@ -139,12 +145,21 @@
    }
   }
  }
+ function step(scene,time,delta,Combat){
+  if(scene.craftedAura){stepOne(scene,scene.craftedAura,time,delta,Combat);
+   if(scene.craftedAura.expired)scene.craftedAura=null}
+  if(scene.craftedShots?.length){
+   for(const cast of scene.craftedShots)stepOne(scene,cast,time,delta,Combat);
+   scene.craftedShots=scene.craftedShots.filter(cast=>!cast.expired);
+  }
+ }
  function hex(g,x,y,r){
   const pts=[];for(let i=0;i<6;i++){const th=i*TAU/6+Math.PI/6;pts.push({x:x+Math.cos(th)*r,y:y+Math.sin(th)*r})}
   g.fillPoints(pts,true);
  }
  function draw(scene,g,time){
-  const st=scene.craftedAura;if(!st)return;
+  const active=[...(scene.craftedShots||[])];if(scene.craftedAura)active.push(scene.craftedAura);
+  for(const st of active){
   const cfg=st.recipe.settings,colors=palettes[cfg.palette];
   const light=.14+cfg.light/100*.84,alpha=.18+light*.63;
   const n=st.agents.length,budget=Math.min(n,cfg.renderLimit||DEFAULT_DRAW);
@@ -190,13 +205,22 @@
     hex(g,pulse.x+Math.cos(a)*r,pulse.y+Math.sin(a)*r,2.3*(1-q)+.4);
    }
   }
+  }
  }
- const snapshot=scene=>{const s=scene.craftedAura;return s?{
-  active:true,name:s.recipe.name,delivery:s.delivery,center:{...s.center},agents:s.agents.length,
-  rendered:s.rendered,renderBudget:s.recipe.settings.renderLimit,healLinked:s.healLinked,
-  pulses:s.pulses,collisions:s.collisions,free:s.free,offscreen:s.offscreen,physics:Motion.VERSION,
-  spawn:{x:s.spawnX,y:s.spawnY},direction:{...s.forward}
- }:{active:false}};
+ const snapshot=scene=>{
+  const active=[...(scene.craftedShots||[])];if(scene.craftedAura)active.push(scene.craftedAura);
+  if(!active.length)return {active:false};
+  const s=scene.craftedAura||active[active.length-1];
+  return {active:true,name:s.recipe.name,delivery:s.delivery,center:{...s.center},
+   casts:active.length,agents:active.reduce((n,c)=>n+c.agents.length,0),
+   rendered:active.reduce((n,c)=>n+c.rendered,0),
+   renderBudget:active.reduce((n,c)=>n+c.recipe.settings.renderLimit,0),
+   healLinked:active.some(c=>c.healLinked),pulses:active.reduce((n,c)=>n+c.pulses,0),
+   collisions:active.reduce((n,c)=>n+c.collisions,0),free:active.reduce((n,c)=>n+c.free,0),
+   offscreen:active.reduce((n,c)=>n+c.offscreen,0),physics:Motion.VERSION,
+   spawn:{x:s.spawnX,y:s.spawnY},direction:{...s.forward}
+  };
+ };
  return Object.freeze({SAVE_KEY,SOURCE_KEY,starter,normalize,read,fromForge,save,sample,
   spawnCenter,worldPosition,start,stop,step,draw,snapshot});
 });
