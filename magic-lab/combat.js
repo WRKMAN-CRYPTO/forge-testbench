@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 051 | Glassrunner physical evasion and living encounters.
+/* WRKMAN ARCANE LAB 052 | aggressive Glassrunner triple dash and physical evasion.
    Standalone Phaser/Matter encounter module. No networking or permanent game saves. */
 (()=>{
 "use strict";
@@ -723,22 +723,29 @@ function step(s,time,delta){
    }
    const intent=e.mindIntent||{state:'prowl',x:0,y:0,speed:0};
    if(intent.launch){
-    // Physical lateral leap, with NO teleportation or damage immunity.
+    // Defensive sidesteps and all three attacking dashes are real
+    // Matter velocity impulses, never scripted invincibility.
+    const combo=intent.state==='combo-dash';
     intent.launch=false;
     Body.setVelocity(b,{x:intent.dodge.x*intent.speed,y:intent.dodge.y*intent.speed});
-    s.burst(pos.x,pos.y,0x85ecf5,11,3.4);
-   }else if(intent.state==='windup'){
-    Body.setVelocity(b,{x:b.velocity.x*.86,y:b.velocity.y*.86});
-   }else if(intent.state==='recover'){
-    Body.setVelocity(b,{x:b.velocity.x*.96,y:b.velocity.y*.96});
-   }else if(intent.state!=='evade'){
-    const k=.00030*b.mass;
+    s.burst(pos.x,pos.y,combo?0xffcb78:0x85ecf5,combo?16:11,combo?4.1:3.4);
+   }else if(intent.state==='windup'||intent.state==='combo-tell'){
+    Body.setVelocity(b,{x:b.velocity.x*(intent.state==='combo-tell'?.81:.86),
+      y:b.velocity.y*(intent.state==='combo-tell'?.81:.86)});
+   }else if(intent.state==='recover'||intent.state==='combo-recover'){
+    const drag=intent.state==='combo-recover'?.89:.96;
+    Body.setVelocity(b,{x:b.velocity.x*drag,y:b.velocity.y*drag});
+   }else if(intent.state==='combo-gap'){
+    Body.setVelocity(b,{x:b.velocity.x*.90,y:b.velocity.y*.90});
+   }else if(intent.state!=='evade'&&intent.state!=='combo-dash'){
+    const k=.00042*b.mass;
     const vx=(intent.x||0)*(intent.speed||0),vy=(intent.y||0)*(intent.speed||0);
     Body.applyForce(b,pos,{x:clamp(vx-b.velocity.x,-4,4)*k,
       y:clamp(vy-b.velocity.y,-4,4)*k});
    }
    if(Math.hypot(pos.x-s.player.x,pos.y-s.player.y)<e.r+17)
-    hitPlayer(s,6,pos.x,pos.y,'glassrunner swipe');
+    hitPlayer(s,intent.state==='combo-dash'?13:7,pos.x,pos.y,
+      intent.state==='combo-dash'?'glassrunner triple dash':'glassrunner swipe');
    continue;
   }
   if(e.type==="gravelhorn"&&e.territory&&Territory){
@@ -980,6 +987,34 @@ function paint(s,g,time){
    const face=m?.face||{x:1,y:0},dir=face.x>=0?1:-1;
    const pulse=.5+.5*Math.sin(time*.016+e.id);
    const evade=state==='evade',warn=state==='windup';
+   const comboTell=state==='combo-tell',comboDash=state==='combo-dash';
+   const comboGap=state==='combo-gap',comboRecover=state==='combo-recover';
+   if(comboTell){
+    const angle=m?.combo?.heading||face;
+    const progress=1-Math.max(0,(m.combo?.until||time)-time)/560;
+    g.lineStyle(2.8,0xffc76c,.48+.36*pulse);
+    g.strokeCircle(x,y,31+13*clamp(progress,0,1));
+    g.lineStyle(2,0xffe1ab,.72);
+    g.lineBetween(x,y,x+angle.x*175,y+angle.y*175);
+    for(let k=0;k<3;k++){
+     const offset=(k-1)*12;
+     const hx=x+angle.x*(57+k*18)-angle.y*offset;
+     const hy=y+angle.y*(57+k*18)+angle.x*offset;
+     g.fillStyle(k===m.combo?.step?0xfff0a9:0xa4dfde,.8);
+     g.fillCircle(hx,hy,3.3);
+    }
+   }
+   if(comboDash||comboGap){
+    const heading=m?.combo?.heading||face;
+    g.lineStyle(comboDash?7:4,comboDash?0x8df0f5:0xffc887,comboDash?.34:.13);
+    g.lineBetween(x-heading.x*(comboDash?74:36),y-heading.y*(comboDash?74:36),x,y);
+    g.lineStyle(1.7,0xffe4ac,.50);
+    g.strokeCircle(x,y,24+2.5*pulse);
+   }
+   if(comboRecover){
+    g.lineStyle(1.6,0xffd19c,.21+.12*pulse);
+    g.strokeCircle(x,y,27);
+   }
    if(warn){
     // Telegraph before leap, a genuine opportunity to hit it.
     g.lineStyle(2.5,0xffdf87,.6+.25*pulse);g.strokeCircle(x,y,29+pulse*6);
@@ -1005,12 +1040,15 @@ function paint(s,g,time){
    g.lineStyle(1.5,0xd2ffff,.62);g.strokeEllipse(x,y,35,22);
    g.fillStyle(0xffe1ab,.97);g.fillCircle(x+dir*17,y-3,2.8);
    g.fillStyle(0x092c38);g.fillCircle(x+dir*17.7,y-3,1.3);
-   const label={prowl:'PROWL',alert:'TRACKING',windup:'SIDESTEP!',evade:'DODGE',
-    recover:'RECOVER',stagger:'STAGGER'}[state]||'PROWL';
+   const label={prowl:'HUNTING',alert:'TRACKING',windup:'SIDESTEP!',evade:'DODGE',
+    recover:'RECOVER',stagger:'STAGGER', 'combo-tell':'TRIPLE DASH!',
+    'combo-dash':'DASH '+((m.combo?.step||0)+1)+'/3',
+    'combo-gap':'CHAINING', 'combo-recover':'EXHAUSTED'}[state]||'HUNTING';
    if(e.moodText?.active){
     e.moodText.setPosition(x,y-38);
     if(e.moodText.text!==label)e.moodText.setText(label);
-    e.moodText.setColor(warn?'#ffe09b':evade?'#90f7ff':'#b7e1dd');
+    e.moodText.setColor(comboTell?'#ffd490':comboDash?'#fff5bd':
+      comboRecover?'#c2b8ab':warn?'#ffe09b':evade?'#90f7ff':'#b7e1dd');
    }
   }else if(e.type==="charger"){
    const warning=e.phase==="windup";
