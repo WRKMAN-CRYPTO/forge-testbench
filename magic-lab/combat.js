@@ -1,9 +1,10 @@
-/* WRKMAN ARCANE LAB 045 | Living targets, creature instincts, and bounded combustion.
+/* WRKMAN ARCANE LAB 046 | Territorial beasts, creatures, and bounded combustion.
    Standalone Phaser/Matter encounter module. No networking or permanent game saves. */
 (()=>{
 "use strict";
 const Body=Phaser.Physics.Matter.Matter.Body;
 const Mind=window.WRKMAN_CREATURE_MIND||null;
+const Territory=window.WRKMAN_TERRITORY_MIND||null;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 // Shared with the Lab scene's expanded navigable world.
@@ -13,23 +14,26 @@ const MAX_DEBRIS=36,DEBRIS_LIFE=18000,PILLAR_HEALTH=82;
 let chainCounter=0,enemyCounter=0,pillarCounter=0;
 const now=s=>s.time.now;
 function spawn(s,type,x,y){
- const heavy=type==="charger",resident=type==="mossling";
- const r=heavy?26:resident?16:18;
+ const heavy=type==="charger",resident=type==="mossling",guardian=type==="gravelhorn";
+ const r=guardian?38:heavy?26:resident?16:18;
  const body=s.matter.add.circle(x,y,r,{
-  frictionAir:heavy?.075:resident?.16:.09,restitution:heavy?.4:resident?.35:.68,
-  density:heavy?.016:resident?.0019:.002,slop:.02
+  frictionAir:guardian?.064:heavy?.075:resident?.16:.09,
+  restitution:guardian?.22:heavy?.4:resident?.35:.68,
+  density:guardian?.023:heavy?.016:resident?.0019:.002,slop:.02
  });
  const enemy={
   id:++enemyCounter,body,r,type,alive:true,
-  hp:heavy?165:resident?90:80,maxHP:heavy?165:resident?90:80,
+  hp:guardian?370:heavy?165:resident?90:80,
+  maxHP:guardian?370:heavy?165:resident?90:80,
   phase:"stalk",until:0,nextAttack:now(s)+1000+Math.random()*800,
   face:{x:-1,y:0},burn:null,hitAt:0,staggerUntil:0,
   orbit:Math.random()<.5?-1:1,
   mind:resident&&Mind?Mind.make(enemyCounter,x,y,now(s)):null,
+  territory:guardian&&Territory?Territory.make(enemyCounter,x,y,now(s)):null,
   mindAt:0,mindIntent:null
  };
- if(resident&&s.add?.text){
-  enemy.moodText=s.add.text(x,y-40,"GRAZE",{
+ if((resident||guardian)&&s.add?.text){
+  enemy.moodText=s.add.text(x,y-40,guardian?"PATROL":"GRAZE",{
    fontFamily:"monospace",fontSize:"10px",color:"#b4e9c0",
    backgroundColor:"#12251ddd",padding:{x:3,y:2}
   }).setOrigin(.5,.5).setDepth(6);
@@ -64,6 +68,16 @@ function reset(s,layout=null){
    const spot=pads[0],x=spot?.x??s.player.x+310,y=spot?.y??s.player.y+130;
    spawn(s,'mossling',x,y);
   }
+  // A single territorial beast per hostile arena, away from gate and foes.
+  if(layout.index!==0&&Territory){
+   const spots=(layout.pads||[]).filter(p=>
+    Math.hypot(p.x-s.player.x,p.y-s.player.y)>350&&
+    (layout.enemies||[]).every(e=>Math.hypot(p.x-e.x,p.y-e.y)>155));
+   spots.sort((a,b)=>Math.abs(Math.hypot(a.x-s.player.x,a.y-s.player.y)-475)-
+    Math.abs(Math.hypot(b.x-s.player.x,b.y-s.player.y)-475));
+   const chosen=spots[0];
+   spawn(s,'gravelhorn',chosen?.x??s.player.x+520,chosen?.y??s.player.y-145);
+  }
   for(const p of layout.pillar||[])pillar(s,p.x,p.y);
   for(const d of layout.debris||[])rubble(s,d.x,d.y,d.r,0,0);
  }else{
@@ -72,6 +86,7 @@ function reset(s,layout=null){
   spawn(s,"wisp",760,174);
   spawn(s,"wisp",753,426);
   if(Mind)spawn(s,"mossling",451,544);
+  if(Territory)spawn(s,"gravelhorn",930,565);
   // Preserve original lab targets and fracture-physics landmarks.
   pillar(s,371,165);pillar(s,694,362);pillar(s,377,457);
   for(const [x,y,r] of [[322,247,9],[785,304,11],[570,465,8],[316,401,7]]){
@@ -364,8 +379,10 @@ function queueBurnDetonation(s,e,burn){
 function hitEnemy(s,e,amount,kind){
  if(!e?.alive||!Number.isFinite(amount)||amount<=0)return false;
  if(e.type==="mossling"&&e.mind&&Mind){
-  // Damage is an event the creature remembers, not a universal aggro flag.
   Mind.injured(e.mind,e.body.position,s.player,now(s));
+ }
+ if(e.type==="gravelhorn"&&e.territory&&Territory){
+  Territory.injured(e.territory,s.player,now(s));
  }
  e.hp=Math.max(0,e.hp-amount);
  e.hitAt=now(s);
@@ -623,6 +640,33 @@ function step(s,time,delta){
   // Stagger suspends intent, not physics: sliding bodies continue to move
   // under their actual velocity, gravity and impacts.
   if(time<e.staggerUntil)continue;
+  if(e.type==="gravelhorn"&&e.territory&&Territory){
+   const m=e.territory;
+   if(time>=e.mindAt){
+    e.mindAt=time+100;
+    e.mindIntent=Territory.decide(m,{
+     time,pos,player:s.player,health:e.hp/e.maxHP,signals:c.stimuli
+    });
+   }
+   const intent=e.mindIntent||{state:'patrol',x:0,y:0,speed:0};
+   if(intent.launch){
+    // One-time committed body velocity, not per-frame target correction.
+    Body.setVelocity(b,{x:intent.face.x*intent.speed,y:intent.face.y*intent.speed});
+    s.burst(pos.x,pos.y,0xffd087,13,4);
+    stimulus(s,pos.x,pos.y,'danger',1.25);
+   }else if(intent.state!=='charge'){
+    const turn=.00028*b.mass;
+    Body.applyForce(b,pos,{
+     x:clamp(intent.x*intent.speed-b.velocity.x,-5,5)*turn,
+     y:clamp(intent.y*intent.speed-b.velocity.y,-5,5)*turn
+    });
+   }
+   if(intent.state==='charge'&&Math.hypot(pos.x-s.player.x,pos.y-s.player.y)<e.r+23)
+    hitPlayer(s,27,pos.x,pos.y,'gravelhorn impact');
+   else if(intent.state==='warn'&&Math.hypot(pos.x-s.player.x,pos.y-s.player.y)<e.r+12)
+    hitPlayer(s,7,pos.x,pos.y,'territorial shove');
+   continue;
+  }
   if(e.type==="mossling"&&e.mind&&Mind){
    // Perception/decisions run ~10Hz; physical force is applied every frame.
    if(time>=e.mindAt){
