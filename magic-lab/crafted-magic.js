@@ -1,4 +1,4 @@
-/* WRKMAN Arcane Lab 043 / adjustable lifespans and death fades
+/* WRKMAN Arcane Lab 044 / moving fade with unchanged Agent Field physics
  * Exactly the same 32x32 field physics as Agent Field. Casting transforms
  * coordinates into world space; it never steers individual agent velocities.
  * Game damage, durations, rendering budgets, and linked events are separate.
@@ -63,8 +63,9 @@
  // The shared Agent Field physics is unchanged. Lifespan is a game rule,
  // measured in scene time for EACH agent, independent of frame rate and of
  // the original Motion.stepAgent age counter (which caps simulation dt).
- // At death, retain only visible render snapshots. Fading hexes never move,
- // collide, heal or occupy capacity. The cast itself can close immediately.
+ // At death, transfer visible agent states to a separate VISUAL swarm.
+ // It retains the same velocity and field instructions during its fade, but
+ // cannot collide, heal or occupy live capacity. The cast closes immediately.
  function queueFades(scene,st,dead,now){
   if(!scene||!dead.length)return;
   const cfg=st.recipe.settings,camera=scene.cameras?.main?.worldView;
@@ -83,12 +84,20 @@
     a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
    const vy=st.delivery==='world'?
     a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
-   pieces.push({x:p.x,y:p.y,r:Math.max(.9,radius),color,angle:Math.atan2(vy,vx),
+   pieces.push({agent:a,x:p.x,y:p.y,r:Math.max(.9,radius),color,angle:Math.atan2(vy,vx),
     texture:cfg.texture,opacity:(.18+(.14+cfg.light/100*.84)*.63)});
   }
   if(!pieces.length)return;
   scene.craftedFades=scene.craftedFades||[];
-  scene.craftedFades.push({at:now,pieces});
+  // Only geometry and recipe references are kept, not the parent cast, its
+  // damage tracking, or the (possibly large) now-empty agent collection.
+  const transform={
+   delivery:st.delivery,center:{...st.center},right:{...st.right},
+   forward:{...st.forward},scale:st.scale,worldW:st.worldW,worldH:st.worldH,
+   spawnX:st.spawnX,spawnY:st.spawnY
+  };
+  scene.craftedFades.push({at:now,pieces,transform,field:st.recipe.values,
+   settings:{...cfg},motionTime:st.motionTime});
   // Bound temporary rendering memory even if many spells die at once.
   let total=scene.craftedFades.reduce((n,b)=>n+b.pieces.length,0);
   while(total>MAX_FADE_PARTICLES&&scene.craftedFades.length){
@@ -178,15 +187,45 @@
   Impacts.process(scene,st,time,Combat,previousCenter);
   if(st.agents.length===0)st.expired=true;
  }
+ // Fading particles keep the *same* dynamics as they had at their last
+ // live frame. We advance them every frame, but never pass them to Impacts.
+ // Aura fades continue following the wizard, just as live Aura does.
+ function stepFades(scene,time,delta){
+  if(!scene.craftedFades?.length)return;
+  const dt=clamp(delta,0,50)/1000,remaining=[];
+  for(const batch of scene.craftedFades){
+   if(time-batch.at>=FADE_MS)continue;
+   batch.motionTime+=dt;
+   const anchor=batch.transform;
+   if(anchor.delivery==='aura'&&scene.player){
+    anchor.center.x=scene.player.x;anchor.center.y=scene.player.y;
+   }
+   for(const p of batch.pieces){
+    Motion.stepAgent(p.agent,batch.field,batch.settings,dt,
+     anchor.worldW,anchor.worldH,batch.motionTime);
+    const pos=worldPosition(anchor,p.agent);
+    p.x=pos.x;p.y=pos.y;
+    const a=p.agent;
+    const vx=anchor.delivery==='world'?
+     a.vx*anchor.right.x*anchor.worldW+a.vy*anchor.forward.x*anchor.worldH:a.vx;
+    const vy=anchor.delivery==='world'?
+     a.vx*anchor.right.y*anchor.worldW+a.vy*anchor.forward.y*anchor.worldH:a.vy;
+    p.angle=Math.atan2(vy,vx);
+   }
+   remaining.push(batch);
+  }
+  scene.craftedFades=remaining;
+ }
  function step(scene,time,delta,Combat){
-  if(scene.craftedFades?.length)
-   scene.craftedFades=scene.craftedFades.filter(batch=>time-batch.at<FADE_MS);
   if(scene.craftedAura){stepOne(scene,scene.craftedAura,time,delta,Combat);
    if(scene.craftedAura.expired)scene.craftedAura=null}
   if(scene.craftedShots?.length){
    for(const cast of scene.craftedShots)stepOne(scene,cast,time,delta,Combat);
    scene.craftedShots=scene.craftedShots.filter(cast=>!cast.expired);
   }
+  // Process newly expired hexes immediately, avoiding a frozen transition
+  // frame, and keep moving them until their 800ms visual fade ends.
+  stepFades(scene,time,delta);
  }
  function hex(g,x,y,r){
   const pts=[];for(let i=0;i<6;i++){const th=i*TAU/6+Math.PI/6;pts.push({x:x+Math.cos(th)*r,y:y+Math.sin(th)*r})}
@@ -287,5 +326,5 @@
   };
  };
  return Object.freeze({SAVE_KEY,SOURCE_KEY,starter,normalize,read,fromForge,save,sample,
-  spawnCenter,worldPosition,AGENT_MAX_AGE_MS,FADE_MS,expireAgents,start,stop,step,draw,snapshot});
+  spawnCenter,worldPosition,AGENT_MAX_AGE_MS,FADE_MS,expireAgents,stepFades,start,stop,step,draw,snapshot});
 });
