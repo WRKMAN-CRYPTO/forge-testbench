@@ -202,7 +202,8 @@ function environmentCollision(s,a,b,normal){
  const old=c.pairCollisions.get("pillar:"+key)??-Infinity;
  if(t-old<340)return true;
  c.pairCollisions.set("pillar:"+key,t);
- const mult=moving.gameTag==="enemy"&&moving.enemyRef?.type==="charger"?1.45:
+ const mult=moving.gameTag==="enemy"&&moving.enemyRef?.type==="gravelhorn"?1.72:
+  moving.gameTag==="enemy"&&moving.enemyRef?.type==="charger"?1.45:
   moving.gameTag==="debris"&&moving.debrisRef?.core?1.15:1;
  damagePillar(s,p,Math.max(2,(approach-2.4)*8.4*mult),"impact");
  return true;
@@ -383,6 +384,9 @@ function hitEnemy(s,e,amount,kind){
  }
  if(e.type==="gravelhorn"&&e.territory&&Territory){
   Territory.injured(e.territory,s.player,now(s));
+  // Actual stone armor: spell petals are less effective while bracing.
+  // This does not redirect their momentum or give the body immunity.
+  if(kind==='crafted-field')amount*=e.territory.state==='windup'?.46:.73;
  }
  e.hp=Math.max(0,e.hp-amount);
  e.hitAt=now(s);
@@ -675,7 +679,8 @@ function step(s,time,delta){
     e.mindAt=time+100;
     e.mindIntent=Mind.decide(e.mind,{
      time,pos,player:s.player,health:e.hp/e.maxHP,signals:c.stimuli,
-     hazards:c.enemies.filter(o=>o!==e&&o.alive&&o.type==="charger"&&o.phase==="charge")
+     hazards:c.enemies.filter(o=>o!==e&&o.alive&&((o.type==="charger"&&o.phase==="charge")||
+      (o.type==="gravelhorn"&&o.territory?.state==="charge")))
     });
    }
    const intent=e.mindIntent||{x:0,y:0,speed:0};
