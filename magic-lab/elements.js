@@ -1,8 +1,8 @@
-/* WRKMAN ELEMENTAL WORLD / 019
+/* WRKMAN ELEMENTAL WORLD / 048
  * Matter is authoritative for bodies. This layer carries local temperature,
  * liquid water, ice, and moving vapor without checking spell-combo names.
  * Fixed finite budgets; no random numbers, persistent writes, networking,
- * dynamic code, or Spell-Language integration.
+ * dynamic code. Swarm agents can deposit energy and material on contact.
  */
 (function(root,factory){
  "use strict";
@@ -61,7 +61,8 @@ const WORLD={left:-800,right:1760,top:-520,bottom:1120};
   const w=s.elementWorld||reset(s);
   // Simulate at most 50ms per frame; pause/resume doesn't fast-forward matter.
   const dt=clamp(Number(delta)||0,0,50)/1000;
-  const active=new Set(),actors=(s.actors||[]).slice(0,MAX_BODIES);
+  const active=new Set(),actors=[...(s.actors||[]),...(s.combat?.enemies||[]),
+   ...(s.combat?.pillars||[])].slice(0,MAX_BODIES);
   const cold=s.frosts||[],hot=s.combat?.fields||[];
   for(const a of actors){
    const b=a.body;
@@ -143,6 +144,38 @@ const WORLD={left:-800,right:1760,top:-520,bottom:1120};
   w.flashes=w.flashes.filter(f=>time<f.until);
   w.iceCount=actors.filter(a=>a.body&&w.states.get(a.body)?.ice>.24).length;
  }
+ // Aggregated by target/frame in Field Impacts. Physical contact deposits
+ // elemental material; there is no prefab named-spell interpreter.
+ function agentContacts(s,body,actor,counts,x,y,time,combat){
+  if(!body?.position||!counts)return;
+  const w=s.elementWorld||reset(s),m=stateFor(w,body);
+  const fire=Math.max(0,counts[1]||0),water=Math.max(0,counts[2]||0),
+   frost=Math.max(0,counts[3]||0),electric=Math.max(0,counts[4]||0);
+  if(!(fire+water+frost+electric))return;
+  // Finite per-target/frame transfers prevent unbounded work.
+  if(water)m.liquid=clamp(m.liquid+Math.min(.45,water*.022),0,1.6);
+  if(fire)m.temperature=clamp(m.temperature+Math.min(52,fire*1.55),-65,150);
+  if(frost){
+   m.temperature=clamp(m.temperature-Math.min(60,frost*2.5),-65,150);
+   m.liquid=clamp(m.liquid+Math.min(.20,frost*.012),0,1.6);
+   m.ice=clamp(m.ice+Math.min(.42,frost*.025),0,1.65);
+   if(actor?.type&&actor.alive&&m.ice>.24&&time>=m.nextFreezeStunAt){
+    actor.staggerUntil=Math.max(actor.staggerUntil||0,time+480);
+    m.nextFreezeStunAt=time+4000;
+    m.freezeStunSpent=true;
+   }
+  }
+  if(electric){
+   const conductivity=clamp(m.liquid+m.ice,0,1.6);
+   if(actor?.type&&actor.alive&&combat?.hitEnemy){
+    const damage=Math.min(10,Math.round(Math.min(electric,12)*(.25+conductivity*.6)));
+    if(damage>0)combat.hitEnemy(s,actor,damage,'swarm electricity');
+   }
+   if(w.flashes.length>=MAX_FLASHES)w.flashes.shift();
+   w.flashes.push({x,y,r:Math.min(43,10+electric*2),born:time,
+    until:time+300,wet:conductivity>.35});
+  }
+ }
  function impulse(s,x,y,energy=100){
   const w=s.elementWorld;if(!w)return;
   const radius=clamp(90+energy*.8,90,240);
@@ -212,7 +245,7 @@ const WORLD={left:-800,right:1760,top:-520,bottom:1120};
   }
   // Frost crystals are visual evidence of local stored ice, independent of
   // which spell deposited the temperature.
-  for(const a of s.actors||[]){
+  for(const a of [...(s.actors||[]),...(s.combat?.enemies||[])]){
    const b=a.body,m=b&&w.states.get(b);
    if(!m||m.ice<.24||!b.position||b.labAlive===false)continue;
    const r=clamp(16+m.ice*18,18,34),x=b.position.x,y=b.position.y;
@@ -242,6 +275,6 @@ const WORLD={left:-800,right:1760,top:-520,bottom:1120};
   return {clouds:w.clouds.length,frozen:w.iceCount,arcs:w.discharges,
    volume:Number(w.clouds.reduce((n,c)=>n+c.mass,0).toFixed(2))};
  }
- return Object.freeze({reset,step,impulse,discharge,paint,snapshot,
+ return Object.freeze({reset,step,agentContacts,impulse,discharge,paint,snapshot,
   MAX_CLOUDS,MAX_FLASHES,MAX_BODIES});
 });
