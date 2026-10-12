@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 047 / found spell scroll generator
+/* WRKMAN ARCANE LAB 048 / elemental source pixels + found scrolls
  * Field geometry remains the same portable WRKMAN_AGENT_FIELD_V1 recipe.
  * Editor and spell library never require Phaser; the game supplies pause/equip hooks.
  */
@@ -17,6 +17,8 @@
  if(!Precision)throw Error('Precision touch editor 040 missing');
  const Scroll=typeof globalThis==='object'?globalThis.WRKMAN_SCROLL_GENERATOR:null;
  if(!Scroll)throw Error('Random scroll generator 047 missing');
+ const Sources=typeof globalThis==='object'?globalThis.WRKMAN_ELEMENT_SOURCES:null;
+ if(!Sources)throw Error('Elemental source pixels 048 missing');
  const KEY='wrkman-arcane-lab035-spell-library-v1',N=32,TAU=Math.PI*2,MAX_SPELLS=24;
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
  const $=(id)=>document.getElementById(id);
@@ -95,7 +97,7 @@
   document.head.append(style);
   const overlay=document.createElement('div');overlay.id='forgeOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','sfHeading');
   overlay.innerHTML=`<div class="sf-shell">
-   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>047 · RANDOM SCROLLS</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
+   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>048 · ELEMENTAL SOURCES</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
    <div class="sf-grid">
     <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><div class="sf-map-heading"><span id="sfMapCoords">CELL 16,16 · MAGENTA</span><strong id="sfZoomValue">1×</strong></div>
      <canvas id="sfMap" width="320" height="320" tabindex="0" class="sf-canvas" aria-label="32 by 32 instruction field. Zoom in, draw, or use arrows and Stamp Cell for exact placement"></canvas>
@@ -104,10 +106,10 @@
       <div class="sf-nudge"><span class="sf-empty"></span><button data-nudge="0,-1" type="button" aria-label="Select cell above">↑</button><span class="sf-empty"></span><span class="sf-empty"></span><button data-nudge="-1,0" type="button" aria-label="Select cell left">←</button><button class="sf-stamp" id="sfStamp" type="button">⬡ STAMP CELL</button><button data-nudge="1,0" type="button" aria-label="Select cell right">→</button><span class="sf-empty"></span><button data-nudge="0,1" type="button" aria-label="Select cell below">↓</button><span class="sf-empty"></span><span class="sf-empty"></span></div>
      </div>
      <div class="sf-caption">ZOOM with +/− or pinch. Drag to paint, switch to MOVE to pan, or tap the overview to jump. Nudge arrows choose one exact cell; STAMP paints it. Nothing changes in your saved 32×32 field until you paint.</div>
-     <div class="sf-tools" id="sfTools"><button data-brush="white" class="active" title="White, high instruction value">⬜</button><button data-brush="gray" title="Gray, adjustable value">◧</button><button data-brush="black" title="Black, low instruction value">⬛</button><button data-brush="mask" title="Magenta, no instruction">🟪</button><button data-brush="line" title="Drag a white-to-black gradient line">↘</button></div>
+     <div class="sf-tools" id="sfTools"><button data-brush="white" class="active" title="White, high instruction value">⬜</button><button data-brush="gray" title="Gray, adjustable value">◧</button><button data-brush="black" title="Black, low instruction value">⬛</button><button data-brush="mask" title="Magenta, no instruction">🟪</button><button data-brush="line" title="Drag a white-to-black gradient line">↘</button><button data-brush="src1" title="FIRE: element at birth" aria-label="Paint fire source">🔥</button><button data-brush="src2" title="WATER: element at birth" aria-label="Paint water source">💧</button><button data-brush="src3" title="FROST: element at birth" aria-label="Paint frost source">❄️</button><button data-brush="src4" title="LIGHTNING: element at birth" aria-label="Paint lightning source">⚡</button><button data-brush="src0" title="Remove element source; preserve movement underneath" aria-label="Erase elemental source">◌</button></div>
      <div class="sf-flex"><label>GRAY <span id="sfGrayVal">128</span><input type="range" id="sfGray" min="1" max="254" value="128"/></label><label>BRUSH SIZE <span id="sfRadiusVal">1</span><input type="range" id="sfRadius" min="1" max="4" value="1"/></label></div>
      <div class="sf-actions"><button id="sfUndo">↶ UNDO</button><button id="sfClear">CLEAR TO MAGENTA</button><button id="sfRing">◯ RING STARTER</button><button id="sfCurtain">☷ CURTAIN STARTER</button></div>
-     <div class="sf-caption">White starts · gray guides · black sinks · magenta releases. Gradient tool: drag a line from white toward black.</div>
+     <div class="sf-caption">White creates neutral agents; colored pixels create FIRE, WATER, FROST or LIGHTNING agents. The element sits ON TOP of the grayscale movement field. ◌ erases only color. Gray guides, black sinks, magenta releases.</div>
     </section>
     <section class="sf-box"><h3>02 / SHAPE & LINK</h3><canvas id="sfPreview" width="360" height="500" class="sf-preview" aria-label="Animated preview of the field"></canvas><div class="sf-flex"><span class="sf-caption" id="sfPreviewMeta">PHYSICS 037</span><button id="sfReseed" type="button">↻ RESEED PREVIEW</button></div><label>PREVIEW SIMULATION<select id="sfPreviewCount"><option value="140">140 · LIGHT</option><option value="600" selected>600 · STANDARD</option><option value="1200">1,200</option><option value="2400">2,400 · HEAVY</option><option value="6000">6,000 · EXPERIMENTAL</option></select></label>
      <label>SPELL NAME <input id="sfName" maxlength="48" autocomplete="off" spellcheck="false" placeholder="Name your creation"></label>
@@ -118,7 +120,7 @@
      <label>VISIBLE AGENTS / FRAME<select id="sfRenderLimit"><option value="600">600 · FAST</option><option value="1200">1,200 · BALANCED</option><option value="2400">2,400 · HIGH</option><option value="6000">6,000 · ALL (HEAVY)</option></select></label>
      <label>HEX LIFESPAN <strong id="sfLifespanVal">5.5s</strong><input id="sfLifespan" type="range" min="0.5" max="30" step="0.5" value="5.5"></label>
       <div class="sf-caption">Set each hex's active life (0.5–30 seconds). At its limit, the hex stops interacting, but keeps moving with its original field physics as it fades out over 0.8 seconds. Fading agents won't occupy casting capacity.</div>
-      <div class="sf-caption">Every agent obeys the original field physics. Impacts consume hexes. Survivors continue moving as they fade after their lifespan, without dealing damage. Display density controls drawing only. 6,000 simulated is experimental and may slow phones.</div>
+      <div class="sf-caption">Colored source pixels assign elements at birth; every agent still obeys the original field physics. Impacts consume hexes. Survivors continue moving as they fade after their lifespan, without dealing damage. Display density controls drawing only. 6,000 simulated is experimental and may slow phones.</div>
      <div class="sf-flex"><label>SWIRL <span id="sfSwirlVal"></span><input id="sfSwirl" type="range" min="0" max="100"></label><label>MOMENTUM <span id="sfMomentumVal"></span><input id="sfMomentum" type="range" min="0" max="100"></label></div>
      <label>LIGHT <span id="sfLightVal"></span><input id="sfLight" type="range" min="0" max="100"></label>
      <div class="sf-link"><label><input id="sfHeal" type="checkbox"> ♥ LINK MINOR HEAL</label><small>Every 3s · self-anchor</small></div>
@@ -141,8 +143,13 @@
   const map=$('sfMap'),overview=$('sfOverview'),preview=$('sfPreview'),mc=map.getContext('2d'),oc=overview.getContext('2d'),pc=preview.getContext('2d');
   function status(msg){$('sfStatus').textContent=msg}
   function mark(){dirty=true;$('sfDirty').textContent='UNSAVED';$('sfDirty').style.color='#ffc7a0';resetParticles()}
-  function checkpoint(){undo.push(draft.values.slice());if(undo.length>24)undo.shift()}
-  function setCell(x,y,v){if(x>=0&&y>=0&&x<N&&y<N)draft.values[y*N+x]=v}
+  function snapshotLayers(){return {values:draft.values.slice(),sources:draft.sources.slice()}}
+  function restoreLayers(before){draft.values=before.values.slice();draft.sources=before.sources.slice()}
+  function checkpoint(){undo.push(snapshotLayers());if(undo.length>24)undo.shift()}
+  function setCell(x,y,v){if(x<0||y<0||x>=N||y>=N)return;
+   const index=y*N+x;
+   if(brush.startsWith('src'))draft.sources[index]=Number(brush.slice(3));
+   else draft.values[index]=v}
   function stamp(cx,cy,v){for(let dy=-brushRadius+1;dy<brushRadius;dy++)for(let dx=-brushRadius+1;dx<brushRadius;dx++)if(dx*dx+dy*dy<(brushRadius-.15)**2)setCell(cx+dx,cy+dy,v)}
   function value(){return brush==='white'?255:brush==='black'?0:brush==='mask'?-1:gray}
   function line(x1,y1,x2,y2,gradient){const steps=Math.max(1,Math.max(Math.abs(x2-x1),Math.abs(y2-y1))*2);for(let i=0;i<=steps;i++){const t=i/steps;stamp(Math.round(x1+(x2-x1)*t),Math.round(y1+(y2-y1)*t),gradient?Math.round(255*(1-t)):value())}}
@@ -150,6 +157,9 @@
   // mutation stays in this file. The old 1x brush workflow remains intact.
   const editor=Precision.install({
    map,overview,root:overlay,values:()=>draft.values,
+   sources:()=>draft.sources,sourceColor:code=>Sources.byId(code).color,
+   sourceName:code=>Sources.byId(code).name,
+   capture:snapshotLayers,restore:restoreLayers,
    stamp,line,value,brush:()=>brush,checkpoint,undo,mark,status
   });
   function paintMap(){editor.paintMap()}
@@ -161,7 +171,7 @@
   // Preview and world use the identical 32x32 interpreter. Lower preview
   // population changes density, never steering, momentum or lifetimes.
   function resetParticles(){
-   particles=[];previewGhosts=[];previewSeeded=false;previewDeath=0;previewStarts=Motion.startingCells(draft.values);
+   particles=[];previewGhosts=[];previewSeeded=false;previewDeath=0;previewStarts=Sources.startingCells(draft.values,draft.sources,Motion);
    previewClock=0;previewFrames=0;prevFrame=0;
    $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+previewPopulation+' AGENTS';
   }
@@ -173,7 +183,7 @@
    const cfg=draft.settings,colors=pals[cfg.palette]||pals.flame;
    const total=previewPopulation;
    if(!previewSeeded){
-    for(let i=0;i<total;i++)particles.push(Motion.spawn(draft.values,previewStarts));
+    for(let i=0;i<total;i++)particles.push(Sources.spawn(draft.values,previewStarts,Motion));
     previewSeeded=true;
    }
    // Same birth/death timing as a cast, but visual only.
@@ -207,10 +217,11 @@
         // Don't recycle travelers; pixels that escape remain alive offscreen.
     if(a.x<-.08||a.x>1.08||a.y<-.08||a.y>1.08)continue;
     const t=clamp(a.progress||0,0,1),shade=cfg.mode==='ab'?t:.44;
-    pc.fillStyle=colors[shade<.34?0:shade<.7?1:2];
+    const particleColor=a.element?Sources.byId(a.element).color:colors[shade<.34?0:shade<.7?1:2];
+    pc.fillStyle=particleColor;
     pc.globalAlpha=(.35+.45*cfg.light/100)*fading;
     const px=a.x*w,py=a.y*h,rad=cfg.texture==='leaf'?2.4:2;
-    if(a.tail.length){pc.strokeStyle=colors[shade<.34?0:shade<.7?1:2];pc.lineWidth=.65;pc.globalAlpha=.085*fading;
+    if(a.tail.length){pc.strokeStyle=particleColor;pc.lineWidth=.65;pc.globalAlpha=.085*fading;
      pc.beginPath();pc.moveTo(a.tail[0][0]*w,a.tail[0][1]*h);
      for(const pt of a.tail)pc.lineTo(pt[0]*w,pt[1]*h);
      pc.lineTo(px,py);pc.stroke();pc.globalAlpha=(.35+.45*cfg.light/100)*fading;
@@ -242,10 +253,10 @@
    $(id).addEventListener(id.startsWith('sf')&&['swirl','momentum','light','lifespan'].includes(key)?'input':'change',e=>{draft.settings[key]=['population','renderLimit','lifespan','swirl','momentum','light'].includes(key)?Number(e.target.value):e.target.value;const label=$('sf'+key[0].toUpperCase()+key.slice(1)+'Val');if(label)label.textContent=key==='lifespan'?Number(e.target.value).toFixed(1)+'s':e.target.value;mark()});
   }
   $('sfHeal').addEventListener('change',e=>{heal=!!e.target.checked;mark()});
-  $('sfUndo').addEventListener('click',()=>{if(!undo.length){status('Nothing to undo.');return}draft.values=undo.pop();mark();paintMap()});
-  $('sfClear').addEventListener('click',()=>{checkpoint();draft.values.fill(-1);paintMap();mark();status('The field is now free magenta space. Paint a new instruction.')});
-  $('sfRing').addEventListener('click',()=>{checkpoint();draft.values=engine.starter().values.slice();paintMap();mark();status('Ring template applied. You can repaint any cell.')});
-  $('sfCurtain').addEventListener('click',()=>{checkpoint();draft.values.fill(-1);for(let x=0;x<N;x+=3){draft.values[x]=255;draft.values[N+x]=128;draft.values[2*N+x]=0}paintMap();mark();status('Curtain template applied. Experiment with the teeth.')});
+  $('sfUndo').addEventListener('click',()=>{if(!undo.length){status('Nothing to undo.');return}restoreLayers(undo.pop());mark();paintMap()});
+  $('sfClear').addEventListener('click',()=>{checkpoint();draft.values.fill(-1);draft.sources.fill(0);paintMap();mark();status('Grayscale cleared to magenta; elemental source pixels cleared.')});
+  $('sfRing').addEventListener('click',()=>{checkpoint();draft.values=engine.starter().values.slice();draft.sources.fill(0);paintMap();mark();status('Ring template applied with no elemental sources.')});
+  $('sfCurtain').addEventListener('click',()=>{checkpoint();draft.values.fill(-1);draft.sources.fill(0);for(let x=0;x<N;x+=3){draft.values[x]=255;draft.values[N+x]=128;draft.values[2*N+x]=0}paintMap();mark();status('Curtain template applied. Experiment with the teeth.')});
   $('sfSave').addEventListener('click',()=>{storeDraft();status('Saved '+item.recipe.name+' to this device.')});
   $('sfEquip').addEventListener('click',()=>{storeDraft();onEquip(clone(item.recipe),heal);status(item.recipe.name+' equipped. Close Forge, select ⬡ BOUND FIELD on your wheel, then cast.')});
   function unsealScroll(fresh){
