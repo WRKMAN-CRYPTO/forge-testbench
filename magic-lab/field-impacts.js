@@ -1,4 +1,4 @@
-/* WRKMAN Arcane Lab 039 / Solid Agent Contacts
+/* WRKMAN Arcane Lab 048 / Elemental Solid Agent Contacts
  * Continuous swept-circle impacts. A lightweight game collision layer,
  * separate from the canonical Agent Field physical laws.
  */
@@ -96,12 +96,17 @@
    }
    if(!first){agents[remaining++]=a;continue}
    first.impacts++;consumed++;
+   if(a.element){
+    if(!first.elements)first.elements=[0,0,0,0,0];
+    if(a.element>=1&&a.element<=4)first.elements[a.element]++;
+   }
    // One small impact mark per subset. Never one Phaser emitter per agent.
    if(first.impacts<=3&&cast.impactFX.length<96){
     cast.impactFX.push({
      x:ax+(tx-ax)*earliest,
      y:ay+(ty-ay)*earliest,
-     born:time,color:first.kind==='enemy'?0xffa768:0xe2d5b0});
+     born:time,color:a.element?([0,0xff6b32,0x44c9ed,0xa7d8ff,0xffe65a][a.element]||0xffa768):
+      first.kind==='enemy'?0xffa768:0xe2d5b0});
    }
   }
   agents.length=remaining;
@@ -111,6 +116,10 @@
   // agent was already consumed regardless of these caps or hit cooldowns.
   for(const t of all){
    if(!t.impacts)continue;
+   const Elements=typeof globalThis==='object'?globalThis.WRKMAN_ELEMENTS:null;
+   if(t.elements&&Elements?.agentContacts){
+    Elements.agentContacts(scene,t.obj.body,t.obj,t.elements,t.to.x,t.to.y,time,Combat);
+   }
    if(t.kind==='enemy'&&Combat.hitEnemy)
     Combat.hitEnemy(scene,t.obj,Math.min(28,Math.max(2,Math.round(t.impacts*1.7))),'crafted-field');
    else if(t.kind==='stone'&&Combat.damagePillar)
