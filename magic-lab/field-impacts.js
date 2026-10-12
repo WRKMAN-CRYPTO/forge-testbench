@@ -49,10 +49,11 @@
   cast.impactFX=cast.impactFX.filter(f=>time-f.born<300);
   if(!Combat)return 0;
   const all=targets(scene,cast);
+  const maxPad=Runes&&cast.runeCount?48:3;
   if(!all.length)return 0;
   const grid=new Map();let gridMinX=Infinity,gridMinY=Infinity,gridMaxX=-Infinity,gridMaxY=-Infinity;
   for(const t of all){
-   const r=t.r+48; // broad-phase includes the maximum Behemoth radius
+   const r=t.r+maxPad; // only broaden the search for rune-enabled casts
    const x0=Math.floor((Math.min(t.from.x,t.to.x)-r)/CELL);
    const x1=Math.floor((Math.max(t.from.x,t.to.x)+r)/CELL);
    const y0=Math.floor((Math.min(t.from.y,t.to.y)-r)/CELL);
