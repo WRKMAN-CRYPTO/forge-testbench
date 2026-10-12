@@ -377,7 +377,7 @@ function hitEnemy(s,e,amount,kind){
  e.burn=null;
  s.removal.push(e.body);
  s.burst(e.body.position.x,e.body.position.y,e.type==="charger"?0xffaa77:0x8aefff,20,6);
- if(s.combat.enemies.every(x=>!x.alive||x.type==="mossling"))s.announceCombat("HOSTILES CLEARED • Peaceful creatures still live here.");
+ if(e.type!=="mossling"&&s.combat.enemies.every(x=>!x.alive||x.type==="mossling"))s.announceCombat("HOSTILES CLEARED • Peaceful creatures still live here.");
  heads(s);
  return true;
 }
@@ -813,9 +813,12 @@ function paint(s,g,time){
    g.fillStyle(0xffba47,.66);g.fillTriangle(x-8,y-e.r+4,x,y-e.r-17,x+7,y-e.r+4);
    g.fillStyle(0xffed88,.85);g.fillCircle(x,y-e.r-1,3);
   }
-  const w=e.type==="charger"?52:e.type==="mossling"?34:39;
-  g.fillStyle(0x0a1c26,.92);g.fillRoundedRect(x-w/2,y-e.r-15,w,5,2);
-  g.fillStyle(e.burn?0xffa267:0x8fe7d8);g.fillRoundedRect(x-w/2,y-e.r-15,w*(e.hp/e.maxHP),5,2);
+  // A peaceful resident doesn't wear an enemy health bar until wounded.
+  if(e.type!=="mossling"||e.hp<e.maxHP){
+   const w=e.type==="charger"?52:e.type==="mossling"?34:39;
+   g.fillStyle(0x0a1c26,.92);g.fillRoundedRect(x-w/2,y-e.r-15,w,5,2);
+   g.fillStyle(e.burn?0xffa267:0x8fe7d8);g.fillRoundedRect(x-w/2,y-e.r-15,w*(e.hp/e.maxHP),5,2);
+  }
   if(time-e.hitAt<140){
    g.lineStyle(3,0xfff7dc,.8);g.strokeCircle(x,y,e.r+3);
   }
