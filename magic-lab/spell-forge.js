@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 043 / adjustable lifespan + death fade
+/* WRKMAN ARCANE LAB 044 / continuous-motion death fade
  * Field geometry remains the same portable WRKMAN_AGENT_FIELD_V1 recipe.
  * Editor and spell library never require Phaser; the game supplies pause/equip hooks.
  */
@@ -89,7 +89,7 @@
   document.head.append(style);
   const overlay=document.createElement('div');overlay.id='forgeOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','sfHeading');
   overlay.innerHTML=`<div class="sf-shell">
-   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>043 · LIFESPAN FORGE</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
+   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>044 · MOVING FADE</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
    <div class="sf-grid">
     <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><div class="sf-map-heading"><span id="sfMapCoords">CELL 16,16 · MAGENTA</span><strong id="sfZoomValue">1×</strong></div>
      <canvas id="sfMap" width="320" height="320" tabindex="0" class="sf-canvas" aria-label="32 by 32 instruction field. Zoom in, draw, or use arrows and Stamp Cell for exact placement"></canvas>
@@ -111,8 +111,8 @@
      <div class="sf-flex"><label>BEHAVIOR<select id="sfMode"><option value="ab">A+B FIELD + BEHAVIOR</option><option value="a">A FOLLOW FIELD</option></select></label><label>SIMULATED AGENTS<select id="sfPopulation"><option value="200">200</option><option value="600">600</option><option value="1200">1200</option><option value="2400">2400</option><option value="6000">6000</option></select></label></div>
      <label>VISIBLE AGENTS / FRAME<select id="sfRenderLimit"><option value="600">600 · FAST</option><option value="1200">1,200 · BALANCED</option><option value="2400">2,400 · HIGH</option><option value="6000">6,000 · ALL (HEAVY)</option></select></label>
      <label>HEX LIFESPAN <strong id="sfLifespanVal">5.5s</strong><input id="sfLifespan" type="range" min="0.5" max="30" step="0.5" value="5.5"></label>
-      <div class="sf-caption">Set each hex's active life (0.5–30 seconds). At its limit, it stops moving and interacting, then softly disappears over 0.8 seconds. Fading agents won't occupy casting capacity.</div>
-      <div class="sf-caption">Every agent obeys the original field physics. Impacts consume hexes. Survivors fade after their lifespan without dealing more damage. Display density controls drawing only. 6,000 simulated is experimental and may slow phones.</div>
+      <div class="sf-caption">Set each hex's active life (0.5–30 seconds). At its limit, the hex stops interacting, but keeps moving with its original field physics as it fades out over 0.8 seconds. Fading agents won't occupy casting capacity.</div>
+      <div class="sf-caption">Every agent obeys the original field physics. Impacts consume hexes. Survivors continue moving as they fade after their lifespan, without dealing damage. Display density controls drawing only. 6,000 simulated is experimental and may slow phones.</div>
      <div class="sf-flex"><label>SWIRL <span id="sfSwirlVal"></span><input id="sfSwirl" type="range" min="0" max="100"></label><label>MOMENTUM <span id="sfMomentumVal"></span><input id="sfMomentum" type="range" min="0" max="100"></label></div>
      <label>LIGHT <span id="sfLightVal"></span><input id="sfLight" type="range" min="0" max="100"></label>
      <div class="sf-link"><label><input id="sfHeal" type="checkbox"> ♥ LINK MINOR HEAL</label><small>Every 3s · self-anchor</small></div>
@@ -179,7 +179,12 @@
     previewGhosts=particles.filter((_,i)=>i%stride===0);
     particles=[];
    }
-   if(previewGhosts.length&&previewClock-previewDeath>=.8)previewGhosts=[];
+   // These are original agent objects, not static pixel snapshots.
+   // They continue following the same grayscale instructions while fading.
+   if(previewGhosts.length){
+    if(previewClock-previewDeath>=.8)previewGhosts=[];
+    else Motion.stepSwarm(previewGhosts,draft.values,cfg,dt,360,500,previewClock);
+   }
       const w=preview.width,h=preview.height;
    pc.fillStyle='#081724';pc.fillRect(0,0,w,h);
    pc.strokeStyle='#34535d88';pc.lineWidth=1;pc.beginPath();pc.ellipse(w*.5,h*.5,w*.42,h*.42,0,0,TAU);pc.stroke();
@@ -215,7 +220,7 @@
    $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+particles.length+' LIVE / '+previewGhosts.length+' FADING · '+(particles.length?stats.offscreen+' OUT':'RESEED TO REPLAY');
    rafId=requestAnimationFrame(tick);
   }
-  $('sfReseed').addEventListener('click',()=>{resetParticles();status('Fresh agents seeded. Preview runs for your chosen lifespan, then fades and stops.')});
+  $('sfReseed').addEventListener('click',()=>{resetParticles();status('Fresh agents seeded. After their chosen lifespan, agents keep moving as they fade.')});
   $('sfPreviewCount').addEventListener('change',e=>{previewPopulation=Number(e.target.value)||600;resetParticles();status('Preview: '+previewPopulation+' independently simulated agents. No recycling.')});
    $('sfLifespan').addEventListener('change',()=>{resetParticles();status('Preview replaying with '+Number(draft.settings.lifespan).toFixed(1)+'s of active life, then an 0.8s fade.')});
   $('sfTools').addEventListener('click',e=>{const b=e.target.closest('button[data-brush]');if(!b)return;brush=b.dataset.brush;for(const n of $('sfTools').querySelectorAll('button'))n.classList.toggle('active',n===b)});
