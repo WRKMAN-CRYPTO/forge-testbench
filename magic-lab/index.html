@@ -641,6 +641,12 @@ header .actions{display:flex;gap:6px}
 #craftHelp{font:10px/1.35 system-ui;color:#bad1c6}
 #craftHud{position:absolute;top:7px;left:50%;transform:translateX(-50%);z-index:5;pointer-events:none;white-space:nowrap;border-radius:12px;padding:4px 9px;background:#0a241ddd;border:1px solid #7dbaa1;font:800 10px ui-monospace,monospace;color:#b2f8cf}
 #craftHud[hidden]{display:none}
+
+/* 053: Bestiary is isolated from Phaser and gesture capture. */
+#bestiaryOverlay[hidden]{display:none!important}
+#bestiaryOverlay{position:fixed;inset:0;z-index:90;display:flex;align-items:stretch;justify-content:center;
+ background:#04131de8;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#bestiaryFrame{width:100%;max-width:1100px;min-height:0;height:100%;border:0;background:#091c2a}
 </style>
 </head>
 <body>
@@ -655,10 +661,11 @@ header .actions{display:flex;gap:6px}
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 052 • TRIPLE DASH</span></div>
+   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 053 • BESTIARY</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="gateMenuOpen" type="button">✧ DIAL GATE</button>
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
+     <button class="minibtn" id="bestiaryOpen" type="button">◈ BESTIARY</button>
     <button class="minibtn" id="spellForgeOpen" type="button">🔨 SPELL FORGE</button>
     <button class="minibtn" id="craftSync" type="button">⬡ SYNC FIELD</button>
     <button class="minibtn" id="skinsOpen" type="button">SKINS <span id="skinActiveNo">01</span>/20</button>
@@ -713,6 +720,10 @@ header .actions{display:flex;gap:6px}
  <div id="wheelReadout" aria-live="polite">HOLD + SLIDE TO EQUIP</div>
 </div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show" role="dialog" aria-modal="true" aria-labelledby="labWelcomeTitle"><div id="modal"><h1 id="labWelcomeTitle">Magic has rules. Let's break some.</h1><p class="modalIntro">Cast spells. Shape the physics. Invent something dangerous. <b>Click ENTER THE LAB to begin.</b></p><div id="modalScroll"><details id="labGuide"><summary>CONTROLS &amp; FULL FIELD GUIDE</summary><div id="modalGuideContent"><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse or ⬡ Bound Field.</p><p><b>CRAFTED MAGIC:</b> In ☰ → SPELL FORGE, paint a 32×32 field, preview its agents, choose materials, name and save spells, then SAVE & EQUIP. The game automatically assigns ⬡ BOUND FIELD to a spell wheel slot. SYNC FIELD and JSON import remain available for outside experiments. Cast Bound Field from your feet. Choose AURA (follows your wizard), WORLD EMISSION (releases independent world agents), or PLACED FIELD (tap a world position) inside Spell Forge. Each agent's active lifespan is adjustable per spell (0.5 to 30 seconds, 5.5 by default). When time runs out, the hex stops colliding but continues to follow its original field physics as its opacity fades over 0.8 seconds. Empty casts release capacity immediately while their visual remnants keep moving and fade. World Emission starts at the painted high-value cells near the wizard, turns the field toward your aim, then releases every agent. There is no moving projectile container, invisible homing, or particle recycling. Cast up to three WORLD spells at once, within 6,000 total active agents. Rendering has a separate visible-agent budget. Each hex now physically collides with enemies, pillars, loose stone and solid props along its full trajectory, then disappears on impact. Hits are detected every frame; damage is capped per target to keep large swarms balanced. Linked Minor Heal pulses at the player's CURRENT position every three seconds. Toggle the link in ☰ before casting again. When no recipe is imported, FIRE RING is the starter example.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p></div></details></div><div id="modalFooter"><button id="begin" type="button">ENTER THE LAB →</button><span>FULL GUIDE ALSO AVAILABLE THROUGH NOTES</span></div></div></div></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div>
+</div>
+<!-- 053: Bestiary stores local reference records, not live combat settings. -->
+<div id="bestiaryOverlay" role="dialog" aria-modal="true" aria-label="Creature bestiary" hidden>
+ <iframe id="bestiaryFrame" src="./bestiary.html?v=053" title="WRKMAN Magic Lab Bestiary"></iframe>
 </div>
 <!-- The wardrobe is a separate presentation layer, never a gameplay control. -->
 <div id="skinOverlay" role="dialog" aria-modal="true" aria-labelledby="skinTitle" hidden>
@@ -2044,7 +2055,7 @@ function closeGameMenu(resume=true,focus=false){
  menuPanel.hidden=true;menuCover.hidden=true;
  menuButton.setAttribute("aria-expanded","false");
  menuButton.setAttribute("aria-label","Open game menu");
- if(resume&&$("skinOverlay").hidden&&$("hueOverlay").hidden&&$("spellbookOverlay").hidden&&
+ if(resume&&$("bestiaryOverlay").hidden&&$("skinOverlay").hidden&&$("hueOverlay").hidden&&$("spellbookOverlay").hidden&&
     !$("instructions").classList.contains("show"))scene?.scene.resume();
  if(focus)menuButton.focus({preventScroll:true});
 }
@@ -2072,6 +2083,37 @@ for(const id of ["spellbookOpen","skinsOpen","hueOpen","notes"]){
  $(id).addEventListener("click",()=>closeGameMenu(false,false),true);
 }
 $("reset").addEventListener("click",()=>closeGameMenu(true,false),true);
+
+// 053: pause the live Matter world while viewing or editing the design ledger.
+const bestiaryOverlay=$("bestiaryOverlay"),bestiaryFrame=$("bestiaryFrame");
+function closeBestiary(){
+ if(bestiaryOverlay.hidden)return;
+ bestiaryOverlay.hidden=true;
+ if(menuPanel.hidden&&$("skinOverlay").hidden&&$("hueOverlay").hidden&&
+    $("spellbookOverlay").hidden&&$("gateOverlay").hidden&&
+    !$("instructions").classList.contains("show"))scene?.scene.resume();
+ menuButton.focus({preventScroll:true});
+}
+function openBestiary(){
+ if(!started||!scene){announce("ENTER THE LAB FIRST TO OPEN THE BESTIARY.");return;}
+ closeGameMenu(false,false);
+ wheelTouchId=null;wheelMouseId=null;wheelHide();
+ neutralStick();joyTouchId=null;joyPointer=null;
+ scene.scene.pause();
+ bestiaryOverlay.hidden=false;
+}
+$("bestiaryOpen").addEventListener("click",openBestiary);
+window.addEventListener("message",event=>{
+ if(event.origin!==location.origin||event.source!==bestiaryFrame.contentWindow||
+    event.data?.type!=="wrkman:bestiary:close")return;
+ closeBestiary();
+});
+window.addEventListener("keydown",event=>{
+ if(event.key==="Escape"&&!bestiaryOverlay.hidden){
+  event.preventDefault();event.stopPropagation();closeBestiary();
+ }
+});
+
 
 // 036 / Forge edits portable recipes while the world is paused. Scene spells
 // keep a snapshot made on cast, so editing never mutates an active aura.
