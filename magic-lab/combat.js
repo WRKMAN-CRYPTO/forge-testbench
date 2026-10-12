@@ -28,6 +28,12 @@ function spawn(s,type,x,y){
   mind:resident&&Mind?Mind.make(enemyCounter,x,y,now(s)):null,
   mindAt:0,mindIntent:null
  };
+ if(resident&&s.add?.text){
+  enemy.moodText=s.add.text(x,y-40,"GRAZE",{
+   fontFamily:"monospace",fontSize:"10px",color:"#b4e9c0",
+   backgroundColor:"#12251ddd",padding:{x:3,y:2}
+  }).setOrigin(.5,.5).setDepth(6);
+ }
  body.gameTag="enemy";
  body.enemyRef=enemy;
  s.actors.push(enemy);
@@ -35,6 +41,8 @@ function spawn(s,type,x,y){
  return enemy;
 }
 function reset(s,layout=null){
+ // Release the old resident label on arena travel or reset.
+ for(const e of s.combat?.enemies||[])e.moodText?.destroy();
  // Reset is invoked only after old Matter bodies are removed by Lab.resetLab.
  // Region layouts are generated from a versioned glyph seed. The original
  // 032 lab without a layout is unchanged, including all starting enemies.
@@ -362,7 +370,8 @@ function hitEnemy(s,e,amount,kind){
  e.hitAt=now(s);
  if(e.hp>0)return false;
  e.alive=false;
- s.combat.kills++;
+ e.moodText?.destroy();
+ if(e.type!=="mossling")s.combat.kills++;
  queueBurnDetonation(s,e,e.burn);
  e.burn=null;
  s.removal.push(e.body);
@@ -769,12 +778,12 @@ function paint(s,g,time){
    g.fillCircle(x+flip*12,y-5+twitch,2.5);
    g.fillStyle(alarmed?0xffc77f:0x9acaba,.9);
    g.fillCircle(x+flip*6,y+4+twitch,2);
-   // State text makes testable intentions legible to the player.
    const label={graze:'GRAZE',investigate:'CURIOUS',alert:'WARY',flee:'FLEE',defend:'DEFEND'}[state]||'GRAZE';
-   g.fillStyle(0x0b1c19,.78);g.fillRoundedRect(x-31,y-42,62,14,4);
-   g.lineStyle(.8,alarmed?0xe5b27d:0x82cda0,.55);g.strokeRoundedRect(x-31,y-42,62,14,4);
-   // Small text via existing scene canvas API when available; otherwise color badge.
-   if(g.scene?.add){} // label is also exposed in snapshot/debug state
+   if(e.moodText?.active){
+    e.moodText.setPosition(x,y-46);
+    if(e.moodText.text!==label)e.moodText.setText(label);
+    e.moodText.setColor(alarmed?'#ffc58a':'#b4e9c0');
+   }
   }else if(e.type==="charger"){
    const warning=e.phase==="windup";
    if(warning){
