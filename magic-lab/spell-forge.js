@@ -44,7 +44,7 @@
   const find=()=>library.items.find(i=>i.id===library.selected)||library.items[0];
   const saveLibrary=()=>{try{storage.setItem(KEY,JSON.stringify(library));return true}catch(_){return false}};
   let item=find(),draft=clone(item.recipe),heal=item.heal,dirty=false,brush='white',brushRadius=1,gray=128;
-  let undo=[],activePointer=null,dragStart=null,painting=false,particles=[],previewStarts=[],previewClock=0,prevFrame=0,rafId=0,opened=false,previewPopulation=600,previewFrames=0;
+  let undo=[],activePointer=null,dragStart=null,painting=false,particles=[],previewGhosts=[],previewSeeded=false,previewDeath=0,previewStarts=[],previewClock=0,prevFrame=0,rafId=0,opened=false,previewPopulation=600,previewFrames=0;
    const view=Viewport.create();let panMode=false,selectedCell={x:16,y:16},gesture=null,strokeBefore=null,strokeWasDirty=false,strokeChanged=false;
    const pointers=new Map();
   const style=document.createElement('style');style.textContent=`
@@ -150,7 +150,7 @@
   // Preview and world use the identical 32x32 interpreter. Lower preview
   // population changes density, never steering, momentum or lifetimes.
   function resetParticles(){
-   particles=[];previewStarts=Motion.startingCells(draft.values);
+   particles=[];previewGhosts=[];previewSeeded=false;previewDeath=0;previewStarts=Motion.startingCells(draft.values);
    previewClock=0;previewFrames=0;prevFrame=0;
    $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+previewPopulation+' AGENTS';
   }
@@ -161,27 +161,43 @@
    prevFrame=now;previewClock+=dt;
    const cfg=draft.settings,colors=pals[cfg.palette]||pals.flame;
    const total=previewPopulation;
-   while(particles.length<total)particles.push(Motion.spawn(draft.values,previewStarts));
-   const stats=Motion.stepSwarm(particles,draft.values,cfg,dt,360,500,previewClock);
-   if(++previewFrames%3===0)for(const a of particles){
-    a.tail.push([a.x,a.y]);if(a.tail.length>5)a.tail.shift();
+   if(!previewSeeded){
+    for(let i=0;i<total;i++)particles.push(Motion.spawn(draft.values,previewStarts));
+    previewSeeded=true;
    }
-   const w=preview.width,h=preview.height;
+   // Same birth/death timing as a cast, but visual only.
+   const life=Number(cfg.lifespan??5.5);
+   let stats={offscreen:0};
+   if(particles.length&&previewClock<life){
+    stats=Motion.stepSwarm(particles,draft.values,cfg,dt,360,500,previewClock);
+    if(++previewFrames%3===0)for(const a of particles){
+     a.tail.push([a.x,a.y]);if(a.tail.length>5)a.tail.shift();
+    }
+   }else if(particles.length){
+    previewDeath=previewClock;
+    const stride=Math.max(1,Math.ceil(particles.length/1400));
+    previewGhosts=particles.filter((_,i)=>i%stride===0);
+    particles=[];
+   }
+   if(previewGhosts.length&&previewClock-previewDeath>=.8)previewGhosts=[];
+      const w=preview.width,h=preview.height;
    pc.fillStyle='#081724';pc.fillRect(0,0,w,h);
    pc.strokeStyle='#34535d88';pc.lineWidth=1;pc.beginPath();pc.ellipse(w*.5,h*.5,w*.42,h*.42,0,0,TAU);pc.stroke();
-   const step=Math.max(1,Math.ceil(particles.length/1400));
-   for(let ix=0;ix<particles.length;ix+=step){
-    const a=particles[ix];
-    // Don't recycle travelers; pixels that escape remain alive offscreen.
+   const visible=particles.length?particles:previewGhosts;
+   const step=Math.max(1,Math.ceil(visible.length/1400));
+   const fading=particles.length?1:previewGhosts.length?Math.pow(clamp(1-(previewClock-previewDeath)/.8,0,1),1.35):0;
+   for(let ix=0;ix<visible.length;ix+=step){
+    const a=visible[ix];
+        // Don't recycle travelers; pixels that escape remain alive offscreen.
     if(a.x<-.08||a.x>1.08||a.y<-.08||a.y>1.08)continue;
     const t=clamp(a.progress||0,0,1),shade=cfg.mode==='ab'?t:.44;
     pc.fillStyle=colors[shade<.34?0:shade<.7?1:2];
-    pc.globalAlpha=.35+.45*cfg.light/100;
+    pc.globalAlpha=(.35+.45*cfg.light/100)*fading;
     const px=a.x*w,py=a.y*h,rad=cfg.texture==='leaf'?2.4:2;
-    if(a.tail.length){pc.strokeStyle=colors[shade<.34?0:shade<.7?1:2];pc.lineWidth=.65;pc.globalAlpha=.085;
+    if(a.tail.length){pc.strokeStyle=colors[shade<.34?0:shade<.7?1:2];pc.lineWidth=.65;pc.globalAlpha=.085*fading;
      pc.beginPath();pc.moveTo(a.tail[0][0]*w,a.tail[0][1]*h);
      for(const pt of a.tail)pc.lineTo(pt[0]*w,pt[1]*h);
-     pc.lineTo(px,py);pc.stroke();pc.globalAlpha=.35+.45*cfg.light/100;
+     pc.lineTo(px,py);pc.stroke();pc.globalAlpha=(.35+.45*cfg.light/100)*fading;
     }
     pc.beginPath();
     if(cfg.texture==='leaf'){
@@ -196,10 +212,10 @@
     pc.fill();
    }
    pc.globalAlpha=1;
-   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+total+' LIVE / '+Math.ceil(total/step)+' DRAW · '+stats.offscreen+' OUT';
+   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+particles.length+' LIVE / '+previewGhosts.length+' FADING · '+(particles.length?stats.offscreen+' OUT':'RESEED TO REPLAY');
    rafId=requestAnimationFrame(tick);
   }
-  $('sfReseed').addEventListener('click',()=>{resetParticles();status('Fresh agents seeded. Same field laws, new starting conditions.')});
+  $('sfReseed').addEventListener('click',()=>{resetParticles();status('Fresh agents seeded. Preview runs for your chosen lifespan, then fades and stops.')});
   $('sfPreviewCount').addEventListener('change',e=>{previewPopulation=Number(e.target.value)||600;resetParticles();status('Preview: '+previewPopulation+' independently simulated agents. No recycling.')});
   $('sfTools').addEventListener('click',e=>{const b=e.target.closest('button[data-brush]');if(!b)return;brush=b.dataset.brush;for(const n of $('sfTools').querySelectorAll('button'))n.classList.toggle('active',n===b)});
   $('sfGray').addEventListener('input',e=>{gray=Number(e.target.value);$('sfGrayVal').textContent=gray});
