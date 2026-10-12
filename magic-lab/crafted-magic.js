@@ -1,4 +1,4 @@
-/* WRKMAN Arcane Lab 048 / elemental birth pixels; shared motion unchanged
+/* WRKMAN Arcane Lab 050 / elemental swarm and composable runes
  * Exactly the same 32x32 field physics as Agent Field. Casting transforms
  * coordinates into world space; it never steers individual agent velocities.
  * Game damage, durations, rendering budgets, and linked events are separate.
@@ -16,6 +16,8 @@
  if(!Impacts)throw Error('Field collision kernel 039 is missing');
  const Sources=typeof globalThis==='object'?globalThis.WRKMAN_ELEMENT_SOURCES:null;
  if(!Sources)throw Error('Elemental spawn pixels 048 are missing');
+ const Runes=typeof globalThis==='object'?globalThis.WRKMAN_SWARM_RUNES:null;
+ if(!Runes)throw Error('Swarm rune language 050 missing');
  const N=32,MASK=-1,TAU=Math.PI*2,SAVE_KEY='wrkman-arcane-lab034-crafted-field-v1',SOURCE_KEY='wrkman-agent-field-v1';
  const palettes={arcane:[[92,139,244],[176,121,250],[223,193,255]],flame:[[208,65,39],[253,126,49],[255,213,105]],healing:[[66,184,144],[144,231,119],[240,235,149]],void:[[100,67,157],[179,72,199],[255,134,202]]};
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t;
@@ -25,17 +27,17 @@
    const r=Math.hypot(x-15.5,y-15.5);
    values.push(r>8.3&&r<10.7?255:r>=10.7&&r<13.4?Math.round(clamp(245-(r-10.7)*74,35,245)):r>=13.4&&r<14.8?0:MASK);
   }
-  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:'FIRE RING',values,sources:Array(N*N).fill(0),settings:{mode:'ab',palette:'flame',texture:'flat',population:1200,delivery:'aura',swirl:26,momentum:62,light:62,renderLimit:1200,lifespan:5.5}};
+  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:'FIRE RING',values,sources:Array(N*N).fill(0),runes:Array(N*N).fill(0),settings:{mode:'ab',palette:'flame',texture:'flat',population:1200,delivery:'aura',swirl:26,momentum:62,light:62,renderLimit:1200,lifespan:5.5}};
  }
  function normalize(raw){
   if(!raw||raw.width!==N||raw.height!==N||!Array.isArray(raw.values)||raw.values.length!==1024)throw Error('Expected 32x32 Agent Field JSON');
   const values=raw.values.map((v,i)=>{if(!Number.isInteger(v)||(v!==MASK&&(v<0||v>255)))throw Error('Invalid cell '+i);return v});
-  const sources=Sources.normalize(raw.sources);
+  const sources=Sources.normalize(raw.sources),runes=Runes.normalize(raw.runes);
   const s=raw.settings||{},n=(k,d)=>Number.isFinite(s[k])?clamp(s[k],0,100):d;
   // Prior 036 "projectile" fields become world emission. No old scripts
   // preserve the moving-carrier behavior by accident.
   const delivery=s.delivery==='projectile'?'world':['aura','world','placed'].includes(s.delivery)?s.delivery:'aura';
-  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:String(raw.name||'CRAFTED FIELD').slice(0,48),values,sources,
+  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:String(raw.name||'CRAFTED FIELD').slice(0,48),values,sources,runes,
    settings:{mode:s.mode==='a'?'a':'ab',palette:palettes[s.palette]?s.palette:'flame',texture:s.texture==='leaf'?'leaf':'flat',
     population:Number.isFinite(s.population)?Math.round(clamp(s.population,200,6000)):1200,
     delivery,swirl:n('swirl',26),momentum:n('momentum',62),light:n('light',62),
@@ -83,7 +85,8 @@
     colors[1].map((v,j)=>lerp(v,colors[2][j],(t-.5)*2));
    const color=a.element?Sources.byId(a.element).rgb:
      (Math.round(c[0])<<16)|(Math.round(c[1])<<8)|Math.round(c[2]);
-   const radius=cfg.mode==='ab'?1.2+3.1*clamp(a.progress||0,0,1):2.8;
+   const radius=(cfg.mode==='ab'?1.2+3.1*clamp(a.progress||0,0,1):2.8)+
+    (Runes.mass(a)>1?Runes.radius(a):0);
    const vx=st.delivery==='world'?
     a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
    const vy=st.delivery==='world'?
@@ -126,8 +129,8 @@
  }
  function start(scene,recipe,healLinked=true,target=null){
   const cfg=normalize(recipe),starts=Sources.startingCells(cfg.values,cfg.sources,Motion);
-  const existing=(scene.craftedShots||[]).reduce((n,cast)=>n+cast.agents.length,0)+
-   (scene.craftedAura?.agents.length||0);
+  const existing=(scene.craftedShots||[]).reduce((n,cast)=>n+cast.agents.reduce((m,a)=>m+Runes.mass(a),0),0)+
+   (scene.craftedAura?.agents.reduce((m,a)=>m+Runes.mass(a),0)||0);
   if(existing+cfg.settings.population>6000)return false;
   if(cfg.settings.delivery==='world'){
    if((scene.craftedShots||[]).length>=3)return false;
@@ -146,6 +149,7 @@
    delivery,center,forward,right,scale:delivery==='placed'?260:290,
    worldW:360,worldH:500,motionTime:0,free:0,offscreen:0,spawnX:.5,spawnY:.5,
    rendered:0,frames:0};
+  Runes.configure(st);
   const origin=spawnCenter(st);st.spawnX=origin.x;st.spawnY=origin.y;
   // Full requested population. There are no phantom agents replaced at
   // the draw budget. Every agent runs the original simulator each update.
@@ -154,6 +158,7 @@
    agent.bornAt=now;
    st.agents.push(agent);
   }
+  Runes.onBirth(st);
   if(delivery==='world'){if(!scene.craftedShots)scene.craftedShots=[];scene.craftedShots.push(st)}
   else scene.craftedAura=st;
   return true;
@@ -172,6 +177,7 @@
   if(st.delivery==='aura'){st.center.x=scene.player.x;st.center.y=scene.player.y}
   for(const agent of st.agents){agent.prevX=agent.x;agent.prevY=agent.y}
   const stats=Motion.stepSwarm(st.agents,st.recipe.values,cfg,dtSeconds,st.worldW,st.worldH,st.motionTime);
+  Runes.advance(st,scene,time,dtSeconds);
   st.free=stats.free;st.offscreen=stats.offscreen;
   // Open-boundary agents are never recycled. Short-lived trails are only
   // presentation history; they never feed back into movement.
@@ -252,7 +258,8 @@
     colors[1].map((v,j)=>lerp(v,colors[2][j],(t-.5)*2));
    const col=a.element?Sources.byId(a.element).rgb:
      (Math.round(c[0])<<16)|(Math.round(c[1])<<8)|Math.round(c[2]);
-   const r=(cfg.mode==='ab'?1.2+3.1*clamp(a.progress,0,1):2.8)+Math.sin(st.motionTime*3.3+a.seed)*.28;
+   const r=(cfg.mode==='ab'?1.2+3.1*clamp(a.progress,0,1):2.8)+
+     (Runes.mass(a)>1?Runes.radius(a):0)+Math.sin(st.motionTime*3.3+a.seed)*.28;
    if(a.tail?.length){
     const first=worldPosition(st,a,a.tail[0][0],a.tail[0][1]);
     g.lineStyle(Math.max(.55,r*.6),col,.075*light);
@@ -322,6 +329,8 @@
    casts:active.length,agents:active.reduce((n,c)=>n+c.agents.length,0),
    rendered:active.reduce((n,c)=>n+c.rendered,0),
    renderBudget:active.reduce((n,c)=>n+c.recipe.settings.renderLimit,0),
+   mass:active.reduce((sum,c)=>sum+c.agents.reduce((m,a)=>m+Runes.mass(a),0),0),
+   runeMerges:active.reduce((n,c)=>n+(c.runeMerges||0),0),runeSplits:active.reduce((n,c)=>n+(c.runeSplits||0),0),
    healLinked:active.some(c=>c.healLinked),pulses:active.reduce((n,c)=>n+c.pulses,0),
    collisions:active.reduce((n,c)=>n+c.collisions,0),consumed:active.reduce((n,c)=>n+c.consumed,0),agedOut:active.reduce((n,c)=>n+c.agedOut,0),free:active.reduce((n,c)=>n+c.free,0),
    offscreen:active.reduce((n,c)=>n+c.offscreen,0),physics:Motion.VERSION,
