@@ -28,7 +28,7 @@
   });
  }
  const mass=a=>Math.max(1,Math.floor(a.mass||1));
- const radius=a=>Math.min(44,2.7+Math.sqrt(mass(a))*2.05);
+ const radius=a=>mass(a)===1?3:Math.min(44,2.7+Math.sqrt(mass(a))*2.05);
  function composition(a){
   if(a.composition)return a.composition.slice();
   const counts=[0,0,0,0,0];counts[a.element||0]=mass(a);return counts;
