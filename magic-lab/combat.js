@@ -650,7 +650,9 @@ function step(s,time,delta){
    }
    const intent=e.mindIntent||{state:'patrol',x:0,y:0,speed:0};
    if(intent.launch){
-    // One-time committed body velocity, not per-frame target correction.
+    // Consume one-shot intent; the 10Hz decision must not overwrite
+    // velocity during subsequent 60Hz Matter integration.
+    intent.launch=false;
     Body.setVelocity(b,{x:intent.face.x*intent.speed,y:intent.face.y*intent.speed});
     s.burst(pos.x,pos.y,0xffd087,13,4);
     stimulus(s,pos.x,pos.y,'danger',1.25);
@@ -830,6 +832,47 @@ function paint(s,g,time){
     if(e.moodText.text!==label)e.moodText.setText(label);
     e.moodText.setColor(alarmed?'#ffc58a':'#b4e9c0');
    }
+  }else if(e.type==="gravelhorn"){
+   const state=e.territory?.state||'patrol',warning=state==='windup';
+   const face=e.territory?.face||{x:1,y:0};
+   const rage=e.hp/e.maxHP<.38;
+   const pulse=.5+.5*Math.sin(time*.019),dir=face.x>=0?1:-1;
+   const breath=Math.sin(time*.003+e.id)*1.1;
+   g.fillStyle(0x07101a,.60);g.fillEllipse(x,y+e.r*.64,100,27);
+   if(state==='warn'||warning){
+    g.lineStyle(3.5,warning?0xffb35f:0xffdb91,warning?.65+.25*pulse:.38);
+    g.strokeCircle(x,y,e.r+11+pulse*5);
+   }
+   if(warning){
+    // Fixed-direction charge tell, locked at the start of windup.
+    g.lineStyle(3.2,0xffb86c,.65);
+    g.lineBetween(x,y,x+face.x*235,y+face.y*235);
+    g.lineStyle(2,0xffe1a0,.42);g.strokeCircle(x,y,48+Math.sin(time*.03)*4);
+   }
+   if(state==='charge'){
+    g.fillStyle(0xef854a,.19);g.fillCircle(x,y,53);
+    g.lineStyle(3.5,0xffd39a,.6);
+    g.lineBetween(x-face.x*24,y-face.y*24,x+face.x*53,y+face.y*53);
+   }
+   // Heavy low profile, armored plates, split horn crest.
+   g.fillStyle(rage?0x77515a:0x495960);g.fillEllipse(x,y+breath,80,67);
+   g.fillStyle(rage?0xaa6b50:0x73827f);g.fillEllipse(x,y-11+breath,68,40);
+   g.fillStyle(0x273a43,.86);
+   g.fillTriangle(x-35,y-8,x-28,y-32,x-12,y-18);
+   g.fillTriangle(x+12,y-18,x+28,y-32,x+35,y-8);
+   g.fillStyle(rage?0xd0a064:0xaebbb4);
+   g.fillTriangle(x+dir*18,y-15,x+dir*49,y-26,x+dir*21,y+1);
+   g.fillTriangle(x-dir*8,y-24,x-dir*22,y-44,x+dir*2,y-16);
+   g.lineStyle(4,0x263a43,.88);g.strokeEllipse(x,y-2+breath,68,53);
+   g.fillStyle(rage?0xff9a60:0xffd28e);g.fillCircle(x+dir*14,y-7+breath,4.6);
+   g.fillStyle(0x17232c);g.fillCircle(x+dir*15,y-7+breath,2.1);
+   const label={patrol:'PATROL',watch:'WATCH',warn:'WARNING',windup:'BRACING',
+    charge:'CHARGING',recover:'RECOVER',return:'RETURN'}[state]||'PATROL';
+   if(e.moodText?.active){
+    e.moodText.setPosition(x,y-e.r-32);
+    if(e.moodText.text!==label)e.moodText.setText(label);
+    e.moodText.setColor(warning?'#ffb973':state==='charge'?'#ff7f6d':'#d0dcba');
+   }
   }else if(e.type==="charger"){
    const warning=e.phase==="windup";
    if(warning){
@@ -859,7 +902,7 @@ function paint(s,g,time){
   }
   // A peaceful resident doesn't wear an enemy health bar until wounded.
   if(e.type!=="mossling"||e.hp<e.maxHP){
-   const w=e.type==="charger"?52:e.type==="mossling"?34:39;
+   const w=e.type==="gravelhorn"?84:e.type==="charger"?52:e.type==="mossling"?34:39;
    g.fillStyle(0x0a1c26,.92);g.fillRoundedRect(x-w/2,y-e.r-15,w,5,2);
    g.fillStyle(e.burn?0xffa267:0x8fe7d8);g.fillRoundedRect(x-w/2,y-e.r-15,w*(e.hp/e.maxHP),5,2);
   }
