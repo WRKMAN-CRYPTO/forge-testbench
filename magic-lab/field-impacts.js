@@ -1,4 +1,4 @@
-/* WRKMAN Arcane Lab 048 / Elemental Solid Agent Contacts
+/* WRKMAN Arcane Lab 050 / Mass-aware Rune Solid Agent Contacts
  * Continuous swept-circle impacts. A lightweight game collision layer,
  * separate from the canonical Agent Field physical laws.
  */
@@ -9,6 +9,7 @@
 })(typeof globalThis==='object'?globalThis:null,function(){
  'use strict';
  const CELL=96,KEY_ORIGIN=65536,KEY_SPAN=131072;
+ const Runes=typeof globalThis==='object'?globalThis.WRKMAN_SWARM_RUNES:null;
  const key=(x,y)=>(x+KEY_ORIGIN)*KEY_SPAN+(y+KEY_ORIGIN);
  // Relative movement catches both fast particles and moving targets.
  // Returns first intersection fraction or null.
@@ -51,7 +52,7 @@
   if(!all.length)return 0;
   const grid=new Map();let gridMinX=Infinity,gridMinY=Infinity,gridMaxX=-Infinity,gridMaxY=-Infinity;
   for(const t of all){
-   const r=t.r+3;
+   const r=t.r+48; // broad-phase includes the maximum Behemoth radius
    const x0=Math.floor((Math.min(t.from.x,t.to.x)-r)/CELL);
    const x1=Math.floor((Math.max(t.from.x,t.to.x)+r)/CELL);
    const y0=Math.floor((Math.min(t.from.y,t.to.y)-r)/CELL);
@@ -70,7 +71,7 @@
   const yx=world?cast.forward.x*cast.worldH:0;
   const xy=world?cast.right.y*cast.worldW:0;
   const yy=world?cast.forward.y*cast.worldH:cast.scale;
-  let remaining=0,seq=0,consumed=0;
+  let remaining=0,seq=0,consumed=0,spentMass=0;
   for(let i=0;i<agents.length;i++){
    const a=agents[i];
    const bx=a.prevX-originX,by=a.prevY-originY;
@@ -89,17 +90,21 @@
     if(!bucket)continue;
     for(const t of bucket){
      if(t.seen===stamp)continue;t.seen=stamp;
+     if((a.phaseUntil||0)>time&&t.kind!=='enemy')continue;
      const hit=sweep(ax,ay,tx,ty,
-      t.from.x,t.from.y,t.to.x,t.to.y,t.r+3);
+      t.from.x,t.from.y,t.to.x,t.to.y,t.r+(Runes?Runes.radius(a):3));
      if(hit!==null&&hit<earliest){earliest=hit;first=t}
     }
    }
    if(!first){agents[remaining++]=a;continue}
    first.impacts++;consumed++;
-   if(a.element){
-    if(!first.elements)first.elements=[0,0,0,0,0];
-    if(a.element>=1&&a.element<=4)first.elements[a.element]++;
-   }
+   const weight=Runes?Runes.mass(a):1;
+   spentMass+=weight;
+   first.massHits=(first.massHits||0)+weight;
+   if(!first.elements)first.elements=[0,0,0,0,0];
+   const composition=Runes?Runes.composition(a):null;
+   if(composition){for(let element=1;element<5;element++)first.elements[element]+=composition[element]}
+   else if(a.element>=1&&a.element<=4)first.elements[a.element]+=weight;
    // One small impact mark per subset. Never one Phaser emitter per agent.
    if(first.impacts<=3&&cast.impactFX.length<96){
     cast.impactFX.push({
@@ -112,6 +117,7 @@
   agents.length=remaining;
   cast.collisions=(cast.collisions||0)+consumed;
   cast.consumed=(cast.consumed||0)+consumed;
+  cast.consumedMass=(cast.consumedMass||0)+spentMass;
   // Damage and visual FX are bounded per target/frame, but EVERY contacting
   // agent was already consumed regardless of these caps or hit cooldowns.
   for(const t of all){
@@ -121,9 +127,9 @@
     Elements.agentContacts(scene,t.obj.body,t.obj,t.elements,t.to.x,t.to.y,time,Combat);
    }
    if(t.kind==='enemy'&&Combat.hitEnemy)
-    Combat.hitEnemy(scene,t.obj,Math.min(28,Math.max(2,Math.round(t.impacts*1.7))),'crafted-field');
+    Combat.hitEnemy(scene,t.obj,Math.min(t.massHits>t.impacts?70:28,Math.max(2,Math.round(t.massHits*1.7))),'crafted-field');
    else if(t.kind==='stone'&&Combat.damagePillar)
-    Combat.damagePillar(scene,t.obj,Math.min(30,Math.max(2,Math.round(t.impacts*2))),'crafted-field');
+    Combat.damagePillar(scene,t.obj,Math.min(t.massHits>t.impacts?72:30,Math.max(2,Math.round(t.massHits*2))),'crafted-field');
   }
   if(consumed){
    cast.free=0;cast.offscreen=0;
