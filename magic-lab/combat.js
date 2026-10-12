@@ -6,7 +6,7 @@ const Body=Phaser.Physics.Matter.Matter.Body;
 const Mind=window.WRKMAN_CREATURE_MIND||null;
 const Territory=window.WRKMAN_TERRITORY_MIND||null;
 const Glass=window.WRKMAN_GLASSRUNNER_MIND||null;
-const Runes=window.WRKMAN_SWARM_RUNES||null;
+// Rune engine is loaded after combat; look it up at sensor time.
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 // Shared with the Lab scene's expanded navigable world.
@@ -631,6 +631,7 @@ function stimulus(s,x,y,kind='spell',power=.55){
 // A bounded, 10Hz visual sensor. Samples real world position + velocity from
 // independent agents. It does not inspect runes, spell names, or enemy targets.
 function glassThreats(s,enemy){
+ const Runes=window.WRKMAN_SWARM_RUNES||null;
  const shots=[],casts=[...(s.craftedShots||[])];if(s.craftedAura)casts.push(s.craftedAura);
  for(const cast of casts){
   if(!cast?.agents?.length)continue;
