@@ -9,20 +9,25 @@
  const N=32,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  function install(opts){
   if(!Viewport)throw Error('Field viewport 040 missing');
-  const {map,overview,root,values,stamp,line,value,brush,checkpoint,undo,mark,status}=opts;
+  const {map,overview,root,values,stamp,line,value,brush,checkpoint,undo,mark,status,
+   sources,sourceColor,sourceName,capture,restore}=opts;
   const view=Viewport.create(),mc=map.getContext('2d'),oc=overview.getContext('2d');
   const $=id=>root.querySelector('#'+id);
   let panMode=false,selected={x:16,y:16},gesture=null,strokeBefore=null,strokeChanged=false;
   const pointers=new Map();
   function current(){
    const v=values()[selected.y*N+selected.x];
-   return v<0?'MAGENTA / FREE':v===0?'BLACK / SINK':v===255?'WHITE / SOURCE':'GRAY '+v;
+   const element=sources?.()[selected.y*N+selected.x]||0;
+    const tone=v<0?'MAGENTA / FREE':v===0?'BLACK / SINK':v===255?'WHITE / SOURCE':'GRAY '+v;
+    return element?'ELEMENT '+(sourceName?.(element)||element)+' · '+tone:tone;
   }
   function overviewDraw(){
    const w=overview.width/N;oc.clearRect(0,0,overview.width,overview.height);
    for(let y=0;y<N;y++)for(let x=0;x<N;x++){
     const v=values()[y*N+x];oc.fillStyle=v<0?'#ff00ff':'rgb('+v+','+v+','+v+')';
     oc.fillRect(x*w,y*w,w+.15,w+.15);
+    const element=sources?.()[y*N+x]||0;
+    if(element&&sourceColor){oc.fillStyle=sourceColor(element);oc.fillRect(x*w,y*w,w+.15,w+.15)}
    }
    const z=view.view,c=N/z.zoom;
    oc.strokeStyle='#64ffd0';oc.lineWidth=1.7;
@@ -40,6 +45,8 @@
     const v=values()[y*N+x];
     mc.fillStyle=v<0?'#ff00ff':'rgb('+v+','+v+','+v+')';
     mc.fillRect((x-z.x)*side,(y-z.y)*side,side+.15,side+.15);
+     const element=sources?.()[y*N+x]||0;
+     if(element&&sourceColor){mc.fillStyle=sourceColor(element);mc.fillRect((x-z.x)*side,(y-z.y)*side,side+.15,side+.15)}
    }
    mc.strokeStyle=z.zoom>=4?'#162e3dac':'#1723294b';mc.lineWidth=z.zoom>=4?1:.5;
    mc.beginPath();
@@ -77,7 +84,8 @@
    status?.('Painted cell '+selected.x+','+selected.y+' exactly.');
   }
   function undoUnfinished(){
-   if(strokeBefore){values().splice(0,1024,...strokeBefore);undo.pop();strokeBefore=null;strokeChanged=false;}
+   if(strokeBefore){if(restore)restore(strokeBefore);else values().splice(0,1024,...strokeBefore);
+    undo.pop();strokeBefore=null;strokeChanged=false;}
   }
   function point(e){return {x:e.clientX,y:e.clientY}}
   function down(e){
@@ -98,7 +106,7 @@
    const c=cell(e);selected=c;
    if(panMode)gesture={kind:'pan'};
    else{
-    strokeBefore=values().slice();checkpoint();strokeChanged=false;
+    strokeBefore=capture?capture():values().slice();checkpoint();strokeChanged=false;
     gesture={kind:'paint',first:c,last:c};
     if(brush()!=='line'){stamp(c.x,c.y,value());strokeChanged=true;}
    }
