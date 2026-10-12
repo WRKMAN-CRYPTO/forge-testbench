@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#081a25"><title>WRKMAN Magic Lab | Bestiary</title>
+<style>
+:root{color-scheme:dark;--ink:#e9f4ed;--mint:#b1eee1;--gold:#ffda98;--edge:#527f89;--base:#091c2a;--panel:#183948}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{background:radial-gradient(circle at 55% 0%,#2a4f56 0%,#0b2430 40%,#061420 100%);font:12px/1.35 system-ui,sans-serif;color:var(--ink)}
+button,input,textarea{font:inherit}button{color:var(--ink);background:#1e4354;border:1px solid #5a8995;border-radius:8px;
+ padding:8px 10px;font-weight:800;cursor:pointer;touch-action:manipulation}
+button:active{transform:translateY(1px)}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+input,textarea{width:100%;min-width:0;padding:8px;background:#061b28;color:#f5f5ed;border:1px solid #557985;border-radius:7px;outline-offset:1px}
+textarea{resize:vertical;min-height:65px;line-height:1.4}
+[hidden]{display:none!important}
+#shell{display:flex;flex-direction:column;width:100%;max-width:1100px;height:100%;height:100dvh;margin:auto;
+ border-inline:1px solid #4a7180;background:linear-gradient(152deg,#183744,#091b29 65%)}
+header{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-bottom:1px solid var(--edge)}
+.eyebrow{font:850 10px ui-monospace,monospace;letter-spacing:.16em;color:#a3c9c9}h1{font:bold clamp(19px,3vw,27px) Georgia,serif;color:var(--gold);margin:1px 0}
+#back{background:#3e3631;border-color:#ae9266;flex:none}
+.body{display:grid;grid-template-columns:minmax(180px,270px) minmax(0,1fr);flex:1;min-height:0}
+.sidebar{min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--edge);overflow:hidden}
+.searchbar{display:flex;gap:5px;padding:7px;border-bottom:1px solid #436879}
+#search{flex:1}#new{white-space:nowrap}
+.filters{display:flex;gap:4px;padding:5px 7px}.filters button{flex:1;padding:6px 2px;font-size:10px}
+.filters button[aria-pressed=true]{background:#805d33;border-color:#ffcb7a}
+#roster{overflow:auto;min-height:0;flex:1;padding:5px 6px 12px;overscroll-behavior:contain}
+.creature{width:100%;display:flex;gap:8px;align-items:center;text-align:left;margin:3px 0;min-height:50px}
+.creature.selected{border-color:var(--gold);background:#34666a}
+.creature .glyph{font-size:24px;width:30px;flex:none;text-align:center;color:#a1f1e8}
+.creature .creatureText{display:flex;flex-direction:column;gap:3px;min-width:0}
+.creature strong{font:800 12px system-ui;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.creature small{color:#a7ccd1;font:9px ui-monospace,monospace}
+#editor{overflow-y:auto;min-height:0;overscroll-behavior:contain;padding:10px 12px 18px}
+.identity{display:flex;gap:10px;align-items:center}.identity .bigGlyph{font-size:37px;color:#a5f6e9}
+.identity h2{color:#ffdfa5;font:bold 24px Georgia,serif;margin:0}.identity small{color:#a9c7ca;font:10px ui-monospace,monospace}
+.notice{padding:7px 9px;margin:8px 0 12px;background:#1b332f;border:1px solid #506e67;border-radius:8px;color:#cae8d6;font-size:11px}
+#fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}.field label{font:850 10px ui-monospace,monospace;letter-spacing:.065em;color:#b9dbe2}
+.field.wide{grid-column:1/-1}.field input,.field textarea{width:100%}
+.field textarea{field-sizing:content;max-height:230px}
+.actions{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+#delete{color:#ffc6c8;border-color:#b46c73}#reset{border-color:#ad996b}
+footer{flex:none;display:flex;align-items:center;gap:5px;padding:7px 9px;border-top:1px solid var(--edge);flex-wrap:wrap}
+footer button{padding:6px 8px;font-size:10px}#status{flex:1;min-width:140px;color:#b2d4d1;font:10px/1.3 ui-monospace,monospace}
+@media(max-width:600px) and (orientation:portrait){
+ .body{display:flex;flex-direction:column}.sidebar{height:30%;min-height:125px;flex:none;border-right:0;border-bottom:1px solid var(--edge)}
+ #roster{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:5px;padding:3px 7px 9px}
+ .creature{flex:0 0 155px;min-height:50px;margin:0}#editor{flex:1}
+}
+@media(max-height:440px){header{padding:4px 9px}footer{padding:4px 7px}#editor{padding-top:5px}.notice{margin:4px 0}}
+@media(max-width:360px){#fields{grid-template-columns:1fr}.field.wide{grid-column:auto}footer button{padding:5px}}
+</style>
+</head>
+<body>
+<div id="shell">
+<header><div><div class="eyebrow">W / ARCANE LAB · FIELD RECORDS 053</div><h1>The Bestiary</h1></div><button type="button" id="back">BACK TO LAB ✕</button></header>
+<div class="body">
+ <aside class="sidebar" aria-label="Creature index">
+  <div class="searchbar"><input id="search" type="search" aria-label="Search creatures" placeholder="Find a creature…"><button type="button" id="new">＋ NEW</button></div>
+  <div class="filters" role="group" aria-label="Creature filters">
+   <button type="button" data-filter="all" aria-pressed="true">ALL</button>
+   <button type="button" data-filter="live" aria-pressed="false">IN GAME</button>
+   <button type="button" data-filter="concept" aria-pressed="false">CONCEPTS</button>
+  </div>
+  <div id="roster" aria-label="Bestiary creature list"></div>
+ </aside>
+ <main id="editor" aria-label="Creature record">
+  <div class="identity"><div id="bigGlyph" class="bigGlyph">◈</div><div><h2 id="entryName">Glassrunner</h2><small id="entryMeta">IN GAME · glassrunner</small></div></div>
+  <div class="notice" id="notice">The bestiary is an editable design ledger. It does not rewrite running combat AI or stats.</div>
+  <form id="fields" autocomplete="off">
+   <div class="field"><label for="name">CREATURE NAME</label><input name="name" id="name" maxlength="96"></div>
+   <div class="field"><label for="symbol">GLYPH / SYMBOL</label><input name="symbol" id="symbol" maxlength="4"></div>
+   <div class="field"><label for="title">TITLE</label><input name="title" id="title" maxlength="130"></div>
+   <div class="field"><label for="category">ROLE</label><input name="category" id="category"></div>
+   <div class="field"><label for="habitat">HABITAT</label><input name="habitat" id="habitat"></div>
+   <div class="field"><label for="temperament">TEMPERAMENT</label><input name="temperament" id="temperament"></div>
+   <div class="field"><label for="hp">HP · REFERENCE</label><input name="hp" id="hp" type="number" min="0" max="999999" step="1"></div>
+   <div class="field"><label for="radius">BODY RADIUS · REFERENCE</label><input name="radius" id="radius" type="number" min="0" max="999999" step="1"></div>
+   <div class="field wide"><label for="description">IDENTITY / FIELD NOTES</label><textarea name="description" id="description" rows="2"></textarea></div>
+   <div class="field wide"><label for="behaviors">BEHAVIOR / STATES</label><textarea name="behaviors" id="behaviors" rows="2"></textarea></div>
+   <div class="field wide"><label for="abilities">ATTACKS / SPECIALS</label><textarea name="abilities" id="abilities" rows="2"></textarea></div>
+   <div class="field wide"><label for="counterplay">COUNTERPLAY / WEAKNESSES</label><textarea name="counterplay" id="counterplay" rows="2"></textarea></div>
+   <div class="field wide"><label for="tags">TAGS, COMMA-SEPARATED</label><input name="tags" id="tags"></div>
+   <div class="field wide"><label for="notes">DEVELOPMENT NOTES</label><textarea name="notes" id="notes" rows="2"></textarea></div>
+  </form>
+  <div class="actions"><button type="button" id="clone">DUPLICATE AS CONCEPT</button>
+   <button type="button" id="reset">RESTORE RECORD</button>
+   <button type="button" id="delete">DELETE CONCEPT</button></div>
+ </main>
+</div>
+<footer>
+ <button type="button" id="copy">COPY JSON</button>
+ <button type="button" id="export">EXPORT .JSON</button>
+ <button type="button" id="import">IMPORT .JSON</button>
+ <input type="file" accept=".json,application/json" id="file" hidden>
+ <span id="status" role="status" aria-live="polite">Local edits autosave · export to keep a portable copy</span>
+</footer>
+</div>
+<script src="./bestiary-data.js?v=053"></script>
+<script>
+(function(){
+ "use strict";
+ const Data=window.WRKMAN_BESTIARY_DATA,$=id=>document.getElementById(id);
+ let storage=null;
+ try{storage=window.localStorage;}catch(_){}
+ let entries=Data.read(storage),selected="glassrunner",filter="all",search="";
+ const form=$("fields"),status=$("status");
+ const entry=()=>entries.find(x=>x.id===selected)||entries[0];
+ const tell=t=>{status.textContent=t;};
+ const unique=base=>{let n=base,k=2;while(entries.some(e=>e.id===n))n=base+"-"+k++;return n;};
+ function persist(){tell(Data.save(storage,entries)?"SAVED LOCALLY · Export or copy to share":"SESSION ONLY · Export to keep changes");}
+ function renderList(){
+  $("roster").replaceChildren();
+  const matching=entries.filter(e=>(filter==="all"||e.kind===filter)&&
+   (!search||[e.name,e.title,e.category,e.tags,e.description,e.id].join(" ").toLowerCase().includes(search)));
+  for(const e of matching){
+   const button=document.createElement("button");button.type="button";
+   button.className="creature"+(selected===e.id?" selected":"");
+   const glyph=document.createElement("span");glyph.className="glyph";glyph.textContent=e.symbol||"◇";
+   const words=document.createElement("span");words.className="creatureText";
+   const name=document.createElement("strong");name.textContent=e.name||e.id;
+   const sub=document.createElement("small");sub.textContent=(e.kind==="live"?"IN GAME":"CONCEPT")+" · "+e.category;
+   words.append(name,sub);button.append(glyph,words);
+   button.addEventListener("click",()=>{selected=e.id;render();});
+   $("roster").append(button);
+  }
+  if(!matching.length){const p=document.createElement("p");p.textContent="No matching creatures.";p.style.padding="9px";$("roster").append(p);}
+  document.querySelectorAll("[data-filter]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.filter===filter)));
+ }
+ function renderForm(){
+  const e=entry();if(!e)return;
+  $("entryName").textContent=e.name||e.id;
+  $("entryMeta").textContent=(e.kind==="live"?"IN GAME":"CONCEPT")+" · ID: "+e.id;
+  $("bigGlyph").textContent=e.symbol||"◇";
+  $("notice").textContent=e.kind==="live"?
+   "LIVE RECORD · This documents implemented behavior. HP and radius are references, NOT controls. Editing this page never silently modifies the combat engine.":
+   "CONCEPT RECORD · Your new creature is saved here, not yet spawned in game. Its behavior and physics must be implemented separately.";
+  for(const f of Data.FIELDS){const el=form.elements.namedItem(f);if(el)el.value=e[f]??"";}
+  $("reset").disabled=e.kind!=="live";$("delete").disabled=e.kind==="live";
+ }
+ function render(){renderList();renderForm();}
+ function createConcept(source){
+  const base=source||{name:"Unnamed Creature",title:"New design",category:"Unassigned",habitat:"Undecided",temperament:"Undecided",
+   hp:100,radius:18,symbol:"◇",tags:"",description:"",behaviors:"",abilities:"",counterplay:"",notes:""};
+  const id=unique(source?source.id+"-variant":"new-creature");
+  const fresh=Data.normalize(Object.assign({},base,{id,name:source?source.name+" Variant":"Unnamed Creature"}));
+  entries.push(fresh);selected=id;filter="all";search="";$("search").value="";
+  persist();render();$("name").focus();
+ }
+ form.addEventListener("submit",e=>e.preventDefault());
+ form.addEventListener("input",event=>{
+  const field=event.target.name;
+  if(!Data.FIELDS.includes(field))return;
+  const current=entry();if(!current)return;
+  current[field]=field==="hp"||field==="radius"?
+    Math.min(999999,Math.max(0,Math.round(Number(event.target.value)||0))):
+    String(event.target.value).slice(0,field==="symbol"?4:field==="name"?96:field==="title"?130:field==="tags"?280:8000);
+  persist();
+  if(["name","symbol","title","category","description","tags"].includes(field)){
+   renderList();$("entryName").textContent=current.name||current.id;$("bigGlyph").textContent=current.symbol||"◇";
+  }
+ });
+ $("search").addEventListener("input",e=>{search=e.target.value.toLowerCase().trim();renderList();});
+ document.querySelectorAll("[data-filter]").forEach(b=>b.addEventListener("click",()=>{filter=b.dataset.filter;renderList();}));
+ $("new").addEventListener("click",()=>createConcept(null));
+ $("clone").addEventListener("click",()=>createConcept(entry()));
+ $("reset").addEventListener("click",()=>{
+  const old=entry(),def=Data.DEFAULTS.find(e=>e.id===old?.id);
+  if(!def||!confirm("Restore the original record for "+old.name+"?"))return;
+  entries=entries.map(e=>e.id===old.id?Data.normalize(def):e);persist();render();
+ });
+ $("delete").addEventListener("click",()=>{
+  const old=entry();if(!old||old.kind==="live"||!confirm("Delete concept "+old.name+"? Export first to keep a backup."))return;
+  entries=entries.filter(e=>e.id!==old.id);selected=entries[0]?.id||"glassrunner";persist();render();
+ });
+ $("copy").addEventListener("click",async()=>{
+  const value=JSON.stringify(Data.exportData(entries),null,2);
+  try{await navigator.clipboard.writeText(value);tell("JSON COPIED · Paste into a chat to share your creature designs.");}
+  catch(_){
+   try{const t=document.createElement("textarea");t.value=value;t.style.position="fixed";t.style.top="10px";t.style.width="94%";
+    document.body.append(t);t.select();document.execCommand("copy");t.remove();tell("JSON COPIED · Ready to paste.");}
+   catch(_){tell("CLIPBOARD UNAVAILABLE · Use EXPORT .JSON.");}
+  }
+ });
+ $("export").addEventListener("click",()=>{
+  const url=URL.createObjectURL(new Blob([JSON.stringify(Data.exportData(entries),null,2)],{type:"application/json"}));
+  const a=document.createElement("a");a.href=url;a.download="wrkman-magic-lab-bestiary.json";
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
+  tell("EXPORT CREATED · Your records are in one portable JSON file.");
+ });
+ $("import").addEventListener("click",()=>$("file").click());
+ $("file").addEventListener("change",async(e)=>{
+  const file=e.target.files?.[0];e.target.value="";if(!file)return;
+  try{
+   if(file.size>1200000)throw Error("File is too large");
+   const value=JSON.parse(await file.text());
+   if(value?.format!==Data.FORMAT||value.version!==1)throw Error("Not a valid Magic Lab bestiary file");
+   const merged=Data.merge(entries,value);
+   if(!merged)throw Error("Duplicate or invalid creature IDs");
+   if(!confirm("Merge "+value.entries.length+" bestiary records? Entries with matching IDs will be updated."))return;
+   entries=merged;persist();render();tell("IMPORTED "+value.entries.length+" RECORDS · SAVED LOCALLY");
+  }catch(err){tell("IMPORT FAILED · "+String(err?.message||err));}
+ });
+ $("back").addEventListener("click",()=>{
+  if(window.parent!==window)window.parent.postMessage({type:"wrkman:bestiary:close"},window.location.origin);
+  else window.location.href="./?v=053";
+ });
+ window.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){
+   e.preventDefault();
+   if(window.parent!==window)window.parent.postMessage({type:"wrkman:bestiary:close"},window.location.origin);
+   else window.location.href="./?v=053";
+  }
+ });
+ render();
+})();
+</script>
+</body>
+</html>
