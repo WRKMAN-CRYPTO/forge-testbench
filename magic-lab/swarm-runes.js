@@ -165,6 +165,16 @@
   if(!st.runeCount)return;
   const alive=new Set(st.agents),next=[];
   for(const a of st.agents){
+   // Mass is physical inertia. Preserve momentum as the underlying field
+   // turns or damps it, without altering the canonical motion interpreter.
+   if(mass(a)>1&&Number.isFinite(a.beforeVx)&&Number.isFinite(a.beforeVy)){
+    const resistance=1/(1+Math.sqrt(mass(a))*.09),scale=Math.min(2,Math.max(0,dt*60));
+    const dvx=(a.vx-a.beforeVx)*(1-resistance);
+    const dvy=(a.vy-a.beforeVy)*(1-resistance);
+    a.vx-=dvx;a.vy-=dvy;
+    a.x-=dvx*scale/Math.max(1,st.worldW||360);
+    a.y-=dvy*scale/Math.max(1,st.worldH||500);
+   }
    let batch=[a];
    traverse(a.prevX??a.x,a.prevY??a.y,a.x,a.y,index=>{
     if(!st.recipe.runes[index])return;
