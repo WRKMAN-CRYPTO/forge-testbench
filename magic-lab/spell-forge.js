@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 044 / continuous-motion death fade
+/* WRKMAN ARCANE LAB 047 / found spell scroll generator
  * Field geometry remains the same portable WRKMAN_AGENT_FIELD_V1 recipe.
  * Editor and spell library never require Phaser; the game supplies pause/equip hooks.
  */
@@ -15,6 +15,8 @@
  if(!Viewport)throw Error('Precision field viewport 040 missing');
  const Precision=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_PRECISION:null;
  if(!Precision)throw Error('Precision touch editor 040 missing');
+ const Scroll=typeof globalThis==='object'?globalThis.WRKMAN_SCROLL_GENERATOR:null;
+ if(!Scroll)throw Error('Random scroll generator 047 missing');
  const KEY='wrkman-arcane-lab035-spell-library-v1',N=32,TAU=Math.PI*2,MAX_SPELLS=24;
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
  const $=(id)=>document.getElementById(id);
@@ -27,7 +29,9 @@
    try{
     if(!item||typeof item.id!=='string'||item.id.length>64||ids.has(item.id))continue;
     const recipe=engine.normalize(item.recipe);ids.add(item.id);
-    items.push({id:item.id,recipe,heal:item.heal!==false});
+    const o=item.origin;
+     const origin=o?.kind==='random-scroll'&&typeof o.seed==='string'?{kind:'random-scroll',seed:o.seed.slice(0,100),pattern:String(o.pattern||'UNKNOWN').slice(0,24)}:undefined;
+     items.push({id:item.id,recipe,heal:item.heal!==false,origin});
    }catch(_){/* A corrupted entry must not break unrelated spells. */}
   }
   if(!items.length)throw Error('No valid spells');
@@ -78,6 +82,8 @@
 #forgeOverlay .sf-library{max-height:min(350px,57vh);overflow:auto;display:grid;gap:5px;padding-right:3px}
 #forgeOverlay .sf-library button{display:flex;gap:7px;text-align:left;align-items:center;padding:6px;min-height:38px;white-space:normal;font-size:11px}
 #forgeOverlay .sf-library button span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#forgeOverlay .sf-scrolllab{display:grid;gap:7px;background:#1b2431;border:1px dashed #9b8660;border-radius:10px;padding:9px}
+#forgeOverlay .sf-scrolllab .sf-actions .primary{background:#766135;color:#fff5ca;border-color:#e5c57f}
 #forgeOverlay .sf-status{font:11px/1.35 system-ui;color:#b5d5c6;min-height:30px;border-left:3px solid #90ba9d;padding:5px 8px;background:#132e2c}
 #forgeOverlay .sf-caption{font-size:10px;color:#8fb6b5}#forgeOverlay .sf-link{display:flex;align-items:center;gap:7px;background:#172d29;border:1px solid #527963;border-radius:9px;padding:8px}
 #forgeOverlay .sf-link label{display:flex;align-items:center;flex:1;gap:6px;font-size:11px}
@@ -89,7 +95,7 @@
   document.head.append(style);
   const overlay=document.createElement('div');overlay.id='forgeOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','sfHeading');
   overlay.innerHTML=`<div class="sf-shell">
-   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>044 · MOVING FADE</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
+   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>047 · RANDOM SCROLLS</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
    <div class="sf-grid">
     <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><div class="sf-map-heading"><span id="sfMapCoords">CELL 16,16 · MAGENTA</span><strong id="sfZoomValue">1×</strong></div>
      <canvas id="sfMap" width="320" height="320" tabindex="0" class="sf-canvas" aria-label="32 by 32 instruction field. Zoom in, draw, or use arrows and Stamp Cell for exact placement"></canvas>
@@ -119,6 +125,11 @@
      <button class="primary" id="sfEquip">✓ SAVE & EQUIP AS BOUND FIELD</button>
     </section>
     <section class="sf-box sf-library-box"><h3>03 / YOUR SPELLS <span id="sfCount">0</span></h3><div class="sf-library" id="sfLibrary" role="group" aria-label="Saved crafted spells"></div>
+     <div class="sf-scrolllab"><h3>📜 FOUND SCROLL EXPERIMENT</h3>
+      <label>SEED · OPTIONAL / REPEATABLE <input id="sfScrollSeed" type="text" maxlength="100" spellcheck="false" autocomplete="off" placeholder="Blank for a fresh random scroll"></label>
+      <div class="sf-actions"><button id="sfScrollRoll" type="button" class="primary">📜 UNSEAL SCROLL</button><button id="sfScrollFresh" type="button">⚄ NEW RANDOM</button></div>
+      <div class="sf-caption">Real random 32×32 instructions. Same seed = same scroll. Unsealing adds an editable 200-agent recipe to your 24-slot library, but never equips it automatically. Some will be excellent. Some will be junk.</div>
+     </div>
      <div class="sf-actions"><button id="sfNew">+ NEW BLANK</button><button id="sfDuplicate">⧉ DUPLICATE</button><button id="sfSave">↧ SAVE</button><button id="sfExport">⇩ EXPORT JSON</button><button id="sfImport">↥ IMPORT JSON</button><button class="danger" id="sfDelete">× DELETE</button></div>
      <input id="sfFile" type="file" accept="application/json,.json" hidden>
      <div class="sf-status" id="sfStatus" role="status" aria-live="polite">Paint your instructions, choose AURA, WORLD EMISSION or PLACED FIELD, then save and equip.</div>
@@ -142,11 +153,11 @@
    stamp,line,value,brush:()=>brush,checkpoint,undo,mark,status
   });
   function paintMap(){editor.paintMap()}
-  function refreshFields(){const s=draft.settings;$('sfName').value=draft.name;$('sfPalette').value=s.palette;$('sfTexture').value=s.texture;$('sfMode').value=s.mode;$('sfDelivery').value=s.delivery||'aura';$('sfLifespan').value=String(s.lifespan??5.5);$('sfLifespanVal').textContent=Number(s.lifespan??5.5).toFixed(1)+'s';$('sfRenderLimit').value=String([600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.renderLimit)<Math.abs(a-s.renderLimit)?b:a));$('sfPopulation').value=String([200,600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.population)<Math.abs(a-s.population)?b:a));for(const n of ['Swirl','Momentum','Light']){$('sf'+n).value=s[n.toLowerCase()];$('sf'+n+'Val').textContent=String(s[n.toLowerCase()])}$('sfHeal').checked=heal;paintMap();resetParticles();$('sfDirty').textContent='SAVED';$('sfDirty').style.color='#9be6b7'}
-  function refreshLibrary(){const el=$('sfLibrary');el.replaceChildren();$('sfCount').textContent=library.items.length+'/'+MAX_SPELLS;for(const v of library.items){const b=document.createElement('button');b.type='button';b.className=v.id===library.selected?'active':'';const icon=document.createElement('span');icon.style.flex='0 0 auto';icon.textContent='⬡';const title=document.createElement('span');title.textContent=v.recipe.name;const link=document.createElement('small');link.textContent=(v.recipe.settings.delivery==='world'?'↗':v.recipe.settings.delivery==='placed'?'⌖':'◯')+(v.heal?' ♥':'');b.append(icon,title,link);b.addEventListener('click',()=>select(v.id));el.append(b)}}
+  function refreshFields(){$('sfScrollSeed').value=item.origin?.seed||'';const s=draft.settings;$('sfName').value=draft.name;$('sfPalette').value=s.palette;$('sfTexture').value=s.texture;$('sfMode').value=s.mode;$('sfDelivery').value=s.delivery||'aura';$('sfLifespan').value=String(s.lifespan??5.5);$('sfLifespanVal').textContent=Number(s.lifespan??5.5).toFixed(1)+'s';$('sfRenderLimit').value=String([600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.renderLimit)<Math.abs(a-s.renderLimit)?b:a));$('sfPopulation').value=String([200,600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.population)<Math.abs(a-s.population)?b:a));for(const n of ['Swirl','Momentum','Light']){$('sf'+n).value=s[n.toLowerCase()];$('sf'+n+'Val').textContent=String(s[n.toLowerCase()])}$('sfHeal').checked=heal;paintMap();resetParticles();$('sfDirty').textContent='SAVED';$('sfDirty').style.color='#9be6b7'}
+  function refreshLibrary(){const el=$('sfLibrary');el.replaceChildren();$('sfCount').textContent=library.items.length+'/'+MAX_SPELLS;for(const v of library.items){const b=document.createElement('button');b.type='button';b.className=v.id===library.selected?'active':'';const icon=document.createElement('span');icon.style.flex='0 0 auto';icon.textContent=v.origin?.kind==='random-scroll'?'📜':'⬡';const title=document.createElement('span');title.textContent=v.recipe.name;const link=document.createElement('small');link.textContent=(v.recipe.settings.delivery==='world'?'↗':v.recipe.settings.delivery==='placed'?'⌖':'◯')+(v.heal?' ♥':'');b.append(icon,title,link);b.addEventListener('click',()=>select(v.id));el.append(b)}}
   function storeDraft(){draft=engine.normalize(draft);item.recipe=clone(draft);item.heal=heal;dirty=false;const good=saveLibrary();$('sfDirty').textContent=good?'SAVED':'SESSION';$('sfDirty').style.color=good?'#9be6b7':'#ffd89b';refreshLibrary();return good}
-  function select(id){if(dirty)storeDraft();library.selected=id;item=find();draft=clone(item.recipe);heal=item.heal;undo=[];saveLibrary();refreshFields();refreshLibrary();status('Loaded '+item.recipe.name+'. Edit it or equip it.')}
-  function add(recipe,label){if(library.items.length>=MAX_SPELLS){status('Library full: delete a spell before adding more.');return false}if(dirty)storeDraft();const entry={id:uid(),recipe:engine.normalize(recipe),heal:heal};library.items.push(entry);library.selected=entry.id;item=entry;draft=clone(entry.recipe);undo=[];dirty=false;saveLibrary();refreshLibrary();refreshFields();status(label||'New spell ready.');return true}
+  function select(id){if(dirty)storeDraft();library.selected=id;item=find();draft=clone(item.recipe);heal=item.heal;undo=[];saveLibrary();refreshFields();refreshLibrary();status('Loaded '+item.recipe.name+(item.origin?.seed?' · scroll seed '+item.origin.seed:'')+'. Edit it or equip it.')}
+  function add(recipe,label,origin=null){if(library.items.length>=MAX_SPELLS){status('Library full: delete a spell before adding more.');return false}if(dirty)storeDraft();const entry={id:uid(),recipe:engine.normalize(recipe),heal:origin?.kind==='random-scroll'?false:heal,origin};library.items.push(entry);library.selected=entry.id;item=entry;draft=clone(entry.recipe);heal=entry.heal;undo=[];dirty=false;saveLibrary();refreshLibrary();refreshFields();status(label||'New spell ready.');return true}
   // Preview and world use the identical 32x32 interpreter. Lower preview
   // population changes density, never steering, momentum or lifetimes.
   function resetParticles(){
@@ -237,6 +248,17 @@
   $('sfCurtain').addEventListener('click',()=>{checkpoint();draft.values.fill(-1);for(let x=0;x<N;x+=3){draft.values[x]=255;draft.values[N+x]=128;draft.values[2*N+x]=0}paintMap();mark();status('Curtain template applied. Experiment with the teeth.')});
   $('sfSave').addEventListener('click',()=>{storeDraft();status('Saved '+item.recipe.name+' to this device.')});
   $('sfEquip').addEventListener('click',()=>{storeDraft();onEquip(clone(item.recipe),heal);status(item.recipe.name+' equipped. Close Forge, select ⬡ BOUND FIELD on your wheel, then cast.')});
+  function unsealScroll(fresh){
+   if(library.items.length>=MAX_SPELLS){status('Library full. Delete a spell before unsealing another scroll.');return}
+   try{
+    const seed=fresh?'':$('sfScrollSeed').value.trim();
+    const found=Scroll.generate(seed||Scroll.makeSeed());
+    const ok=add(found.recipe,'Unsealed '+found.recipe.name+' · '+found.pattern+' · seed '+found.seed+'. Test in preview; save & equip only if you want it.',{kind:'random-scroll',seed:found.seed,pattern:found.pattern});
+    if(ok)$('sfScrollSeed').value=found.seed;
+   }catch(err){status('Scroll generation failed: '+String(err.message||err))}
+  }
+  $('sfScrollRoll').addEventListener('click',()=>unsealScroll(false));
+  $('sfScrollFresh').addEventListener('click',()=>unsealScroll(true));
   $('sfNew').addEventListener('click',()=>add(makeBlank(engine),'Blank field created. Paint, name, then save & equip.'));
   $('sfDuplicate').addEventListener('click',()=>{const copy=clone(draft);copy.name=(copy.name+' COPY').slice(0,48);add(copy,'Duplicated spell. Edit this copy without overwriting the original.')});
   $('sfDelete').addEventListener('click',()=>{if(library.items.length<=1){status('Keep at least one spell. Use NEW BLANK to start fresh.');return}const deleted=find().recipe.name;library.items=library.items.filter(v=>v.id!==library.selected);library.selected=library.items[0].id;item=find();draft=clone(item.recipe);heal=item.heal;undo=[];dirty=false;saveLibrary();refreshFields();refreshLibrary();status('Deleted '+deleted+'. Your equipped aura is unchanged.')});
