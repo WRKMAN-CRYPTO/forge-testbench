@@ -202,8 +202,12 @@
    const life=Number(cfg.lifespan??5.5);
    let stats={offscreen:0};
    if(particles.length&&previewClock<life){
+    for(const a of particles){a.prevX=a.x;a.prevY=a.y;a.beforeVx=a.vx;a.beforeVy=a.vy}
     stats=Motion.stepSwarm(particles,draft.values,cfg,dt,360,500,previewClock);
-    Runes.advance(previewCast,null,previewClock*1000,dt);particles=previewCast.agents;
+    // A stationary training target exists only in the preview, making SEEKER
+    // steering visible even while the actual game world is paused.
+    const targetScene={combat:{enemies:[{alive:true,body:{position:{x:(.73-.5)*290,y:(.53-.5)*290}}}]}};
+    Runes.advance(previewCast,targetScene,previewClock*1000,dt);particles=previewCast.agents;
     if(++previewFrames%3===0)for(const a of particles){
      a.tail.push([a.x,a.y]);if(a.tail.length>5)a.tail.shift();
     }
@@ -222,6 +226,7 @@
       const w=preview.width,h=preview.height;
    pc.fillStyle='#081724';pc.fillRect(0,0,w,h);
    pc.strokeStyle='#34535d88';pc.lineWidth=1;pc.beginPath();pc.ellipse(w*.5,h*.5,w*.42,h*.42,0,0,TAU);pc.stroke();
+   if(draft.runes.includes(4)){pc.strokeStyle='#f5a1c9';pc.lineWidth=1.5;pc.beginPath();pc.arc(w*.73,h*.53,7,0,TAU);pc.stroke();}
    const visible=particles.length?particles:previewGhosts;
    const step=Math.max(1,Math.ceil(visible.length/1400));
    const fading=particles.length?1:previewGhosts.length?Math.pow(clamp(1-(previewClock-previewDeath)/.8,0,1),1.35):0;
