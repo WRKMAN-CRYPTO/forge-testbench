@@ -1,4 +1,4 @@
-/* WRKMAN Arcane Lab 042 / 5.5-second agent lifespans
+/* WRKMAN Arcane Lab 043 / adjustable lifespans and death fades
  * Exactly the same 32x32 field physics as Agent Field. Casting transforms
  * coordinates into world space; it never steers individual agent velocities.
  * Game damage, durations, rendering budgets, and linked events are separate.
@@ -17,13 +17,13 @@
  const N=32,MASK=-1,TAU=Math.PI*2,SAVE_KEY='wrkman-arcane-lab034-crafted-field-v1',SOURCE_KEY='wrkman-agent-field-v1';
  const palettes={arcane:[[92,139,244],[176,121,250],[223,193,255]],flame:[[208,65,39],[253,126,49],[255,213,105]],healing:[[66,184,144],[144,231,119],[240,235,149]],void:[[100,67,157],[179,72,199],[255,134,202]]};
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t;
- const DEFAULT_DRAW=1200,MAX_DRAW=6000,AGENT_MAX_AGE_MS=5500;
+ const DEFAULT_DRAW=1200,MAX_DRAW=6000,AGENT_MAX_AGE_MS=5500,FADE_MS=800,MAX_FADE_PARTICLES=6000;
  function starter(){
   const values=[];for(let y=0;y<N;y++)for(let x=0;x<N;x++){
    const r=Math.hypot(x-15.5,y-15.5);
    values.push(r>8.3&&r<10.7?255:r>=10.7&&r<13.4?Math.round(clamp(245-(r-10.7)*74,35,245)):r>=13.4&&r<14.8?0:MASK);
   }
-  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:'FIRE RING',values,settings:{mode:'ab',palette:'flame',texture:'flat',population:1200,delivery:'aura',swirl:26,momentum:62,light:62,renderLimit:1200}};
+  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:'FIRE RING',values,settings:{mode:'ab',palette:'flame',texture:'flat',population:1200,delivery:'aura',swirl:26,momentum:62,light:62,renderLimit:1200,lifespan:5.5}};
  }
  function normalize(raw){
   if(!raw||raw.width!==N||raw.height!==N||!Array.isArray(raw.values)||raw.values.length!==1024)throw Error('Expected 32x32 Agent Field JSON');
@@ -36,6 +36,7 @@
    settings:{mode:s.mode==='a'?'a':'ab',palette:palettes[s.palette]?s.palette:'flame',texture:s.texture==='leaf'?'leaf':'flat',
     population:Number.isFinite(s.population)?Math.round(clamp(s.population,200,6000)):1200,
     delivery,swirl:n('swirl',26),momentum:n('momentum',62),light:n('light',62),
+    lifespan:Number.isFinite(s.lifespan)?Math.round(clamp(s.lifespan,.5,30)*2)/2:5.5,
     renderLimit:Number.isFinite(s.renderLimit)?Math.round(clamp(s.renderLimit,200,MAX_DRAW)):DEFAULT_DRAW}};
  }
  function read(storage){try{const v=storage?.getItem(SAVE_KEY);return v?normalize(JSON.parse(v)):normalize(starter())}catch(_){return normalize(starter())}}
@@ -62,15 +63,52 @@
  // The shared Agent Field physics is unchanged. Lifespan is a game rule,
  // measured in scene time for EACH agent, independent of frame rate and of
  // the original Motion.stepAgent age counter (which caps simulation dt).
- function expireAgents(st,now){
-  const agents=st.agents;let alive=0;
+ // At death, retain only visible render snapshots. Fading hexes never move,
+ // collide, heal or occupy capacity. The cast itself can close immediately.
+ function queueFades(scene,st,dead,now){
+  if(!scene||!dead.length)return;
+  const cfg=st.recipe.settings,camera=scene.cameras?.main?.worldView;
+  const allowed=Math.min(dead.length,cfg.renderLimit||DEFAULT_DRAW);
+  const stride=Math.max(1,Math.ceil(dead.length/Math.max(1,allowed)));
+  const colors=palettes[cfg.palette],pieces=[];
+  for(let i=0;i<dead.length;i+=stride){
+   const a=dead[i],p=worldPosition(st,a);
+   if(camera&&(p.x<camera.x-24||p.x>camera.right+24||p.y<camera.y-24||p.y>camera.bottom+24))continue;
+   const t=cfg.mode==='ab'?clamp(a.progress||0,0,1):.44;
+   const c=t<.5?colors[0].map((v,j)=>lerp(v,colors[1][j],t*2)):
+    colors[1].map((v,j)=>lerp(v,colors[2][j],(t-.5)*2));
+   const color=(Math.round(c[0])<<16)|(Math.round(c[1])<<8)|Math.round(c[2]);
+   const radius=cfg.mode==='ab'?1.2+3.1*clamp(a.progress||0,0,1):2.8;
+   const vx=st.delivery==='world'?
+    a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
+   const vy=st.delivery==='world'?
+    a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
+   pieces.push({x:p.x,y:p.y,r:Math.max(.9,radius),color,angle:Math.atan2(vy,vx),
+    texture:cfg.texture,opacity:(.18+(.14+cfg.light/100*.84)*.63)});
+  }
+  if(!pieces.length)return;
+  scene.craftedFades=scene.craftedFades||[];
+  scene.craftedFades.push({at:now,pieces});
+  // Bound temporary rendering memory even if many spells die at once.
+  let total=scene.craftedFades.reduce((n,b)=>n+b.pieces.length,0);
+  while(total>MAX_FADE_PARTICLES&&scene.craftedFades.length){
+   const first=scene.craftedFades[0],extra=total-MAX_FADE_PARTICLES;
+   if(first.pieces.length<=extra){total-=first.pieces.length;scene.craftedFades.shift()}
+   else{first.pieces.splice(0,extra);total-=extra}
+  }
+ }
+ function expireAgents(st,now,scene=null){
+  const agents=st.agents,dead=[];let alive=0;
+  const ttl=st.recipe.settings.lifespan*1000;
   for(let i=0;i<agents.length;i++){
-   const agent=agents[i];
-   if(now-(agent.bornAt??st.born)<AGENT_MAX_AGE_MS)agents[alive++]=agent;
+   const a=agents[i];
+   if(now-(a.bornAt??st.born)<ttl)agents[alive++]=a;
+   else if(scene)dead.push(a);
   }
   const removed=agents.length-alive;
   agents.length=alive;
   st.agedOut=(st.agedOut||0)+removed;
+  queueFades(scene,st,dead,now);
   return removed;
  }
  function start(scene,recipe,healLinked=true,target=null){
@@ -89,7 +127,7 @@
   const center=delivery==='aura'?{x:p.x,y:p.y}:delivery==='placed'?
    {x:clamp(wanted.x,-780,1740),y:clamp(wanted.y,-500,1100)}:
    {x:p.x+forward.x*30,y:p.y+forward.y*30};
-  const duration=delivery==='world'?22000:delivery==='aura'?14000:9000;
+  const duration=cfg.settings.lifespan*1000;
   const st={recipe:cfg,starts,agents:[],born:now,expires:now+duration,nextHeal:now+3000,
    healLinked:!!healLinked,healFX:[],impactFX:[],pulses:0,collisions:0,consumed:0,agedOut:0,targetPrev:new Map(),
    delivery,center,forward,right,scale:delivery==='placed'?260:290,
@@ -107,12 +145,13 @@
   else scene.craftedAura=st;
   return true;
  }
- function stop(scene,onlyAura=false){scene.craftedAura=null;if(!onlyAura)scene.craftedShots=[]}
+ function stop(scene,onlyAura=false){scene.craftedAura=null;if(!onlyAura){scene.craftedShots=[];scene.craftedFades=[]}}
  function stepOne(scene,st,time,delta,Combat){
-  if(time>=st.expires){st.expired=true;return}
   // Age out individual agents BEFORE advancing motion or checking hits.
   // Zero-agent casts expire immediately, freeing spell slots and the 6k cap.
-  expireAgents(st,time);
+  // Move an Aura's visual anchor to its latest location before freezing ghosts.
+  if(st.delivery==='aura'){st.center.x=scene.player.x;st.center.y=scene.player.y}
+  expireAgents(st,time,scene);
   if(st.agents.length===0){st.expired=true;return}
   const cfg=st.recipe.settings,dtSeconds=clamp(delta,0,50)/1000;
   st.motionTime+=dtSeconds;st.frames++;
@@ -140,6 +179,8 @@
   if(st.agents.length===0)st.expired=true;
  }
  function step(scene,time,delta,Combat){
+  if(scene.craftedFades?.length)
+   scene.craftedFades=scene.craftedFades.filter(batch=>time-batch.at<FADE_MS);
   if(scene.craftedAura){stepOne(scene,scene.craftedAura,time,delta,Combat);
    if(scene.craftedAura.expired)scene.craftedAura=null}
   if(scene.craftedShots?.length){
@@ -211,10 +252,27 @@
    }
   }
   }
+  // Visual-only death trails. They draw even after the parent cast is removed
+  // and its gameplay capacity is free; no Phaser bodies, timers or damage.
+  for(const batch of scene.craftedFades||[]){
+   const elapsed=Math.max(0,time-batch.at);
+   const fade=Math.pow(clamp(1-elapsed/FADE_MS,0,1),1.35);
+   if(fade<=0)continue;
+   for(const p of batch.pieces){
+    g.fillStyle(p.color,p.opacity*fade);
+    if(p.texture==='leaf'){
+     const nx=Math.cos(p.angle),ny=Math.sin(p.angle),px=-ny,py=nx,r=p.r;
+     g.fillPoints([{x:p.x-nx*r*1.45,y:p.y-ny*r*1.45},
+      {x:p.x+px*r*.7,y:p.y+py*r*.7},
+      {x:p.x+nx*r*1.65,y:p.y+ny*r*1.65},
+      {x:p.x-px*r*.7,y:p.y-py*r*.7}],true);
+    }else hex(g,p.x,p.y,p.r);
+   }
+  }
  }
  const snapshot=scene=>{
   const active=[...(scene.craftedShots||[])];if(scene.craftedAura)active.push(scene.craftedAura);
-  if(!active.length)return {active:false};
+  if(!active.length)return {active:false,fading:(scene.craftedFades||[]).reduce((n,b)=>n+b.pieces.length,0)};
   const s=scene.craftedAura||active[active.length-1];
   return {active:true,name:s.recipe.name,delivery:s.delivery,center:{...s.center},
    casts:active.length,agents:active.reduce((n,c)=>n+c.agents.length,0),
@@ -223,9 +281,11 @@
    healLinked:active.some(c=>c.healLinked),pulses:active.reduce((n,c)=>n+c.pulses,0),
    collisions:active.reduce((n,c)=>n+c.collisions,0),consumed:active.reduce((n,c)=>n+c.consumed,0),agedOut:active.reduce((n,c)=>n+c.agedOut,0),free:active.reduce((n,c)=>n+c.free,0),
    offscreen:active.reduce((n,c)=>n+c.offscreen,0),physics:Motion.VERSION,
+   fading:(scene.craftedFades||[]).reduce((n,b)=>n+b.pieces.length,0),
+   lifespan:s.recipe.settings.lifespan,
    spawn:{x:s.spawnX,y:s.spawnY},direction:{...s.forward}
   };
  };
  return Object.freeze({SAVE_KEY,SOURCE_KEY,starter,normalize,read,fromForge,save,sample,
-  spawnCenter,worldPosition,AGENT_MAX_AGE_MS,expireAgents,start,stop,step,draw,snapshot});
+  spawnCenter,worldPosition,AGENT_MAX_AGE_MS,FADE_MS,expireAgents,start,stop,step,draw,snapshot});
 });
