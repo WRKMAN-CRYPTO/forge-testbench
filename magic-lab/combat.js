@@ -1,10 +1,12 @@
-/* WRKMAN ARCANE LAB 046 | Territorial beasts, creatures, and bounded combustion.
+/* WRKMAN ARCANE LAB 051 | Glassrunner physical evasion and living encounters.
    Standalone Phaser/Matter encounter module. No networking or permanent game saves. */
 (()=>{
 "use strict";
 const Body=Phaser.Physics.Matter.Matter.Body;
 const Mind=window.WRKMAN_CREATURE_MIND||null;
 const Territory=window.WRKMAN_TERRITORY_MIND||null;
+const Glass=window.WRKMAN_GLASSRUNNER_MIND||null;
+const Runes=window.WRKMAN_SWARM_RUNES||null;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 // Shared with the Lab scene's expanded navigable world.
@@ -14,26 +16,27 @@ const MAX_DEBRIS=36,DEBRIS_LIFE=18000,PILLAR_HEALTH=82;
 let chainCounter=0,enemyCounter=0,pillarCounter=0;
 const now=s=>s.time.now;
 function spawn(s,type,x,y){
- const heavy=type==="charger",resident=type==="mossling",guardian=type==="gravelhorn";
- const r=guardian?38:heavy?26:resident?16:18;
+ const heavy=type==="charger",resident=type==="mossling",guardian=type==="gravelhorn",runner=type==="glassrunner";
+ const r=guardian?38:heavy?26:resident?16:runner?19:18;
  const body=s.matter.add.circle(x,y,r,{
-  frictionAir:guardian?.064:heavy?.075:resident?.16:.09,
-  restitution:guardian?.22:heavy?.4:resident?.35:.68,
-  density:guardian?.023:heavy?.016:resident?.0019:.002,slop:.02
+  frictionAir:guardian?.064:heavy?.075:resident?.16:runner?.078:.09,
+  restitution:guardian?.22:heavy?.4:resident?.35:runner?.37:.68,
+  density:guardian?.023:heavy?.016:resident?.0019:runner?.0032:.002,slop:.02
  });
  const enemy={
   id:++enemyCounter,body,r,type,alive:true,
-  hp:guardian?370:heavy?165:resident?90:80,
-  maxHP:guardian?370:heavy?165:resident?90:80,
+  hp:guardian?370:heavy?165:resident?90:runner?125:80,
+  maxHP:guardian?370:heavy?165:resident?90:runner?125:80,
   phase:"stalk",until:0,nextAttack:now(s)+1000+Math.random()*800,
   face:{x:-1,y:0},burn:null,hitAt:0,staggerUntil:0,
   orbit:Math.random()<.5?-1:1,
   mind:resident&&Mind?Mind.make(enemyCounter,x,y,now(s)):null,
   territory:guardian&&Territory?Territory.make(enemyCounter,x,y,now(s)):null,
+  glass:runner&&Glass?Glass.make(enemyCounter,x,y,now(s)):null,
   mindAt:0,mindIntent:null
  };
- if((resident||guardian)&&s.add?.text){
-  enemy.moodText=s.add.text(x,y-40,guardian?"PATROL":"GRAZE",{
+ if((resident||guardian||runner)&&s.add?.text){
+  enemy.moodText=s.add.text(x,y-40,guardian?"PATROL":runner?"PROWL":"GRAZE",{
    fontFamily:"monospace",fontSize:"10px",color:"#b4e9c0",
    backgroundColor:"#12251ddd",padding:{x:3,y:2}
   }).setOrigin(.5,.5).setDepth(6);
@@ -78,6 +81,18 @@ function reset(s,layout=null){
    const chosen=spots[0];
    spawn(s,'gravelhorn',chosen?.x??s.player.x+520,chosen?.y??s.player.y-145);
   }
+  // Test one Glassrunner per hostile region. Sanctuary stays peaceful.
+  if(layout.index!==0&&Glass){
+   const choices=(layout.pads||[]).filter(p=>
+    Math.hypot(p.x-s.player.x,p.y-s.player.y)>225&&
+    Math.hypot(p.x-s.player.x,p.y-s.player.y)<670&&
+    (layout.enemies||[]).every(e=>Math.hypot(p.x-e.x,p.y-e.y)>105)&&
+    (layout.pillar||[]).every(e=>Math.hypot(p.x-e.x,p.y-e.y)>85));
+   choices.sort((a,b)=>Math.abs(Math.hypot(a.x-s.player.x,a.y-s.player.y)-345)-
+    Math.abs(Math.hypot(b.x-s.player.x,b.y-s.player.y)-345));
+   const spot=choices[0];
+   spawn(s,'glassrunner',spot?.x??s.player.x+350,spot?.y??s.player.y+195);
+  }
   for(const p of layout.pillar||[])pillar(s,p.x,p.y);
   for(const d of layout.debris||[])rubble(s,d.x,d.y,d.r,0,0);
  }else{
@@ -87,6 +102,7 @@ function reset(s,layout=null){
   spawn(s,"wisp",753,426);
   if(Mind)spawn(s,"mossling",451,544);
   if(Territory)spawn(s,"gravelhorn",930,565);
+  if(Glass)spawn(s,"glassrunner",838,306);
   // Preserve original lab targets and fracture-physics landmarks.
   pillar(s,371,165);pillar(s,694,362);pillar(s,377,457);
   for(const [x,y,r] of [[322,247,9],[785,304,11],[570,465,8],[316,401,7]]){
@@ -610,6 +626,51 @@ function stimulus(s,x,y,kind='spell',power=.55){
  c.stimuli.push({x,y,kind,power:clamp(power,0,2),at:now(s)});
  if(c.stimuli.length>24)c.stimuli.splice(0,c.stimuli.length-24);
 }
+
+// A bounded, 10Hz visual sensor. Samples real world position + velocity from
+// independent agents. It does not inspect runes, spell names, or enemy targets.
+function glassThreats(s,enemy){
+ const shots=[],casts=[...(s.craftedShots||[])];if(s.craftedAura)casts.push(s.craftedAura);
+ for(const cast of casts){
+  if(!cast?.agents?.length)continue;
+  const n=cast.agents.length,stride=Math.max(1,Math.ceil(n/340));
+  for(let i=0;i<n;i+=stride){
+   const a=cast.agents[i],dx=a.x-(cast.delivery==="world"?cast.spawnX:.5),
+    dy=a.y-(cast.delivery==="world"?cast.spawnY:.5);
+   const x=cast.delivery==="world"?
+    cast.center.x+dx*cast.worldW*cast.right.x+dy*cast.worldH*cast.forward.x:
+    cast.center.x+dx*cast.scale;
+   const y=cast.delivery==="world"?
+    cast.center.y+dx*cast.worldW*cast.right.y+dy*cast.worldH*cast.forward.y:
+    cast.center.y+dy*cast.scale;
+   const ex=x-enemy.body.position.x,ey=y-enemy.body.position.y;
+   if(ex*ex+ey*ey>410*410)continue;
+   const vx=cast.delivery==="world"?
+    (a.vx*cast.right.x+a.vy*cast.forward.x)*60:
+    a.vx*(cast.scale/Math.max(1,cast.worldW))*60;
+   const vy=cast.delivery==="world"?
+    (a.vx*cast.right.y+a.vy*cast.forward.y)*60:
+    a.vy*(cast.scale/Math.max(1,cast.worldH))*60;
+   shots.push({x,y,vx,vy,r:Runes?Runes.radius(a):3,
+    mass:Runes?Runes.mass(a):1});
+  }
+ }
+ return shots;
+}
+function glassObstacles(s,enemy){
+ const list=[];
+ for(const p of s.combat?.pillars||[])if(p.alive!==false&&p.body?.position)
+  list.push({position:p.body.position,radius:p.r||30});
+ for(const p of s.combat?.debris||[])if(p.alive!==false&&p.body?.position)
+  list.push({position:p.body.position,radius:p.r||12});
+ for(const a of s.actors||[]){
+  if(a===enemy||a.alive===false||a.body?.labAlive===false)continue;
+  if(a.body?.gameTag==="crate"||a.body?.gameTag==="dummy")
+   list.push({position:a.body.position,radius:a.r||a.body.circleRadius||20});
+ }
+ return list;
+}
+
 function step(s,time,delta){
  const c=s.combat;if(!c)return;
  c.stimuli=c.stimuli.filter(event=>time-event.at<2400);
@@ -644,6 +705,33 @@ function step(s,time,delta){
   // Stagger suspends intent, not physics: sliding bodies continue to move
   // under their actual velocity, gravity and impacts.
   if(time<e.staggerUntil)continue;
+  if(e.type==="glassrunner"&&e.glass&&Glass){
+   if(time>=e.mindAt){
+    e.mindAt=time+95;
+    const velocity={x:(b.velocity?.x||0)*60,y:(b.velocity?.y||0)*60};
+    e.mindIntent=Glass.decide(e.glass,{time,pos,velocity,player:s.player,
+     radius:e.r,shots:glassThreats(s,e),obstacles:glassObstacles(s,e),health:e.hp/e.maxHP});
+   }
+   const intent=e.mindIntent||{state:'prowl',x:0,y:0,speed:0};
+   if(intent.launch){
+    // Physical lateral leap, with NO teleportation or damage immunity.
+    intent.launch=false;
+    Body.setVelocity(b,{x:intent.dodge.x*intent.speed,y:intent.dodge.y*intent.speed});
+    s.burst(pos.x,pos.y,0x85ecf5,11,3.4);
+   }else if(intent.state==='windup'){
+    Body.setVelocity(b,{x:b.velocity.x*.86,y:b.velocity.y*.86});
+   }else if(intent.state==='recover'){
+    Body.setVelocity(b,{x:b.velocity.x*.96,y:b.velocity.y*.96});
+   }else if(intent.state!=='evade'){
+    const k=.00030*b.mass;
+    const vx=(intent.x||0)*(intent.speed||0),vy=(intent.y||0)*(intent.speed||0);
+    Body.applyForce(b,pos,{x:clamp(vx-b.velocity.x,-4,4)*k,
+      y:clamp(vy-b.velocity.y,-4,4)*k});
+   }
+   if(Math.hypot(pos.x-s.player.x,pos.y-s.player.y)<e.r+17)
+    hitPlayer(s,6,pos.x,pos.y,'glassrunner swipe');
+   continue;
+  }
   if(e.type==="gravelhorn"&&e.territory&&Territory){
    const m=e.territory;
    if(time>=e.mindAt){
@@ -878,6 +966,43 @@ function paint(s,g,time){
     if(e.moodText.text!==label)e.moodText.setText(label);
     e.moodText.setColor(warning?'#ffb973':state==='charge'?'#ff7f6d':'#d0dcba');
    }
+  }else if(e.type==="glassrunner"){
+   const m=e.glass,state=e.mindIntent?.state||m?.state||'prowl';
+   const face=m?.face||{x:1,y:0},dir=face.x>=0?1:-1;
+   const pulse=.5+.5*Math.sin(time*.016+e.id);
+   const evade=state==='evade',warn=state==='windup';
+   if(warn){
+    // Telegraph before leap, a genuine opportunity to hit it.
+    g.lineStyle(2.5,0xffdf87,.6+.25*pulse);g.strokeCircle(x,y,29+pulse*6);
+    const side=m?.dodge||{x:0,y:0};
+    g.lineStyle(2,0xa0eefd,.48);g.lineBetween(x,y,x+side.x*65,y+side.y*65);
+   }
+   if(evade){
+    g.lineStyle(5,0x71def6,.18);g.lineBetween(x-face.x*57,y-face.y*57,x,y);
+    g.lineStyle(2,0xffffff,.5);g.strokeCircle(x,y,22+pulse*3);
+   }
+   // Angular glass lizard: segmented plates, feet, and a long tail.
+   g.fillStyle(0x2a6878,.85);
+   g.fillTriangle(x-dir*10,y+6,x-dir*51,y+13,x-dir*27,y-3);
+   for(const foot of [-1,1]){
+    g.lineStyle(3,0x55c6ce,.92);
+    g.lineBetween(x+dir*foot*8,y+foot*7,x+dir*foot*21,y+foot*15);
+    g.lineBetween(x-dir*8,y+foot*6,x-dir*20,y+foot*16);
+   }
+   g.fillStyle(0x3b9da9,.94);g.fillEllipse(x,y,36,22);
+   g.fillStyle(0x8be3e6,.9);g.fillTriangle(x-11,y-8,x,y-22,x+4,y-7);
+   g.fillStyle(0x72d5e1,.9);g.fillTriangle(x+5,y-10,x+15,y-3,x+12,y+10);
+   g.fillStyle(0xc1f9fa,.92);g.fillTriangle(x+dir*9,y-10,x+dir*26,y-4,x+dir*13,y+7);
+   g.lineStyle(1.5,0xd2ffff,.62);g.strokeEllipse(x,y,35,22);
+   g.fillStyle(0xffe1ab,.97);g.fillCircle(x+dir*17,y-3,2.8);
+   g.fillStyle(0x092c38);g.fillCircle(x+dir*17.7,y-3,1.3);
+   const label={prowl:'PROWL',alert:'TRACKING',windup:'SIDESTEP!',evade:'DODGE',
+    recover:'RECOVER',stagger:'STAGGER'}[state]||'PROWL';
+   if(e.moodText?.active){
+    e.moodText.setPosition(x,y-38);
+    if(e.moodText.text!==label)e.moodText.setText(label);
+    e.moodText.setColor(warn?'#ffe09b':evade?'#90f7ff':'#b7e1dd');
+   }
   }else if(e.type==="charger"){
    const warning=e.phase==="windup";
    if(warning){
@@ -907,7 +1032,7 @@ function paint(s,g,time){
   }
   // A peaceful resident doesn't wear an enemy health bar until wounded.
   if(e.type!=="mossling"||e.hp<e.maxHP){
-   const w=e.type==="gravelhorn"?84:e.type==="charger"?52:e.type==="mossling"?34:39;
+   const w=e.type==="gravelhorn"?84:e.type==="charger"?52:e.type==="glassrunner"?48:e.type==="mossling"?34:39;
    g.fillStyle(0x0a1c26,.92);g.fillRoundedRect(x-w/2,y-e.r-15,w,5,2);
    g.fillStyle(e.burn?0xffa267:0x8fe7d8);g.fillRoundedRect(x-w/2,y-e.r-15,w*(e.hp/e.maxHP),5,2);
   }
