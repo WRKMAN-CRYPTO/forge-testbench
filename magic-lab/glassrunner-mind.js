@@ -26,7 +26,7 @@
   // Frost and kinetic stun can interrupt a poised jump. No stored
   // invincible dodge fires the instant the stun wears off.
   m.windupUntil=0;m.evadeUntil=0;m.launchPending=false;
-  m.recoverUntil=Math.max(m.recoverUntil,until+410);
+  m.recoverUntil=until+410; // interrupted jump loses its old recovery timetable
   m.nextDodge=Math.max(m.nextDodge,until+250);
   m.state='stagger';m.threat=null;
  }
