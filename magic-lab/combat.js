@@ -1,8 +1,9 @@
-/* WRKMAN ARCANE LAB 006 | Living targets, status physics, and bounded combustion.
+/* WRKMAN ARCANE LAB 045 | Living targets, creature instincts, and bounded combustion.
    Standalone Phaser/Matter encounter module. No networking or permanent game saves. */
 (()=>{
 "use strict";
 const Body=Phaser.Physics.Matter.Matter.Body;
+const Mind=window.WRKMAN_CREATURE_MIND||null;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 // Shared with the Lab scene's expanded navigable world.
@@ -12,18 +13,20 @@ const MAX_DEBRIS=36,DEBRIS_LIFE=18000,PILLAR_HEALTH=82;
 let chainCounter=0,enemyCounter=0,pillarCounter=0;
 const now=s=>s.time.now;
 function spawn(s,type,x,y){
- const heavy=type==="charger";
- const r=heavy?26:18;
+ const heavy=type==="charger",resident=type==="mossling";
+ const r=heavy?26:resident?16:18;
  const body=s.matter.add.circle(x,y,r,{
-  frictionAir:heavy?.075:.09,restitution:heavy?.4:.68,
-  density:heavy?.016:.002,slop:.02
+  frictionAir:heavy?.075:resident?.16:.09,restitution:heavy?.4:resident?.35:.68,
+  density:heavy?.016:resident?.0019:.002,slop:.02
  });
  const enemy={
   id:++enemyCounter,body,r,type,alive:true,
-  hp:heavy?165:80,maxHP:heavy?165:80,
+  hp:heavy?165:resident?90:80,maxHP:heavy?165:resident?90:80,
   phase:"stalk",until:0,nextAttack:now(s)+1000+Math.random()*800,
   face:{x:-1,y:0},burn:null,hitAt:0,staggerUntil:0,
-  orbit:Math.random()<.5?-1:1
+  orbit:Math.random()<.5?-1:1,
+  mind:resident&&Mind?Mind.make(enemyCounter,x,y,now(s)):null,
+  mindAt:0,mindIntent:null
  };
  body.gameTag="enemy";
  body.enemyRef=enemy;
@@ -37,12 +40,21 @@ function reset(s,layout=null){
  // 032 lab without a layout is unchanged, including all starting enemies.
  s.combat={
   hp:100,kills:0,invulnUntil:0,enemyShots:0,
-  enemies:[],fields:[],pending:[],seen:new Map(),
+  enemies:[],fields:[],pending:[],seen:new Map(),stimuli:[],
   relic:true,damageEvents:0,pairCollisions:new Map(),impactFX:[],blastFX:[],lastShake:-1000,wallHits:0,collisionHits:0,pillars:[],debris:[],pendingRuptures:[],playerKnock:{x:0,y:0},playerStaggerUntil:0,playerHurtAt:-9999,playerHurtDir:{x:0,y:0}
  };
  if(layout){
   // Sector zero is a genuinely safe sanctuary (zero enemy spawns).
   for(const e of layout.enemies||[])spawn(s,e.type,e.x,e.y);
+  // A neutral resident belongs to the habitat, not the combat wave.
+  // Arrival sanctuary keeps its original zero-hostiles and zero-residents.
+  if(layout.index!==0&&Mind){
+   const spot=(layout.pads||[]).find(p=>
+    Math.hypot(p.x-s.player.x,p.y-s.player.y)>250&&
+    (layout.enemies||[]).every(e=>Math.hypot(p.x-e.x,p.y-e.y)>135));
+   const x=spot?.x??s.player.x+385,y=spot?.y??s.player.y+190;
+   spawn(s,'mossling',x,y);
+  }
   for(const p of layout.pillar||[])pillar(s,p.x,p.y);
   for(const d of layout.debris||[])rubble(s,d.x,d.y,d.r,0,0);
  }else{
@@ -50,6 +62,7 @@ function reset(s,layout=null){
   spawn(s,"charger",620,410);
   spawn(s,"wisp",760,174);
   spawn(s,"wisp",753,426);
+  if(Mind)spawn(s,"mossling",451,544);
   // Preserve original lab targets and fracture-physics landmarks.
   pillar(s,371,165);pillar(s,694,362);pillar(s,377,457);
   for(const [x,y,r] of [[322,247,9],[785,304,11],[570,465,8],[316,401,7]]){
@@ -68,7 +81,7 @@ function heads(s){
  const pillars=document.getElementById("pillars");
  if(h)h.textContent=Math.max(0,Math.round(c.hp))+"%";
  if(k)k.textContent=String(c.kills);
- if(e)e.textContent=String(c.enemies.filter(x=>x.alive).length);
+ if(e)e.textContent=String(c.enemies.filter(x=>x.alive&&x.type!=="mossling").length);
  if(pillars)pillars.textContent=String(c.pillars.filter(p=>p.alive).length);
  if(relic){
   relic.textContent="✹ CINDERHEART "+(c.relic?"ON":"OFF");
@@ -341,6 +354,10 @@ function queueBurnDetonation(s,e,burn){
 }
 function hitEnemy(s,e,amount,kind){
  if(!e?.alive||!Number.isFinite(amount)||amount<=0)return false;
+ if(e.type==="mossling"&&e.mind&&Mind){
+  // Damage is an event the creature remembers, not a universal aggro flag.
+  Mind.injured(e.mind,e.body.position,s.player,now(s));
+ }
  e.hp=Math.max(0,e.hp-amount);
  e.hitAt=now(s);
  if(e.hp>0)return false;
@@ -350,7 +367,7 @@ function hitEnemy(s,e,amount,kind){
  e.burn=null;
  s.removal.push(e.body);
  s.burst(e.body.position.x,e.body.position.y,e.type==="charger"?0xffaa77:0x8aefff,20,6);
- if(s.combat.enemies.every(x=>!x.alive))s.announceCombat("CHAMBER CLEARED • RESET revives the encounter.");
+ if(s.combat.enemies.every(x=>!x.alive||x.type==="mossling"))s.announceCombat("HOSTILES CLEARED • Peaceful creatures still live here.");
  heads(s);
  return true;
 }
@@ -556,8 +573,14 @@ function collision(s,projectile,other){
  }
  return false;
 }
+function stimulus(s,x,y,kind='spell',power=.55){
+ const c=s?.combat;if(!c||!Number.isFinite(x)||!Number.isFinite(y))return;
+ c.stimuli.push({x,y,kind,power:clamp(power,0,2),at:now(s)});
+ if(c.stimuli.length>24)c.stimuli.splice(0,c.stimuli.length-24);
+}
 function step(s,time,delta){
  const c=s.combat;if(!c)return;
+ c.stimuli=c.stimuli.filter(event=>time-event.at<2400);
  environmentStep(s,time);
  const dt=Math.min(delta,48)/16.667;
  c.fields=c.fields.filter(f=>time-f.born<f.life);
@@ -589,6 +612,29 @@ function step(s,time,delta){
   // Stagger suspends intent, not physics: sliding bodies continue to move
   // under their actual velocity, gravity and impacts.
   if(time<e.staggerUntil)continue;
+  if(e.type==="mossling"&&e.mind&&Mind){
+   // Perception/decisions run ~10Hz; physical force is applied every frame.
+   if(time>=e.mindAt){
+    e.mindAt=time+100;
+    e.mindIntent=Mind.decide(e.mind,{
+     time,pos,player:s.player,health:e.hp/e.maxHP,signals:c.stimuli,
+     hazards:c.enemies.filter(o=>o!==e&&o.alive&&o.type==="charger"&&o.phase==="charge")
+    });
+   }
+   const intent=e.mindIntent||{x:0,y:0,speed:0};
+   const vx=b.velocity.x,vy=b.velocity.y,desiredX=intent.x*intent.speed,desiredY=intent.y*intent.speed;
+   const turn=.00028*b.mass;
+   Body.applyForce(b,pos,{
+    x:clamp(desiredX-vx,-5,5)*turn,
+    y:clamp(desiredY-vy,-5,5)*turn
+   });
+   if(intent.attack&&e.mind.lastNipAt!==e.mind.defendAt){
+    e.mind.lastNipAt=e.mind.defendAt;
+    if(Math.hypot(pos.x-s.player.x,pos.y-s.player.y)<e.r+32)
+     hitPlayer(s,4,pos.x,pos.y,"frightened mossling");
+   }
+   continue;
+  }
   const dx=s.player.x-pos.x,dy=s.player.y-pos.y;
   const d=Math.max(1,Math.hypot(dx,dy));
   if(e.type==="charger"){
@@ -711,7 +757,25 @@ function paint(s,g,time){
   if(!e.alive)continue;
   const p=e.body.position,x=p.x,y=p.y;
   g.fillStyle(0x030a11,.5);g.fillEllipse(x,y+e.r*.7,e.r*2.1,e.r*.72);
-  if(e.type==="charger"){
+  if(e.type==="mossling"){
+   const state=e.mind?.state||'graze',alarmed=['flee','defend','alert'].includes(state);
+   const twitch=Math.sin(time*.009+e.id)*2;
+   g.fillStyle(0x314c34,.35);g.fillEllipse(x,y+13,e.r*2.2,9);
+   g.fillStyle(alarmed?0x80aa63:0x628963,.97);g.fillEllipse(x,y+twitch,34,26);
+   g.fillStyle(0x446b48,.95);g.fillCircle(x-12,y-8+twitch,8);g.fillCircle(x+9,y-10+twitch,7);
+   g.fillStyle(0xb8d392,.92);g.fillEllipse(x,y-3+twitch,19,12);
+   const flip=(e.mindIntent?.x||1)<0?-1:1;
+   g.fillStyle(0x122720,.95);g.fillCircle(x+flip*4,y-5+twitch,2.5);
+   g.fillCircle(x+flip*12,y-5+twitch,2.5);
+   g.fillStyle(alarmed?0xffc77f:0x9acaba,.9);
+   g.fillCircle(x+flip*6,y+4+twitch,2);
+   // State text makes testable intentions legible to the player.
+   const label={graze:'GRAZE',investigate:'CURIOUS',alert:'WARY',flee:'FLEE',defend:'DEFEND'}[state]||'GRAZE';
+   g.fillStyle(0x0b1c19,.78);g.fillRoundedRect(x-31,y-42,62,14,4);
+   g.lineStyle(.8,alarmed?0xe5b27d:0x82cda0,.55);g.strokeRoundedRect(x-31,y-42,62,14,4);
+   // Small text via existing scene canvas API when available; otherwise color badge.
+   if(g.scene?.add){} // label is also exposed in snapshot/debug state
+  }else if(e.type==="charger"){
    const warning=e.phase==="windup";
    if(warning){
     g.lineStyle(3,0xff9a61,.7);g.lineBetween(x,y,x+e.face.x*120,y+e.face.y*120);
@@ -738,7 +802,7 @@ function paint(s,g,time){
    g.fillStyle(0xffba47,.66);g.fillTriangle(x-8,y-e.r+4,x,y-e.r-17,x+7,y-e.r+4);
    g.fillStyle(0xffed88,.85);g.fillCircle(x,y-e.r-1,3);
   }
-  const w=e.type==="charger"?52:39;
+  const w=e.type==="charger"?52:e.type==="mossling"?34:39;
   g.fillStyle(0x0a1c26,.92);g.fillRoundedRect(x-w/2,y-e.r-15,w,5,2);
   g.fillStyle(e.burn?0xffa267:0x8fe7d8);g.fillRoundedRect(x-w/2,y-e.r-15,w*(e.hp/e.maxHP),5,2);
   if(time-e.hitAt<140){
@@ -746,5 +810,5 @@ function paint(s,g,time){
   }
  }
 }
-window.WRKMAN_COMBAT={reset,heads,toggleRelic,hitEnemy,hitPlayer,flame,blast,collision,bodyCollision,environmentCollision,environmentProjectile,resolvePlayerEnvironment,damagePillar,step,paint,spawn};
+window.WRKMAN_COMBAT={reset,heads,toggleRelic,hitEnemy,hitPlayer,stimulus,flame,blast,collision,bodyCollision,environmentCollision,environmentProjectile,resolvePlayerEnvironment,damagePillar,step,paint,spawn};
 })();
