@@ -54,13 +54,14 @@ function reset(s,layout=null){
  if(layout){
   // Sector zero is a genuinely safe sanctuary (zero enemy spawns).
   for(const e of layout.enemies||[])spawn(s,e.type,e.x,e.y);
-  // A neutral resident belongs to the habitat, not the combat wave.
-  // Arrival sanctuary keeps its original zero-hostiles and zero-residents.
-  if(layout.index!==0&&Mind){
-   const spot=(layout.pads||[]).find(p=>
-    Math.hypot(p.x-s.player.x,p.y-s.player.y)>250&&
+  // Neutral residents belong to the habitat, not the combat wave.
+  // Sanctuary retains zero hostiles, but gets a peaceful creature to study.
+  if(Mind){
+   const pads=(layout.pads||[]).filter(p=>
+    Math.hypot(p.x-s.player.x,p.y-s.player.y)>185&&
     (layout.enemies||[]).every(e=>Math.hypot(p.x-e.x,p.y-e.y)>135));
-   const x=spot?.x??s.player.x+385,y=spot?.y??s.player.y+190;
+   pads.sort((a,b)=>Math.hypot(a.x-s.player.x,a.y-s.player.y)-Math.hypot(b.x-s.player.x,b.y-s.player.y));
+   const spot=pads[0],x=spot?.x??s.player.x+310,y=spot?.y??s.player.y+130;
    spawn(s,'mossling',x,y);
   }
   for(const p of layout.pillar||[])pillar(s,p.x,p.y);
@@ -397,6 +398,7 @@ function blast(s,x,y,options={}){
  const chainId=options.chainId||(++chainCounter);
  const chain=Boolean(options.chain);
  const c=s.combat;
+ stimulus(s,x,y,'blast',clamp(energy/75,.3,1.75));
  // Blast visuals are independent of damage, so even weak descendant bursts
  // remain legible without inflating their actual damage or chain range.
  c.blastFX.push({x,y,born:now(s),life:530,energy,chain});
