@@ -395,6 +395,7 @@ function queueBurnDetonation(s,e,burn){
 }
 function hitEnemy(s,e,amount,kind){
  if(!e?.alive||!Number.isFinite(amount)||amount<=0)return false;
+ if(e.type==="glassrunner"&&e.glass&&Glass)Glass.hit(e.glass,now(s));
  if(e.type==="mossling"&&e.mind&&Mind){
   Mind.injured(e.mind,e.body.position,s.player,now(s));
  }
@@ -704,7 +705,14 @@ function step(s,time,delta){
   if(!e.alive)continue;
   // Stagger suspends intent, not physics: sliding bodies continue to move
   // under their actual velocity, gravity and impacts.
-  if(time<e.staggerUntil)continue;
+  if(time<e.staggerUntil){
+   if(e.type==="glassrunner"&&e.glass&&Glass){
+    Glass.stagger(e.glass,time,e.staggerUntil);
+    e.mindIntent={state:'stagger',x:0,y:0,speed:0,launch:false};
+    Body.setVelocity(b,{x:b.velocity.x*.82,y:b.velocity.y*.82});
+   }
+   continue;
+  }
   if(e.type==="glassrunner"&&e.glass&&Glass){
    if(time>=e.mindAt){
     e.mindAt=time+95;
