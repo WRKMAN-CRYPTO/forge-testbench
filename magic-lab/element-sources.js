@@ -44,6 +44,7 @@
   const cell=starts[Math.min(starts.length-1,Math.floor(random()*starts.length))];
   const agent=Motion.spawn(values,[cell.index],random,home);
   agent.element=cell.element;
+  agent.sourceIndex=cell.index;
   return agent;
  }
  return Object.freeze({VERSION:'049',N,TOTAL,TYPES,byId,normalize,startingCells,spawn});
