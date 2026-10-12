@@ -18,7 +18,18 @@
    dodge:{x:0,y:0},launchPending:false,threat:null,observedAt:-1,
    lastDodge:-1e6,injuredAt:-1e6,decisions:0};
  }
- function hit(m,time){m.injuredAt=time}
+ function hit(m,time){
+  if(time-m.injuredAt>400)m.strafe*=-1;
+  m.injuredAt=time;
+ }
+ function stagger(m,time,until){
+  // Frost and kinetic stun can interrupt a poised jump. No stored
+  // invincible dodge fires the instant the stun wears off.
+  m.windupUntil=0;m.evadeUntil=0;m.launchPending=false;
+  m.recoverUntil=Math.max(m.recoverUntil,until+410);
+  m.nextDodge=Math.max(m.nextDodge,until+250);
+  m.state='stagger';m.threat=null;
+ }
  function predictThreat(pos,velocity,radius,shot,now){
   if(!shot||!Number.isFinite(shot.x)||!Number.isFinite(shot.y))return null;
   const dx=shot.x-pos.x,dy=shot.y-pos.y,range=hyp(dx,dy);
@@ -120,5 +131,5 @@
   if(incoming)return intent(m,'alert',move.x/norm,move.y/norm,2.6);
   return intent(m,'prowl',move.x/norm,move.y/norm,2.2);
  }
- return Object.freeze({VERSION:'051',STATES,make,hit,predictThreat,findThreats,dodgeDirection,decide});
+ return Object.freeze({VERSION:'051',STATES,make,hit,stagger,predictThreat,findThreats,dodgeDirection,decide});
 });
