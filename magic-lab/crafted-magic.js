@@ -1,4 +1,4 @@
-/* WRKMAN Arcane Lab 039 / Solid World Impacts
+/* WRKMAN Arcane Lab 042 / 5.5-second agent lifespans
  * Exactly the same 32x32 field physics as Agent Field. Casting transforms
  * coordinates into world space; it never steers individual agent velocities.
  * Game damage, durations, rendering budgets, and linked events are separate.
@@ -17,7 +17,7 @@
  const N=32,MASK=-1,TAU=Math.PI*2,SAVE_KEY='wrkman-arcane-lab034-crafted-field-v1',SOURCE_KEY='wrkman-agent-field-v1';
  const palettes={arcane:[[92,139,244],[176,121,250],[223,193,255]],flame:[[208,65,39],[253,126,49],[255,213,105]],healing:[[66,184,144],[144,231,119],[240,235,149]],void:[[100,67,157],[179,72,199],[255,134,202]]};
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t;
- const DEFAULT_DRAW=1200,MAX_DRAW=6000;
+ const DEFAULT_DRAW=1200,MAX_DRAW=6000,AGENT_MAX_AGE_MS=5500;
  function starter(){
   const values=[];for(let y=0;y<N;y++)for(let x=0;x<N;x++){
    const r=Math.hypot(x-15.5,y-15.5);
@@ -59,6 +59,20 @@
   }
   return {x:center.x+(x-.5)*st.scale,y:center.y+(y-.5)*st.scale};
  }
+ // The shared Agent Field physics is unchanged. Lifespan is a game rule,
+ // measured in scene time for EACH agent, independent of frame rate and of
+ // the original Motion.stepAgent age counter (which caps simulation dt).
+ function expireAgents(st,now){
+  const agents=st.agents;let alive=0;
+  for(let i=0;i<agents.length;i++){
+   const agent=agents[i];
+   if(now-(agent.bornAt??st.born)<AGENT_MAX_AGE_MS)agents[alive++]=agent;
+  }
+  const removed=agents.length-alive;
+  agents.length=alive;
+  st.agedOut=(st.agedOut||0)+removed;
+  return removed;
+ }
  function start(scene,recipe,healLinked=true,target=null){
   const cfg=normalize(recipe),starts=Motion.startingCells(cfg.values);
   const existing=(scene.craftedShots||[]).reduce((n,cast)=>n+cast.agents.length,0)+
@@ -77,14 +91,18 @@
    {x:p.x+forward.x*30,y:p.y+forward.y*30};
   const duration=delivery==='world'?22000:delivery==='aura'?14000:9000;
   const st={recipe:cfg,starts,agents:[],born:now,expires:now+duration,nextHeal:now+3000,
-   healLinked:!!healLinked,healFX:[],impactFX:[],pulses:0,collisions:0,consumed:0,targetPrev:new Map(),
+   healLinked:!!healLinked,healFX:[],impactFX:[],pulses:0,collisions:0,consumed:0,agedOut:0,targetPrev:new Map(),
    delivery,center,forward,right,scale:delivery==='placed'?260:290,
    worldW:360,worldH:500,motionTime:0,free:0,offscreen:0,spawnX:.5,spawnY:.5,
    rendered:0,frames:0};
   const origin=spawnCenter(st);st.spawnX=origin.x;st.spawnY=origin.y;
   // Full requested population. There are no phantom agents replaced at
   // the draw budget. Every agent runs the original simulator each update.
-  for(let i=0;i<cfg.settings.population;i++)st.agents.push(makeAgent(st,i));
+  for(let i=0;i<cfg.settings.population;i++){
+   const agent=makeAgent(st,i);
+   agent.bornAt=now;
+   st.agents.push(agent);
+  }
   if(delivery==='world'){if(!scene.craftedShots)scene.craftedShots=[];scene.craftedShots.push(st)}
   else scene.craftedAura=st;
   return true;
@@ -92,6 +110,10 @@
  function stop(scene,onlyAura=false){scene.craftedAura=null;if(!onlyAura)scene.craftedShots=[]}
  function stepOne(scene,st,time,delta,Combat){
   if(time>=st.expires){st.expired=true;return}
+  // Age out individual agents BEFORE advancing motion or checking hits.
+  // Zero-agent casts expire immediately, freeing spell slots and the 6k cap.
+  expireAgents(st,time);
+  if(st.agents.length===0){st.expired=true;return}
   const cfg=st.recipe.settings,dtSeconds=clamp(delta,0,50)/1000;
   st.motionTime+=dtSeconds;st.frames++;
   const previousCenter={...st.center};
@@ -115,6 +137,7 @@
   }
   st.healFX=st.healFX.filter(p=>time-p.born<600);
   Impacts.process(scene,st,time,Combat,previousCenter);
+  if(st.agents.length===0)st.expired=true;
  }
  function step(scene,time,delta,Combat){
   if(scene.craftedAura){stepOne(scene,scene.craftedAura,time,delta,Combat);
@@ -198,11 +221,11 @@
    rendered:active.reduce((n,c)=>n+c.rendered,0),
    renderBudget:active.reduce((n,c)=>n+c.recipe.settings.renderLimit,0),
    healLinked:active.some(c=>c.healLinked),pulses:active.reduce((n,c)=>n+c.pulses,0),
-   collisions:active.reduce((n,c)=>n+c.collisions,0),consumed:active.reduce((n,c)=>n+c.consumed,0),free:active.reduce((n,c)=>n+c.free,0),
+   collisions:active.reduce((n,c)=>n+c.collisions,0),consumed:active.reduce((n,c)=>n+c.consumed,0),agedOut:active.reduce((n,c)=>n+c.agedOut,0),free:active.reduce((n,c)=>n+c.free,0),
    offscreen:active.reduce((n,c)=>n+c.offscreen,0),physics:Motion.VERSION,
    spawn:{x:s.spawnX,y:s.spawnY},direction:{...s.forward}
   };
  };
  return Object.freeze({SAVE_KEY,SOURCE_KEY,starter,normalize,read,fromForge,save,sample,
-  spawnCenter,worldPosition,start,stop,step,draw,snapshot});
+  spawnCenter,worldPosition,AGENT_MAX_AGE_MS,expireAgents,start,stop,step,draw,snapshot});
 });
