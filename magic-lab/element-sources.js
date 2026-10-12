@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 048 / elemental source pixels
+/* WRKMAN ARCANE LAB 049 / authoritative source-pixel spawning
  * Independent 32x32 birth layer. Grayscale still exclusively controls movement.
  * Each marked pixel is a spawn choice; the agent keeps its birth element.
  * No DOM, Phaser, hidden damage or randomness outside the supplied RNG.
@@ -15,7 +15,8 @@
   Object.freeze({id:1,key:'fire',name:'FIRE',color:'#ff6b32',rgb:0xff6b32}),
   Object.freeze({id:2,key:'water',name:'WATER',color:'#44c9ed',rgb:0x44c9ed}),
   Object.freeze({id:3,key:'frost',name:'FROST',color:'#a7d8ff',rgb:0xa7d8ff}),
-  Object.freeze({id:4,key:'lightning',name:'LIGHTNING',color:'#ffe65a',rgb:0xffe65a})
+  Object.freeze({id:4,key:'lightning',name:'LIGHTNING',color:'#ffe65a',rgb:0xffe65a}),
+  Object.freeze({id:5,key:'neutral-source',name:'NEUTRAL SOURCE',color:'#e5e6cd',rgb:0xe5e6cd})
  ]);
  const byId=id=>TYPES[id]||TYPES[0];
  function normalize(sources){
@@ -27,15 +28,16 @@
   });
  }
  function startingCells(values,sources,Motion){
-  const base=Motion.startingCells(values),used=new Set(base),out=base.map(index=>({index,element:0}));
+  // A painted emitter layer is authoritative: movement's white/gray cells
+  // remain physics instructions, NOT silent extra neutral births.
+  // Without any explicit emitters, preserve legacy grayscale spawning.
+  const painted=[];
   for(let index=0;index<TOTAL;index++){
-   const element=sources[index];
-   if(element===0)continue;
-   if(used.has(index)){
-    const v=out.find(v=>v.index===index);v.element=element;
-   }else out.push({index,element});
+   const source=sources[index];
+   if(source!==0)painted.push({index,element:source===5?0:source});
   }
-  return out;
+  if(painted.length)return painted;
+  return Motion.startingCells(values).map(index=>({index,element:0}));
  }
  function spawn(values,starts,Motion,random=Math.random,home=0){
   if(!starts?.length){const agent=Motion.spawn(values,[],random,home);agent.element=0;return agent}
@@ -44,5 +46,5 @@
   agent.element=cell.element;
   return agent;
  }
- return Object.freeze({VERSION:'048',N,TOTAL,TYPES,byId,normalize,startingCells,spawn});
+ return Object.freeze({VERSION:'049',N,TOTAL,TYPES,byId,normalize,startingCells,spawn});
 });
