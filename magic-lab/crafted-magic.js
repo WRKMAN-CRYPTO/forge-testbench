@@ -175,7 +175,8 @@
   st.motionTime+=dtSeconds;st.frames++;
   const previousCenter={...st.center};
   if(st.delivery==='aura'){st.center.x=scene.player.x;st.center.y=scene.player.y}
-  for(const agent of st.agents){agent.prevX=agent.x;agent.prevY=agent.y}
+  for(const agent of st.agents){agent.prevX=agent.x;agent.prevY=agent.y;
+    agent.beforeVx=agent.vx;agent.beforeVy=agent.vy}
   const stats=Motion.stepSwarm(st.agents,st.recipe.values,cfg,dtSeconds,st.worldW,st.worldH,st.motionTime);
   Runes.advance(st,scene,time,dtSeconds);
   st.free=stats.free;st.offscreen=stats.offscreen;
