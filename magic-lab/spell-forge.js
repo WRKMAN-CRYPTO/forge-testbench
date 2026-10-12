@@ -217,6 +217,7 @@
   }
   $('sfReseed').addEventListener('click',()=>{resetParticles();status('Fresh agents seeded. Preview runs for your chosen lifespan, then fades and stops.')});
   $('sfPreviewCount').addEventListener('change',e=>{previewPopulation=Number(e.target.value)||600;resetParticles();status('Preview: '+previewPopulation+' independently simulated agents. No recycling.')});
+   $('sfLifespan').addEventListener('change',()=>{resetParticles();status('Preview replaying with '+Number(draft.settings.lifespan).toFixed(1)+'s of active life, then an 0.8s fade.')});
   $('sfTools').addEventListener('click',e=>{const b=e.target.closest('button[data-brush]');if(!b)return;brush=b.dataset.brush;for(const n of $('sfTools').querySelectorAll('button'))n.classList.toggle('active',n===b)});
   $('sfGray').addEventListener('input',e=>{gray=Number(e.target.value);$('sfGrayVal').textContent=gray});
   $('sfRadius').addEventListener('input',e=>{brushRadius=Number(e.target.value);$('sfRadiusVal').textContent=brushRadius});
