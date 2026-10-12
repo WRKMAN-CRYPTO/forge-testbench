@@ -1,4 +1,4 @@
-/* WRKMAN Forge 040 / precise cell painting UI. No spell-physics coupling. */
+/* WRKMAN Forge 050 / precise cell painting UI. No spell-physics coupling. */
 (function(root,factory){
  'use strict';const api=factory();
  if(typeof module==='object'&&module.exports)module.exports=api;
@@ -10,7 +10,7 @@
  function install(opts){
   if(!Viewport)throw Error('Field viewport 040 missing');
   const {map,overview,root,values,stamp,line,value,brush,checkpoint,undo,mark,status,
-   sources,sourceColor,sourceName,capture,restore}=opts;
+   sources,sourceColor,sourceName,runes,runeColor,runeName,runeSymbol,capture,restore}=opts;
   const view=Viewport.create(),mc=map.getContext('2d'),oc=overview.getContext('2d');
   const $=id=>root.querySelector('#'+id);
   let panMode=false,selected={x:16,y:16},gesture=null,strokeBefore=null,strokeChanged=false;
@@ -18,8 +18,10 @@
   function current(){
    const v=values()[selected.y*N+selected.x];
    const element=sources?.()[selected.y*N+selected.x]||0;
+   const rune=runes?.()[selected.y*N+selected.x]||0;
     const tone=v<0?'MAGENTA / FREE':v===0?'BLACK / SINK':v===255?'WHITE / SOURCE':'GRAY '+v;
-    return element?'ELEMENT '+(sourceName?.(element)||element)+' · '+tone:tone;
+    return (rune?'RUNE '+(runeName?.(rune)||rune)+' · ':'')+
+    (element?'ELEMENT '+(sourceName?.(element)||element)+' · ':'')+tone;
   }
   function overviewDraw(){
    const w=overview.width/N;oc.clearRect(0,0,overview.width,overview.height);
@@ -28,6 +30,8 @@
     oc.fillRect(x*w,y*w,w+.15,w+.15);
     const element=sources?.()[y*N+x]||0;
     if(element&&sourceColor){oc.fillStyle=sourceColor(element);oc.fillRect(x*w,y*w,w+.15,w+.15)}
+    const rune=runes?.()[y*N+x]||0;
+    if(rune){oc.fillStyle=runeColor?.(rune)||'#ffffff';oc.fillRect(x*w+.65,y*w+.65,Math.max(.8,w-1.3),Math.max(.8,w-1.3))}
    }
    const z=view.view,c=N/z.zoom;
    oc.strokeStyle='#64ffd0';oc.lineWidth=1.7;
@@ -47,6 +51,21 @@
     mc.fillRect((x-z.x)*side,(y-z.y)*side,side+.15,side+.15);
      const element=sources?.()[y*N+x]||0;
      if(element&&sourceColor){mc.fillStyle=sourceColor(element);mc.fillRect((x-z.x)*side,(y-z.y)*side,side+.15,side+.15)}
+     const rune=runes?.()[y*N+x]||0;
+     if(rune){
+      const px=(x-z.x)*side,py=(y-z.y)*side;
+      mc.lineWidth=side>15?Math.max(2,side*.07):1.3;
+      mc.strokeStyle='#07121c';mc.strokeRect(px+1,py+1,Math.max(1,side-2),Math.max(1,side-2));
+      mc.fillStyle=runeColor?.(rune)||'#fff';
+      if(side>=9){
+       mc.font='bold '+Math.max(8,Math.min(22,side*.66))+'px ui-monospace,monospace';
+       mc.textAlign='center';mc.textBaseline='middle';
+       mc.strokeStyle='#06111a';mc.lineWidth=Math.max(2,side*.13);
+       const sym=runeSymbol?.(rune)||'◆';
+       mc.strokeText(sym,px+side/2,py+side/2);
+       mc.fillText(sym,px+side/2,py+side/2);
+      }else mc.fillRect(px+side*.3,py+side*.3,side*.4,side*.4);
+     }
    }
    mc.strokeStyle=z.zoom>=4?'#162e3dac':'#1723294b';mc.lineWidth=z.zoom>=4?1:.5;
    mc.beginPath();
