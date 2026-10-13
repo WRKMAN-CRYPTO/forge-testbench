@@ -71,11 +71,11 @@
   let maxRisk=0,close=Infinity,blocked=false;
   // 30 simulation ticks = 0.5s of travel. A second ply can arrive at
   // roughly 45 ticks when delayed gambits are employed.
-  for(let t=4;t<=76;t+=4){
+  for(let t=5;t<=125;t+=5){
    const p=estimate(ob,path,t,b);
    if(nearTerrain(p,ob)){blocked=true;break;}
    for(const s of shots){
-    const age=t-s.t0;if(age<0||age>35)continue;
+    const age=t-s.t0;if(age<0||age>100)continue;
     const q={x:s.x+s.vx*age,y:s.y+s.vy*age};
     const d=distance(p,q);
     if(d<close)close=d;
