@@ -408,7 +408,8 @@
  }
  function planDirections(m,plan,origin,player){
   const latest=m.lastPlayer||{vx:0,vy:0};
-  const lead=plan.lead?clamp(Math.hypot(latest.vx,latest.vy)*.34,0,90):0;
+  const lead=plan.stage==="opening"||plan.stage==="followup"?0:
+   plan.lead?clamp(Math.hypot(latest.vx,latest.vy)*.34,0,90):0;
   const theta=Math.atan2(player.y-origin.y+Math.sign(latest.vy)*lead,player.x-origin.x+Math.sign(latest.vx)*lead)+(plan.angleBias||0);
   const angles=[];
   for(let i=0;i<plan.count;i++){
