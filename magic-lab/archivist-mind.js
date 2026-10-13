@@ -38,7 +38,7 @@
   const prior=read(storage);
   return {prior,storage,started:time,nextThink:time,until:0,attackAt:time+2200,
    state:"observe",intent:{x:0,y:0,speed:0},held:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0]},
-   learned:0,observedAt:time,attacks:0,successes:0,experiments:[],lastPlan:null,
+   learned:0,observedAt:time,pressure:{x:0,y:0,count:0},attacks:0,successes:0,experiments:[],lastPlan:null,
    leaveSaved:false,quoteAt:0,quote:"I have not seen your methods.",lastHp:1,
    seed:(0x9e3779b9^Math.imul(prior.encounters+1,0x85ebca6b))>>>0};
  }
@@ -70,8 +70,8 @@
   m.lastPlayer={x:player.x,y:player.y,vx:previous?(player.x-previous.x)/dt:0,
     vy:previous?(player.y-previous.y)/dt:0};
   // Look only at nearby observed agents, sample no more than 48 per frame.
-  if(!d||d>RANGE+240)return;
-  let budget=48;
+  if(!d||d>RANGE+240){m.pressure={x:0,y:0,count:0};return;}
+  let budget=48,px=0,py=0,nearby=0;
   for(const cast of casts){
    if(budget<=0)break;
    const agents=cast?.agents||[];
@@ -87,7 +87,12 @@
      x=cast.center.x+dx*cast.right.x+dy*cast.forward.x;
      y=cast.center.y+dx*cast.right.y+dy*cast.forward.y;
     }else{x=cast.center.x+(a.x-.5)*cast.scale;y=cast.center.y+(a.y-.5)*cast.scale;}
-    if(Math.hypot(x-pos.x,y-pos.y)>390)continue;
+    const dist=Math.hypot(x-pos.x,y-pos.y);
+    if(dist>390)continue;
+    if(dist<205&&dist>1){
+     const weight=clamp((205-dist)/160,.12,1);
+     px+=(pos.x-x)/dist*weight;py+=(pos.y-y)/dist*weight;nearby++;
+    }
     const element=observedElement(a);
     m.seen.element[element]+=.07;m.learned+=.07;
    }
@@ -101,6 +106,7 @@
    }
   }
   m.learned=clamp(m.learned,0,1000);
+  m.pressure={x:px,y:py,count:nearby};
  }
  function weight(m,elem,motif,lead,feint){
   const preferred=m.seen.element.map((x,i)=>x+m.prior.element[i]);
@@ -148,6 +154,20 @@
   const speed=health<.22?2.25:2.6;
   m.intent={x:normal.x*approach-normal.y*.65*sidestep,
     y:normal.y*approach+normal.x*.65*sidestep,speed};
+  const hazard=m.pressure||{x:0,y:0,count:0};
+  const hz=Math.hypot(hazard.x,hazard.y);
+  // Actual visible clusters can interrupt an experiment. Never read rune
+  // overlays, invisible agent positions or future player controls.
+  const danger=hazard.count>=2&&hz>.45;
+  if(danger){
+   const bx=hazard.x/hz,by=hazard.y/hz;
+   m.intent={x:bx-normal.y*.24*sidestep,
+     y:by+normal.x*.24*sidestep,speed:3.8};
+   if(m.held&&hz>2.2){
+    m.held=null;m.attackAt=time+680;
+    m.state="evade";return {move:m.intent};
+   }
+  }
   if(m.held){
    m.state=m.held.feint?"mislead":"inscribe";
    if(time>=m.until){
@@ -167,7 +187,7 @@
    m.quote=plan.feint?"Observe the obvious answer.":"An unfamiliar arrangement...";
    return {move:{x:0,y:0,speed:0},tell:plan};
   }
-  m.state=d>450?"study":"observe";
+  m.state=danger?"evade-swarm":d>450?"study":"observe";
   return {move:m.intent};
  }
  function onDamage(m,damage,time){
