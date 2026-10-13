@@ -6,6 +6,7 @@ const Body=Phaser.Physics.Matter.Matter.Body;
 const Mind=window.WRKMAN_CREATURE_MIND||null;
 const Territory=window.WRKMAN_TERRITORY_MIND||null;
 const Glass=window.WRKMAN_GLASSRUNNER_MIND||null;
+const Archive=window.WRKMAN_ARCHIVIST_COMBAT||null;
 // Rune engine is loaded after combat; look it up at sensor time.
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -16,27 +17,28 @@ const MAX_DEBRIS=36,DEBRIS_LIFE=18000,PILLAR_HEALTH=82;
 let chainCounter=0,enemyCounter=0,pillarCounter=0;
 const now=s=>s.time.now;
 function spawn(s,type,x,y){
- const heavy=type==="charger",resident=type==="mossling",guardian=type==="gravelhorn",runner=type==="glassrunner";
- const r=guardian?38:heavy?26:resident?16:runner?19:18;
+ const heavy=type==="charger",resident=type==="mossling",guardian=type==="gravelhorn",runner=type==="glassrunner",archivist=type==="archivist";
+ const r=archivist?32:guardian?38:heavy?26:resident?16:runner?19:18;
  const body=s.matter.add.circle(x,y,r,{
-  frictionAir:guardian?.064:heavy?.075:resident?.16:runner?.078:.09,
-  restitution:guardian?.22:heavy?.4:resident?.35:runner?.37:.68,
-  density:guardian?.023:heavy?.016:resident?.0019:runner?.0032:.002,slop:.02
+  frictionAir:archivist?.065:guardian?.064:heavy?.075:resident?.16:runner?.078:.09,
+  restitution:archivist?.36:guardian?.22:heavy?.4:resident?.35:runner?.37:.68,
+  density:archivist?.012:guardian?.023:heavy?.016:resident?.0019:runner?.0032:.002,slop:.02
  });
  const enemy={
   id:++enemyCounter,body,r,type,alive:true,
-  hp:guardian?370:heavy?165:resident?90:runner?125:80,
-  maxHP:guardian?370:heavy?165:resident?90:runner?125:80,
+  hp:archivist?1650:guardian?370:heavy?165:resident?90:runner?125:80,
+  maxHP:archivist?1650:guardian?370:heavy?165:resident?90:runner?125:80,
   phase:"stalk",until:0,nextAttack:now(s)+1000+Math.random()*800,
   face:{x:-1,y:0},burn:null,hitAt:0,staggerUntil:0,
   orbit:Math.random()<.5?-1:1,
   mind:resident&&Mind?Mind.make(enemyCounter,x,y,now(s)):null,
   territory:guardian&&Territory?Territory.make(enemyCounter,x,y,now(s)):null,
   glass:runner&&Glass?Glass.make(enemyCounter,x,y,now(s)):null,
+  archivist:archivist&&Archive?Archive.initialize(null,now(s)):null,
   mindAt:0,mindIntent:null
  };
- if((resident||guardian||runner)&&s.add?.text){
-  enemy.moodText=s.add.text(x,y-40,guardian?"PATROL":runner?"PROWL":"GRAZE",{
+ if((resident||guardian||runner||archivist)&&s.add?.text){
+  enemy.moodText=s.add.text(x,y-40,archivist?"OBSERVING":guardian?"PATROL":runner?"PROWL":"GRAZE",{
    fontFamily:"monospace",fontSize:"10px",color:"#b4e9c0",
    backgroundColor:"#12251ddd",padding:{x:3,y:2}
   }).setOrigin(.5,.5).setDepth(6);
@@ -49,7 +51,10 @@ function spawn(s,type,x,y){
 }
 function reset(s,layout=null){
  // Release the old resident label on arena travel or reset.
- for(const e of s.combat?.enemies||[])e.moodText?.destroy();
+ for(const e of s.combat?.enemies||[]){
+  if(e.type==="archivist"&&e.alive&&Archive)Archive.retreat(e);
+  e.moodText?.destroy();
+ }
  // Reset is invoked only after old Matter bodies are removed by Lab.resetLab.
  // Region layouts are generated from a versioned glyph seed. The original
  // 032 lab without a layout is unchanged, including all starting enemies.
@@ -63,7 +68,7 @@ function reset(s,layout=null){
   for(const e of layout.enemies||[])spawn(s,e.type,e.x,e.y);
   // Neutral residents belong to the habitat, not the combat wave.
   // Sanctuary retains zero hostiles, but gets a peaceful creature to study.
-  if(Mind){
+  if(Mind&&!layout.archivist){
    const pads=(layout.pads||[]).filter(p=>
     Math.hypot(p.x-s.player.x,p.y-s.player.y)>185&&
     (layout.enemies||[]).every(e=>Math.hypot(p.x-e.x,p.y-e.y)>135));
@@ -72,7 +77,7 @@ function reset(s,layout=null){
    spawn(s,'mossling',x,y);
   }
   // A single territorial beast per hostile arena, away from gate and foes.
-  if(layout.index!==0&&Territory){
+  if(layout.index!==0&&!layout.archivist&&Territory){
    const spots=(layout.pads||[]).filter(p=>
     Math.hypot(p.x-s.player.x,p.y-s.player.y)>350&&
     (layout.enemies||[]).every(e=>Math.hypot(p.x-e.x,p.y-e.y)>155));
@@ -82,7 +87,7 @@ function reset(s,layout=null){
    spawn(s,'gravelhorn',chosen?.x??s.player.x+520,chosen?.y??s.player.y-145);
   }
   // Test one Glassrunner per hostile region. Sanctuary stays peaceful.
-  if(layout.index!==0&&Glass){
+  if(layout.index!==0&&!layout.archivist&&Glass){
    const choices=(layout.pads||[]).filter(p=>
     Math.hypot(p.x-s.player.x,p.y-s.player.y)>225&&
     Math.hypot(p.x-s.player.x,p.y-s.player.y)<670&&
@@ -406,16 +411,21 @@ function hitEnemy(s,e,amount,kind){
   if(kind==='crafted-field')amount*=e.territory.state==='windup'?.46:.73;
  }
  e.hp=Math.max(0,e.hp-amount);
+ if(e.archivist&&Archive)Archive.damaged(e,amount,now(s));
  e.hitAt=now(s);
  if(e.hp>0)return false;
  e.alive=false;
+ if(e.archivist&&Archive){
+  Archive.defeated(e);
+  s.announceCombat("THE ARCHIVIST • Defeat was informative. I will remember fragments.");
+ }
  e.moodText?.destroy();
  if(e.type!=="mossling")s.combat.kills++;
  queueBurnDetonation(s,e,e.burn);
  e.burn=null;
  s.removal.push(e.body);
  s.burst(e.body.position.x,e.body.position.y,e.type==="charger"?0xffaa77:0x8aefff,20,6);
- if(e.type!=="mossling"&&s.combat.enemies.every(x=>!x.alive||x.type==="mossling"))s.announceCombat("HOSTILES CLEARED • Peaceful creatures still live here.");
+ if(e.type!=="archivist"&&e.type!=="mossling"&&s.combat.enemies.every(x=>!x.alive||x.type==="mossling"))s.announceCombat("HOSTILES CLEARED • Peaceful creatures still live here.");
  heads(s);
  return true;
 }
@@ -714,6 +724,10 @@ function step(s,time,delta){
    }
    continue;
   }
+  if(e.type==="archivist"&&Archive&&e.archivist){
+   Archive.step(s,e,time,delta,Body,hitPlayer);
+   continue;
+  }
   if(e.type==="glassrunner"&&e.glass&&Glass){
    if(time>=e.mindAt){
     e.mindAt=time+95;
@@ -856,8 +870,13 @@ function step(s,time,delta){
   if(!b?.labAlive||b.gameTag!=="ember")continue;
   if(distance(b.position,s.player)<24){
    b.labAlive=false;s.removal.push(b);
-   hitPlayer(s,12,b.position.x,b.position.y,"ember bolt");
-   s.burst(b.position.x,b.position.y,0xff9258,11,4);
+   const archive=b.archive,canHit=time>=c.invulnUntil&&time>=s.dashUntil;
+   hitPlayer(s,archive?.damage||12,b.position.x,b.position.y,archive?"archivist "+archive.element:"ember bolt");
+   if(archive&&canHit&&Archive){
+    Archive.projectileHit(s,b);
+    if(archive.element==="frost")c.playerStaggerUntil=Math.max(c.playerStaggerUntil,time+260);
+   }
+   s.burst(b.position.x,b.position.y,archive?.color||0xff9258,11,4);
   }
  }
  // Burning enemies become delayed blast sources; queue capped so a crowd
@@ -923,7 +942,9 @@ function paint(s,g,time){
   if(!e.alive)continue;
   const p=e.body.position,x=p.x,y=p.y;
   g.fillStyle(0x030a11,.5);g.fillEllipse(x,y+e.r*.7,e.r*2.1,e.r*.72);
-  if(e.type==="mossling"){
+  if(e.type==="archivist"&&Archive){
+   Archive.paint(s,e,g,time);
+  }else if(e.type==="mossling"){
    const state=e.mind?.state||'graze',alarmed=['flee','defend','alert'].includes(state);
    const twitch=Math.sin(time*.009+e.id)*2;
    g.fillStyle(0x314c34,.35);g.fillEllipse(x,y+13,e.r*2.2,9);
@@ -1079,7 +1100,7 @@ function paint(s,g,time){
   }
   // A peaceful resident doesn't wear an enemy health bar until wounded.
   if(e.type!=="mossling"||e.hp<e.maxHP){
-   const w=e.type==="gravelhorn"?84:e.type==="charger"?52:e.type==="glassrunner"?48:e.type==="mossling"?34:39;
+   const w=e.type==="archivist"?126:e.type==="gravelhorn"?84:e.type==="charger"?52:e.type==="glassrunner"?48:e.type==="mossling"?34:39;
    g.fillStyle(0x0a1c26,.92);g.fillRoundedRect(x-w/2,y-e.r-15,w,5,2);
    g.fillStyle(e.burn?0xffa267:0x8fe7d8);g.fillRoundedRect(x-w/2,y-e.r-15,w*(e.hp/e.maxHP),5,2);
   }
