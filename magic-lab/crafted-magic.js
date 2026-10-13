@@ -92,6 +92,7 @@
    const vy=st.delivery==='world'?
     a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
    pieces.push({agent:a,x:p.x,y:p.y,r:Math.max(.9,radius),color,angle:Math.atan2(vy,vx),
+    element:a.element||0,seed:a.seed||i,palette:cfg.palette,progress:a.progress||.44,
     texture:cfg.texture,opacity:(.18+(.14+cfg.light/100*.84)*.63)});
   }
   if(!pieces.length)return;
@@ -246,6 +247,7 @@
   const active=[...(scene.craftedShots||[])];if(scene.craftedAura)active.push(scene.craftedAura);
   for(const st of active){
   const cfg=st.recipe.settings,colors=palettes[cfg.palette];
+  const vfx=scene.elementVfx||null;
   const light=.14+cfg.light/100*.84,alpha=.18+light*.63;
   const n=st.agents.length,budget=Math.min(n,cfg.renderLimit||DEFAULT_DRAW);
   const stride=Math.max(1,Math.ceil(n/budget));
@@ -271,6 +273,12 @@
     }
     g.lineBetween(first.x,first.y,x,y);
    }
+   if(vfx){
+    const vx=st.delivery==='world'?a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
+    const vy=st.delivery==='world'?a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
+    vfx.paint(g,{x,y,r,element:a.element||0,color:col,alpha,time,seed:a.seed||i,
+     texture:cfg.texture,palette:cfg.palette,progress:t,angle:Math.atan2(vy,vx)});
+   }else{
    g.fillStyle(col,alpha);
    if(cfg.texture==='leaf'){
     // Leaf facing follows the real world-space trajectory after rotating
@@ -286,13 +294,15 @@
       {x:tip.x,y:tip.y},{x:x-px*r*.7,y:y-py*r*.7}],true);
     if(r>2){g.lineStyle(.5,0x17452e,.35);g.lineBetween(base.x,base.y,tip.x,tip.y)}
    }else hex(g,x,y,Math.max(.9,r));
+   }
    visible++;
   }
   st.rendered=visible;
   for(const impact of st.impactFX){
    const t=clamp((time-impact.born)/300,0,1);
-   g.lineStyle(1.8,impact.color,(1-t)*.78);
-   g.strokeCircle(impact.x,impact.y,2+t*14);
+   if(vfx)vfx.paintImpact(g,impact,time);
+   else{g.lineStyle(1.8,impact.color,(1-t)*.78);
+    g.strokeCircle(impact.x,impact.y,2+t*14);}
   }
   for(const pulse of st.healFX){
    const q=clamp((time-pulse.born)/600,0,1);
@@ -311,6 +321,12 @@
    const fade=Math.pow(clamp(1-elapsed/FADE_MS,0,1),1.35);
    if(fade<=0)continue;
    for(const p of batch.pieces){
+    if(scene.elementVfx){
+     scene.elementVfx.paint(g,{x:p.x,y:p.y,r:p.r,element:p.element||0,color:p.color,
+      alpha:p.opacity*fade,time,seed:p.seed||0,texture:p.texture,palette:p.palette,
+      progress:p.progress||.44,angle:p.angle});
+     continue;
+    }
     g.fillStyle(p.color,p.opacity*fade);
     if(p.texture==='leaf'){
      const nx=Math.cos(p.angle),ny=Math.sin(p.angle),px=-ny,py=nx,r=p.r;
