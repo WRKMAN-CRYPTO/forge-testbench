@@ -1066,7 +1066,7 @@ class Lab extends Phaser.Scene{
   // Start with our built-in vector wizard. Art upgrades asynchronously;
   // failure cannot interrupt enemy spawning, input, or combat setup.
   this.playerSkinSprite=null;
-  this.input.keyboard.on("keydown",e=>{if($("instructions").classList.contains("show")||!$("skinOverlay").hidden||!$("spellbookOverlay").hidden||!$("gameMenu").hidden)return;
+  this.input.keyboard.on("keydown",e=>{if(!started||$("instructions").classList.contains("show")||!$("skinOverlay").hidden||!$("spellbookOverlay").hidden||!$("gameMenu").hidden)return;
    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
    if(["1","2","3","4","5","6"].includes(e.key))selectSpell(equipped[Number(e.key)-1]);
    if(e.key.toLowerCase()==="b")openSpellbook();
@@ -1084,7 +1084,7 @@ class Lab extends Phaser.Scene{
    }
   });
   this.input.on("pointerdown",p=>{
-   if($("instructions").classList.contains("show"))return;
+   if(!started||$("instructions").classList.contains("show"))return;
    // The DOM capture listener owns phone taps; avoid duplicate casting.
    if(p.event?.pointerType==="touch"||p.event?.type?.startsWith("touch"))return;
    const pos=this.cameras.main.getWorldPoint(p.x,p.y);
@@ -1115,6 +1115,8 @@ class Lab extends Phaser.Scene{
   this.resetLab();
   // The world is live BEFORE any optional wardrobe/dye operations.
   $("labState").textContent="READY";
+  // The title gate freezes physics without blocking asynchronous cosmetic art.
+  if(!started)try{this.matter.world.pause();}catch(_){}
   try{refreshSkinUI();refreshHueUI();}
   catch(e){announce("WARDROBE PREVIEW ERROR • Combat remains usable.");}
   // Do not start another loader during the Scene.create lifecycle.
@@ -1504,11 +1506,7 @@ class Lab extends Phaser.Scene{
   return {player:{x:p.x,y:p.y},motions,obstacles,thermals,lights,shocks,forces};
  }
  update(time,delta){
-  if(!started){
-   if(!$("instructions").classList.contains("show")){
-    started=true; // Self-heal if a browser hides the welcome overlay.
-   }else return;
-  }
+  if(!started)return; // Title gate controls starting the game.
   try {
   delta=Math.min(delta,50);const t=delta/16.667;
   const mv=this.getMove(),combat=this.combat;
@@ -2098,8 +2096,17 @@ gateOverlay.addEventListener("keydown",e=>{
 renderGateDial();
 renderGateJournal();
 
-$("begin").onclick=()=>{music?.setMode("main");music?.unlock();started=true;$("instructions").classList.remove("show");scene?.scene.resume();if($("labState").textContent==="READY")$("labState").textContent="START";announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
-$("notes").onclick=()=>{$("labGuide").open=true;$("instructions").classList.add("show");};
+// 055: HOW TO PLAY is a closable reference, no longer the welcome screen.
+$("begin").onclick=()=>{
+ $("instructions").classList.remove("show");
+ if(started&&$("gameMenu").hidden&&$("bestiaryOverlay").hidden)scene?.scene.resume();
+ $("gameMenuToggle").focus({preventScroll:true});
+};
+$("notes").onclick=()=>{
+ $("labGuide").open=true;
+ $("instructions").classList.add("show");
+ scene?.scene.pause();
+};
 $("reset").onclick=()=>{scene?.resetLab();};
 bindInstantPress($("dash"),()=>scene?.dash());
 $("copy").onclick=async()=>{
@@ -2140,7 +2147,18 @@ renderGameSettings();
 $("menuHintToggle").addEventListener("click",()=>{uiHints=!uiHints;saveGameSettings();});
 $("menuControlToggle").addEventListener("click",()=>{uiSoft=!uiSoft;saveGameSettings();});
  // 054: Media import is user-triggered, suitable for Safari audio restrictions.
- const updateMusicButtons=()=>{
+ // 055: start the world and music from the direct title button gesture.
+const Title=window.WRKMAN_TITLE?.mount({onEnter:()=>{
+ if(started)return;
+ music?.setMode("main");
+ music?.unlock();
+ started=true;
+ try{scene?.matter?.world?.resume();}catch(_){}
+ scene?.scene?.resume();
+ if($("labState").textContent==="READY")$("labState").textContent="START";
+ announce("WELCOME TO WANDRUNE • Magic is made, not given.");
+}});
+const updateMusicButtons=()=>{
   $("musicToggle").textContent="♫ MUSIC: "+(music?.enabled?"ON":"OFF");
   $("musicToggle").setAttribute("aria-pressed",String(Boolean(music?.enabled)));
   $("welcomeMusic").textContent=music?.enabled&&music.unlocked?"♫ SOUNDTRACK PLAYING":"♫ PLAY NEW JOURNEY";
