@@ -1,4 +1,4 @@
-/* WANDRUNE 056 | Elemental Material Renderer
+/* WANDRUNE 057 | Stable Glow + Luminance Upgrade
  * Purely visual. No forces, no collisions, no timers, no agent mutations.
  * One texture atlas set and capped, recyclable sprites. Every other agent
  * receives inexpensive elemental geometry through the existing Graphics pass.
@@ -10,21 +10,24 @@
  if(root)root.WRKMAN_ELEMENT_VFX=api;
 })(typeof globalThis==="object"?globalThis:null,function(){
  "use strict";
- const VERSION="056",PREF="wrkman-wandrune056-vfx-quality",TWO_PI=Math.PI*2;
+ const VERSION="057",PREF="wrkman-wandrune056-vfx-quality",TWO_PI=Math.PI*2;
  const QUALITY=Object.freeze({
    low:Object.freeze({sprites:0,motes:26,lights:0,detail:0}),
    medium:Object.freeze({sprites:300,motes:105,lights:2,detail:1}),
    high:Object.freeze({sprites:850,motes:220,lights:4,detail:2})
  });
  const MATERIALS=Object.freeze({
-  0:Object.freeze({key:"arcane",glow:0xb7a4ff,center:"#ffffff",mid:"#b2a6ff",edge:"#4e387f"}),
-  1:Object.freeze({key:"fire",glow:0xff7c29,center:"#fff9c0",mid:"#ffc044",edge:"#8f241b"}),
-  2:Object.freeze({key:"water",glow:0x56ccec,center:"#e8ffff",mid:"#43d4f4",edge:"#16567c"}),
-  3:Object.freeze({key:"frost",glow:0xa2eaff,center:"#ffffff",mid:"#b1efff",edge:"#336b96"}),
-  4:Object.freeze({key:"lightning",glow:0xa9e5ff,center:"#ffffff",mid:"#fffaac",edge:"#347eea"})
+  0:Object.freeze({key:"arcane",glow:0xb7a4ff,center:"#ffffff",mid:"#cfbcff",edge:"#7055a4"}),
+  1:Object.freeze({key:"fire",glow:0xff7c29,center:"#fffce0",mid:"#ffcf62",edge:"#b83f26"}),
+  2:Object.freeze({key:"water",glow:0x56ccec,center:"#ffffff",mid:"#71e7ff",edge:"#277ca2"}),
+  3:Object.freeze({key:"frost",glow:0xa2eaff,center:"#ffffff",mid:"#bff2ff",edge:"#467fa8"}),
+  4:Object.freeze({key:"lightning",glow:0xa9e5ff,center:"#ffffff",mid:"#f3faff",edge:"#408de8"})
  });
  const safeQuality=x=>QUALITY[x]?x:"medium";
  const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+ // Boost opacity without introducing a floor, so the 800ms lifespan fades still vanish.
+ // Frost keeps the restrained glass translucency that already looked right.
+ const litAlpha=(alpha,element=0)=>clamp(Math.pow(clamp(alpha),element===3?.8:.55)*(element===4?1.035:1));
  function kind(element){return Number.isInteger(element)&&MATERIALS[element]?element:0;}
  function hash(v){let x=(Math.floor(v*9817)||1)>>>0;x^=x>>>16;x=Math.imul(x,0x7feb352d);x^=x>>>15;return (x>>>0)/4294967295;}
  function drawMaterial(ctx,element,seed,neutralColor=null){
@@ -33,7 +36,7 @@
   const grad=ctx.createRadialGradient(20,17,1,24,24,19);
   grad.addColorStop(0,neutralColor||m.center);
   grad.addColorStop(.40,neutralColor||m.mid);
-  grad.addColorStop(.82,m.mid);
+  grad.addColorStop(.74,m.mid);
   grad.addColorStop(1,m.edge);
   if(element===1||element===4){
    const glow=ctx.createRadialGradient(c,c,2,c,c,24);
@@ -119,6 +122,27 @@
   scene.textures.addCanvas(key,canvas);
   return true;
  }
+ // Radial alpha image, not a PointLight shader. No hard white circles.
+ // Soft halos are wholly transparent at their edges, independent of renderer.
+ function makeHalo(scene,key,fire=false){
+  if(scene.textures.exists(key))return;
+  if(typeof document==="undefined")return;
+  const canvas=document.createElement("canvas");canvas.width=canvas.height=96;
+  const ctx=canvas.getContext("2d");if(!ctx)return;
+  const glow=ctx.createRadialGradient(48,48,0,48,48,47);
+  if(fire){
+   glow.addColorStop(0,"rgba(255,199,106,.47)");
+   glow.addColorStop(.26,"rgba(255,141,62,.33)");
+   glow.addColorStop(.60,"rgba(252,96,38,.105)");
+  }else{
+   glow.addColorStop(0,"rgba(161,225,255,.48)");
+   glow.addColorStop(.26,"rgba(96,174,255,.31)");
+   glow.addColorStop(.60,"rgba(57,121,241,.10)");
+  }
+  glow.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle=glow;ctx.fillRect(0,0,96,96);
+  scene.textures.addCanvas(key,canvas);
+ }
  function install(scene){
   if(!scene?.textures||!scene.add)return null;
   const prefix="wandrune-mat056-";
@@ -142,11 +166,15 @@
     keys[palette+"_"+i]=key;
    }
   }
+  const glowKeys={1:prefix+"halo-fire-057",4:prefix+"halo-lightning-057"};
+  makeHalo(scene,glowKeys[1],true);
+  makeHalo(scene,glowKeys[4],false);
   let q="medium";
   try{q=safeQuality(localStorage.getItem(PREF));}catch(_){}
   const overlay=scene.add.graphics().setDepth(5.35);
   let pool=[],used=0,previous=0,lastActive=0,lastMotes=0;
-  const anchors=[],flashes=[],lights=[];
+  const anchors=[],glows=[];
+  let lastGlowTime=0;
   function setQuality(level){
    q=safeQuality(level);
    try{localStorage.setItem(PREF,q);}catch(_){}
@@ -162,24 +190,24 @@
    return pool[used++];
   }
   function begin(){
-   used=0;lastActive=0;lastMotes=0;anchors.length=0;flashes.length=0;
+   used=0;lastActive=0;lastMotes=0;anchors.length=0;
    overlay.clear();
   }
   function pushAnchor(element,x,y,r,seed){
    const max=QUALITY[q].motes;
    if(!max||anchors.length>=max)return;
    // Stable deterministic subsampling avoids per-agent ParticleEmitters.
-   const mark=hash(seed*17+x*.2+y*.19);
+   const mark=hash(seed*17+element*29); // Stable agent identity; no positional flicker.
    if(mark>.26)return;
    anchors.push({element,x,y,r,seed});
   }
   function paint(g,opts){
    const {x,y,r,element=0,alpha=.8,time=0,seed=0,texture="flat",palette="flame",progress=.44,angle=0}=opts;
-   const e=kind(element),radius=Math.max(.8,r);
+   const e=kind(element),radius=Math.max(.8,r),illum=litAlpha(alpha,e);
    // Only the intended recipe leaf shape stays leaf-shaped.
    if(texture==="leaf"){
     const nx=Math.cos(angle),ny=Math.sin(angle),px=-ny,py=nx;
-    g.fillStyle(e?([0,0xff9b4c,0x52d5f8,0xb5edff,0xffeb89][e]):opts.color,alpha);
+    g.fillStyle(e?([0,0xffb669,0x7ce8ff,0xb5edff,0xffeeae][e]):opts.color,illum);
     g.fillPoints([
      {x:x-nx*radius*1.45,y:y-ny*radius*1.45},
      {x:x+px*radius*.72,y:y+py*radius*.72},
@@ -195,12 +223,12 @@
    if(sprite&&scene.textures.exists(key)){
     const flicker=e===4?1+.07*Math.sin(time*.027+seed):e===1?1+.035*Math.sin(time*.014+seed):1;
     sprite.setTexture(key).setPosition(x,y).setDisplaySize(radius*3.2*flicker,radius*3.2*flicker)
-      .setAlpha(clamp(alpha*(e===4?1.22:1),0,1)).setVisible(true);
+      .setAlpha(illum).setVisible(true);
     sprite.setRotation(e===3?Math.sin(seed)*.1:e===1?Math.sin(time*.0008+seed)*.12:0);
    }else{
     // All unsprited agents still have faceted material and luminescent core.
-    const col=e===0?opts.color:[0,0xff8538,0x40bfdf,0x9bdffc,0xffed76][e];
-    g.fillStyle(col,clamp(alpha));
+    const col=e===0?opts.color:[0,0xffa347,0x61d7fb,0xb6ecff,0xffed9a][e];
+    g.fillStyle(col,illum);
     const sides=e===3?6:e===4?7:6;
     const points=[];
     for(let j=0;j<sides;j++){
@@ -210,7 +238,7 @@
     g.fillPoints(points,true);
     if(QUALITY[q].detail>0||e===4){
      const light=e===1?0xffe7a0:e===2?0xcaffff:e===3?0xe7fbff:0xffffff;
-     g.fillStyle(light,clamp(alpha*(e===4?.9:.52)));
+     g.fillStyle(light,clamp(illum*(e===4?.86:.6)));
      g.fillCircle(x-radius*.21,y-radius*.24,Math.max(.42,radius*(e===4?.38:.25)));
     }
     if(radius>4.5&&QUALITY[q].detail>0){
@@ -269,41 +297,66 @@
    }
    for(let i=previous;i>used;i--)pool[i-1].setVisible(false);
    previous=used;lastMotes=anchors.length;
-   // True shader-based glow is strictly pooled and camera-local. It does not
-   // enable Light2D or normal-map material pipelines for the whole arena.
-   let lightCount=0;
-   if(settings.lights&&scene.game?.renderer?.type===((typeof Phaser!=="undefined"&&Phaser.WEBGL)||2)){
-    for(let i=0;i<anchors.length&&lightCount<settings.lights;i++){
-     const a=anchors[i];
+   // Pool up to 2/4 ambient halos. Group by world cell so many lightning agents
+   // illuminate one region rather than each agent spawning a new light.
+   // This substitutes soft procedural textures for unstable PointLight shaders.
+   const buckets=new Map();
+   if(settings.lights){
+    const camera=scene.cameras?.main?.worldView;
+    for(const a of anchors){
      if(a.element!==4&&!(q==="high"&&a.element===1))continue;
-     if(i%5!==0)continue;
-     if(!scene.cameras.main.worldView.contains(a.x,a.y))continue;
-     let light=lights[lightCount];
-     if(!light&&typeof scene.add.pointlight==="function"){
-      try{
-       light=scene.add.pointlight(a.x,a.y,a.element===4?0x75d9ff:0xff8329,78,.78,.12)
-        .setDepth(5.38);
-       lights[lightCount]=light;
-      }catch(_){break;}
-     }
-     if(!light)break;
-     light.setVisible(true);
-     light.setPosition(a.x,a.y);
-     light.color=a.element===4?0x9acfff:0xff9c47;
-     light.radius=65+Math.min(a.r*3,58);
-     light.intensity=.55+.25*Math.sin(time*.016+i);
-     lightCount++;
+     if(camera&&!camera.contains(a.x,a.y))continue;
+     const key=a.element+":"+Math.floor(a.x/110)+":"+Math.floor(a.y/110);
+     let bucket=buckets.get(key);
+     if(!bucket){bucket={key,element:a.element,x:0,y:0,count:0,r:0};buckets.set(key,bucket);}
+     bucket.x+=a.x;bucket.y+=a.y;bucket.r+=Math.min(a.r,14);bucket.count++;
     }
    }
-   for(let i=lightCount;i<lights.length;i++)lights[i].setVisible(false);
+   const targets=[...buckets.values()].sort((a,b)=>
+     (b.count+(b.element===4?.4:0))-(a.count+(a.element===4?.4:0))||
+     a.key.localeCompare(b.key)).slice(0,settings.lights);
+   const dt=lastGlowTime?clamp(time-lastGlowTime,8,55):16;
+   lastGlowTime=time;
+   const glide=clamp(dt/140,.05,.40),fadeSpeed=clamp(dt/175,.05,.34);
+   for(let i=0;i<Math.max(glows.length,targets.length);i++){
+    const target=targets[i];
+    if(!glows[i]&&target){
+     const obj=scene.add.image(target.x/target.count,target.y/target.count,glowKeys[target.element])
+       .setDepth(5.12).setOrigin(.5,.5).setAlpha(0).setVisible(true);
+     // Additive color at a small, capped alpha gives a glow, not a white disk.
+     if(typeof obj.setBlendMode==="function"&&typeof Phaser!=="undefined")
+      obj.setBlendMode(Phaser.BlendModes.ADD);
+     glows[i]=obj;
+    }
+    const halo=glows[i];if(!halo)continue;
+    if(target&&scene.textures.exists(glowKeys[target.element])){
+     const x=target.x/target.count,y=target.y/target.count;
+     const distance=Math.hypot(x-halo.x,y-halo.y);
+     if(distance>115&&halo.alpha>.06){
+      halo.setAlpha(Math.max(0,halo.alpha-fadeSpeed*.5));
+      continue; // Cross regions invisibly instead of teleporting bright circles.
+     }
+     halo.setTexture(glowKeys[target.element]);
+     halo.setPosition(halo.alpha<.06?x:halo.x+(x-halo.x)*glide,
+                      halo.alpha<.06?y:halo.y+(y-halo.y)*glide);
+     const averageRadius=target.r/target.count;
+     const diameter=Math.min(118,78+averageRadius*2.9);
+     halo.setDisplaySize(diameter,diameter).setVisible(true);
+     const targetAlpha=Math.min(.53,.31+.065*Math.sqrt(target.count));
+     halo.setAlpha(clamp(halo.alpha+(targetAlpha-halo.alpha)*fadeSpeed));
+    }else{
+     halo.setAlpha(Math.max(0,halo.alpha-fadeSpeed*.57));
+     if(halo.alpha<.012)halo.setVisible(false);
+    }
+   }
   }
   function destroy(){
    for(const x of pool)x.destroy();
-   for(const x of lights)x.destroy();
+   for(const x of glows)x.destroy();
    overlay.destroy();
   }
   return {begin,paint,paintImpact,extras,setQuality,get quality(){return q;},
-    get stats(){return {sprites:used,agents:lastActive,motes:lastMotes,lights:lights.filter(x=>x.visible).length};},
+    get stats(){return {sprites:used,agents:lastActive,motes:lastMotes,lights:glows.filter(x=>x.visible).length};},
     destroy};
  }
  return Object.freeze({VERSION,PREF,QUALITY,MATERIALS,safeQuality,hash,drawMaterial,install});
