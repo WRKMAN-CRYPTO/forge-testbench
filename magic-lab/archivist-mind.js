@@ -376,9 +376,10 @@
    len=Math.max(1,Math.hypot(dx,dy));
   // Existing walking speed. Positioning is a refusal, not an invulnerable dodge.
   m.intent={x:dx/len-.35*dy/len,y:dy/len+.35*dx/len,speed};
+  m.tempo.holdMove={...m.intent};
   m.state="decline-bait";
   m.quote="Not every opening is an invitation.";
-  return {move:m.intent,declined:true,reason:judgment.reason,until:m.attackAt};
+  return {move:m.tempo.holdMove,declined:true,newRefusal:true,reason:judgment.reason,until:m.attackAt};
  }
  function decide(m,ob){
   const {time,pos,player,health=1}=ob;
@@ -464,7 +465,7 @@
   }
   if(time<m.tempo.holdUntil){
    m.state="decline-bait";
-   return {move:m.intent,declined:true};
+   return {move:m.tempo.holdMove||m.intent,declined:true};
   }
   if(d<680&&time>=m.attackAt){
    const judgment=judgeOpening(m,ob,danger,threats);
