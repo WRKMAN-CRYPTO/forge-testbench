@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#080e16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>WRKMAN | Magic Physics Laboratory 052</title>
+<title>Wandrune | Magic Is Made, Not Given</title>
 <style>
 :root{color-scheme:dark;--bg:#080e16;--panel:#101a28;--line:#35465c;--ink:#f3efdd;--muted:#98adc0;--gold:#f5ca7e;--blue:#82d8ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -654,9 +654,70 @@ header .actions{display:flex;gap:6px}
  padding:5px;min-height:30px;font:900 10px ui-monospace,monospace;letter-spacing:0}
 #modalFooter #welcomeMusicStatus{font-size:8px;color:#a9d1d3;white-space:normal}
 #musicStatus{font-size:9px;text-transform:none;line-height:1.25}
+
+/* WANDRUNE / 055: the title is a first-paint layer, higher than the portrait rotation gate. */
+#titleOverlay[hidden]{display:none!important}
+#titleOverlay{position:fixed;inset:0;z-index:20000;isolation:isolate;
+ width:100%;height:100%;height:100dvh;display:flex;justify-content:center;align-items:flex-end;
+ overflow:hidden;background:radial-gradient(ellipse at 50% 35%,#39496f,#071422 80%);
+ color:#f9e9ca;opacity:1;transition:opacity .7s ease,visibility .7s ease}
+#titleOverlay.exiting{opacity:0;visibility:hidden;pointer-events:none}
+#titleArtwork{position:absolute;inset:0;width:100%;height:100%;
+ object-fit:cover;object-position:50% 46%;z-index:0;pointer-events:none}
+#titleOverlay:not(.art-ready) #titleArtwork{display:none}
+#titleFallback{position:absolute;inset:0;display:grid;align-content:center;
+ text-align:center;padding:12px;pointer-events:none}
+#titleFallback strong{font:clamp(32px,9vw,98px)/1 Georgia,serif;letter-spacing:.09em;
+ color:#ffdfab;text-shadow:0 5px 28px #000c}
+#titleFallback span{font:clamp(10px,2.4vw,16px)/1.4 Georgia,serif;
+ letter-spacing:.20em;color:#c9e5ff;margin-top:14px}
+#titleOverlay.art-ready #titleFallback{display:none}
+#titleActions{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:7px;justify-content:center;
+ align-items:center;width:100%;padding:42px max(8px,env(safe-area-inset-right))
+ calc(19px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
+ background:linear-gradient(0deg,#06101ce8,#0c17387d 55%,transparent)}
+#titleActions button{min-height:40px;border:1px solid #cfaa70;border-radius:8px;
+ background:linear-gradient(#503b2b,#302117);color:#fff3df;
+ font:900 clamp(10px,1.5vw,14px)/1.2 ui-monospace,monospace;letter-spacing:.06em;
+ text-shadow:0 1px 3px #0009;padding:8px 13px;touch-action:manipulation;
+ box-shadow:0 4px 14px #0007}
+#titleActions #enterTitle{min-width:min(280px,45vw);background:linear-gradient(#a3763c,#634120);
+ border-color:#ffe0a1;box-shadow:0 0 22px #e9c26c4c,0 5px 16px #0008}
+#titleArtPick{position:absolute;z-index:2;top:calc(8px + env(safe-area-inset-top));
+ right:calc(8px + env(safe-area-inset-right));background:#102436d8;border:1px solid #c5ae78;
+ border-radius:7px;color:#fff2d4;font:800 10px ui-monospace,monospace;padding:8px}
+#titleStatus{position:absolute;z-index:1;bottom:calc(3px + env(safe-area-inset-bottom));
+ left:6px;right:6px;text-align:center;color:#c9dcda;font:700 9px ui-monospace,monospace;
+ text-shadow:0 1px 5px #000;pointer-events:none}
+@media(pointer:coarse) and (orientation:portrait){
+ #titleArtwork{object-fit:contain;background:#071422}
+ #titleActions #enterTitle{min-width:85%;order:-1}
+}
+@media(pointer:coarse) and (orientation:landscape) and (max-height:480px){
+ #titleActions{padding-top:20px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+ #titleActions button{min-height:34px;padding:6px 9px;font-size:10px}
+ #titleActions #enterTitle{min-width:190px}
+}
+@media(prefers-reduced-motion:reduce){#titleOverlay{transition:none}}
 </style>
 </head>
 <body>
+<!-- First visible interface, even before Phaser is ready. The logo is already in the artwork. -->
+<div id="titleOverlay" role="dialog" aria-modal="true" aria-label="Wandrune title screen">
+ <div id="titleFallback"><strong>WANDRUNE</strong><span>Magic is made, not given.</span></div>
+ <img id="titleArtwork" src="./assets/wandrune-title.jpg?v=055"
+  alt="Wandrune title artwork: wizards overlooking a glowing portal and floating islands." decoding="async">
+ <button type="button" id="titleArtPick" hidden>IMPORT TITLE ART</button>
+ <div id="titleActions">
+  <button type="button" id="enterTitle">✦ ENTER WANDRUNE</button>
+  <button type="button" id="welcomeMusic">♫ PLAY MUSIC</button>
+  <button type="button" id="welcomeImport">IMPORT MUSIC</button>
+ </div>
+ <div id="titleStatus" role="status" aria-live="polite">
+  <span id="welcomeMusicStatus">NEW JOURNEY · TAP ♫ TO PLAY</span>
+ </div>
+ <input id="titleArtFile" type="file" accept="image/jpeg,image/png,image/webp,image/avif" hidden>
+</div>
 <div id="shell">
 <header id="gameTopbar">
  <div id="healthHud" role="group" aria-label="Health and enemies">
@@ -668,7 +729,7 @@ header .actions{display:flex;gap:6px}
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 054 • SOUNDTRACK</span></div>
+   <div class="menuHeader"><strong>W / WANDRUNE</strong><span>BUILD 055 • TITLE SCREEN</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="gateMenuOpen" type="button">✧ DIAL GATE</button>
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
@@ -730,11 +791,7 @@ header .actions{display:flex;gap:6px}
   <span id="wheelGlyph" aria-hidden="true">✦</span><span id="wheelName">BOLT</span>
  </button>
  <div id="wheelReadout" aria-live="polite">HOLD + SLIDE TO EQUIP</div>
-</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show" role="dialog" aria-modal="true" aria-labelledby="labWelcomeTitle"><div id="modal"><h1 id="labWelcomeTitle">Magic has rules. Let's break some.</h1><p class="modalIntro">Cast spells. Shape the physics. Invent something dangerous. <b>Click ENTER THE LAB to begin.</b></p><div id="modalScroll"><details id="labGuide"><summary>CONTROLS &amp; FULL FIELD GUIDE</summary><div id="modalGuideContent"><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse or ⬡ Bound Field.</p><p><b>CRAFTED MAGIC:</b> In ☰ → SPELL FORGE, paint a 32×32 field, preview its agents, choose materials, name and save spells, then SAVE & EQUIP. The game automatically assigns ⬡ BOUND FIELD to a spell wheel slot. SYNC FIELD and JSON import remain available for outside experiments. Cast Bound Field from your feet. Choose AURA (follows your wizard), WORLD EMISSION (releases independent world agents), or PLACED FIELD (tap a world position) inside Spell Forge. Each agent's active lifespan is adjustable per spell (0.5 to 30 seconds, 5.5 by default). When time runs out, the hex stops colliding but continues to follow its original field physics as its opacity fades over 0.8 seconds. Empty casts release capacity immediately while their visual remnants keep moving and fade. World Emission starts at the painted high-value cells near the wizard, turns the field toward your aim, then releases every agent. There is no moving projectile container, invisible homing, or particle recycling. Cast up to three WORLD spells at once, within 6,000 total active agents. Rendering has a separate visible-agent budget. Each hex now physically collides with enemies, pillars, loose stone and solid props along its full trajectory, then disappears on impact. Hits are detected every frame; damage is capped per target to keep large swarms balanced. Linked Minor Heal pulses at the player's CURRENT position every three seconds. Toggle the link in ☰ before casting again. When no recipe is imported, FIRE RING is the starter example.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p></div></details></div><div id="modalFooter"><button id="begin" type="button">ENTER THE LAB →</button>
- <div class="musicRow"><button id="welcomeMusic" type="button">♫ PLAY NEW JOURNEY</button>
- <button id="welcomeImport" type="button">IMPORT MUSIC</button></div>
- <span id="welcomeMusicStatus">TAP ♫ TO START SOUNDTRACK · IPHONE SAFE</span>
- </div></div></div></div>
+</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" role="dialog" aria-modal="true" aria-labelledby="labWelcomeTitle"><div id="modal"><h1 id="labWelcomeTitle">Wandrune Field Guide</h1><p class="modalIntro">Review the controls and magic systems. <b>Return to the game when ready.</b></p><div id="modalScroll"><details id="labGuide"><summary>CONTROLS &amp; FULL FIELD GUIDE</summary><div id="modalGuideContent"><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse or ⬡ Bound Field.</p><p><b>CRAFTED MAGIC:</b> In ☰ → SPELL FORGE, paint a 32×32 field, preview its agents, choose materials, name and save spells, then SAVE & EQUIP. The game automatically assigns ⬡ BOUND FIELD to a spell wheel slot. SYNC FIELD and JSON import remain available for outside experiments. Cast Bound Field from your feet. Choose AURA (follows your wizard), WORLD EMISSION (releases independent world agents), or PLACED FIELD (tap a world position) inside Spell Forge. Each agent's active lifespan is adjustable per spell (0.5 to 30 seconds, 5.5 by default). When time runs out, the hex stops colliding but continues to follow its original field physics as its opacity fades over 0.8 seconds. Empty casts release capacity immediately while their visual remnants keep moving and fade. World Emission starts at the painted high-value cells near the wizard, turns the field toward your aim, then releases every agent. There is no moving projectile container, invisible homing, or particle recycling. Cast up to three WORLD spells at once, within 6,000 total active agents. Rendering has a separate visible-agent budget. Each hex now physically collides with enemies, pillars, loose stone and solid props along its full trajectory, then disappears on impact. Hits are detected every frame; damage is capped per target to keep large swarms balanced. Linked Minor Heal pulses at the player's CURRENT position every three seconds. Toggle the link in ☰ before casting again. When no recipe is imported, FIRE RING is the starter example.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p></div></details></div><div id="modalFooter"><button id="begin" type="button">BACK TO WANDRUNE →</button><span>HOW TO PLAY IS ALWAYS AVAILABLE UNDER ☰</span></div></div></div></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div>
 </div>
 <!-- 053: Bestiary stores local reference records, not live combat settings. -->
@@ -825,7 +882,7 @@ header .actions{display:flex;gap:6px}
  </div>
 </div>
 <div id="rotationGate" role="status" aria-label="Rotate your phone to landscape">
-  <div class="rotBrand">W / ARCANE LAB</div>
+  <div class="rotBrand">W / WANDRUNE</div>
   <div class="rotPhone" aria-hidden="true">▭</div>
   <h1>TURN SIDEWAYS</h1>
   <p>This laboratory is built to be held like a Game Boy Advance. Rotate your phone and keep both thumbs on the controls.</p>
@@ -851,6 +908,7 @@ header .actions{display:flex;gap:6px}
 <script src="./scroll-generator.js?v=047"></script>
 <script src="./spell-forge.js?v=050"></script>
 <script src="./music.js?v=054"></script>
+<script src="./title-screen.js?v=055"></script>
 <script>
 (()=>{
 "use strict";
