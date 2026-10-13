@@ -87,7 +87,7 @@
        try{el.currentTime=0;}catch(_){}
        if(mode===name)tryPlay(name);
      });
-     tracks[name]={el,mix:0,from:0,to:0,at:0,until:0};
+     tracks[name]={el,mix:0,from:0,to:0,at:0,until:0,lastAttempt:-3000};
    }
    function persist(){
      try{store?.setItem(PREF,JSON.stringify({enabled,volume}));}catch(_){}
@@ -107,13 +107,13 @@
      let local={};
      try{local=await loadSaved();}catch(_){}
      for(const name of ["main","battle"]){
-       if(local[name] instanceof Blob&&local[name].size>128){
+       if(!sourceReady[name]&&local[name] instanceof Blob&&local[name].size>128){
          setSource(name,URL.createObjectURL(local[name]),true);
        }else{
          // Avoid an error event from an expected 404 when assets aren't hosted yet.
          try{
            const response=await fetch(FILES[name],{method:"HEAD",cache:"no-cache"});
-           if(response.ok)setSource(name,FILES[name]);
+           if(response.ok&&!sourceReady[name])setSource(name,FILES[name]);
          }catch(_){}
        }
      }
@@ -129,6 +129,9 @@
      const tr=tracks[name];
      if(!sourceReady[name])return Promise.resolve(false);
      if(!tr.el.paused)return Promise.resolve(true);
+     const now=performance.now();
+     if(now-tr.lastAttempt<950)return Promise.resolve(false);
+     tr.lastAttempt=now;
      try{
        const p=tr.el.play();
        if(p&&typeof p.then==="function"){
