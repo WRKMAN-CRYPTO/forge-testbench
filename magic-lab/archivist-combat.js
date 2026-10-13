@@ -46,7 +46,8 @@
  function step(s,e,time,delta,Body,hitPlayer){
   if(!e.alive||!e.archivist||!M)return;
   const b=e.body,pos=b.position;
-  if(time>=e.mindAt){
+  // Do not quantize shortened spell charges to the 120ms AI polling cadence.
+  if(time>=e.mindAt||(e.archivist?.held&&time>=e.archivist.until)){
    e.mindAt=time+120;
    e.mindIntent=M.decide(e.archivist,{
     time,pos,velocity:b.velocity,radius:e.r,player:s.player,
