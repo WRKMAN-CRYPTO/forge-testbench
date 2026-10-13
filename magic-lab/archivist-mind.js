@@ -492,9 +492,15 @@
   if(m.held){
    m.state=m.held.feint?"mislead":"inscribe";
    if(time>=m.until){
-    const ready=m.held;m.held=null;m.lastPlan=ready;m.attacks++;
-    registerAttempt(m,ready);
-    const release=openingPlan(m,ready,time,player);
+    const ready=m.held;m.held=null;m.attacks++;
+    let release;
+    if(ready.kind==="edict"){
+     m.edictStats.uses++;m.lastEdictAttack=m.attacks;
+     release={...ready,stage:"edict",target:{...ready.tellTarget}};
+    }else{
+     m.lastPlan=ready;registerAttempt(m,ready);
+     release=openingPlan(m,ready,time,player);
+    }
     m.attackAt=time+clamp(3300-m.learned*15,2250,3400);
     m.state="experiment";
     m.quote="Experiment "+m.attacks+": "+ready.name+".";
