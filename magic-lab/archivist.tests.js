@@ -102,4 +102,65 @@ check('physical projectiles capped and stay Matter bodies',()=>{
  Act.projectileHit(s,s.projectiles[0].body);
  assert.equal(e.archivist.successes,before+1);
 });
-console.log('Archivist 059 checks passed: '+passed);
+check('Arc Bolt on a collision course is recognized from real Matter velocity',()=>{
+ const shot={body:{labAlive:true,gameTag:'bolt',position:{x:430,y:305},velocity:{x:13,y:0}}};
+ const danger=Brain.predictBolt({x:800,y:305},{x:0,y:0},32,shot);
+ assert.ok(danger);assert.ok(danger.ticks>25&&danger.ticks<30);
+ assert.ok(danger.miss<danger.reach);
+});
+check('near misses, stationary bolts, spent bolts and enemy embers are ignored',()=>{
+ const at=(x,y,vx,vy,tag='bolt',alive=true)=>({body:{
+   labAlive:alive,gameTag:tag,position:{x,y},velocity:{x:vx,y:vy}}});
+ const pos={x:800,y:305},vel={x:0,y:0};
+ assert.equal(Brain.predictBolt(pos,vel,32,at(430,400,13,0)),null);
+ assert.equal(Brain.predictBolt(pos,vel,32,at(430,305,-13,0)),null);
+ assert.equal(Brain.predictBolt(pos,vel,32,at(430,305,0,0)),null);
+ assert.equal(Brain.predictBolt(pos,vel,32,at(430,305,13,0,'bolt',false)),null);
+ assert.equal(Brain.predictBolt(pos,vel,32,at(430,305,13,0,'ember')),null);
+});
+check('threat evaluation considers multiple real incoming bolts',()=>{
+ const b=(x,y,vx,vy)=>({body:{gameTag:'bolt',labAlive:true,
+   position:{x,y},velocity:{x:vx,y:vy}}});
+ const state={pos:{x:800,y:305},velocity:{x:0,y:0},radius:32,
+   shots:[b(430,305,13,0),b(435,336,13,0)]};
+ const threats=Brain.visibleBolts(state);
+ assert.equal(threats.length,2);
+ const choice=Brain.chooseDodge(Brain.make(store,0),state,threats,2.6);
+ assert.ok(choice&&Number.isFinite(choice.risk));
+ assert.ok(choice.dir.y<0,'move away from second bolt rather than into its corridor');
+});
+check('evasion requires perception and has no teleport, speed boost or invulnerability',()=>{
+ const shot={body:{gameTag:'bolt',labAlive:true,position:{x:430,y:305},velocity:{x:13,y:0}}};
+ const m=Brain.make(store,0),pos={x:800,y:305},base={pos,velocity:{x:0,y:0},
+  radius:32,player:{x:300,y:305},health:.1,casts:[],shots:[shot],obstacles:[]};
+ let launches=0,first=null,after=null;
+ for(const t of [0,125,250,375,500]){
+  const action=Brain.decide(m,{...base,time:t});
+  if(t===0)first=action;
+  if(action?.launch){launches++;after=action;assert.equal(m.state,'evade-bolt');}
+ }
+ assert.ok(first&&!first.launch,'cannot dodge before recognition delay');
+ assert.equal(launches,1,'one physical sidestep per recognized threat');
+ assert.equal(after.move.speed,2.25,'at low health retain prior slow base speed');
+ assert.ok(m.boltThreats>=1);
+});
+check('physical dodge uses the original body and a normal-speed Matter velocity',()=>{
+ const Mind=Brain.make(store,0);
+ const shot={body:{gameTag:'bolt',labAlive:true,position:{x:430,y:305},velocity:{x:13,y:0}}};
+ const p={x:800,y:305},body={position:p,velocity:{x:0,y:0},mass:2};
+ let launches=0;
+ const Body={setVelocity(b,v){launches++;b.velocity={...v}},
+   applyForce(b,_,f){b.velocity.x+=f.x;b.velocity.y+=f.y}};
+ const scene={player:{x:300,y:305},projectiles:[shot],craftedShots:[],craftedAura:null,
+  actors:[],combat:{pillars:[],debris:[]},time:{now:0},burst(){},announceCombat(){}};
+ const boss={id:1,alive:true,hp:1650,maxHP:1650,r:32,archivist:Mind,
+  body,mindAt:0,mindIntent:null};
+ for(const t of [0,125,250,375]){
+  scene.time.now=t;Act.step(scene,boss,t,16.667,Body,()=>{});
+ }
+ assert.equal(launches,1,'only one physical velocity shift');
+ assert.ok(Math.hypot(body.velocity.x,body.velocity.y)<=2.65,
+  'normal movement speed capped; no supernatural dash');
+ assert.equal(boss.hp,1650,'dodge never raises HP');
+});
+console.log('Archivist 060 checks passed: '+passed);
