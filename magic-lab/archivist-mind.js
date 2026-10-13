@@ -1,4 +1,4 @@
-/* WANDRUNE 064 | The Archivist: Judgment, Tempo and Refusing a Trap
+/* WANDRUNE 065 | The Archivist: Judgment, Tempo and Refusing a Trap
  * No global player profiling. One creature, a bounded, imperfect memory.
  * Observes visible physical movement / nearby elemental matter, not rune layouts
  * or future inputs. Experimental physical projectile motifs are composable.
@@ -13,8 +13,10 @@
  const ELEMENTS=["arcane","frost","fire","lightning"];
  const MOTIFS=["lance","fan","pincer","spiral"];
  const TACTICS=["probe","herd","bait","fork"];
+ const Board=typeof window!=="undefined"?window.WRKMAN_ARCHIVIST_BOARD:
+   typeof require==="function"?require("./archivist-board.js"):null;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- const fresh=()=>({version:1,encounters:0,defeats:0,wins:0,element:[0,0,0,0],dodges:[0,0],feints:0,judgment:{anticipation:0,disruption:0,wasted:0},plans:[],lastLine:""});
+ const fresh=()=>({version:1,encounters:0,defeats:0,wins:0,element:[0,0,0,0],dodges:[0,0],feints:0,judgment:{anticipation:0,disruption:0,wasted:0},pressure:{forced:0,unforced:0,observed:0},plans:[],lastLine:""});
  function validate(raw){
   const m=fresh();if(!raw||raw.version!==1)return m;
   for(const k of ["encounters","defeats","wins"])m[k]=clamp(Math.floor(Number(raw[k])||0),0,999);
@@ -24,6 +26,8 @@
   m.feints=clamp(Number(raw.feints)||0,0,80);
   for(const k of ["anticipation","disruption","wasted"])
    m.judgment[k]=clamp(Number(raw.judgment?.[k])||0,0,80);
+  for(const k of ["forced","unforced","observed"])
+   m.pressure[k]=clamp(Number(raw.pressure?.[k])||0,0,80);
   if(Array.isArray(raw.plans))m.plans=raw.plans.slice(0,6).filter(x=>
    x&&MOTIFS.includes(x.motif)&&ELEMENTS.includes(x.element)&&
    Number.isFinite(x.score)).map(x=>({motif:x.motif,element:x.element,
@@ -43,6 +47,7 @@
   return {prior,storage,started:time,nextThink:time,until:0,attackAt:time+2200,
    state:"observe",intent:{x:0,y:0,speed:0},held:null,pending:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0],feints:0,judgment:{anticipation:0,disruption:0,wasted:0}},attempts:[],
     tempo:{anticipatedFor:null,precommit:false,lastHoldCast:-99,holdUntil:0,holds:0,probe:null},
+    board:{forecast:0,threatened:0,free:5,plies:1,forced:0,unforced:0,observed:0,probes:[]},
    learned:0,observedAt:time,pressure:{x:0,y:0,count:0},
    // Projectile impressions are held only during this physical encounter.
    boltSeen:null,dodgeUntil:0,dodgeCooldown:0,dodgeDirection:null,dodgeLaunch:false,
@@ -79,6 +84,18 @@
     vy:previous?(player.y-previous.y)/dt:0};
   m.lastPlayer=current;
   const speed=Math.hypot(current.vx,current.vy);
+  // Was the visible player actually forced away from their prior motion?
+  for(const probe of m.board.probes){
+   if(time-probe.at<500)continue;
+   const elapsed=(time-probe.at)/1000;
+   const expected={x:probe.x+probe.vx*elapsed,y:probe.y+probe.vy*elapsed};
+   const deviation=Math.hypot(player.x-expected.x,player.y-expected.y);
+   const acceleration=Math.hypot(current.vx-probe.vx,current.vy-probe.vy);
+   if(deviation>62||acceleration>180)m.board.forced++;
+   else m.board.unforced++;
+   m.board.observed++;
+  }
+  m.board.probes=m.board.probes.filter(x=>time-x.at<500);
   // Anticipation is observed movement BEFORE the known firing opportunity,
   // never a read of future controls. A running player can fool this inference.
   if(m.attacks>0&&!m.held&&!m.pending&&
@@ -235,7 +252,7 @@
   if(feint&&m.learned>2)n+=.35;
   return clamp(n+(learnedPlan?.score||0)*.35,.2,8);
  }
- function invent(m){
+ function invent(m,ob=null){
   // Every experiment combines independent properties, not a scripted fixed move.
   // Samples explore unfamiliar alternatives while exploiting observed success.
   let best=null,score=-Infinity;
@@ -261,10 +278,18 @@
        ({arcane:"Ink",frost:"Glass",fire:"Cinders",lightning:"Static"}[element])};
    const remembered=m.prior.plans.find(p=>p.element===element&&p.motif===motif&&
       (p.tactic||"probe")===tactic);
+   const assessment=Board&&ob?.pos&&ob?.player?
+     Board.evaluate(candidate,{...ob,lastPlayer:m.lastPlayer,
+       dodgePreference:dodgePreference(m)},m.attacks):null;
+   candidate.forecast=assessment?Number(assessment.score.toFixed(3)):0;
+   candidate.threatened=assessment?.threatened||0;
+   candidate.free=assessment?.free??5;
+   candidate.plies=assessment?.plies||1;
    const scoreNow=weight(m,element,motif,lead,feint)+
       (remembered?.score||0)*.36+rand(m)*1.8+
       (tactic==="herd"&&m.attacks>=1?.3:0)+
-      (tactic==="fork"&&suspicious>.8?.55:0);
+      (tactic==="fork"&&suspicious>.8?.55:0)+
+      (assessment?assessment.score*2.1:0);
    if(scoreNow>score){best=candidate;score=scoreNow;}
   }
   return best;
@@ -471,7 +496,11 @@
    const judgment=judgeOpening(m,ob,danger,threats);
    if(judgment.hold)return declineOpening(m,ob,judgment,speed);
    m.tempo.precommit=false;
-   const plan=invent(m);
+   const plan=invent(m,ob);
+   m.board.forecast=plan.forecast||0;
+   m.board.threatened=plan.threatened||0;
+   m.board.free=plan.free??5;
+   m.board.plies=plan.plies||1;
    plan.tellTarget={x:player.x,y:player.y}; // Physical observation at windup, never future input.
    // 75% shorter charge: normal 670ms → 168ms; deceptive 1080ms → 270ms.
    m.held=plan;m.until=time+(plan.feint?270:168);
@@ -486,6 +515,12 @@
   if(!m)return;
   // Incoming damage informs defensive caution, not omniscient counter tags.
   m.lastHp=time;m.learned+=Math.min(3,damage/25);
+ }
+ function onVolley(m,plan,time,player){
+  if(!m?.board||!player||!plan)return;
+  const last=m.lastPlayer||{vx:0,vy:0};
+  if(m.board.probes.length>=3)m.board.probes.shift();
+  m.board.probes.push({at:time,x:player.x,y:player.y,vx:last.vx||0,vy:last.vy||0});
  }
  function onHit(m,projectile){
   if(!m||!projectile)return;
@@ -508,6 +543,8 @@
   for(const k of ["anticipation","disruption","wasted"])
    p.judgment[k]=clamp((p.judgment[k]||0)*.74+
      m.seen.judgment[k]*.55,0,80);
+  for(const k of ["forced","unforced","observed"])
+   p.pressure[k]=clamp((p.pressure[k]||0)*.72+m.board[k]*.38,0,80);
   for(const e of m.experiments){
    let item=p.plans.find(x=>x.motif===e.motif&&x.element===e.element&&(x.tactic||"probe")===e.tactic);
    if(!item){item={motif:e.motif,element:e.element,tactic:e.tactic,lead:false,feint:false,score:0};p.plans.push(item);}
@@ -549,5 +586,5 @@
   }
   return angles;
  }
- return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,TACTICS,read,make,observe,invent,decide,onDamage,onHit,remember,planDirections,predictBolt,visibleBolts,chooseDodge,openingPlan,followupPlan,trackEscape,judgeOpening,declineOpening});
+ return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,TACTICS,read,make,observe,invent,decide,onDamage,onHit,onVolley,remember,planDirections,predictBolt,visibleBolts,chooseDodge,openingPlan,followupPlan,trackEscape,judgeOpening,declineOpening});
 });
