@@ -376,7 +376,9 @@
  function onHit(m,projectile){
   if(!m||!projectile)return;
   m.successes++;
-  const tactic=TACTICS.includes(projectile.tactic)?projectile.tactic:"probe";
+  const tactic=TACTICS.includes(projectile.tactic)?projectile.tactic:
+   (m.lastPlan?.motif===projectile.motif&&m.lastPlan?.element===projectile.element?
+    (m.lastPlan.tactic||"probe"):"probe");
   const p=m.experiments.find(e=>e.motif===projectile.motif&&e.element===projectile.element&&e.tactic===tactic);
   if(p)p.hits++;else m.experiments.push({motif:projectile.motif,element:projectile.element,tactic,hits:1});
  }
