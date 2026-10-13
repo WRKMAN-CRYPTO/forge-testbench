@@ -376,8 +376,9 @@
  function onHit(m,projectile){
   if(!m||!projectile)return;
   m.successes++;
-  const p=m.experiments.find(e=>e.motif===projectile.motif&&e.element===projectile.element);
-  if(p)p.hits++;else m.experiments.push({motif:projectile.motif,element:projectile.element,hits:1});
+  const tactic=TACTICS.includes(projectile.tactic)?projectile.tactic:"probe";
+  const p=m.experiments.find(e=>e.motif===projectile.motif&&e.element===projectile.element&&e.tactic===tactic);
+  if(p)p.hits++;else m.experiments.push({motif:projectile.motif,element:projectile.element,tactic,hits:1});
  }
  function remember(m,result){
   if(!m||m.leaveSaved)return false;
@@ -386,13 +387,13 @@
   p.element=p.element.map((v,i)=>clamp(v*.72+m.seen.element[i]*.30,0,80));
   p.dodges=p.dodges.map((v,i)=>clamp(v*.70+m.seen.dodges[i]*.32,0,80));
   for(const e of m.experiments){
-   let item=p.plans.find(x=>x.motif===e.motif&&x.element===e.element);
-   if(!item){item={motif:e.motif,element:e.element,lead:false,feint:false,score:0};p.plans.push(item);}
+   let item=p.plans.find(x=>x.motif===e.motif&&x.element===e.element&&(x.tactic||"probe")===e.tactic);
+   if(!item){item={motif:e.motif,element:e.element,tactic:e.tactic,lead:false,feint:false,score:0};p.plans.push(item);}
    item.score=clamp(item.score+.4*e.hits,-5,10);
   }
-  if(m.lastPlan&&!m.experiments.some(e=>e.motif===m.lastPlan.motif&&e.element===m.lastPlan.element)){
-   let item=p.plans.find(x=>x.motif===m.lastPlan.motif&&x.element===m.lastPlan.element);
-   if(!item){item={motif:m.lastPlan.motif,element:m.lastPlan.element,lead:!!m.lastPlan.lead,feint:!!m.lastPlan.feint,score:0};p.plans.push(item)}
+  if(m.lastPlan&&!m.experiments.some(e=>e.motif===m.lastPlan.motif&&e.element===m.lastPlan.element&&e.tactic===(m.lastPlan.tactic||"probe"))){
+   let item=p.plans.find(x=>x.motif===m.lastPlan.motif&&x.element===m.lastPlan.element&&(x.tactic||"probe")===(m.lastPlan.tactic||"probe"));
+   if(!item){item={motif:m.lastPlan.motif,element:m.lastPlan.element,tactic:m.lastPlan.tactic||"probe",lead:!!m.lastPlan.lead,feint:!!m.lastPlan.feint,score:0};p.plans.push(item)}
    item.score=clamp(item.score-.25,-5,10);
   }
   p.plans=p.plans.sort((a,b)=>b.score-a.score).slice(0,6);
