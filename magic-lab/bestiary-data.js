@@ -11,6 +11,15 @@
  const FIELDS=["name","title","category","habitat","temperament","hp","radius","symbol",
                "description","behaviors","abilities","counterplay","notes","tags"];
  const DEFAULTS=[
+ {id:"archivist",name:"The Archivist",title:"The Learning Adversary",category:"Superboss",
+  habitat:"The Living Archive · Stargate ✶ ☽ ◇ ✦ ⬡ ☼",
+  temperament:"Curious, calculating, capable of deliberate deception",
+  hp:1650,radius:32,symbol:"✶",tags:"Boss, Learning, Memory, Invention, Deception",
+  description:"A recurring arcane construct. Unlike ordinary creatures, he regards defeat as information. One vessel may fall while portions of his observations survive the encounter.",
+  behaviors:"OBSERVE → INSCRIBE → EXPERIMENT → REASSESS\nRetains partial preferences and successful inventions between encounters on this device. Does not inspect your rune layout or predict future inputs.",
+  abilities:"Invents physical projectile spells by combining Arcane/Frost/Fire/Lightning with Lance, Fan, Pincer or Spiral patterns, optional lead aiming and false telegraphs. Successful tests are remembered. Frost projectiles can briefly stagger.",
+  counterplay:"His readings are imperfect. Teach him a false dodge habit, use changing timings, deflect his physical volleys and exploit the windup before a spell releases.",
+  notes:"Implemented Build 059 in archivist-mind.js, archivist-combat.js and combat.js. Reserved gate code 721360. Bounded attack combinations; full 32x32 autonomous spell-field synthesis is future work."},
  {id:"glassrunner",name:"Glassrunner",title:"The Crystal Dodger",category:"Skirmisher",habitat:"Hostile arenas • Home Lab",
   temperament:"Aggressive hunter",hp:125,radius:19,symbol:"◈",tags:"Crystal, Evade, Burst",
   description:"A slender cyan crystal lizard. Reads real incoming projectile trajectories, not spell names. Can be fooled, cornered, staggered or hit mid-dodge.",
