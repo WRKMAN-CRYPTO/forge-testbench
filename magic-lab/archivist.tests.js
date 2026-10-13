@@ -548,4 +548,29 @@ check('old saved memories load with zero pressure without losing prior defeats',
  assert.equal(m.prior.defeats,38);
  assert.deepEqual(m.prior.pressure,{forced:0,unforced:0,observed:0});
 });
+check('pressure evidence changes the score of the tactic that actually fired',()=>{
+ function play(shift){
+  const storage={data:null,getItem(){return this.data},setItem(k,v){this.data=v}};
+  const m=Brain.make(storage,0),info={element:'fire',motif:'fan',tactic:'herd'};
+  m.lastPlan=info;m.attempts=[{...info,tries:1,hits:0}];
+  m.observedAt=1000;m.lastPlayer={x:500,y:305,vx:0,vy:0};
+  Brain.onVolley(m,info,1000,{x:500,y:305});
+  Brain.observe(m,{time:1600,pos:{x:800,y:305},
+   player:{x:500,y:305+shift},shots:[],casts:[]});
+  assert.equal(Brain.remember(m,'defeat'),true);
+  return Brain.make(storage,1800).prior.plans.find(p=>p.tactic==='herd').score;
+ }
+ const moved=play(120),steady=play(0);
+ assert.ok(moved>steady,'observed evasion must strengthen a tactic relative to a missed attack');
+ assert.ok(moved<0,'mere movement should not outweigh an actual missed hit');
+});
+check('only an actual projectile release creates a pressure observation',()=>{
+ const m=Brain.make(store,0);
+ assert.equal(m.board.probes.length,0);
+ const dummy={time:1000,pos:{x:800,y:305},player:{x:500,y:305}};
+ Brain.judgeOpening(m,dummy,false,[]);
+ assert.equal(m.board.probes.length,0);
+ Brain.onVolley(m,{element:'arcane',motif:'lance',tactic:'probe'},1000,{x:500,y:305});
+ assert.equal(m.board.probes.length,1);
+});
 console.log('Archivist 065 checks passed: '+passed);
