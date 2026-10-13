@@ -136,7 +136,12 @@
  }
  function visibleBolts(ob){
   const found=[];
-  for(const p of (ob.shots||[]).slice(0,MAX_SENSED)){
+  let checked=0;
+  for(const p of (ob.shots||[])){
+   // His own Ember spells are not Arc Bolts and cannot hide incoming bolts
+   // by filling the front of the shared projectile queue.
+   if(p?.body?.gameTag!=="bolt")continue;
+   if(++checked>MAX_SENSED)break;
    const threat=predictBolt(ob.pos,ob.velocity,ob.radius||32,p);
    if(threat)found.push(threat);
   }
