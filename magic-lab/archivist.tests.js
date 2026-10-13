@@ -5,6 +5,7 @@
 const assert=require('node:assert/strict');
 const Regions=require('./region-gate.js');
 const Brain=require('./archivist-mind.js');
+const Board=require('./archivist-board.js');
 const Act=require('./archivist-combat.js');
 let passed=0;
 function check(label,fn){fn();passed++;console.log('✓ '+label);}
@@ -471,4 +472,80 @@ check('retained Judgment memory is capped and backward-compatible',()=>{
  assert.deepEqual(Brain.make(mem,5000).prior.judgment,
    {anticipation:80,disruption:0,wasted:0});
 });
-console.log('Archivist 064 checks passed: '+passed);
+check('board planner compares five actual escape lanes under bounded two-ply budgets',()=>{
+ const ob={pos:{x:800,y:305},player:{x:400,y:305},lastPlayer:{vx:0,vy:0}};
+ const probe={element:'frost',motif:'lance',tactic:'probe',count:3,spread:.11,speed:8};
+ const trap={element:'frost',motif:'fan',tactic:'herd',count:5,spread:.5,speed:6.6};
+ const a=Board.evaluate(probe,ob),b=Board.evaluate(trap,ob);
+ assert.equal(a.paths.length,5);assert.equal(b.paths.length,5);
+ assert.equal(a.plies,1);assert.equal(b.plies,2);
+ assert.equal(a.budget,3);assert.equal(b.budget,5);
+ assert.ok(a.threatened>0,'direct bolt has at least one realistic threatened lane');
+ assert.ok(b.free>0,'counterplay lane always remains in test encounter');
+ assert.ok(Number.isFinite(a.score)&&Number.isFinite(b.score));
+});
+check('board forecasts respond to an actually observed circling velocity',()=>{
+ const plans=[
+  {tactic:'probe',motif:'lance',count:3,spread:.11,speed:8},
+  {tactic:'fork',motif:'fan',count:5,spread:.5,speed:6.6}
+ ];
+ const base={pos:{x:800,y:305},player:{x:400,y:305}};
+ const still=Board.compare(plans,{...base,lastPlayer:{vx:0,vy:0}});
+ const running=Board.compare(plans,{...base,lastPlayer:{vx:0,vy:240}});
+ assert.ok(Math.abs(still[0].assessment.score-running[0].assessment.score)>.1,
+ 'real observed movement changes a physical escape forecast');
+});
+check('planner geometry matches the real Archivist projectile geometry',()=>{
+ const m=Brain.make(store,0);
+ const plan={element:'fire',motif:'pincer',tactic:'fork',stage:'opening',
+  count:3,spread:.65,speed:6.6,angleBias:0};
+ const a=Brain.planDirections(m,plan,{x:800,y:305},{x:400,y:305});
+ const b=Board.angles(plan,{x:800,y:305},{x:400,y:305},m.attacks);
+ assert.deepEqual(a,b,'planner cannot secretly use different attack physics');
+});
+check('invented attacks are re-ranked by board control without stat inflation',()=>{
+ const m=Brain.make(store,0);m.attacks=8;m.seed=8;
+ m.seen.dodges=[2,8];
+ m.lastPlayer={vx:0,vy:0};
+ const p=Brain.invent(m,{pos:{x:800,y:305},player:{x:400,y:305},obstacles:[]});
+ assert.ok(p.forecast>0&&Number.isFinite(p.forecast));
+ assert.ok(p.threatened>=0&&p.free>=0);
+ assert.ok(p.count>=3&&p.count<=6&&p.speed<=8);
+ assert.ok([1,2].includes(p.plies));
+ const noInput=Brain.invent(Brain.make(store,0));
+ assert.equal(noInput.forecast,0,'older callers remain supported');
+});
+check('continuous straight-line movement is NOT counted as a forced dodge',()=>{
+ const m=Brain.make(store,0);
+ m.observedAt=1000;m.lastPlayer={x:500,y:300,vx:100,vy:0};
+ Brain.onVolley(m,{motif:'fan'},1000,{x:500,y:300});
+ Brain.observe(m,{time:1600,pos:{x:800,y:305},
+  player:{x:560,y:300},shots:[],casts:[]});
+ assert.equal(m.board.forced,0);
+ assert.equal(m.board.unforced,1);
+ assert.equal(m.board.observed,1);
+ assert.equal(m.board.probes.length,0,'probe must resolve once, not every frame');
+});
+check('stopping or reversing after an actual volley is measurable pressure',()=>{
+ const m=Brain.make(store,0);
+ m.observedAt=1000;m.lastPlayer={x:500,y:300,vx:0,vy:0};
+ Brain.onVolley(m,{motif:'fan'},1000,{x:500,y:300});
+ Brain.observe(m,{time:1600,pos:{x:800,y:305},
+  player:{x:500,y:420},shots:[],casts:[]});
+ assert.equal(m.board.forced,1);
+ assert.equal(m.board.unforced,0);
+ const own={getItem(){return null},setItem(k,v){this.data=v}};
+ m.storage=own;
+ assert.equal(Brain.remember(m,'defeat'),true);
+ const p=Brain.make({getItem(){return own.data}},2000);
+ assert.ok(p.prior.pressure.forced>0);
+});
+check('old saved memories load with zero pressure without losing prior defeats',()=>{
+ const storage={getItem(){return JSON.stringify({version:1,encounters:40,
+  defeats:38,wins:0,element:[1,2,3,4],dodges:[5,6],feints:5,
+  judgment:{anticipation:3,disruption:2,wasted:1},plans:[]})}};
+ const m=Brain.make(storage,0);
+ assert.equal(m.prior.defeats,38);
+ assert.deepEqual(m.prior.pressure,{forced:0,unforced:0,observed:0});
+});
+console.log('Archivist 065 checks passed: '+passed);
