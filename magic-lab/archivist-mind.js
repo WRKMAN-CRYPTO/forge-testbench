@@ -40,7 +40,7 @@
    state:"observe",intent:{x:0,y:0,speed:0},held:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0]},
    learned:0,observedAt:time,pressure:{x:0,y:0,count:0},
    // Projectile impressions are held only during this physical encounter.
-   boltSeen:null,dodgeUntil:0,dodgeCooldown:0,dodgeDirection:null,
+   boltSeen:null,dodgeUntil:0,dodgeCooldown:0,dodgeDirection:null,dodgeLaunch:false,
    boltDodges:0,boltThreats:0,attacks:0,successes:0,experiments:[],lastPlan:null,
    leaveSaved:false,quoteAt:0,quote:"I have not seen your methods.",lastHp:1,
    seed:(0x9e3779b9^Math.imul(prior.encounters+1,0x85ebca6b))>>>0};
@@ -252,7 +252,7 @@
    if(recognized&&time>=m.dodgeCooldown){
     const choice=chooseDodge(m,ob,threats,speed);
     if(choice&&choice.risk<400&&first.ticks>2){
-     m.dodgeDirection=choice.dir;
+     m.dodgeDirection=choice.dir;m.dodgeLaunch=true;
      m.dodgeUntil=time+clamp(first.ticks*16.67+125,260,720);
      m.dodgeCooldown=m.dodgeUntil+clamp(180+rand(m)*170,180,350);
      m.boltDodges++;
@@ -265,7 +265,9 @@
    const dir=m.dodgeDirection;
    m.intent={x:dir.x,y:dir.y,speed}; // original movement speed, unchanged
    m.state="evade-bolt";
-   return {move:m.intent,threat:threats[0]||null};
+   const launch=m.dodgeLaunch;
+   m.dodgeLaunch=false;
+   return {move:m.intent,launch,threat:threats[0]||null};
   }
   if(danger){
    const bx=hazard.x/hz,by=hazard.y/hz;
