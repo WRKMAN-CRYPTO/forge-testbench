@@ -741,7 +741,7 @@ if(window.WRKMAN_WANDRUNE_ART){
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / WANDRUNE</strong><span>BUILD 058 • CONVERGENCE</span></div>
+   <div class="menuHeader"><strong>W / WANDRUNE</strong><span>BUILD 059 • THE ARCHIVIST</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="gateMenuOpen" type="button">✧ DIAL GATE</button>
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
@@ -885,6 +885,7 @@ if(window.WRKMAN_WANDRUNE_ART){
   <div class="gateActions">
    <button id="gateBack" type="button">⌫ ERASE</button>
    <button id="gateClear" type="button">CLEAR</button>
+  <button id="gateArchivist" type="button" title="Load the Archivist’s six-glyph Stargate address">✶ ARCHIVIST</button>
    <button id="gateTravel" type="button" disabled>✧ ENGAGE</button>
    <button id="gateHome" type="button" hidden>⌂ HOME LAB</button>
   </div>
@@ -905,12 +906,14 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./creature-mind.js?v=045"></script>
 <script src="./territory-mind.js?v=046"></script>
 <script src="./glassrunner-mind.js?v=052"></script>
-<script src="./combat.js?v=052"></script>
+<script src="./archivist-mind.js?v=059"></script>
+<script src="./archivist-combat.js?v=059"></script>
+<script src="./combat.js?v=059"></script>
 <script src="./elements.js?v=048"></script>
 <script src="./hue-forge.js?v=012"></script>
 <script src="./spell-loadout.js?v=034"></script>
 <script src="./wildlife.js?v=032"></script>
-<script src="./region-gate.js?v=033"></script>
+<script src="./region-gate.js?v=059"></script>
 <script src="../field-physics.js?v=037"></script>
 <script src="./element-sources.js?v=050"></script>
 <script src="./swarm-runes.js?v=058"></script>
@@ -2114,6 +2117,12 @@ $("gateNearby").addEventListener("click",openGate);
 $("gateDone").addEventListener("click",()=>closeGate());
 $("gateBack").addEventListener("click",()=>{gateDigits.pop();gateDialVersion=Regions?.VERSION||1;renderGateDial();});
 $("gateClear").addEventListener("click",()=>{gateDigits.length=0;gateDialVersion=Regions?.VERSION||1;renderGateDial();});
+$("gateArchivist").addEventListener("click",()=>{
+ if(!Regions?.ARCHIVE_ADDRESS)return;
+ gateDigits.splice(0,gateDigits.length,...Regions.ARCHIVE_ADDRESS.split(""));
+ gateDialVersion=Regions.VERSION;renderGateDial();
+ $("gateMessage").textContent="✶ THE ARCHIVIST · SIX GLYPHS ALIGNED · ENGAGE TO TRAVEL";
+});
 $("gateTravel").addEventListener("click",()=>{
  if(gateDigits.length!==6||!Regions)return;
  const address=gateDigits.join("");
