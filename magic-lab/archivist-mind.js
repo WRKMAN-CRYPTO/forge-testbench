@@ -1,4 +1,4 @@
-/* WANDRUNE 065 | The Archivist: Judgment, Tempo and Refusing a Trap
+/* WANDRUNE 066 | The Archivist: Judgment, Tempo and Refusing a Trap
  * No global player profiling. One creature, a bounded, imperfect memory.
  * Observes visible physical movement / nearby elemental matter, not rune layouts
  * or future inputs. Experimental physical projectile motifs are composable.
@@ -16,7 +16,7 @@
  const Board=typeof window!=="undefined"?window.WRKMAN_ARCHIVIST_BOARD:
    typeof require==="function"?require("./archivist-board.js"):null;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- const fresh=()=>({version:1,encounters:0,defeats:0,wins:0,element:[0,0,0,0],dodges:[0,0],feints:0,judgment:{anticipation:0,disruption:0,wasted:0},pressure:{forced:0,unforced:0,observed:0},plans:[],lastLine:""});
+ const fresh=()=>({version:1,encounters:0,defeats:0,wins:0,element:[0,0,0,0],dodges:[0,0],feints:0,judgment:{anticipation:0,disruption:0,wasted:0},pressure:{forced:0,unforced:0,observed:0},edict:{uses:0,hits:0,escaped:0},plans:[],lastLine:""});
  function validate(raw){
   const m=fresh();if(!raw||raw.version!==1)return m;
   for(const k of ["encounters","defeats","wins"])m[k]=clamp(Math.floor(Number(raw[k])||0),0,999);
@@ -28,6 +28,7 @@
    m.judgment[k]=clamp(Number(raw.judgment?.[k])||0,0,80);
   for(const k of ["forced","unforced","observed"])
    m.pressure[k]=clamp(Number(raw.pressure?.[k])||0,0,80);
+  for(const k of ["uses","hits","escaped"])m.edict[k]=clamp(Number(raw.edict?.[k])||0,0,80);
   if(Array.isArray(raw.plans))m.plans=raw.plans.slice(0,6).filter(x=>
    x&&MOTIFS.includes(x.motif)&&ELEMENTS.includes(x.element)&&
    Number.isFinite(x.score)).map(x=>({motif:x.motif,element:x.element,
@@ -52,7 +53,7 @@
    // Projectile impressions are held only during this physical encounter.
    boltSeen:null,dodgeUntil:0,dodgeCooldown:0,dodgeDirection:null,dodgeLaunch:false,
    boltDodges:0,boltThreats:0,attacks:0,successes:0,experiments:[],lastPlan:null,
-   leaveSaved:false,quoteAt:0,quote:"I have not seen your methods.",lastHp:-1,
+   leaveSaved:false,quoteAt:0,quote:"I have not seen your methods.",lastHp:-1,edict:null,edictStats:{uses:0,hits:0,escaped:0},lastEdictAttack:-10,
    seed:(0x9e3779b9^Math.imul(prior.encounters+1,0x85ebca6b))>>>0};
  }
  function rand(m){
