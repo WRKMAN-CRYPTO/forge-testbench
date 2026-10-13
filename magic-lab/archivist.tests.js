@@ -204,7 +204,7 @@ check('a tactical attack executes two physical volleys with original damage',()=
  const m=Brain.make(store,0);
  const plan={element:'fire',motif:'pincer',tactic:'herd',count:4,spread:.65,
   speed:6.6,lead:false,feint:false,tellTarget:{x:330,y:305},name:'Mirror of Cinders'};
- const first=Brain.openingPlan(m,1500,{x:330,y:305});
+ const first=Brain.openingPlan(m,plan,1500,{x:330,y:305});
  m.lastPlayer={x:325,y:380,vx:0,vy:175};
  const reply=Brain.followupPlan(m,{time:2250,pos:{x:800,y:305},player:{x:325,y:380}});
  const Body={setVelocity(b,v){b.velocity=v}};
