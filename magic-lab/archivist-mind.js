@@ -277,7 +277,7 @@
    // Pay time for suspicion. The marker remains visible, giving the player
    // a chance to reverse yet again.
    if(!p.waited&&p.due-ob.time<340&&p.due-ob.time>=-125){
-    p.waited=true;p.due=Math.max(p.due,ob.time+240);
+    p.waited=true;p.due=Math.max(p.due+220,ob.time+250);
    }
   }
   p.lastMoveSide=side;
