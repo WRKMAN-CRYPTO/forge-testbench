@@ -177,6 +177,7 @@
   let lastGlowTime=0;
   function setQuality(level){
    q=safeQuality(level);
+   if(q==="low")for(const halo of glows)halo.setAlpha(0).setVisible(false);
    try{localStorage.setItem(PREF,q);}catch(_){}
    return q;
   }
