@@ -348,6 +348,8 @@
    renderBudget:active.reduce((n,c)=>n+c.recipe.settings.renderLimit,0),
    mass:active.reduce((sum,c)=>sum+c.agents.reduce((m,a)=>m+Runes.mass(a),0),0),
    runeMerges:active.reduce((n,c)=>n+(c.runeMerges||0),0),runeSplits:active.reduce((n,c)=>n+(c.runeSplits||0),0),
+    convergenceMarked:active.reduce((n,c)=>n+c.agents.reduce((m,a)=>m+(a.convergence?1:0),0),0),
+    converging:active.reduce((n,c)=>n+(c.converging||0),0),
    healLinked:active.some(c=>c.healLinked),pulses:active.reduce((n,c)=>n+c.pulses,0),
    collisions:active.reduce((n,c)=>n+c.collisions,0),consumed:active.reduce((n,c)=>n+c.consumed,0),agedOut:active.reduce((n,c)=>n+c.agedOut,0),free:active.reduce((n,c)=>n+c.free,0),
    offscreen:active.reduce((n,c)=>n+c.offscreen,0),physics:Motion.VERSION,
