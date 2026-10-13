@@ -280,7 +280,8 @@
  }
  function decide(m,ob){
   const {time,pos,player,health=1}=ob;
-  if(time<m.nextThink)return null;
+  // Casting completion is checked exactly when ready, even between slower thinking ticks.
+  if(time<m.nextThink&&!(m.held&&time>=m.until))return null;
   m.nextThink=time+125;
   observe(m,ob);
   const dx=player.x-pos.x,dy=player.y-pos.y,d=Math.max(1,Math.hypot(dx,dy));
@@ -360,7 +361,8 @@
   if(d<680&&time>=m.attackAt){
    const plan=invent(m);
    plan.tellTarget={x:player.x,y:player.y}; // Physical observation at windup, never future input.
-   m.held=plan;m.until=time+(plan.feint?1080:670);
+   // 75% shorter charge: normal 670ms → 168ms; deceptive 1080ms → 270ms.
+   m.held=plan;m.until=time+(plan.feint?270:168);
    m.state=plan.feint?"mislead":"inscribe";
    m.quote=plan.feint?"Observe the obvious answer.":"An unfamiliar arrangement...";
    return {move:{x:0,y:0,speed:0},tell:plan};
