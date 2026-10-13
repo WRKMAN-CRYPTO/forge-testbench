@@ -1,4 +1,4 @@
-/* WANDRUNE 063 | The Archivist: Counter-Deception and Forked Threats
+/* WANDRUNE 064 | The Archivist: Judgment, Tempo and Refusing a Trap
  * No global player profiling. One creature, a bounded, imperfect memory.
  * Observes visible physical movement / nearby elemental matter, not rune layouts
  * or future inputs. Experimental physical projectile motifs are composable.
@@ -14,7 +14,7 @@
  const MOTIFS=["lance","fan","pincer","spiral"];
  const TACTICS=["probe","herd","bait","fork"];
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- const fresh=()=>({version:1,encounters:0,defeats:0,wins:0,element:[0,0,0,0],dodges:[0,0],feints:0,plans:[],lastLine:""});
+ const fresh=()=>({version:1,encounters:0,defeats:0,wins:0,element:[0,0,0,0],dodges:[0,0],feints:0,judgment:{anticipation:0,disruption:0,wasted:0},plans:[],lastLine:""});
  function validate(raw){
   const m=fresh();if(!raw||raw.version!==1)return m;
   for(const k of ["encounters","defeats","wins"])m[k]=clamp(Math.floor(Number(raw[k])||0),0,999);
@@ -22,6 +22,8 @@
    if(Array.isArray(raw[k]))m[k]=m[k].map((_,i)=>clamp(Number(raw[k][i])||0,0,80));
   }
   m.feints=clamp(Number(raw.feints)||0,0,80);
+  for(const k of ["anticipation","disruption","wasted"])
+   m.judgment[k]=clamp(Number(raw.judgment?.[k])||0,0,80);
   if(Array.isArray(raw.plans))m.plans=raw.plans.slice(0,6).filter(x=>
    x&&MOTIFS.includes(x.motif)&&ELEMENTS.includes(x.element)&&
    Number.isFinite(x.score)).map(x=>({motif:x.motif,element:x.element,
@@ -39,7 +41,8 @@
  function make(storage,time=0){
   const prior=read(storage);
   return {prior,storage,started:time,nextThink:time,until:0,attackAt:time+2200,
-   state:"observe",intent:{x:0,y:0,speed:0},held:null,pending:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0],feints:0},attempts:[],
+   state:"observe",intent:{x:0,y:0,speed:0},held:null,pending:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0],feints:0,judgment:{anticipation:0,disruption:0,wasted:0}},attempts:[],
+    tempo:{anticipatedFor:null,precommit:false,lastHoldCast:-99,holdUntil:0,holds:0,probe:null},
    learned:0,observedAt:time,pressure:{x:0,y:0,count:0},
    // Projectile impressions are held only during this physical encounter.
    boltSeen:null,dodgeUntil:0,dodgeCooldown:0,dodgeDirection:null,dodgeLaunch:false,
@@ -72,8 +75,33 @@
     m.learned+=.18;
    }
   }
-  m.lastPlayer={x:player.x,y:player.y,vx:previous?(player.x-previous.x)/dt:0,
+  const current={x:player.x,y:player.y,vx:previous?(player.x-previous.x)/dt:0,
     vy:previous?(player.y-previous.y)/dt:0};
+  m.lastPlayer=current;
+  const speed=Math.hypot(current.vx,current.vy);
+  // Anticipation is observed movement BEFORE the known firing opportunity,
+  // never a read of future controls. A running player can fool this inference.
+  if(m.attacks>0&&!m.held&&!m.pending&&
+     m.attackAt-time>100&&m.attackAt-time<575&&
+     m.tempo.anticipatedFor!==m.attackAt&&speed>130){
+   m.tempo.anticipatedFor=m.attackAt;
+   m.tempo.precommit=true;
+   m.seen.judgment.anticipation=clamp(m.seen.judgment.anticipation+.45,0,80);
+  }
+  const probe=m.tempo.probe;
+  if(probe&&time-probe.at>=220){
+   const velocityChanged=previous?
+    Math.hypot(current.vx-previous.vx,current.vy-previous.vy):0;
+   const moved=Math.hypot(player.x-probe.x,player.y-probe.y);
+   const disrupted=(Math.abs(speed-probe.speed)>110||velocityChanged>210||moved>82);
+   if(disrupted){
+    m.seen.judgment.disruption=clamp(m.seen.judgment.disruption+1,0,80);
+    m.tempo.probe=null;
+   }else if(time-probe.at>=850){
+    m.seen.judgment.wasted=clamp(m.seen.judgment.wasted+1,0,80);
+    m.tempo.probe=null;
+   }
+  }
   // Look only at nearby observed agents, sample no more than 48 per frame.
   if(!d||d>RANGE+240){m.pressure={x:0,y:0,count:0};return;}
   let budget=48,px=0,py=0,nearby=0;
@@ -313,6 +341,45 @@
   m.state="countermove";m.quote="Let's see where you land.";
   return plan;
  }
+
+ // Actual tactical judgment: a tempting opening can be declined.
+ // Confidence comes from OBSERVED behavior, and it can be wrong.
+ function judgeOpening(m,ob,danger,threats){
+  if(m.attacks<1||m.pending||m.held||danger||threats.length||
+     m.attacks-m.tempo.lastHoldCast<2)return {hold:false,reason:"engage"};
+  const speed=Math.hypot(m.lastPlayer?.vx||0,m.lastPlayer?.vy||0);
+  const still=speed<65,close=Math.hypot(ob.player.x-ob.pos.x,ob.player.y-ob.pos.y)<360;
+  const bait=still&&close&&ob.time-m.lastHp<2500;
+  const anticipation=m.tempo.precommit&&m.tempo.anticipatedFor===m.attackAt;
+  // No cues? He continues attacking instead of rolling an arbitrary idle.
+  if(!bait&&!anticipation)return {hold:false,reason:"engage"};
+  const memory=m.prior.judgment||{anticipation:0,disruption:0,wasted:0};
+  const confidence=(bait?2.0:0)+(anticipation?1.8:0)+
+   Math.min(1.1,(m.seen.feints+m.prior.feints*.5)*.16)+
+   Math.min(.7,(memory.disruption||0)*.16)-
+   Math.min(1.4,(memory.wasted||0)*.18);
+  const chance=clamp(.14+.14*confidence,.12,.82);
+  if(rand(m)>chance)return {hold:false,reason:"uncertain"};
+  return {hold:true,reason:bait?"suspected-bait":"anticipated-rhythm",
+   delay:Math.round(350+rand(m)*360)};
+ }
+ function declineOpening(m,ob,judgment,speed){
+  m.tempo.lastHoldCast=m.attacks;
+  m.tempo.holds++;
+  m.tempo.holdUntil=ob.time+judgment.delay;
+  m.attackAt=m.tempo.holdUntil; // Extends cooldown; NEVER makes an earlier attack.
+  m.tempo.precommit=false;
+  const previous=m.lastPlayer||{vx:0,vy:0};
+  m.tempo.probe={at:ob.time,x:ob.player.x,y:ob.player.y,
+    speed:Math.hypot(previous.vx,previous.vy)};
+  const dx=ob.pos.x-ob.player.x,dy=ob.pos.y-ob.player.y,
+   len=Math.max(1,Math.hypot(dx,dy));
+  // Existing walking speed. Positioning is a refusal, not an invulnerable dodge.
+  m.intent={x:dx/len-.35*dy/len,y:dy/len+.35*dx/len,speed};
+  m.state="decline-bait";
+  m.quote="Not every opening is an invitation.";
+  return {move:m.intent,declined:true,reason:judgment.reason,until:m.attackAt};
+ }
  function decide(m,ob){
   const {time,pos,player,health=1}=ob;
   // Casting completion is checked exactly when ready, even between slower thinking ticks.
@@ -395,7 +462,14 @@
    }
    return {move:{x:0,y:0,speed:0},tell:m.held};
   }
+  if(time<m.tempo.holdUntil){
+   m.state="decline-bait";
+   return {move:m.intent,declined:true};
+  }
   if(d<680&&time>=m.attackAt){
+   const judgment=judgeOpening(m,ob,danger,threats);
+   if(judgment.hold)return declineOpening(m,ob,judgment,speed);
+   m.tempo.precommit=false;
    const plan=invent(m);
    plan.tellTarget={x:player.x,y:player.y}; // Physical observation at windup, never future input.
    // 75% shorter charge: normal 670ms → 168ms; deceptive 1080ms → 270ms.
@@ -430,6 +504,9 @@
   p.element=p.element.map((v,i)=>clamp(v*.72+m.seen.element[i]*.30,0,80));
   p.dodges=p.dodges.map((v,i)=>clamp(v*.70+m.seen.dodges[i]*.32,0,80));
   p.feints=clamp((p.feints||0)*.75+m.seen.feints*.8,0,80);
+  for(const k of ["anticipation","disruption","wasted"])
+   p.judgment[k]=clamp((p.judgment[k]||0)*.74+
+     m.seen.judgment[k]*.55,0,80);
   for(const e of m.experiments){
    let item=p.plans.find(x=>x.motif===e.motif&&x.element===e.element&&(x.tactic||"probe")===e.tactic);
    if(!item){item={motif:e.motif,element:e.element,tactic:e.tactic,lead:false,feint:false,score:0};p.plans.push(item);}
@@ -471,5 +548,5 @@
   }
   return angles;
  }
- return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,TACTICS,read,make,observe,invent,decide,onDamage,onHit,remember,planDirections,predictBolt,visibleBolts,chooseDodge,openingPlan,followupPlan,trackEscape});
+ return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,TACTICS,read,make,observe,invent,decide,onDamage,onHit,remember,planDirections,predictBolt,visibleBolts,chooseDodge,openingPlan,followupPlan,trackEscape,judgeOpening,declineOpening});
 });
