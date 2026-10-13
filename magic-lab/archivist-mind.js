@@ -47,7 +47,7 @@
    // Projectile impressions are held only during this physical encounter.
    boltSeen:null,dodgeUntil:0,dodgeCooldown:0,dodgeDirection:null,dodgeLaunch:false,
    boltDodges:0,boltThreats:0,attacks:0,successes:0,experiments:[],lastPlan:null,
-   leaveSaved:false,quoteAt:0,quote:"I have not seen your methods.",lastHp:1,
+   leaveSaved:false,quoteAt:0,quote:"I have not seen your methods.",lastHp:-1,
    seed:(0x9e3779b9^Math.imul(prior.encounters+1,0x85ebca6b))>>>0};
  }
  function rand(m){
@@ -349,7 +349,7 @@
      m.attacks-m.tempo.lastHoldCast<2)return {hold:false,reason:"engage"};
   const speed=Math.hypot(m.lastPlayer?.vx||0,m.lastPlayer?.vy||0);
   const still=speed<65,close=Math.hypot(ob.player.x-ob.pos.x,ob.player.y-ob.pos.y)<360;
-  const bait=still&&close&&ob.time-m.lastHp<2500;
+  const bait=still&&close&&m.lastHp>=m.started&&ob.time-m.lastHp<2500;
   const anticipation=m.tempo.precommit&&m.tempo.anticipatedFor===m.attackAt;
   // No cues? He continues attacking instead of rolling an arbitrary idle.
   if(!bait&&!anticipation)return {hold:false,reason:"engage"};
