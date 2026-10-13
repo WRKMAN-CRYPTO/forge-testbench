@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 050 / five composable runes
+/* WANDRUNE 058 / six composable runes
  * Third 32x32 instruction layer, independent of grayscale and birth elements.
  * Conserves represented agent mass through merge and fracture.
  * Agents retain rune memory: learned behavior stays after leaving its pixel.
@@ -16,7 +16,8 @@
   Object.freeze({id:2,key:'fracture',name:'FRACTURE',color:'#ffb778',symbol:'F'}),
   Object.freeze({id:3,key:'impulse',name:'IMPULSE',color:'#a8e885',symbol:'I'}),
   Object.freeze({id:4,key:'seeker',name:'SEEKER',color:'#ff8cc0',symbol:'S'}),
-  Object.freeze({id:5,key:'phase',name:'PHASE',color:'#90e4ef',symbol:'P'})
+  Object.freeze({id:5,key:'phase',name:'PHASE',color:'#90e4ef',symbol:'P'}),
+  Object.freeze({id:6,key:'convergence',name:'CONVERGENCE',color:'#92f0d9',symbol:'C'})
  ]);
  const byId=id=>TYPES[id]||TYPES[0];
  function normalize(raw){
@@ -47,6 +48,8 @@
   if(other.runeSeen)for(const id of other.runeSeen)receiver.runeSeen.add(id);
   receiver.seekUntil=Math.max(receiver.seekUntil||0,other.seekUntil||0);
   receiver.phaseUntil=Math.max(receiver.phaseUntil||0,other.phaseUntil||0);
+  // Behemoth keeps any learned Convergence identity; Fracture copies it to children.
+  receiver.convergence=!!(receiver.convergence||other.convergence);
   return receiver;
  }
  function fracture(a){
@@ -113,6 +116,9 @@
    agent.seekUntil=Math.max(agent.seekUntil||0,time+2000);
   }else if(code===5){
    agent.phaseUntil=Math.max(agent.phaseUntil||0,time+2000);
+  }else if(code===6){
+   // Only agents touching painted Convergence cells learn to regroup.
+   agent.convergence=true;
   }
   return [agent];
  }
@@ -187,20 +193,50 @@
   }
   st.agents=next;
   if(!scene)return;
+  // No new bodies or global hunting. The existing Seeker gets first refusal;
+  // only idle, rune-marked agents participate in Convergence.
+  // One group per elemental signature in THIS cast, not all spells in the arena.
+  // World axes are measured using real field scale so rotation is irrelevant.
+  const sx=st.delivery==='world'?st.worldW:st.scale;
+  const sy=st.delivery==='world'?st.worldH:st.scale;
+  const groups=new Map(),idle=[];
+  st.converging=0;
   for(const a of next){
-   if((a.seekUntil||0)<=time)continue;
-   const target=acquireTarget(st,scene,a);
-   if(!target)continue;
-   const d=Math.hypot(target.dx,target.dy)||1;
-   a.vx+=target.dx/d*.22*Math.min(2,dt*60);
-   a.vy+=target.dy/d*.22*Math.min(2,dt*60);
+   a.converging=false;
+   const target=(a.seekUntil||0)>time?acquireTarget(st,scene,a):null;
+   if(target){
+    const d=Math.hypot(target.dx,target.dy)||1;
+    a.vx+=target.dx/d*.22*Math.min(2,dt*60);
+    a.vy+=target.dy/d*.22*Math.min(2,dt*60);
+    const speed=Math.hypot(a.vx,a.vy);
+    if(speed>5){a.vx*=5/speed;a.vy*=5/speed}
+    continue;
+   }
+   if(!a.convergence||!Number.isFinite(a.x)||!Number.isFinite(a.y))continue;
+   const element=a.element||0;
+   let group=groups.get(element);
+   if(!group){group={count:0,x:0,y:0};groups.set(element,group)}
+   group.count++;group.x+=a.x;group.y+=a.y;
+   idle.push(a);
+  }
+  for(const a of idle){
+   const group=groups.get(a.element||0);
+   if(!group||group.count<2)continue;
+   // Exclude the agent's own position, avoiding a self-aiming one-body group.
+   const mx=(group.x-a.x)/(group.count-1),my=(group.y-a.y)/(group.count-1);
+   const dx=(mx-a.x)*sx,dy=(my-a.y)*sy,d=Math.hypot(dx,dy);
+   // A gathering zone instead of a forced collapse into one pixel.
+   if(d<36||!Number.isFinite(d))continue;
+   const thrust=.15*Math.min(2,Math.max(0,dt*60))*Math.min(1,d/130);
+   a.vx+=dx/d*thrust;a.vy+=dy/d*thrust;
    const speed=Math.hypot(a.vx,a.vy);
    if(speed>5){a.vx*=5/speed;a.vy*=5/speed}
+   a.converging=true;st.converging++;
   }
  }
  function configure(st){
   st.runeCount=st.recipe.runes.reduce((n,v)=>n+(v!==0),0);
-  st.runeAnchors=new Map();st.runeMerges=0;st.runeSplits=0;
+  st.runeAnchors=new Map();st.runeMerges=0;st.runeSplits=0;st.converging=0;
  }
- return Object.freeze({VERSION:'050',TYPES,byId,normalize,mass,radius,composition,combine,fracture,tile,traverse,configure,onBirth,advance});
+ return Object.freeze({VERSION:'058',TYPES,byId,normalize,mass,radius,composition,combine,fracture,tile,traverse,configure,onBirth,advance});
 });
