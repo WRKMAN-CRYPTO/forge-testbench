@@ -220,6 +220,9 @@
      if(!running)startFrame();
      // Called synchronously from a tap; iOS allows this user-initiated play().
      tryPlay(mode);
+     // Unlock the second element in the same user gesture for later iOS battle switches.
+     // Its routed gain remains zero until the crossfade requests it.
+     tryPlay(mode==="main"?"battle":"main");
    }
    function setEnabled(next){
      enabled=Boolean(next);persist();
@@ -284,7 +287,7 @@
    }
    return {initialize,unlock,setEnabled,setVolume,selectFiles,setMode,updateWorld,
      suspend,resume,destroy,get enabled(){return enabled;},get volume(){return volume;},
-     get mode(){return mode;},get sources(){return {...sourceReady};}};
+     get mode(){return mode;},get unlocked(){return unlocked;},get sources(){return {...sourceReady};}};
  }
  return Object.freeze({KEYS,FILES,PREF,envelope,threat,create});
 });
