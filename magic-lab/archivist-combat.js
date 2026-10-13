@@ -1,4 +1,4 @@
-/* WANDRUNE 061 | Archivist physical boss combat adapter.
+/* WANDRUNE 063 | Archivist physical boss combat adapter.
  * Mind may decide and invent; only this layer is permitted to spawn projectiles.
  * The existing Matter and combat damage loops remain authoritative.
  */
@@ -40,7 +40,7 @@
   s.burst(e.body.position.x,e.body.position.y,COLORS[plan.element],13,4);
   const description=plan.stage==="opening"?"OPENING GAMBIT":
      plan.stage==="followup"?"COUNTERMOVE":"INVENTS";
-  s.announceCombat("ARCHIVIST "+description+" • "+plan.name.toUpperCase());
+  s.announceCombat("ARCHIVIST "+description+" • "+(plan.tactic==="fork"?"FORKED ":"")+plan.name.toUpperCase());
   return true;
  }
  function step(s,e,time,delta,Body,hitPlayer){
@@ -125,6 +125,15 @@
    const ax=-Math.sin(direction),ay=Math.cos(direction);
    const guess={x:from.x+ax*m.pending.side*52,
      y:from.y+ay*m.pending.side*52};
+   if(m.pending.plan?.tactic==="fork"){
+    // Split lanes are visible, and leaving the middle untouched is intentional.
+    for(const side of [-1,1]){
+     const lane={x:from.x+ax*side*76,y:from.y+ay*side*76};
+     g.lineStyle(1.4,0xf2c891,.36+.3*pulse);
+     g.lineBetween(x,y,lane.x,lane.y);
+     g.strokeCircle(lane.x,lane.y,12+2*pulse);
+    }
+   }
    g.lineStyle(1.5,0xffcf97,.42+.30*pulse);
    g.lineBetween(x,y,guess.x,guess.y);
    g.strokeCircle(guess.x,guess.y,12+3*pulse);
@@ -143,7 +152,8 @@
    g.strokeCircle(x,y,36+4*pulse);
   }
   if(e.moodText?.active){
-   const state=m?.state==="countermove"?"COUNTERMOVE":
+   const state=m?.state==="question-bait"?"QUESTIONING BAIT":
+    m?.state==="countermove"?"COUNTERMOVE":
     m?.state==="read-escape"?"READING ESCAPE":
     m?.state==="evade-bolt"?"READING ARC / EVADE":
     m?.state==="inscribe"?"INSCRIBING":
