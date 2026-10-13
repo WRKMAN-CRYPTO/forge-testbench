@@ -129,6 +129,15 @@ check('threat evaluation considers multiple real incoming bolts',()=>{
  assert.ok(choice&&Number.isFinite(choice.risk));
  assert.ok(choice.dir.y<0,'move away from second bolt rather than into its corridor');
 });
+check('the boss own sixteen spells cannot hide incoming Arc Bolts',()=>{
+ const own=Array.from({length:16},()=>({body:{gameTag:'ember',labAlive:true,
+   position:{x:580,y:305},velocity:{x:-6,y:0}}}));
+ const bolt={body:{gameTag:'bolt',labAlive:true,position:{x:430,y:305},
+   velocity:{x:13,y:0}}};
+ const detected=Brain.visibleBolts({pos:{x:800,y:305},velocity:{x:0,y:0},
+   radius:32,shots:[...own,bolt]});
+ assert.equal(detected.length,1,'same global projectile queue contains all enemies');
+});
 check('evasion requires perception and has no teleport, speed boost or invulnerability',()=>{
  const shot={body:{gameTag:'bolt',labAlive:true,position:{x:430,y:305},velocity:{x:13,y:0}}};
  const m=Brain.make(store,0),pos={x:800,y:305},base={pos,velocity:{x:0,y:0},
