@@ -104,9 +104,11 @@
   if(result){
    let hit=false;
    if(result.inside){
-    const before=s.combat?.hp;
+    // Even lethal damage counts, despite testing mode resetting the wizard
+    // to full HP. Dash and normal hurt-invulnerability still protect him.
+    hit=!!s.combat&&time>=(s.combat.invulnUntil||0)&&
+      time>=(s.dashUntil||0);
     hitPlayer(s,mark.damage,mark.x,mark.y,"Edict of Motion");
-    hit=typeof before==="number"?s.combat.hp<before:true;
    }
    mark.resolved=true;mark.resolvedAt=time;mark.inside=result.inside;
    M.onEdictOutcome(m,{hit,escaped:!result.inside});
