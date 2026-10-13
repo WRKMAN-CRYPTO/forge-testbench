@@ -113,6 +113,17 @@
     g.lineBetween(x,y,x+Math.cos(a)*125,y+Math.sin(a)*125);
    }
   }
+  if(m?.state==="evade-bolt"){
+   // Player-facing cue: the Archivist is reading an ACTUAL visible bolt.
+   // A quick amber/cyan annotation, not immunity or a fake projectile.
+   const observed=m.boltSeen?.body;
+   if(observed?.labAlive&&observed.position){
+    g.lineStyle(1.3,0x9de9ff,.50+.25*pulse);
+    g.lineBetween(x,y,observed.position.x,observed.position.y);
+   }
+   g.lineStyle(2,0x9de9ff,.42+.4*pulse);
+   g.strokeCircle(x,y,36+4*pulse);
+  }
   if(e.moodText?.active){
    const state=m?.state==="evade-bolt"?"READING ARC / EVADE":
     m?.state==="inscribe"?"INSCRIBING":
