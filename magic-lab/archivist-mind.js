@@ -91,9 +91,17 @@
    const expected={x:probe.x+probe.vx*elapsed,y:probe.y+probe.vy*elapsed};
    const deviation=Math.hypot(player.x-expected.x,player.y-expected.y);
    const acceleration=Math.hypot(current.vx-probe.vx,current.vy-probe.vy);
-   if(deviation>62||acceleration>180)m.board.forced++;
+   const changed=deviation>62||acceleration>180;
+   if(changed)m.board.forced++;
    else m.board.unforced++;
    m.board.observed++;
+   const tactic=TACTICS.includes(probe.tactic)?probe.tactic:"probe";
+   const attempt=m.attempts.find(a=>a.motif===probe.motif&&
+     a.element===probe.element&&a.tactic===tactic);
+   if(attempt){
+    if(changed)attempt.changed=(attempt.changed||0)+1;
+    else attempt.unchanged=(attempt.unchanged||0)+1;
+   }
   }
   m.board.probes=m.board.probes.filter(x=>time-x.at<500);
   // Anticipation is observed movement BEFORE the known firing opportunity,
@@ -289,7 +297,12 @@
       (remembered?.score||0)*.36+rand(m)*1.8+
       (tactic==="herd"&&m.attacks>=1?.3:0)+
       (tactic==="fork"&&suspicious>.8?.55:0)+
-      (assessment?assessment.score*2.1:0);
+      (assessment?assessment.score*2.1:0)+
+      (()=>{
+       const past=m.attempts.find(a=>a.motif===motif&&a.element===element&&a.tactic===tactic);
+       return past?clamp(((past.changed||0)-(past.unchanged||0)*.35)/
+         Math.max(1,past.tries)*.25,-.45,.45):0;
+      })();
    if(scoreNow>score){best=candidate;score=scoreNow;}
   }
   return best;
@@ -520,7 +533,8 @@
   if(!m?.board||!player||!plan)return;
   const last=m.lastPlayer||{vx:0,vy:0};
   if(m.board.probes.length>=3)m.board.probes.shift();
-  m.board.probes.push({at:time,x:player.x,y:player.y,vx:last.vx||0,vy:last.vy||0});
+  m.board.probes.push({at:time,x:player.x,y:player.y,vx:last.vx||0,vy:last.vy||0,
+    element:plan.element,motif:plan.motif,tactic:plan.tactic||"probe"});
  }
  function onHit(m,projectile){
   if(!m||!projectile)return;
@@ -558,7 +572,11 @@
   for(const attempt of m.attempts){
    const item=p.plans.find(x=>x.motif===attempt.motif&&x.element===attempt.element&&
       (x.tactic||"probe")===attempt.tactic);
-   if(item)item.score=clamp(item.score-Math.max(0,attempt.tries-attempt.hits)*.19,-5,10);
+   if(item){
+    const penalty=Math.max(0,attempt.tries-attempt.hits)*.19;
+    const motion=(attempt.changed||0)*.12-(attempt.unchanged||0)*.045;
+    item.score=clamp(item.score-penalty+motion,-5,10);
+   }
   }
   p.plans=p.plans.sort((a,b)=>b.score-a.score).slice(0,6);
   p.encounters=clamp(p.encounters+1,0,999);
