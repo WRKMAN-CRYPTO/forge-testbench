@@ -714,6 +714,8 @@ function step(s,time,delta){
    }
   }
   if(!e.alive)continue;
+  if(e.type==="archivist"&&Archive?.tickHazards)
+   Archive.tickHazards(s,e,time,hitPlayer);
   // Stagger suspends intent, not physics: sliding bodies continue to move
   // under their actual velocity, gravity and impacts.
   if(time<e.staggerUntil){
