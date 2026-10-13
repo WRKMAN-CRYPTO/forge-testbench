@@ -268,4 +268,51 @@ check('no tactical casts circumvent stun, real bolt dodges, or existing attack c
  assert.equal(m.attacks,1,'followup did not count as another cast');
  assert.equal(m.attackAt,afterFirst,'followup did not shorten attack cooldown');
 });
-console.log('Archivist 061 checks passed: '+passed);
+check('normal spell charge shortened 75%, releasing on intended frame',()=>{
+ let m=null,result=null;
+ for(let seed=1;seed<=80;seed++){
+  m=Brain.make(store,0);m.seed=seed;m.attackAt=0;
+  result=Brain.decide(m,{time:1000,pos:{x:800,y:305},player:{x:330,y:305},casts:[],shots:[]});
+  if(result?.tell&&!result.tell.feint)break;
+ }
+ assert.ok(result?.tell&&!result.tell.feint);
+ assert.equal(m.until,1168,'670ms quarter rounded to 168ms');
+ assert.equal(Brain.decide(m,{time:1167,pos:{x:800,y:305},player:{x:330,y:305},casts:[],shots:[]})?.release,undefined);
+ assert.ok(Brain.decide(m,{time:1168,pos:{x:800,y:305},player:{x:330,y:305},casts:[],shots:[]})?.release,
+  'charge release must not wait for next scheduled cognition tick');
+});
+check('deceptive spell charge shortened 75%, without cooldown changes',()=>{
+ let m=null,result=null;
+ for(let seed=1;seed<=240;seed++){
+  m=Brain.make(store,0);m.seed=seed;m.attackAt=0;
+  result=Brain.decide(m,{time:1000,pos:{x:800,y:305},player:{x:330,y:305},casts:[],shots:[]});
+  if(result?.tell&&result.tell.feint)break;
+ }
+ assert.ok(result?.tell?.feint);
+ assert.equal(m.until,1270,'1080ms quarter = 270ms');
+ assert.equal(Brain.decide(m,{time:1269,pos:{x:800,y:305},player:{x:330,y:305},casts:[],shots:[]})?.release,undefined);
+ const released=Brain.decide(m,{time:1270,pos:{x:800,y:305},player:{x:330,y:305},casts:[],shots:[]});
+ assert.ok(released?.release);
+ assert.ok(m.attackAt-1270>=2250,'original post-cast cooldown preserved');
+});
+check('real combat adapter bypasses 120ms poll barrier at charge completion',()=>{
+ const body={position:{x:800,y:305},velocity:{x:0,y:0},mass:2},m=Brain.make(store,0);
+ m.attackAt=0;
+ const b={alive:true,id:12,hp:1650,maxHP:1650,r:32,archivist:m,
+  body,mindAt:0,mindIntent:null};
+ const launches=[];
+ const Body={setVelocity(o,v){o.velocity=v},applyForce(){}};
+ const scene={time:{now:1000},player:{x:330,y:305},projectiles:[],craftedShots:[],craftedAura:null,
+  combat:{pillars:[],debris:[]},actors:[],matter:{add:{circle(x,y){return{position:{x,y},velocity:{x:0,y:0}}}}},
+  burst(){},announceCombat(label){launches.push({at:scene.time.now,label})}};
+ // Force a normal (non-deceptive) opening to isolate schedule timing.
+ const original=Brain.invent(m);
+ m.held={...original,feint:false,tellTarget:{x:330,y:305}};
+ m.until=1168;m.nextThink=1125;m.attackAt=3400;b.mindAt=1120;
+ scene.time.now=1167;Act.step(scene,b,1167,16.667,Body,()=>{});
+ assert.equal(launches.length,0);
+ scene.time.now=1168;Act.step(scene,b,1168,16.667,Body,()=>{});
+ assert.equal(launches.length,1,'projectiles release without waiting for 120ms polling');
+ assert.equal(launches[0].at,1168);
+});
+console.log('Archivist 062 checks passed: '+passed);
