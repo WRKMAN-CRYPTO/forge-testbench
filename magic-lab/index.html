@@ -647,6 +647,13 @@ header .actions{display:flex;gap:6px}
 #bestiaryOverlay{position:fixed;inset:0;z-index:90;display:flex;align-items:stretch;justify-content:center;
  background:#04131de8;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 #bestiaryFrame{width:100%;max-width:1100px;min-height:0;height:100%;border:0;background:#091c2a}
+
+/* 054: Compact secondary music controls under the welcome button. */
+#modalFooter .musicRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+#modalFooter .musicRow button{border:1px solid #79b3a9;background:#1b3848;color:#c9f0e7;
+ padding:5px;min-height:30px;font:900 10px ui-monospace,monospace;letter-spacing:0}
+#modalFooter #welcomeMusicStatus{font-size:8px;color:#a9d1d3;white-space:normal}
+#musicStatus{font-size:9px;text-transform:none;line-height:1.25}
 </style>
 </head>
 <body>
@@ -661,7 +668,7 @@ header .actions{display:flex;gap:6px}
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 053 • BESTIARY</span></div>
+   <div class="menuHeader"><strong>W / ARCANE LAB</strong><span>BUILD 054 • SOUNDTRACK</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="gateMenuOpen" type="button">✧ DIAL GATE</button>
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
@@ -689,7 +696,11 @@ header .actions{display:flex;gap:6px}
     <div class="menuSettingGrid">
      <button id="menuHintToggle" type="button" aria-pressed="false">CAST HINTS: OFF</button>
      <button id="menuControlToggle" type="button" aria-pressed="true">CONTROLS: SOFT</button>
+     <button id="musicToggle" type="button" aria-pressed="true">♫ MUSIC: ON</button>
+     <button id="musicVolume" type="button">VOLUME: 68%</button>
+     <button id="musicImport" type="button">♫ IMPORT MP3</button>
     </div>
+    <div id="musicStatus" role="status" aria-live="polite" class="menuCaption">♫ A New Journey / Wizard Life · Import MP3s to play.</div>
    </div>
    <details class="menuDiagnostics">
     <summary>LAB TELEMETRY</summary>
@@ -710,6 +721,7 @@ header .actions{display:flex;gap:6px}
  </div>
 </header>
 <div id="menuShield" hidden aria-hidden="true"></div>
+ <input type="file" id="musicFiles" accept="audio/mpeg,.mp3" multiple hidden>
 <div id="stageWrap"><div id="stage"></div><div id="craftHud" hidden>⬡ FIELD ACTIVE</div><div id="regionTitle" hidden></div><button id="gateNearby" type="button" hidden>✧ DIAL GATE</button><div id="portalNearby" hidden></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP ORB TO FIRE</div>
 <button class="minibtn" id="dash" type="button" aria-label="Dash in movement direction">DASH</button>
 <div id="wheelDock" aria-label="Six-slot quarter-fan spell selector">
@@ -718,7 +730,11 @@ header .actions{display:flex;gap:6px}
   <span id="wheelGlyph" aria-hidden="true">✦</span><span id="wheelName">BOLT</span>
  </button>
  <div id="wheelReadout" aria-live="polite">HOLD + SLIDE TO EQUIP</div>
-</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show" role="dialog" aria-modal="true" aria-labelledby="labWelcomeTitle"><div id="modal"><h1 id="labWelcomeTitle">Magic has rules. Let's break some.</h1><p class="modalIntro">Cast spells. Shape the physics. Invent something dangerous. <b>Click ENTER THE LAB to begin.</b></p><div id="modalScroll"><details id="labGuide"><summary>CONTROLS &amp; FULL FIELD GUIDE</summary><div id="modalGuideContent"><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse or ⬡ Bound Field.</p><p><b>CRAFTED MAGIC:</b> In ☰ → SPELL FORGE, paint a 32×32 field, preview its agents, choose materials, name and save spells, then SAVE & EQUIP. The game automatically assigns ⬡ BOUND FIELD to a spell wheel slot. SYNC FIELD and JSON import remain available for outside experiments. Cast Bound Field from your feet. Choose AURA (follows your wizard), WORLD EMISSION (releases independent world agents), or PLACED FIELD (tap a world position) inside Spell Forge. Each agent's active lifespan is adjustable per spell (0.5 to 30 seconds, 5.5 by default). When time runs out, the hex stops colliding but continues to follow its original field physics as its opacity fades over 0.8 seconds. Empty casts release capacity immediately while their visual remnants keep moving and fade. World Emission starts at the painted high-value cells near the wizard, turns the field toward your aim, then releases every agent. There is no moving projectile container, invisible homing, or particle recycling. Cast up to three WORLD spells at once, within 6,000 total active agents. Rendering has a separate visible-agent budget. Each hex now physically collides with enemies, pillars, loose stone and solid props along its full trajectory, then disappears on impact. Hits are detected every frame; damage is capped per target to keep large swarms balanced. Linked Minor Heal pulses at the player's CURRENT position every three seconds. Toggle the link in ☰ before casting again. When no recipe is imported, FIRE RING is the starter example.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p></div></details></div><div id="modalFooter"><button id="begin" type="button">ENTER THE LAB →</button><span>FULL GUIDE ALSO AVAILABLE THROUGH NOTES</span></div></div></div></div>
+</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" class="show" role="dialog" aria-modal="true" aria-labelledby="labWelcomeTitle"><div id="modal"><h1 id="labWelcomeTitle">Magic has rules. Let's break some.</h1><p class="modalIntro">Cast spells. Shape the physics. Invent something dangerous. <b>Click ENTER THE LAB to begin.</b></p><div id="modalScroll"><details id="labGuide"><summary>CONTROLS &amp; FULL FIELD GUIDE</summary><div id="modalGuideContent"><p>Make a <b>Gravity Well</b>, then throw an <b>Arc Bolt</b> near it. Watch the trajectory curve naturally.</p><p><b>Phone:</b> Hold sideways. Left thumb moves. The right thumb uses the <b>CAST orb</b> in the bottom-right corner: tap to quick-cast, or hold and slide <b>up and left</b> into the six-rune quarter-fan, then release to equip. <b>DASH</b> stays immediately left of the orb, safely outside the fan. For targeted spells select the rune, then tap the arena to place it. Open <b>SPELLBOOK</b> to replace any of the six equipped spells, including swapping in Pulse or ⬡ Bound Field.</p><p><b>CRAFTED MAGIC:</b> In ☰ → SPELL FORGE, paint a 32×32 field, preview its agents, choose materials, name and save spells, then SAVE & EQUIP. The game automatically assigns ⬡ BOUND FIELD to a spell wheel slot. SYNC FIELD and JSON import remain available for outside experiments. Cast Bound Field from your feet. Choose AURA (follows your wizard), WORLD EMISSION (releases independent world agents), or PLACED FIELD (tap a world position) inside Spell Forge. Each agent's active lifespan is adjustable per spell (0.5 to 30 seconds, 5.5 by default). When time runs out, the hex stops colliding but continues to follow its original field physics as its opacity fades over 0.8 seconds. Empty casts release capacity immediately while their visual remnants keep moving and fade. World Emission starts at the painted high-value cells near the wizard, turns the field toward your aim, then releases every agent. There is no moving projectile container, invisible homing, or particle recycling. Cast up to three WORLD spells at once, within 6,000 total active agents. Rendering has a separate visible-agent budget. Each hex now physically collides with enemies, pillars, loose stone and solid props along its full trajectory, then disappears on impact. Hits are detected every frame; damage is capped per target to keep large swarms balanced. Linked Minor Heal pulses at the player's CURRENT position every three seconds. Toggle the link in ☰ before casting again. When no recipe is imported, FIRE RING is the starter example.</p><p><b>Spell origins:</b> Pulse and Frost start at your feet. Bolt fires toward your aim. Gravity, Flame Field, and Detonation are precisely placed on the arena.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Freeze briefly (2s field, short stagger), melt leftover ice with Flame, then let moving steam accumulate. Equip ⚡ SPARK on the six-slot wheel and tap inside the vapor for an electrical sphere. Gravity pulls steam and detonations shove it; hot steam damages enemies. This is material behavior, not a fixed combo trigger.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The three stone pillars are solid and destructible. Hit one with a charging enemy or cast Detonation directly on it. Cracks reveal its damage. When it breaks, the heavy core and smaller fragments become real physics objects that Gravity Well, Frost, and Detonation can fling into enemies. Four smaller rocks are already loose on the arena floor.</p><p><b>PC:</b> WASD or arrows move, mouse aims, click casts. Keys 1–6 select equipped wheel slots, SPACE dashes, E spawns an experiment object, R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p></div></details></div><div id="modalFooter"><button id="begin" type="button">ENTER THE LAB →</button>
+ <div class="musicRow"><button id="welcomeMusic" type="button">♫ PLAY NEW JOURNEY</button>
+ <button id="welcomeImport" type="button">IMPORT MUSIC</button></div>
+ <span id="welcomeMusicStatus">TAP ♫ TO START SOUNDTRACK · IPHONE SAFE</span>
+ </div></div></div></div>
 <div id="log" role="status" aria-live="polite">LAB ONLINE • Place a gravity well, then bend a bolt.</div>
 </div>
 <!-- 053: Bestiary stores local reference records, not live combat settings. -->
@@ -834,6 +850,7 @@ header .actions{display:flex;gap:6px}
 <script src="./field-precision-ui.js?v=050"></script>
 <script src="./scroll-generator.js?v=047"></script>
 <script src="./spell-forge.js?v=050"></script>
+<script src="./music.js?v=054"></script>
 <script>
 (()=>{
 "use strict";
@@ -859,6 +876,20 @@ const gameStorage={
   try{nativeStore?.removeItem(key);}catch(_){}
  }
 };
+// Build 054: no audio code lives inside the Phaser physics or rendering loop.
+const Music=window.WRKMAN_MUSIC||null;
+let music=null;
+if(Music){
+ try{
+  music=Music.create({storage:gameStorage,onStatus:message=>{
+   const menu=document.getElementById("musicStatus");
+   const intro=document.getElementById("welcomeMusicStatus");
+   if(menu)menu.textContent=message;
+   if(intro)intro.textContent=message;
+  }});
+  music.initialize().catch(()=>{});
+ }catch(_){music=null;}
+}
 // Logical camera viewport remains 960×600. The traversable world extends
 // beyond it in every direction, independently of device aspect ratio.
 const W=960,H=600,MINX=-800,MAXX=1760,MINY=-520,MAXY=1120;
@@ -2009,7 +2040,7 @@ gateOverlay.addEventListener("keydown",e=>{
 renderGateDial();
 renderGateJournal();
 
-$("begin").onclick=()=>{started=true;$("instructions").classList.remove("show");scene?.scene.resume();if($("labState").textContent==="READY")$("labState").textContent="START";announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
+$("begin").onclick=()=>{music?.setMode("main");music?.unlock();started=true;$("instructions").classList.remove("show");scene?.scene.resume();if($("labState").textContent==="READY")$("labState").textContent="START";announce("LAB ONLINE • Try Gravity, then Arc Bolt.");};
 $("notes").onclick=()=>{$("labGuide").open=true;$("instructions").classList.add("show");};
 $("reset").onclick=()=>{scene?.resetLab();};
 bindInstantPress($("dash"),()=>scene?.dash());
@@ -2050,6 +2081,49 @@ function saveGameSettings(){
 renderGameSettings();
 $("menuHintToggle").addEventListener("click",()=>{uiHints=!uiHints;saveGameSettings();});
 $("menuControlToggle").addEventListener("click",()=>{uiSoft=!uiSoft;saveGameSettings();});
+ // 054: Media import is user-triggered, suitable for Safari audio restrictions.
+ const updateMusicButtons=()=>{
+  $("musicToggle").textContent="♫ MUSIC: "+(music?.enabled?"ON":"OFF");
+  $("musicToggle").setAttribute("aria-pressed",String(Boolean(music?.enabled)));
+  $("welcomeMusic").textContent=music?.enabled?"♫ MUSIC ON":"♫ PLAY NEW JOURNEY";
+  $("musicVolume").textContent="VOLUME: "+Math.round((music?.volume||0.68)*100)+"%";
+ };
+ updateMusicButtons();
+ $("musicToggle").addEventListener("click",()=>{
+  if(music)music.setEnabled(!music.enabled);
+  updateMusicButtons();
+ });
+ $("welcomeMusic").addEventListener("click",()=>{
+  if(!music)return;
+  if(!music.enabled)music.setEnabled(true);
+  music.setMode("main");music.unlock();updateMusicButtons();
+ });
+ $("musicVolume").addEventListener("click",()=>{
+  if(!music)return;
+  const current=music.volume;
+  music.setVolume(current<.52?.68:current<.80?.9:.40);
+  updateMusicButtons();
+ });
+ $("musicImport").addEventListener("click",()=>$("musicFiles").click());
+ $("welcomeImport").addEventListener("click",()=>$("musicFiles").click());
+ $("musicFiles").addEventListener("change",event=>{
+  if(music)music.selectFiles(event.target.files);
+  event.target.value="";
+  updateMusicButtons();
+ });
+ document.addEventListener("visibilitychange",()=>{
+  if(!music)return;
+  if(document.hidden)music.suspend();else music.resume();
+ });
+ setInterval(()=>{
+  if(!music||!started||!scene||document.hidden||
+     !$("gameMenu").hidden||!$("spellbookOverlay").hidden||
+     !$("skinOverlay").hidden||!$("hueOverlay").hidden||
+     !$("bestiaryOverlay").hidden||!$("gateOverlay").hidden||
+     $("instructions").classList.contains("show"))return;
+  music.updateWorld(scene,true);
+ },420);
+
 function closeGameMenu(resume=true,focus=false){
  if(menuPanel.hidden)return;
  menuPanel.hidden=true;menuCover.hidden=true;
