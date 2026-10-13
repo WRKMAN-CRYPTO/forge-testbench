@@ -1605,9 +1605,18 @@ class Lab extends Phaser.Scene{
   this.renderWorld(time);
   if(this.craftedDraw){
    this.craftedDraw.clear();
-   this.elementVfx?.begin();
-   if(Crafted)Crafted.draw(this,this.craftedDraw,this.time.now);
-   this.elementVfx?.extras(this.time.now);
+   try{
+    this.elementVfx?.begin();
+    if(Crafted)Crafted.draw(this,this.craftedDraw,this.time.now);
+    this.elementVfx?.extras(this.time.now);
+   }catch(vfxError){
+    // Optional graphics must NEVER take the game or agent simulation down.
+    console.warn("Elemental visuals fell back to original draw",vfxError);
+    try{this.elementVfx?.destroy();}catch(_){}
+    this.elementVfx=null;
+    this.craftedDraw.clear();
+    if(Crafted)Crafted.draw(this,this.craftedDraw,this.time.now);
+   }
   }
   const fieldStatus=Crafted?Crafted.snapshot(this):{active:false};
   if(fieldStatus.active){
