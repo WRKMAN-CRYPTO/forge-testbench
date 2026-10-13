@@ -538,6 +538,22 @@
   // Incoming damage informs defensive caution, not omniscient counter tags.
   m.lastHp=time;m.learned+=Math.min(3,damage/25);
  }
+ function chooseEdict(m,ob){
+  if(!ob?.player||!ob?.pos||m.attacks<2||
+    m.attacks-m.lastEdictAttack<3||m.edict)return false;
+  const distance=Math.hypot(ob.pos.x-ob.player.x,ob.pos.y-ob.player.y);
+  if(distance>630||distance<120)return false;
+  const motion=Math.hypot(m.lastPlayer?.vx||0,m.lastPlayer?.vy||0);
+  const easy=m.board.unforced>=2&&m.board.unforced>=m.board.forced*.65;
+  const past=m.prior.edict||{hits:0,escaped:0};
+  const bias=clamp((past.hits-past.escaped)*.04,-.17,.18);
+  return rand(m)<clamp((motion<85?.58:easy?.50:.24)+bias,.12,.73);
+ }
+ function onEdictOutcome(m,result){
+  if(!m||!result)return;
+  if(result.hit)m.edictStats.hits++;
+  else m.edictStats.escaped++;
+ }
  function onVolley(m,plan,time,player){
   if(!m?.board||!player||!plan)return;
   const last=m.lastPlayer||{vx:0,vy:0};
@@ -568,6 +584,7 @@
      m.seen.judgment[k]*.55,0,80);
   for(const k of ["forced","unforced","observed"])
    p.pressure[k]=clamp((p.pressure[k]||0)*.72+m.board[k]*.38,0,80);
+  for(const k of ["uses","hits","escaped"])p.edict[k]=clamp((p.edict[k]||0)*.8+m.edictStats[k]*.55,0,80);
   for(const e of m.experiments){
    let item=p.plans.find(x=>x.motif===e.motif&&x.element===e.element&&(x.tactic||"probe")===e.tactic);
    if(!item){item={motif:e.motif,element:e.element,tactic:e.tactic,lead:false,feint:false,score:0};p.plans.push(item);}
@@ -613,5 +630,5 @@
   }
   return angles;
  }
- return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,TACTICS,read,make,observe,invent,decide,onDamage,onHit,onVolley,remember,planDirections,predictBolt,visibleBolts,chooseDodge,openingPlan,followupPlan,trackEscape,judgeOpening,declineOpening});
+ return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,TACTICS,read,make,observe,invent,decide,onDamage,onHit,onVolley,chooseEdict,onEdictOutcome,remember,planDirections,predictBolt,visibleBolts,chooseDodge,openingPlan,followupPlan,trackEscape,judgeOpening,declineOpening});
 });
