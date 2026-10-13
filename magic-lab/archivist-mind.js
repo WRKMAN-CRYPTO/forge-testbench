@@ -1,4 +1,4 @@
-/* WANDRUNE 061 | The Archivist: Tactical Offense
+/* WANDRUNE 063 | The Archivist: Counter-Deception and Forked Threats
  * No global player profiling. One creature, a bounded, imperfect memory.
  * Observes visible physical movement / nearby elemental matter, not rune layouts
  * or future inputs. Experimental physical projectile motifs are composable.
@@ -12,15 +12,16 @@
  const ADDRESS="721360",NAME="The Archivist",KEY="wrkman-wandrune-archivist-memory-v1",RANGE=530;
  const ELEMENTS=["arcane","frost","fire","lightning"];
  const MOTIFS=["lance","fan","pincer","spiral"];
- const TACTICS=["probe","herd","bait"];
+ const TACTICS=["probe","herd","bait","fork"];
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- const fresh=()=>({version:1,encounters:0,defeats:0,wins:0,element:[0,0,0,0],dodges:[0,0],plans:[],lastLine:""});
+ const fresh=()=>({version:1,encounters:0,defeats:0,wins:0,element:[0,0,0,0],dodges:[0,0],feints:0,plans:[],lastLine:""});
  function validate(raw){
   const m=fresh();if(!raw||raw.version!==1)return m;
   for(const k of ["encounters","defeats","wins"])m[k]=clamp(Math.floor(Number(raw[k])||0),0,999);
   for(const k of ["element","dodges"]){
    if(Array.isArray(raw[k]))m[k]=m[k].map((_,i)=>clamp(Number(raw[k][i])||0,0,80));
   }
+  m.feints=clamp(Number(raw.feints)||0,0,80);
   if(Array.isArray(raw.plans))m.plans=raw.plans.slice(0,6).filter(x=>
    x&&MOTIFS.includes(x.motif)&&ELEMENTS.includes(x.element)&&
    Number.isFinite(x.score)).map(x=>({motif:x.motif,element:x.element,
@@ -38,7 +39,7 @@
  function make(storage,time=0){
   const prior=read(storage);
   return {prior,storage,started:time,nextThink:time,until:0,attackAt:time+2200,
-   state:"observe",intent:{x:0,y:0,speed:0},held:null,pending:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0]},
+   state:"observe",intent:{x:0,y:0,speed:0},held:null,pending:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0],feints:0},attempts:[],
    learned:0,observedAt:time,pressure:{x:0,y:0,count:0},
    // Projectile impressions are held only during this physical encounter.
    boltSeen:null,dodgeUntil:0,dodgeCooldown:0,dodgeDirection:null,dodgeLaunch:false,
@@ -216,9 +217,13 @@
    const lead=rand(m)<.45,feint=rand(m)<(.12+Math.min(.25,m.learned/80));
    const observedDodge=m.seen.dodges[0]+m.seen.dodges[1]+
     m.prior.dodges[0]+m.prior.dodges[1];
+   const suspicious=m.seen.feints+m.prior.feints*.7;
+   const roll=rand(m);
    const tactic=observedDodge>.8?
-      (rand(m)<.36?"probe":rand(m)<.53?"herd":"bait"):
-      (m.attacks>=1&&rand(m)<.52?"herd":"probe");
+      (roll<.17?"probe":roll<.39?"herd":
+       roll<(suspicious>.8?.59:.76)?"bait":"fork"):
+      (m.attacks>=1&&roll<.28?"fork":
+       m.attacks>=1&&roll<.59?"herd":"probe");
    const candidate={element,motif,lead,feint,tactic,
      count:motif==="lance"?3:motif==="fan"?5:motif==="pincer"?4:6,
      spread:motif==="lance"?.11:motif==="fan"?.50:motif==="pincer"?.65:.84,
@@ -230,7 +235,8 @@
       (p.tactic||"probe")===tactic);
    const scoreNow=weight(m,element,motif,lead,feint)+
       (remembered?.score||0)*.36+rand(m)*1.8+
-      (tactic==="herd"&&m.attacks>=1?.3:0);
+      (tactic==="herd"&&m.attacks>=1?.3:0)+
+      (tactic==="fork"&&suspicious>.8?.55:0);
    if(scoreNow>score){best=candidate;score=scoreNow;}
   }
   return best;
@@ -245,14 +251,42 @@
  }
  function openingPlan(m,plan,time,player){
   const target={...(plan.tellTarget||player)};
-  if(plan.tactic!=="herd"&&plan.tactic!=="bait")
+  if(!["herd","bait","fork"].includes(plan.tactic))
    return {...plan,stage:"single",target};
   const count=Math.max(1,Math.ceil(plan.count/2));
   const side=dodgePreference(m);
   m.pending={plan:{...plan},due:time+750,from:{x:player.x,y:player.y},
-   side,remaining:plan.count-count};
+   side,remaining:plan.count-count,lastMoveSide:0,reversals:0,waited:false};
   return {...plan,stage:"opening",count,target,
    angleBias:-side*(plan.tactic==="bait"?.28:.17)};
+ }
+
+ // He sees which direction the player actually moves AFTER his first volley.
+ // A reversal is evidence of possible deliberate deception, not mind-reading.
+ function trackEscape(m,ob){
+  const p=m.pending,last=m.lastPlayer;
+  if(!p||!last)return;
+  const theta=Math.atan2(p.from.y-ob.pos.y,p.from.x-ob.pos.x);
+  const sideways={x:-Math.sin(theta),y:Math.cos(theta)};
+  const lateralSpeed=(last.vx||0)*sideways.x+(last.vy||0)*sideways.y;
+  if(Math.abs(lateralSpeed)<90)return;
+  const side=Math.sign(lateralSpeed);
+  if(p.lastMoveSide&&side!==p.lastMoveSide){
+   p.reversals++;
+   if(p.reversals===1)m.seen.feints=clamp(m.seen.feints+1,0,80);
+   // Pay time for suspicion. The marker remains visible, giving the player
+   // a chance to reverse yet again.
+   if(!p.waited&&p.due-ob.time<340&&p.due-ob.time>=-125){
+    p.waited=true;p.due=Math.max(p.due,ob.time+240);
+   }
+  }
+  p.lastMoveSide=side;
+ }
+ function registerAttempt(m,plan){
+  const tactic=TACTICS.includes(plan.tactic)?plan.tactic:"probe";
+  let item=m.attempts.find(x=>x.motif===plan.motif&&x.element===plan.element&&x.tactic===tactic);
+  if(!item){item={motif:plan.motif,element:plan.element,tactic,tries:0,hits:0};m.attempts.push(item);}
+  item.tries++;
  }
  function followupPlan(m,ob){
   const pending=m.pending;
@@ -274,7 +308,8 @@
      clamp(last.vy||0,-230,230)*.09,WORLD.top+75,WORLD.bottom-75)
   };
   const plan={...pending.plan,stage:"followup",count:pending.remaining,target,
-   spread:Math.min(.26,pending.plan.spread*.70),angleBias:0};
+   spread:Math.min(.26,pending.plan.spread*.70),angleBias:0,
+   contested:pending.reversals>0};
   m.state="countermove";m.quote="Let's see where you land.";
   return plan;
  }
@@ -338,18 +373,20 @@
     m.state="evade";return {move:m.intent};
    }
   }
+  if(m.pending)trackEscape(m,ob);
   if(m.pending&&time>=m.pending.due){
    const reply=followupPlan(m,ob);
    if(reply)return {move:m.intent,release:reply};
   }
   if(m.pending){
-   m.state="read-escape";
+   m.state=m.pending.waited?"question-bait":"read-escape";
    return {move:m.intent,counterTell:{target:{...m.pending.from},side:m.pending.side}};
   }
   if(m.held){
    m.state=m.held.feint?"mislead":"inscribe";
    if(time>=m.until){
     const ready=m.held;m.held=null;m.lastPlan=ready;m.attacks++;
+    registerAttempt(m,ready);
     const release=openingPlan(m,ready,time,player);
     m.attackAt=time+clamp(3300-m.learned*15,2250,3400);
     m.state="experiment";
@@ -383,6 +420,8 @@
     (m.lastPlan.tactic||"probe"):"probe");
   const p=m.experiments.find(e=>e.motif===projectile.motif&&e.element===projectile.element&&e.tactic===tactic);
   if(p)p.hits++;else m.experiments.push({motif:projectile.motif,element:projectile.element,tactic,hits:1});
+  const attempt=m.attempts.find(a=>a.motif===projectile.motif&&a.element===projectile.element&&a.tactic===tactic);
+  if(attempt)attempt.hits++;
  }
  function remember(m,result){
   if(!m||m.leaveSaved)return false;
@@ -390,6 +429,7 @@
   // Partial fading memory, only selected observations survive this vessel.
   p.element=p.element.map((v,i)=>clamp(v*.72+m.seen.element[i]*.30,0,80));
   p.dodges=p.dodges.map((v,i)=>clamp(v*.70+m.seen.dodges[i]*.32,0,80));
+  p.feints=clamp((p.feints||0)*.75+m.seen.feints*.8,0,80);
   for(const e of m.experiments){
    let item=p.plans.find(x=>x.motif===e.motif&&x.element===e.element&&(x.tactic||"probe")===e.tactic);
    if(!item){item={motif:e.motif,element:e.element,tactic:e.tactic,lead:false,feint:false,score:0};p.plans.push(item);}
@@ -399,6 +439,11 @@
    let item=p.plans.find(x=>x.motif===m.lastPlan.motif&&x.element===m.lastPlan.element&&(x.tactic||"probe")===(m.lastPlan.tactic||"probe"));
    if(!item){item={motif:m.lastPlan.motif,element:m.lastPlan.element,tactic:m.lastPlan.tactic||"probe",lead:!!m.lastPlan.lead,feint:!!m.lastPlan.feint,score:0};p.plans.push(item)}
    item.score=clamp(item.score-.25,-5,10);
+  }
+  for(const attempt of m.attempts){
+   const item=p.plans.find(x=>x.motif===attempt.motif&&x.element===attempt.element&&
+      (x.tactic||"probe")===attempt.tactic);
+   if(item)item.score=clamp(item.score-Math.max(0,attempt.tries-attempt.hits)*.19,-5,10);
   }
   p.plans=p.plans.sort((a,b)=>b.score-a.score).slice(0,6);
   p.encounters=clamp(p.encounters+1,0,999);
@@ -415,12 +460,16 @@
   const theta=Math.atan2(player.y-origin.y+Math.sign(latest.vy)*lead,player.x-origin.x+Math.sign(latest.vx)*lead)+(plan.angleBias||0);
   const angles=[];
   for(let i=0;i<plan.count;i++){
-   if(plan.motif==="lance")angles.push(theta+(i-1)*plan.spread*.55);
+   if(plan.tactic==="fork"&&plan.stage==="opening"){
+    // Two visible side corridors, leaving a center lane to outplay him.
+    const side=i<plan.count/2?-1:1;
+    angles.push(theta+side*(.24+.08*Math.floor(i/2)));
+   }else if(plan.motif==="lance")angles.push(theta+(i-1)*plan.spread*.55);
    else if(plan.motif==="fan")angles.push(theta+(i-2)*plan.spread);
    else if(plan.motif==="pincer")angles.push(theta+((i%2===0?-1:1)*(.20+Math.floor(i/2)*plan.spread)));
    else angles.push(theta+(i-2.5)*plan.spread+.23*(m.attacks%3));
   }
   return angles;
  }
- return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,TACTICS,read,make,observe,invent,decide,onDamage,onHit,remember,planDirections,predictBolt,visibleBolts,chooseDodge,openingPlan,followupPlan});
+ return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,TACTICS,read,make,observe,invent,decide,onDamage,onHit,remember,planDirections,predictBolt,visibleBolts,chooseDodge,openingPlan,followupPlan,trackEscape});
 });
