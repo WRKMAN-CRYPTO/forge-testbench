@@ -1,4 +1,4 @@
-/* WANDRUNE 059 | The Archivist
+/* WANDRUNE 060 | The Archivist: Physical Threat Perception
  * No global player profiling. One creature, a bounded, imperfect memory.
  * Observes visible physical movement / nearby elemental matter, not rune layouts
  * or future inputs. Experimental physical projectile motifs are composable.
@@ -38,7 +38,10 @@
   const prior=read(storage);
   return {prior,storage,started:time,nextThink:time,until:0,attackAt:time+2200,
    state:"observe",intent:{x:0,y:0,speed:0},held:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0]},
-   learned:0,observedAt:time,pressure:{x:0,y:0,count:0},attacks:0,successes:0,experiments:[],lastPlan:null,
+   learned:0,observedAt:time,pressure:{x:0,y:0,count:0},
+   // Projectile impressions are held only during this physical encounter.
+   boltSeen:null,dodgeUntil:0,dodgeCooldown:0,dodgeDirection:null,
+   boltDodges:0,boltThreats:0,attacks:0,successes:0,experiments:[],lastPlan:null,
    leaveSaved:false,quoteAt:0,quote:"I have not seen your methods.",lastHp:1,
    seed:(0x9e3779b9^Math.imul(prior.encounters+1,0x85ebca6b))>>>0};
  }
@@ -108,6 +111,81 @@
   m.learned=clamp(m.learned,0,1000);
   m.pressure={x:px,y:py,count:nearby};
  }
+
+ // Matter velocity uses pixels/physics tick (not pixels per second).
+ // Extrapolate only currently visible moving bodies. We do NOT inspect casts,
+ // inputs, future movement, or player intention for dodging decisions.
+ const BOLT_SENSE=450,MAX_SENSED=20,MAX_TICKS=37;
+ const WORLD=Object.freeze({left:-800,right:1760,top:-520,bottom:1120});
+ function predictBolt(pos,velocity,radius,shot){
+  const b=shot?.body||shot;
+  if(!b||b.gameTag!=="bolt"||b.labAlive===false||
+     !b.position||!b.velocity)return null;
+  const x=b.position.x-pos.x,y=b.position.y-pos.y;
+  if(!Number.isFinite(x)||!Number.isFinite(y)||Math.hypot(x,y)>BOLT_SENSE)return null;
+  const vx=b.velocity.x-(velocity?.x||0),vy=b.velocity.y-(velocity?.y||0);
+  const v2=vx*vx+vy*vy;
+  if(v2<4||x*vx+y*vy>=0)return null; // stationary or receding projectile
+  const ticks=-(x*vx+y*vy)/v2;
+  if(ticks<2||ticks>MAX_TICKS)return null;
+  const miss=Math.hypot(x+vx*ticks,y+vy*ticks);
+  const reach=radius+8+11; // honest collision size plus uncertainty
+  if(miss>=reach)return null; // don't waste dodges on near misses
+  return {ticks,miss,reach,shot:{x:b.position.x,y:b.position.y,
+   vx:b.velocity.x,vy:b.velocity.y,r:8},body:b};
+ }
+ function visibleBolts(ob){
+  const found=[];
+  for(const p of (ob.shots||[]).slice(0,MAX_SENSED)){
+   const threat=predictBolt(ob.pos,ob.velocity,ob.radius||32,p);
+   if(threat)found.push(threat);
+  }
+  return found.sort((a,b)=>a.ticks-b.ticks||a.miss-b.miss);
+ }
+ function edgePenalty(pos,dir,obstacles){
+  const dest={x:pos.x+dir.x*75,y:pos.y+dir.y*75};
+  let penalty=0;
+  if(dest.x<WORLD.left+52||dest.x>WORLD.right-52||
+     dest.y<WORLD.top+52||dest.y>WORLD.bottom-52)penalty+=420;
+  for(const o of (obstacles||[]).slice(0,14)){
+   if(!o?.position)continue;
+   const r=o.radius||28;
+   const ax=o.position.x-pos.x,ay=o.position.y-pos.y;
+   const projection=clamp(ax*dir.x+ay*dir.y,0,75);
+   if(Math.hypot(ax-dir.x*projection,ay-dir.y*projection)<r+35)penalty+=200;
+   if(Math.hypot(dest.x-o.position.x,dest.y-o.position.y)<r+40)penalty+=180;
+  }
+  return penalty;
+ }
+ function chooseDodge(m,ob,threats,speed){
+  const first=threats[0],b=first.shot;
+  const mag=Math.hypot(b.vx,b.vy)||1,axis={x:-b.vy/mag,y:b.vx/mag};
+  const directions=[axis,{x:-axis.x,y:-axis.y}];
+  let best=null;
+  for(let side=0;side<2;side++){
+   const dir=directions[side];
+   const time=Math.min(first.ticks,20);
+   // Damped dodge distance accounts for the acceleration required by a real
+   // Matter body: no teleport and no fictitious invulnerability.
+   const distance=speed*Math.max(0,time-2)*.72;
+   const destination={x:ob.pos.x+dir.x*distance,y:ob.pos.y+dir.y*distance};
+   let risk=edgePenalty(ob.pos,dir,ob.obstacles);
+   for(const t of threats){
+    const future={x:t.shot.x+t.shot.vx*t.ticks,
+     y:t.shot.y+t.shot.vy*t.ticks};
+    const futureSelf={x:destination.x+(ob.velocity?.x||0)*Math.min(5,t.ticks),
+     y:destination.y+(ob.velocity?.y||0)*Math.min(5,t.ticks)};
+    const clearance=Math.hypot(future.x-futureSelf.x,future.y-futureSelf.y);
+    if(clearance<t.reach+30)risk+=(t.reach+30-clearance)*3;
+   }
+   // A poor early theory can send him toward the wrong side; that bias is
+   // deterministic per encounter and small compared to actual collision risk.
+   const habit=m.prior?.dodges||[0,0];
+   risk+=((side===0?habit[0]:habit[1])||0)*.04;
+   if(!best||risk<best.risk)best={dir,risk};
+  }
+  return best;
+ }
  function weight(m,elem,motif,lead,feint){
   const preferred=m.seen.element.map((x,i)=>x+m.prior.element[i]);
   const max=Math.max(...preferred);
@@ -159,6 +237,36 @@
   // Actual visible clusters can interrupt an experiment. Never read rune
   // overlays, invisible agent positions or future player controls.
   const danger=hazard.count>=2&&hz>.45;
+  // A separate fast physical reflex runs at the same modest thought cadence.
+  // Learning improves recognition latency, never speed, damage or hitboxes.
+  const threats=visibleBolts(ob);
+  if(!threats.length)m.boltSeen=null;
+  if(threats.length){
+   m.boltThreats++;
+   const first=threats[0],same=m.boltSeen?.body===first.body;
+   const familiarity=clamp((m.prior?.element?.[0]||0)*3+m.seen.element[0]*2,0,105);
+   if(!same){
+    m.boltSeen={body:first.body,at:time,delay:clamp(240-familiarity+rand(m)*100,90,340)};
+   }
+   const recognized=time-m.boltSeen.at>=m.boltSeen.delay;
+   if(recognized&&time>=m.dodgeCooldown){
+    const choice=chooseDodge(m,ob,threats,speed);
+    if(choice&&choice.risk<400&&first.ticks>2){
+     m.dodgeDirection=choice.dir;
+     m.dodgeUntil=time+clamp(first.ticks*16.67+125,260,720);
+     m.dodgeCooldown=m.dodgeUntil+clamp(180+rand(m)*170,180,350);
+     m.boltDodges++;
+     // A real threat can interrupt an experiment. That costs him the cast.
+     if(m.held){m.held=null;m.attackAt=Math.max(m.attackAt,time+450);}
+    }
+   }
+  }
+  if(time<m.dodgeUntil&&m.dodgeDirection){
+   const dir=m.dodgeDirection;
+   m.intent={x:dir.x,y:dir.y,speed}; // original movement speed, unchanged
+   m.state="evade-bolt";
+   return {move:m.intent,threat:threats[0]||null};
+  }
   if(danger){
    const bx=hazard.x/hz,by=hazard.y/hz;
    m.intent={x:bx-normal.y*.24*sidestep,
@@ -238,5 +346,5 @@
   }
   return angles;
  }
- return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,read,make,observe,invent,decide,onDamage,onHit,remember,planDirections});
+ return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,read,make,observe,invent,decide,onDamage,onHit,remember,planDirections,predictBolt,visibleBolts,chooseDodge});
 });
