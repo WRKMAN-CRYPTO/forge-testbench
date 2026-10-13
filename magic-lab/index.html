@@ -705,7 +705,7 @@ header .actions{display:flex;gap:6px}
 <!-- First visible interface, even before Phaser is ready. The logo is already in the artwork. -->
 <div id="titleOverlay" role="dialog" aria-modal="true" aria-label="Wandrune title screen">
  <div id="titleFallback"><strong>WANDRUNE</strong><span>Magic is made, not given.</span></div>
- <img id="titleArtwork" src="./assets/wandrune-title.jpg?v=055"
+ <img id="titleArtwork" data-hosted-src="./assets/wandrune-title.jpg?v=055"
   alt="Wandrune title artwork: wizards overlooking a glowing portal and floating islands." decoding="async">
  <button type="button" id="titleArtPick" hidden>IMPORT TITLE ART</button>
  <div id="titleActions">
@@ -718,6 +718,17 @@ header .actions{display:flex;gap:6px}
  </div>
  <input id="titleArtFile" type="file" accept="image/jpeg,image/png,image/webp,image/avif" hidden>
 </div>
+<!-- Load just the painting before the game engine. The rest of the world can wait. -->
+<script src="./title-art.js?v=055"></script>
+<script>
+if(window.WRKMAN_WANDRUNE_ART){
+ const picture=document.getElementById("titleArtwork");
+ picture.addEventListener("load",()=>{
+  document.getElementById("titleOverlay").classList.add("art-ready");
+ },{once:true});
+ picture.src=window.WRKMAN_WANDRUNE_ART;
+}
+</script>
 <div id="shell">
 <header id="gameTopbar">
  <div id="healthHud" role="group" aria-label="Health and enemies">
@@ -908,7 +919,6 @@ header .actions{display:flex;gap:6px}
 <script src="./scroll-generator.js?v=047"></script>
 <script src="./spell-forge.js?v=050"></script>
 <script src="./music.js?v=054"></script>
-<script src="./title-art.js?v=055"></script>
 <script src="./title-screen.js?v=055"></script>
 <script>
 (()=>{
