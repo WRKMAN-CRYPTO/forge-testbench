@@ -1,4 +1,4 @@
-/* WANDRUNE 063 | Archivist physical boss combat adapter.
+/* WANDRUNE 064 | Archivist physical boss combat adapter.
  * Mind may decide and invent; only this layer is permitted to spawn projectiles.
  * The existing Matter and combat damage loops remain authoritative.
  */
@@ -65,6 +65,8 @@
     ].slice(0,14)
    });
    if(e.mindIntent?.release)fire(s,e,e.mindIntent.release,Body);
+   if(e.mindIntent?.newRefusal)
+    s.announceCombat("ARCHIVIST DECLINES • AN OPENING TOO CONVENIENT");
   }
   const intent=e.mindIntent?.move||e.archivist.intent||{x:0,y:0,speed:0};
   if(e.mindIntent?.launch){
@@ -140,6 +142,13 @@
    g.lineStyle(1,0xe5d0ff,.33+.25*pulse);
    g.strokeCircle(x,y,51+4*pulse);
   }
+  if(m?.state==="decline-bait"){
+   // An intentional decision to NOT attack must be readable, not invisible.
+   g.lineStyle(2,0xe6bc86,.5+.24*pulse);
+   g.strokeCircle(x,y,64+6*pulse);
+   g.lineStyle(1.2,0xe6bc86,.4+.2*pulse);
+   g.strokeCircle(x,y,80-4*pulse);
+  }
   if(m?.state==="evade-bolt"){
    // Player-facing cue: the Archivist is reading an ACTUAL visible bolt.
    // A quick amber/cyan annotation, not immunity or a fake projectile.
@@ -152,7 +161,8 @@
    g.strokeCircle(x,y,36+4*pulse);
   }
   if(e.moodText?.active){
-   const state=m?.state==="question-bait"?"QUESTIONING BAIT":
+   const state=m?.state==="decline-bait"?"DECLINING BAIT":
+     m?.state==="question-bait"?"QUESTIONING BAIT":
     m?.state==="countermove"?"COUNTERMOVE":
     m?.state==="read-escape"?"READING ESCAPE":
     m?.state==="evade-bolt"?"READING ARC / EVADE":
@@ -161,7 +171,7 @@
     m?.state==="experiment"?"EXPERIMENTING":"STUDYING";
    e.moodText.setPosition(x,y-73);
    if(e.moodText.text!==state)e.moodText.setText(state);
-   e.moodText.setColor(m?.state==="evade-bolt"?"#9beaff":m?.held?"#ffe0a8":"#d0c1fa");
+   e.moodText.setColor(m?.state==="decline-bait"?"#f1d2aa":m?.state==="evade-bolt"?"#9beaff":m?.held?"#ffe0a8":"#d0c1fa");
   }
  }
  function damaged(e,amount,time){if(M&&e.archivist)M.onDamage(e.archivist,amount,time)}
