@@ -258,7 +258,7 @@
   m.pending={plan:{...plan},due:time+750,from:{x:player.x,y:player.y},
    side,remaining:plan.count-count,lastMoveSide:0,reversals:0,waited:false};
   return {...plan,stage:"opening",count,target,
-   angleBias:-side*(plan.tactic==="bait"?.28:.17)};
+   angleBias:plan.tactic==="fork"?0:-side*(plan.tactic==="bait"?.28:.17)};
  }
 
  // He sees which direction the player actually moves AFTER his first volley.
@@ -463,7 +463,7 @@
    if(plan.tactic==="fork"&&plan.stage==="opening"){
     // Two visible side corridors, leaving a center lane to outplay him.
     const side=i<plan.count/2?-1:1;
-    angles.push(theta+side*(.24+.08*Math.floor(i/2)));
+    angles.push(theta+side*(.24+.08*Math.floor((i+1)/2)));
    }else if(plan.motif==="lance")angles.push(theta+(i-1)*plan.spread*.55);
    else if(plan.motif==="fan")angles.push(theta+(i-2)*plan.spread);
    else if(plan.motif==="pincer")angles.push(theta+((i%2===0?-1:1)*(.20+Math.floor(i/2)*plan.spread)));
