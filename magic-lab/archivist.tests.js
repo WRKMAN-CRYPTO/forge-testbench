@@ -315,4 +315,80 @@ check('real combat adapter bypasses 120ms poll barrier at charge completion',()=
  assert.equal(launches.length,1,'projectiles release without waiting for 120ms polling');
  assert.equal(launches[0].at,1168);
 });
-console.log('Archivist 062 checks passed: '+passed);
+check('forked attack puts physical shots on two sides with a real center gap',()=>{
+ const m=Brain.make(store,0);
+ const plan={element:'lightning',motif:'fan',tactic:'fork',count:6,spread:.5,
+   speed:6.6,lead:false,feint:false,name:'Crown of Static',tellTarget:{x:400,y:300}};
+ const first=Brain.openingPlan(m,plan,1000,{x:400,y:300});
+ assert.equal(first.count,3);
+ const angles=Brain.planDirections(m,first,{x:800,y:300},first.target);
+ const straight=Math.PI;
+ assert.ok(angles.some(a=>a<straight-.2));
+ assert.ok(angles.some(a=>a>straight+.2));
+ assert.ok(angles.every(a=>Math.abs(a-straight)>.19),'middle remains physically unblocked');
+ const reply=Brain.followupPlan(m,{time:1750,pos:{x:800,y:300},
+   player:{x:400,y:300}});
+ assert.equal(first.count+reply.count,plan.count);
+});
+check('the Archivist recognizes a deliberate dodge reversal and actually hesitates',()=>{
+ const m=Brain.make(store,0);
+ const plan={element:'fire',motif:'pincer',tactic:'bait',count:4,spread:.65,
+   speed:6.6,tellTarget:{x:400,y:300}};
+ Brain.openingPlan(m,plan,1000,{x:400,y:300});
+ const original=m.pending.due;
+ m.lastPlayer={x:400,y:260,vx:0,vy:-180};
+ Brain.trackEscape(m,{time:1440,pos:{x:800,y:300}});
+ m.lastPlayer={x:400,y:310,vx:0,vy:230};
+ Brain.trackEscape(m,{time:1570,pos:{x:800,y:300}});
+ assert.equal(m.pending.reversals,1);
+ assert.equal(m.pending.waited,true);
+ assert.equal(m.seen.feints,1);
+ assert.ok(m.pending.due>=original+200,'the bluff costs the boss real time');
+ assert.equal(Brain.followupPlan(m,{time:original,pos:{x:800,y:300},
+  player:{x:400,y:310}}),null,'followup withheld at old release moment');
+ const reply=Brain.followupPlan(m,{time:m.pending.due,pos:{x:800,y:300},
+  player:{x:400,y:310}});
+ assert.ok(reply?.contested,'he remembers that the prediction was disputed');
+});
+check('an unmoving wizard does not falsely teach dodge reversals',()=>{
+ const m=Brain.make(store,0);
+ Brain.openingPlan(m,{element:'arcane',motif:'lance',tactic:'herd',count:3,
+   spread:.11,speed:8,tellTarget:{x:400,y:300}},1000,{x:400,y:300});
+ m.lastPlayer={x:400,y:300,vx:0,vy:0};
+ Brain.trackEscape(m,{time:1470,pos:{x:800,y:300}});
+ Brain.trackEscape(m,{time:1570,pos:{x:800,y:300}});
+ assert.equal(m.pending.reversals,0);
+ assert.equal(m.seen.feints,0);
+ assert.equal(m.pending.due,1750);
+});
+check('learned deception memory remains bounded and old records still load',()=>{
+ const own={data:null,getItem(){return this.data},setItem(k,v){this.data=v}};
+ const m=Brain.make(own,0);
+ m.seen.feints=4;m.prior.feints=2;
+ assert.equal(Brain.remember(m,'retreat'),true);
+ const next=Brain.make(own,1000);
+ assert.ok(next.prior.feints>0&&next.prior.feints<6);
+ const previous=JSON.parse(own.data);delete previous.feints;
+ own.data=JSON.stringify(previous);
+ assert.equal(Brain.make(own,2000).prior.feints,0);
+});
+check('actual misses reduce a failed tactical hypothesis rather than boosting it',()=>{
+ const own={data:null,getItem(){return this.data},setItem(k,v){this.data=v}};
+ const m=Brain.make(own,0);
+ m.attempts=[{element:'frost',motif:'fan',tactic:'fork',tries:5,hits:0}];
+ m.lastPlan={element:'frost',motif:'fan',tactic:'fork'};
+ assert.equal(Brain.remember(m,'defeat'),true);
+ const entry=Brain.make(own,0).prior.plans.find(p=>p.tactic==='fork');
+ assert.ok(entry&&entry.score<-.8,'failed tactical plans lose confidence');
+});
+check('the learning boss explores fork, herd, bait, and probing without buffs',()=>{
+ const m=Brain.make(store,0);m.attacks=11;m.seen.dodges=[3,8];
+ m.seen.feints=3;const seen=new Set();
+ for(let i=0;i<350;i++){
+  const p=Brain.invent(m);seen.add(p.tactic);
+  assert.ok(p.count>=3&&p.count<=6);
+  assert.ok(p.speed<=8);
+ }
+ assert.deepEqual([...seen].sort(),['bait','fork','herd','probe']);
+});
+console.log('Archivist 063 checks passed: '+passed);
