@@ -161,6 +161,7 @@
   }
   if(d<680&&time>=m.attackAt){
    const plan=invent(m);
+   plan.tellTarget={x:player.x,y:player.y}; // Physical observation at windup, never future input.
    m.held=plan;m.until=time+(plan.feint?1080:670);
    m.state=plan.feint?"mislead":"inscribe";
    m.quote=plan.feint?"Observe the obvious answer.":"An unfamiliar arrangement...";
