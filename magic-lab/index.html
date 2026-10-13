@@ -741,7 +741,7 @@ if(window.WRKMAN_WANDRUNE_ART){
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / WANDRUNE</strong><span>BUILD 055 • TITLE SCREEN</span></div>
+   <div class="menuHeader"><strong>W / WANDRUNE</strong><span>BUILD 056 • ELEMENTAL MATERIALS</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="gateMenuOpen" type="button">✧ DIAL GATE</button>
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
@@ -772,6 +772,7 @@ if(window.WRKMAN_WANDRUNE_ART){
      <button id="musicToggle" type="button" aria-pressed="true">♫ MUSIC: ON</button>
      <button id="musicVolume" type="button">VOLUME: 68%</button>
      <button id="musicImport" type="button">♫ IMPORT MP3</button>
+     <button id="vfxQuality" type="button" aria-label="Elemental visual effects quality">ELEMENT FX: MEDIUM</button>
     </div>
     <div id="musicStatus" role="status" aria-live="polite" class="menuCaption">♫ A New Journey / Wizard Life · Import MP3s to play.</div>
    </div>
@@ -914,7 +915,8 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./element-sources.js?v=050"></script>
 <script src="./swarm-runes.js?v=050"></script>
 <script src="./field-impacts.js?v=050"></script>
-<script src="./crafted-magic.js?v=050"></script>
+<script src="./element-vfx.js?v=056"></script>
+<script src="./crafted-magic.js?v=056"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=050"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1062,6 +1064,7 @@ const Elements=window.WRKMAN_ELEMENTS||null; // optional so core gameplay surviv
 const Wildlife=window.WRKMAN_WILDLIFE||null; // optional ambient world, never required for combat
 const Regions=window.WRKMAN_REGIONS||null; // optional canonical region generator
 const Crafted=window.WRKMAN_CRAFTED_MAGIC||null;
+const ElementVFX=window.WRKMAN_ELEMENT_VFX||null;
 let craftedRecipe=Crafted?Crafted.read(gameStorage):null;
 let craftedHealLinked=gameStorage.getItem("wrkman-arcane-lab034-heal-linked")!=="false";
 const MatterBody=Phaser.Physics.Matter.Matter.Body;
@@ -1106,6 +1109,12 @@ class Lab extends Phaser.Scene{
   this.g=this.add.graphics();this.drawFloor();
   this.draw=this.add.graphics().setDepth(4);
   this.craftedDraw=this.add.graphics().setDepth(5);
+  // 056: Optional presentation adapter. The normal renderer is the fallback.
+  try{
+   this.elementVfx=ElementVFX?ElementVFX.install(this):null;
+   if(this.elementVfx)this.events.once("shutdown",()=>this.elementVfx?.destroy());
+  }catch(e){this.elementVfx=null;console.warn("Optional elemental visuals unavailable",e);}
+
   // Camera follows a stable point, not a particular player object. The
   // player object is recreated by RESET and by some future respawn flows.
   this.cameraFocus={x:254,y:305};
@@ -1594,7 +1603,12 @@ class Lab extends Phaser.Scene{
   if(this.removal.length){const dead=new Set(this.removal);for(const b of dead)this.matter.world.remove(b);this.projectiles=this.projectiles.filter(p=>!dead.has(p.body));this.actors=this.actors.filter(a=>!dead.has(a.body));this.combat.enemies=this.combat.enemies.filter(e=>!dead.has(e.body));this.removal=[];}
   this.fx=this.fx.filter(p=>{p.x+=p.vx*t;p.y+=p.vy*t;p.vx*=.96;p.vy*=.96;p.life-=delta;return p.life>0;});
   this.renderWorld(time);
-  if(this.craftedDraw){this.craftedDraw.clear();if(Crafted)Crafted.draw(this,this.craftedDraw,this.time.now);}
+  if(this.craftedDraw){
+   this.craftedDraw.clear();
+   this.elementVfx?.begin();
+   if(Crafted)Crafted.draw(this,this.craftedDraw,this.time.now);
+   this.elementVfx?.extras(this.time.now);
+  }
   const fieldStatus=Crafted?Crafted.snapshot(this):{active:false};
   if(fieldStatus.active){
    $("craftHud").hidden=false;
@@ -2156,7 +2170,21 @@ function saveGameSettings(){
  renderGameSettings();
 }
 renderGameSettings();
-$("menuHintToggle").addEventListener("click",()=>{uiHints=!uiHints;saveGameSettings();});
+ // Quality changes affect drawing only. Spell physics never reads this setting.
+ function displayVfxQuality(){
+  const value=scene?.elementVfx?.quality||"medium";
+  $("vfxQuality").textContent="ELEMENT FX: "+value.toUpperCase();
+  $("vfxQuality").setAttribute("aria-label","Elemental visual quality "+value+". Tap to change.");
+ }
+ displayVfxQuality();
+ $("vfxQuality").addEventListener("click",()=>{
+  if(!scene?.elementVfx){announce("ELEMENTAL MATERIAL RENDERER UNAVAILABLE");return;}
+  const levels=["low","medium","high"],n=levels.indexOf(scene.elementVfx.quality);
+  scene.elementVfx.setQuality(levels[(n+1)%levels.length]);
+  displayVfxQuality();
+  announce("ELEMENTAL VISUAL QUALITY • "+scene.elementVfx.quality.toUpperCase());
+ });
+ $("menuHintToggle").addEventListener("click",()=>{uiHints=!uiHints;saveGameSettings();});
 $("menuControlToggle").addEventListener("click",()=>{uiSoft=!uiSoft;saveGameSettings();});
  // 054: Media import is user-triggered, suitable for Safari audio restrictions.
  // 055: start the world and music from the direct title button gesture.
