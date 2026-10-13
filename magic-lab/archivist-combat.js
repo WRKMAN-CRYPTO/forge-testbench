@@ -1,4 +1,4 @@
-/* WANDRUNE 065 | Archivist physical boss combat adapter.
+/* WANDRUNE 066 | Archivist physical boss combat adapter.
  * Mind may decide and invent; only this layer is permitted to spawn projectiles.
  * The existing Matter and combat damage loops remain authoritative.
  */
@@ -10,6 +10,8 @@
  "use strict";
  const M=typeof window!=="undefined"?window.WRKMAN_ARCHIVIST:
   typeof require==="function"?require("./archivist-mind.js"):null;
+ const Edict=typeof window!=="undefined"?window.WRKMAN_ARCHIVIST_EDICT:
+  typeof require==="function"?require("./archivist-edict.js"):null;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  const COLORS={arcane:0xcba5ff,frost:0xa7eefe,fire:0xffb76b,lightning:0xffed9f};
  function initialize(enemy,time){
@@ -18,7 +20,14 @@
   return M.make(storage,time);
  }
  function fire(s,e,plan,Body){
-  if(!M||!e.alive||!plan||s.projectiles.length>=31)return false;
+  if(!M||!e.alive||!plan)return false;
+  if(plan.kind==="edict"){
+   if(!Edict||e.archivist.edict)return false;
+   e.archivist.edict=Edict.create(plan.target||s.player,s.time.now);
+   s.announceCombat("EDICT OF MOTION • LEAVE THE INSCRIBED CIRCLE");
+   return true;
+  }
+  if(s.projectiles.length>=31)return false;
   const shots=M.planDirections(e.archivist,plan,e.body.position,plan.target||s.player);
   const left=Math.min(35-s.projectiles.length,
    16-s.projectiles.filter(p=>p.body?.archive).length);
@@ -88,8 +97,26 @@
   if(Math.hypot(pos.x-s.player.x,pos.y-s.player.y)<e.r+21)
    hitPlayer(s,8,pos.x,pos.y,"archivist pressure");
  }
+ function tickHazards(s,e,time,hitPlayer){
+  const m=e?.archivist,mark=m?.edict;
+  if(!mark||!Edict)return;
+  const result=Edict.outcome(mark,s.player,time);
+  if(result){
+   let hit=false;
+   if(result.inside){
+    const before=s.combat?.hp;
+    hitPlayer(s,mark.damage,mark.x,mark.y,"Edict of Motion");
+    hit=typeof before==="number"?s.combat.hp<before:true;
+   }
+   mark.resolved=true;mark.resolvedAt=time;mark.inside=result.inside;
+   M.onEdictOutcome(m,{hit,escaped:!result.inside});
+   if(!result.inside)s.announceCombat("EDICT EVADED • POSITION VACATED");
+  }
+  if(mark.resolved&&time>=mark.resolvedAt+Edict.AFTERGLOW)m.edict=null;
+ }
  function paint(s,e,g,time){
   const p=e.body.position,x=p.x,y=p.y,m=e.archivist;
+  if(Edict&&m?.edict)Edict.paint(g,m.edict,time);
   const pulse=.5+.5*Math.sin(time*.005+e.id),low=e.hp/e.maxHP<.25;
   g.fillStyle(0x6a5096,.11+.06*pulse);g.fillCircle(x,y,76);
   for(let i=0;i<6;i++){
@@ -163,7 +190,9 @@
    g.strokeCircle(x,y,36+4*pulse);
   }
   if(e.moodText?.active){
-   const state=m?.state==="decline-bait"?"DECLINING BAIT":
+   const state=m?.state==="inscribe"&&m?.held?.kind==="edict"?"INSCRIBING EDICT":
+     m?.edict&&!m.edict.resolved?"MOVE · EDICT OF MOTION":
+     m?.state==="decline-bait"?"DECLINING BAIT":
      m?.state==="question-bait"?"QUESTIONING BAIT":
     m?.state==="countermove"?"COUNTERMOVE":
     m?.state==="read-escape"?"READING ESCAPE":
@@ -184,5 +213,5 @@
   const e=s.combat.enemies.find(x=>x.id===shot.owner&&x.archivist);
   if(e)M.onHit(e.archivist,shot.archive);
  }
- return Object.freeze({initialize,fire,step,paint,damaged,defeated,retreat,projectileHit});
+ return Object.freeze({initialize,fire,step,tickHazards,paint,damaged,defeated,retreat,projectileHit});
 });
