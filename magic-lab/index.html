@@ -689,6 +689,7 @@ header .actions{display:flex;gap:6px}
 #titleStatus{position:absolute;z-index:1;bottom:calc(3px + env(safe-area-inset-bottom));
  left:6px;right:6px;text-align:center;color:#c9dcda;font:700 9px ui-monospace,monospace;
  text-shadow:0 1px 5px #000;pointer-events:none}
+@media(min-aspect-ratio:2/1){#titleArtwork{object-fit:contain;background:#071422}}
 @media(pointer:coarse) and (orientation:portrait){
  #titleArtwork{object-fit:contain;background:#071422}
  #titleActions #enterTitle{min-width:85%;order:-1}
