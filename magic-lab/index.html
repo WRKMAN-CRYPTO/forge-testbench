@@ -700,6 +700,18 @@ header .actions{display:flex;gap:6px}
  #titleActions #enterTitle{min-width:190px}
 }
 @media(prefers-reduced-motion:reduce){#titleOverlay{transition:none}}
+
+/* Build 059: visible boss cognition and health, purely HUD. */
+#archivistBar[hidden]{display:none!important}
+#archivistBar{position:absolute;z-index:8;pointer-events:none;top:7px;left:32%;width:36%;
+ min-width:185px;padding:5px 10px;border:1px solid #a7a2d099;background:#0b1029d9;
+ border-radius:9px;box-shadow:0 4px 18px #0009;text-align:center}
+#archivistBar strong{font:900 11px/1.2 Georgia,serif;color:#e6d4ff;letter-spacing:.11em}
+#archivistBar small{display:block;color:#b9a6d9;font:8px ui-monospace,monospace}
+#archivistTrack{height:5px;background:#1d203b;border-radius:5px;overflow:hidden;margin-top:3px}
+#archivistFill{display:block;height:100%;width:100%;background:linear-gradient(90deg,#7370b1,#e8c3ff);
+ transition:width .15s ease}
+@media(max-width:760px){#archivistBar{left:33%;width:34%;min-width:155px;top:5px;padding:3px 7px}}
 </style>
 </head>
 <body>
@@ -796,7 +808,10 @@ if(window.WRKMAN_WANDRUNE_ART){
 </header>
 <div id="menuShield" hidden aria-hidden="true"></div>
  <input type="file" id="musicFiles" accept="audio/mpeg,.mp3" multiple hidden>
-<div id="stageWrap"><div id="stage"></div><div id="craftHud" hidden>⬡ FIELD ACTIVE</div><div id="regionTitle" hidden></div><button id="gateNearby" type="button" hidden>✧ DIAL GATE</button><div id="portalNearby" hidden></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP ORB TO FIRE</div>
+<div id="stageWrap"><div id="stage"></div>
+ <div id="archivistBar" hidden><strong>THE ARCHIVIST</strong><small id="archivistThought">STUDYING</small>
+  <div id="archivistTrack"><span id="archivistFill"></span></div></div>
+ <div id="craftHud" hidden>⬡ FIELD ACTIVE</div><div id="regionTitle" hidden></div><button id="gateNearby" type="button" hidden>✧ DIAL GATE</button><div id="portalNearby" hidden></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">ARC BOLT • TAP ORB TO FIRE</div>
 <button class="minibtn" id="dash" type="button" aria-label="Dash in movement direction">DASH</button>
 <div id="wheelDock" aria-label="Six-slot quarter-fan spell selector">
  <div id="wheelSlots" role="group" aria-label="Equipped spells"></div>
@@ -1314,7 +1329,8 @@ class Lab extends Phaser.Scene{
   // Reset returns the camera to the original chamber, even after exploring.
   if(this.cameraFocus){this.cameraFocus.x=this.player.x;this.cameraFocus.y=this.player.y;}
   this.cameras?.main?.setScroll(0,0);
-  const d=this.matter.add.circle(704,304,30,{frictionAir:.07,restitution:.8,density:.006,slop:.02});
+  const archiveArena=this.region?.sectors?.[this.sectorIndex]?.archivist===true;
+  const d=this.matter.add.circle(archiveArena?-570:704,archiveArena?875:304,30,{frictionAir:.07,restitution:.8,density:.006,slop:.02});
   d.gameTag="dummy";this.dummy={body:d,r:30};
   this.actors.push(this.dummy);
   const sector=this.region?.sectors[this.sectorIndex]||null;
@@ -1579,6 +1595,14 @@ class Lab extends Phaser.Scene{
   }
   if(Elements&&this.elementWorld)Elements.step(this,time,delta,Combat);
   Combat.step(this,time,delta);
+  const archiveEnemy=this.combat?.enemies.find(e=>e.type==="archivist"&&e.alive);
+  $("archivistBar").hidden=!archiveEnemy;
+  if(archiveEnemy){
+   $("archivistFill").style.width=(100*archiveEnemy.hp/archiveEnemy.maxHP).toFixed(2)+"%";
+   const m=archiveEnemy.archivist;
+   $("archivistThought").textContent=(m?.state||"observing").toUpperCase()+
+      " · "+(m?.prior?.encounters||0)+" PRIOR ENCOUNTERS · "+(m?.attacks||0)+" EXPERIMENTS";
+  }
   if(Crafted)Crafted.step(this,this.time.now,delta,Combat);
   if(Wildlife&&this.wildlife){
    // World probes + instincts stay ~12.5Hz on the phone. Movement and
