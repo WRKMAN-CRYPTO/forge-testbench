@@ -8,7 +8,8 @@
  if(root)root.WRKMAN_ARCHIVIST_COMBAT=api;
 })(typeof window!=="undefined"?window:globalThis,function(){
  "use strict";
- const M=typeof window!=="undefined"?window.WRKMAN_ARCHIVIST:null;
+ const M=typeof window!=="undefined"?window.WRKMAN_ARCHIVIST:
+  typeof require==="function"?require("./archivist-mind.js"):null;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  const COLORS={arcane:0xcba5ff,frost:0xa7eefe,fire:0xffb76b,lightning:0xffed9f};
  function initialize(enemy,time){
