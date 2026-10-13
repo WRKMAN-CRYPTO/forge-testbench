@@ -2085,7 +2085,7 @@ $("menuControlToggle").addEventListener("click",()=>{uiSoft=!uiSoft;saveGameSett
  const updateMusicButtons=()=>{
   $("musicToggle").textContent="♫ MUSIC: "+(music?.enabled?"ON":"OFF");
   $("musicToggle").setAttribute("aria-pressed",String(Boolean(music?.enabled)));
-  $("welcomeMusic").textContent=music?.enabled?"♫ MUSIC ON":"♫ PLAY NEW JOURNEY";
+  $("welcomeMusic").textContent=music?.enabled&&music.unlocked?"♫ SOUNDTRACK PLAYING":"♫ PLAY NEW JOURNEY";
   $("musicVolume").textContent="VOLUME: "+Math.round((music?.volume||0.68)*100)+"%";
  };
  updateMusicButtons();
