@@ -172,4 +172,100 @@ check('physical dodge uses the original body and a normal-speed Matter velocity'
   'normal movement speed capped; no supernatural dash');
  assert.equal(boss.hp,1650,'dodge never raises HP');
 });
-console.log('Archivist 060 checks passed: '+passed);
+check('new tactics are learned variants, not extra base projectiles',()=>{
+ const m=Brain.make(store,0);m.attacks=3;m.seen.dodges=[2,7];
+ const types=new Set();
+ for(let i=0;i<120;i++){
+  const p=Brain.invent(m);types.add(p.tactic);
+  assert.ok(Brain.TACTICS.includes(p.tactic));
+  assert.ok(p.count>=3&&p.count<=6);
+  assert.ok(p.speed<=8);
+ }
+ assert.ok(types.has('probe')&&types.has('herd')&&types.has('bait'),
+   'an experienced mind explores all three strategies');
+});
+check('opening gambit reserves rather than duplicates its projectile budget',()=>{
+ const m=Brain.make(store,0);m.seen.dodges=[0,5];
+ const plan={element:'frost',motif:'fan',tactic:'bait',count:5,spread:.5,
+  speed:6.6,lead:false,feint:true,tellTarget:{x:420,y:260}};
+ const first=Brain.openingPlan(m,plan,2000,{x:430,y:305});
+ assert.equal(first.stage,'opening');assert.equal(first.count,3);
+ assert.equal(m.pending.remaining,2);assert.ok(first.angleBias<0);
+ assert.deepEqual(first.target,{x:420,y:260},'locked windup aim');
+ m.lastPlayer={x:430,y:340,vx:0,vy:170};
+ const second=Brain.followupPlan(m,{time:2750,pos:{x:800,y:305},player:{x:430,y:340}});
+ assert.equal(second.stage,'followup');
+ assert.equal(second.count,2);
+ assert.equal(first.count+second.count,plan.count);
+ assert.equal(m.pending,null);
+ assert.ok(second.target.y>340,'the learned response is based on post-volley movement');
+});
+check('a tactical attack executes two physical volleys with original damage',()=>{
+ const m=Brain.make(store,0);
+ const plan={element:'fire',motif:'pincer',tactic:'herd',count:4,spread:.65,
+  speed:6.6,lead:false,feint:false,tellTarget:{x:330,y:305},name:'Mirror of Cinders'};
+ const first=Brain.openingPlan(m,1500,{x:330,y:305});
+ m.lastPlayer={x:325,y:380,vx:0,vy:175};
+ const reply=Brain.followupPlan(m,{time:2250,pos:{x:800,y:305},player:{x:325,y:380}});
+ const Body={setVelocity(b,v){b.velocity=v}};
+ const scene={time:{now:1500},player:{x:330,y:305},projectiles:[],
+  matter:{add:{circle(x,y){return {position:{x,y},velocity:{x:0,y:0}}}}},
+  burst(){},announceCombat(){}};
+ const boss={alive:true,id:12,body:{position:{x:800,y:305}},archivist:m};
+ assert.equal(Act.fire(scene,boss,first,Body),true);
+ scene.time.now=2250;
+ assert.equal(Act.fire(scene,boss,reply,Body),true);
+ assert.equal(scene.projectiles.length,4,'same total count as a single cast');
+ assert.equal(scene.projectiles.filter(p=>p.body.archive.stage==='opening').length,2);
+ assert.equal(scene.projectiles.filter(p=>p.body.archive.stage==='followup').length,2);
+ assert.ok(scene.projectiles.every(p=>p.body.archive.damage===13&&
+   p.body.archive.tactic==='herd'));
+});
+check('an observed response influences follow-up, but can be deliberately inverted',()=>{
+ const plan={element:'arcane',motif:'lance',tactic:'bait',count:3,spread:.11,
+  speed:8,tellTarget:{x:400,y:300}};
+ const baseline={x:400,y:300},observer={x:800,y:300};
+ const left=Brain.make(store,0);left.seen.dodges=[0,5];
+ Brain.openingPlan(left,plan,100,baseline);
+ left.lastPlayer={x:400,y:200,vx:0,vy:-180};
+ const leftResult=Brain.followupPlan(left,{time:850,pos:observer,player:{x:400,y:200}});
+ const right=Brain.make(store,0);right.seen.dodges=[0,5];
+ Brain.openingPlan(right,plan,100,baseline);
+ right.lastPlayer={x:400,y:400,vx:0,vy:180};
+ const rightResult=Brain.followupPlan(right,{time:850,pos:observer,player:{x:400,y:400}});
+ assert.ok(leftResult.target.y<baseline.y&&rightResult.target.y>baseline.y,
+  'changing actual movement changes the guessed landing zone');
+});
+check('success scores store tactical identity across defeats and old saves remain compatible',()=>{
+ const key=Brain.KEY;
+ const storage={data:null,getItem(){return this.data},setItem(k,v){this.data=v}};
+ const m=Brain.make(storage,0);
+ m.lastPlan={motif:'fan',element:'lightning',tactic:'bait'};
+ Brain.onHit(m,{motif:'fan',element:'lightning',tactic:'bait'});
+ assert.equal(Brain.remember(m,'defeat'),true);
+ const next=Brain.make(storage,0);
+ assert.ok(next.prior.plans.some(x=>x.tactic==='bait'&&x.score>0));
+ const previous=JSON.parse(storage.data);
+ previous.plans=[{motif:'fan',element:'lightning',lead:false,feint:false,score:1}];
+ storage.data=JSON.stringify(previous);
+ assert.equal(Brain.make(storage,0).prior.plans[0].tactic,'probe');
+});
+check('no tactical casts circumvent stun, real bolt dodges, or existing attack cooldown',()=>{
+ const m=Brain.make(store,0);
+ m.held={element:'frost',motif:'lance',tactic:'herd',count:3,
+  spread:.11,speed:8,lead:false,feint:false,name:'Needle of Glass',
+  tellTarget:{x:330,y:305}};
+ m.until=1000;
+ const at=t=>Brain.decide(m,{time:t,pos:{x:800,y:305},velocity:{x:0,y:0},
+  player:{x:330,y:305},health:.6,casts:[],shots:[],obstacles:[]});
+ const opening=at(1000);
+ assert.ok(opening?.release&&opening.release.stage==='opening');
+ const afterFirst=m.attackAt;
+ assert.ok(afterFirst>1000+2100);
+ assert.equal(at(1500)?.release,undefined);
+ const reply=at(1750);
+ assert.ok(reply?.release&&reply.release.stage==='followup');
+ assert.equal(m.attacks,1,'followup did not count as another cast');
+ assert.equal(m.attackAt,afterFirst,'followup did not shorten attack cooldown');
+});
+console.log('Archivist 061 checks passed: '+passed);
