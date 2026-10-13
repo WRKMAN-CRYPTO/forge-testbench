@@ -246,7 +246,7 @@
    const first=threats[0],same=m.boltSeen?.body===first.body;
    const familiarity=clamp((m.prior?.element?.[0]||0)*3+m.seen.element[0]*2,0,105);
    if(!same){
-    m.boltSeen={body:first.body,at:time,delay:clamp(240-familiarity+rand(m)*100,90,340)};
+    m.boltSeen={body:first.body,at:time,delay:clamp(100-familiarity*.4+rand(m)*110,65,215)};
    }
    const recognized=time-m.boltSeen.at>=m.boltSeen.delay;
    if(recognized&&time>=m.dodgeCooldown){
