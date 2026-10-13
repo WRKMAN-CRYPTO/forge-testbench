@@ -6,6 +6,7 @@ const assert=require('node:assert/strict');
 const Regions=require('./region-gate.js');
 const Brain=require('./archivist-mind.js');
 const Board=require('./archivist-board.js');
+const Edict=require('./archivist-edict.js');
 const Act=require('./archivist-combat.js');
 let passed=0;
 function check(label,fn){fn();passed++;console.log('✓ '+label);}
@@ -573,4 +574,84 @@ check('only an actual projectile release creates a pressure observation',()=>{
  Brain.onVolley(m,{element:'arcane',motif:'lance',tactic:'probe'},1000,{x:500,y:305});
  assert.equal(m.board.probes.length,1);
 });
-console.log('Archivist 065 checks passed: '+passed);
+check('Edict is a locked area with a readable window and safe escape',()=>{
+ const m=Edict.create({x:400,y:300},1000);
+ assert.equal(m.due,1850);assert.equal(m.r,82);assert.equal(m.damage,16);
+ assert.equal(Edict.outcome(m,{x:400,y:300},1849),null);
+ assert.equal(Edict.outcome(m,{x:400,y:300},1850).inside,true);
+ assert.equal(Edict.outcome(m,{x:525,y:300},1850).inside,false);
+ assert.deepEqual({x:m.x,y:m.y},{x:400,y:300},'target may never track the player');
+});
+check('ground Edict substitutes a normal cast without extra projectiles',()=>{
+ const m=Brain.make(store,0),b={position:{x:800,y:305}},scene={
+  time:{now:2000},player:{x:400,y:305},projectiles:[],
+  announceCombat(){},burst(){},matter:{add:{circle(){throw Error('Edict must create no projectile');}}}};
+ const foe={id:2,alive:true,body:b,archivist:m};
+ const active={kind:'edict',name:'Edict of Motion',target:{x:400,y:305}};
+ assert.equal(Act.fire(scene,foe,active,{}),true);
+ assert.equal(scene.projectiles.length,0);
+ assert.equal(foe.archivist.edict.due,2850);
+ assert.equal(Act.fire(scene,foe,active,{}),false,'no stacking a second mark');
+});
+check('Edict actually injures stationary player using existing damage pathway',()=>{
+ const m=Brain.make(store,0);m.edict=Edict.create({x:400,y:305},1000);
+ const scene={player:{x:400,y:305},time:{now:1850},
+  combat:{hp:100,invulnUntil:0},dashUntil:0,announceCombat(){}};
+ const foe={archivist:m};
+ let calls=0;
+ const hit=(s,damage)=>{calls++;s.combat.hp-=damage;};
+ Act.tickHazards(scene,foe,1849,hit);
+ assert.equal(calls,0);
+ Act.tickHazards(scene,foe,1850,hit);
+ assert.equal(calls,1);assert.equal(scene.combat.hp,84);
+ assert.equal(m.edictStats.hits,1);
+ Act.tickHazards(scene,foe,1860,hit);
+ assert.equal(calls,1,'the same circle cannot damage twice');
+});
+check('leaving the circle avoids all damage, no chasing or invisible hitbox',()=>{
+ const m=Brain.make(store,0);m.edict=Edict.create({x:400,y:305},1000);
+ const scene={player:{x:530,y:305},time:{now:1850},
+  combat:{hp:100,invulnUntil:0},dashUntil:0,announceCombat(){}};
+ Act.tickHazards(scene,{archivist:m},1850,()=>{throw Error('escaped rune hit player')});
+ assert.equal(m.edictStats.hits,0);
+ assert.equal(m.edictStats.escaped,1);
+});
+check('lethal contact counts, dash immunity prevents damage',()=>{
+ const make=(inv,dash)=>{
+  const m=Brain.make(store,0);m.edict=Edict.create({x:400,y:305},1000);
+  const scene={player:{x:400,y:305},time:{now:1850},
+   combat:{hp:3,invulnUntil:inv},dashUntil:dash,announceCombat(){}};
+  const hit=(s,damage)=>{
+   if(s.time.now<inv||s.time.now<dash)return;
+   s.combat.hp=100; // existing test mode recovers after lethal strike
+  };
+  Act.tickHazards(scene,{archivist:m},1850,hit);
+  return m.edictStats;
+ };
+ assert.equal(make(0,0).hits,1,'lethal recovery is still a successful contact');
+ assert.equal(make(2000,0).hits,0);
+ assert.equal(make(0,2000).hits,0);
+});
+check('Edict can be selected by a learned opponent, but no faster than every three casts',()=>{
+ const m=Brain.make(store,0);
+ m.attacks=4;m.seed=0;m.lastPlayer={vx:0,vy:0};
+ const ob={pos:{x:800,y:305},player:{x:400,y:305}};
+ assert.equal(Brain.chooseEdict(m,ob),true);
+ m.lastEdictAttack=3;
+ assert.equal(Brain.chooseEdict(m,ob),false,'cannot place Edict repeatedly');
+ m.lastEdictAttack=-10;m.attacks=1;
+ assert.equal(Brain.chooseEdict(m,ob),false,'must observe normal fights first');
+});
+check('Edict outcomes persist without damaging older saved tactics',()=>{
+ const mem={data:null,getItem(){return this.data},setItem(k,v){this.data=v}};
+ const m=Brain.make(mem,0);
+ Brain.onEdictOutcome(m,{hit:true});Brain.onEdictOutcome(m,{hit:false});
+ m.edictStats.uses=2;
+ assert.equal(Brain.remember(m,'defeat'),true);
+ const b=Brain.make(mem,0);
+ assert.ok(b.prior.edict.uses>0&&b.prior.edict.hits>0&&b.prior.edict.escaped>0);
+ const legacy=JSON.parse(mem.data);delete legacy.edict;
+ mem.data=JSON.stringify(legacy);
+ assert.deepEqual(Brain.make(mem,0).prior.edict,{uses:0,hits:0,escaped:0});
+});
+console.log('Archivist 066 checks passed: '+passed);
