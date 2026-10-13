@@ -1711,10 +1711,19 @@ class Lab extends Phaser.Scene{
    }
   }
   for(const p of this.projectiles){
-   const b=p.body;for(let i=0;i<p.trail.length;i++){const t=p.trail[i];g.fillStyle(b.gameTag==="ember"?0xff794d:0xffd37b,i/p.trail.length*.45);g.fillCircle(t.x,t.y,2+i*.5);}
-   g.fillStyle(b.gameTag==="ember"?0xff7e4d:0xffe7ad,.18);g.fillCircle(b.position.x,b.position.y,19);
-   g.fillStyle(b.gameTag==="ember"?0xff8451:0xffdfa1);g.fillCircle(b.position.x,b.position.y,8);
+   const b=p.body,arc=b.archive;
+   const tint=arc?.color||(b.gameTag==="ember"?0xff8451:0xffdfa1);
+   for(let i=0;i<p.trail.length;i++){
+    const t=p.trail[i];g.fillStyle(tint,i/p.trail.length*.45);
+    g.fillCircle(t.x,t.y,2+i*.5);
+   }
+   g.fillStyle(tint,.19);g.fillCircle(b.position.x,b.position.y,arc?23:19);
+   g.fillStyle(tint);g.fillCircle(b.position.x,b.position.y,8);
    g.fillStyle(0xffffff);g.fillCircle(b.position.x,b.position.y,3);
+   if(arc&&arc.element==="lightning"){
+    g.lineStyle(1.4,0xddeaff,.7);
+    g.lineBetween(b.position.x-11,b.position.y+4,b.position.x+12,b.position.y-6);
+   }
   }
   for(const p of this.fx){const q=Math.min(1,p.life/p.max);g.fillStyle(p.c,q*.8);g.fillCircle(p.x,p.y,p.size*q);}
   const p=this.player;
