@@ -391,4 +391,84 @@ check('the learning boss explores fork, herd, bait, and probing without buffs',(
  }
  assert.deepEqual([...seen].sort(),['bait','fork','herd','probe']);
 });
-console.log('Archivist 063 checks passed: '+passed);
+check('Judgment never invents bait evidence before a real hit or anticipation',()=>{
+ const m=Brain.make(store,0);m.attacks=4;m.attackAt=1000;m.seed=0;
+ m.lastPlayer={x:500,y:305,vx:0,vy:0};
+ const evaluated=Brain.judgeOpening(m,{time:1000,pos:{x:800,y:305},player:{x:500,y:305}},false,[]);
+ assert.equal(evaluated.hold,false,'standing still alone is not an automatic trap');
+ assert.equal(evaluated.reason,'engage');
+});
+check('an actual hit followed by stillness can provoke a deliberate refusal',()=>{
+ const m=Brain.make(store,0);m.attacks=4;m.attackAt=1000;m.seed=0;
+ m.lastPlayer={x:500,y:305,vx:0,vy:0};
+ Brain.onDamage(m,15,800);
+ const result=Brain.decide(m,{time:1000,pos:{x:800,y:305},
+  player:{x:500,y:305},casts:[],shots:[],health:.8});
+ assert.equal(result.declined,true);
+ assert.equal(result.newRefusal,true);
+ assert.equal(result.reason,'suspected-bait');
+ assert.ok(m.attackAt>=1350,'suspicion delays rather than advances the spell');
+ assert.equal(m.attacks,4,'refusing costs no new or free attack');
+ assert.equal(m.held,null);
+ const at=m.attackAt;
+ const early=Brain.decide(m,{time:1125,pos:{x:800,y:305},
+  player:{x:500,y:305},casts:[],shots:[],health:.8});
+ assert.ok(early?.declined);
+ assert.equal(early.newRefusal,undefined);
+ assert.ok(early.move.x>0,'withdrawal is actually maintained throughout refusal');
+ assert.equal(m.attackAt,at);
+});
+check('Judgment can detect anticipation of an ordinary firing rhythm',()=>{
+ const m=Brain.make(store,0);m.attacks=5;m.attackAt=2200;
+ m.observedAt=1400;m.lastPlayer={x:400,y:305,vx:0,vy:0};
+ Brain.observe(m,{time:1750,pos:{x:800,y:305},player:{x:450,y:305},shots:[],casts:[]});
+ assert.equal(m.tempo.precommit,true);
+ assert.equal(m.tempo.anticipatedFor,2200);
+ assert.ok(m.seen.judgment.anticipation>0);
+});
+check('Judgment protects an active emergency dodge and refuses no free openings',()=>{
+ const m=Brain.make(store,0);m.attacks=4;m.attackAt=1000;m.seed=0;
+ m.lastPlayer={x:500,y:305,vx:0,vy:0};
+ Brain.onDamage(m,15,800);
+ const ob={time:1000,pos:{x:800,y:305},player:{x:500,y:305}};
+ assert.equal(Brain.judgeOpening(m,ob,true,[]).hold,false);
+ assert.equal(Brain.judgeOpening(m,ob,false,[{ticks:20}]).hold,false);
+ m.tempo.lastHoldCast=3;
+ assert.equal(Brain.judgeOpening(m,ob,false,[]).hold,false,
+  'not allowed to spam refusals on consecutive attack cycles');
+});
+check('a delayed exchange has a measurable outcome instead of free learning',()=>{
+ const m=Brain.make(store,0);m.attacks=4;m.attackAt=1000;m.seed=0;
+ m.lastPlayer={x:500,y:305,vx:0,vy:0};m.observedAt=900;
+ Brain.onDamage(m,10,850);
+ const choice=Brain.judgeOpening(m,{time:1000,pos:{x:800,y:305},player:{x:500,y:305}},false,[]);
+ assert.equal(choice.hold,true);
+ Brain.declineOpening(m,{time:1000,pos:{x:800,y:305},player:{x:500,y:305}},choice,2.6);
+ Brain.observe(m,{time:1280,pos:{x:800,y:305},player:{x:620,y:305},shots:[],casts:[]});
+ assert.equal(m.seen.judgment.disruption,1,'observed motion affects learned judgment');
+ assert.equal(m.seen.judgment.wasted,0);
+ assert.equal(m.tempo.probe,null);
+ const n=Brain.make(store,0);n.tempo.probe={at:1000,x:500,y:305,speed:0};
+ n.observedAt=1100;n.lastPlayer={x:500,y:305,vx:0,vy:0};
+ Brain.observe(n,{time:1920,pos:{x:800,y:305},player:{x:500,y:305},shots:[],casts:[]});
+ assert.equal(n.seen.judgment.wasted,1,'no observed reaction penalizes bluff');
+});
+check('retained Judgment memory is capped and backward-compatible',()=>{
+ const mem={data:null,getItem(){return this.data},setItem(k,v){this.data=v}};
+ const m=Brain.make(mem,0);
+ m.seen.judgment={anticipation:4,disruption:2,wasted:1};
+ assert.equal(Brain.remember(m,'defeat'),true);
+ const later=Brain.make(mem,5000);
+ assert.ok(later.prior.judgment.anticipation>0);
+ assert.ok(later.prior.judgment.disruption>0);
+ const old=JSON.parse(mem.data);
+ delete old.judgment;
+ mem.data=JSON.stringify(old);
+ assert.deepEqual(Brain.make(mem,5000).prior.judgment,
+   {anticipation:0,disruption:0,wasted:0});
+ old.judgment={anticipation:9999,disruption:-10,wasted:'bad'};
+ mem.data=JSON.stringify(old);
+ assert.deepEqual(Brain.make(mem,5000).prior.judgment,
+   {anticipation:80,disruption:0,wasted:0});
+});
+console.log('Archivist 064 checks passed: '+passed);
