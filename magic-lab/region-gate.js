@@ -11,6 +11,7 @@
 })(typeof globalThis==="object"?globalThis:null,function(){
  "use strict";
  const VERSION=1; // Home is a separate scene; every six-glyph address is valid.
+ const ARCHIVE_ADDRESS="721360"; // ✶ ☽ ◇ ✦ ⬡ ☼, reserved within generator v1.
  const GLYPHS=Object.freeze(["☼","◇","☽","✦","≋","△","⬡","✶"]);
  const ORIGIN=Object.freeze({x:254,y:305});
  const GATE=Object.freeze({x:128,y:300});
@@ -102,7 +103,24 @@
   // rerolling the geography of addresses discovered with this version.
   if(version!==1)throw Error("Unsupported region generator version: "+version);
   const seed=hash(code),sectors=Array.from({length:5},(_,i)=>sector(seed,i));
-  return {address:code,version:VERSION,seed,sectors};
+  if(code===ARCHIVE_ADDRESS){
+   // Reserved encounter overlay: original region v1 geography is unchanged
+   // for every other address, and no new generator version is required.
+   const names=["The Unwritten Vestibule","Margins of Doubt",
+     "Hall of Failed Hypotheses","The Revision Gallery","The Living Archive"];
+   for(let i=0;i<sectors.length;i++){
+    const a=sectors[i];a.name=names[i];a.theme="Archive";
+    a.colors=[0x171a37,0x222a4a,0x0b142a,0x15203c];
+    a.line=0x8d91cf;a.glow=0xe3c8ff;
+    if(i===4){
+     a.archivist=true;a.enemies=[{type:"archivist",x:885,y:305}];
+     a.crate=[];a.pillar=[];a.debris=[];
+     a.pads=[{x:810,y:148,r:34,kind:2},{x:810,y:465,r:34,kind:2},
+       {x:1100,y:150,r:30,kind:2},{x:1100,y:465,r:30,kind:2}];
+    }
+   }
+  }
+  return {address:code,version:VERSION,seed,sectors,special:code===ARCHIVE_ADDRESS?"archivist":null};
  }
  function portals(region,index){
   const links=region.sectors[index].links;
@@ -160,5 +178,5 @@
   }
   g.fillStyle(0xeffbff,.7+beat*.25);g.fillCircle(x,y,8+beat*5);
  }
- return Object.freeze({VERSION,GLYPHS,ORIGIN,GATE,EXITS,valid,hash,make,neighbors,portals,drawFloor,drawPortal,drawGate});
+ return Object.freeze({VERSION,ARCHIVE_ADDRESS,GLYPHS,ORIGIN,GATE,EXITS,valid,hash,make,neighbors,portals,drawFloor,drawPortal,drawGate});
 });
