@@ -516,16 +516,18 @@
    const judgment=judgeOpening(m,ob,danger,threats);
    if(judgment.hold)return declineOpening(m,ob,judgment,speed);
    m.tempo.precommit=false;
-   const plan=invent(m,ob);
-   m.board.forecast=plan.forecast||0;
-   m.board.threatened=plan.threatened||0;
-   m.board.free=plan.free??5;
-   m.board.plies=plan.plies||1;
+   const useEdict=chooseEdict(m,ob);
+   const plan=useEdict?{kind:"edict",name:"Edict of Motion",element:"arcane",
+       feint:false,lead:false}:invent(m,ob);
+   m.board.forecast=useEdict?0:plan.forecast||0;
+   m.board.threatened=useEdict?1:plan.threatened||0;
+   m.board.free=useEdict?4:plan.free??5;
+   m.board.plies=useEdict?1:plan.plies||1;
    plan.tellTarget={x:player.x,y:player.y}; // Physical observation at windup, never future input.
    // 75% shorter charge: normal 670ms → 168ms; deceptive 1080ms → 270ms.
    m.held=plan;m.until=time+(plan.feint?270:168);
    m.state=plan.feint?"mislead":"inscribe";
-   m.quote=plan.feint?"Observe the obvious answer.":"An unfamiliar arrangement...";
+   m.quote=useEdict?"Your position has been noted.":plan.feint?"Observe the obvious answer.":"An unfamiliar arrangement...";
    return {move:{x:0,y:0,speed:0},tell:plan};
   }
   m.state=danger?"evade-swarm":d>450?"study":"observe";
