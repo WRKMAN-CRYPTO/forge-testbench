@@ -65,7 +65,7 @@
    const store=opts.storage||null;
    const onStatus=typeof opts.onStatus==="function"?opts.onStatus:()=>{};
    let volume=0.68,enabled=true,unlocked=false,mode="main",running=false,raf=0,interval=0,
-     lastThreat=0,lastProximity=false,sourceReady={main:false,battle:false},
+     lastThreat=0,lastProximity=false,audioContext=null,sourceReady={main:false,battle:false},
      urlByTrack={main:null,battle:null},generation=0;
    try{
      const pref=JSON.parse(store?.getItem(PREF)||"null");
@@ -87,7 +87,33 @@
        try{el.currentTime=0;}catch(_){}
        if(mode===name)tryPlay(name);
      });
-     tracks[name]={el,mix:0,from:0,to:0,at:0,until:0,lastAttempt:-3000};
+     tracks[name]={el,gainNode:null,mix:0,from:0,to:0,at:0,until:0,lastAttempt:-3000};
+   }
+   function ensureWebAudio(){
+     if(audioContext)return;
+     const Ctx=typeof window!=="undefined"&&(window.AudioContext||window.webkitAudioContext);
+     if(!Ctx){onStatus("Web Audio unavailable. Fades may not work on this device.");return;}
+     try{
+       audioContext=new Ctx();
+       for(const key of ["main","battle"]){
+         const track=tracks[key],source=audioContext.createMediaElementSource(track.el);
+         track.gainNode=audioContext.createGain();
+         track.gainNode.gain.value=0;
+         source.connect(track.gainNode);
+         track.gainNode.connect(audioContext.destination);
+         track.el.volume=1; // Web Audio gain, not HTMLAudio.volume, controls iPhone fades.
+       }
+     }catch(e){
+       onStatus("Web Audio setup failed; using basic playback.");
+       // A browser cannot attach a second MediaElementSource to the same element.
+       // Keep the successful routes and avoid breaking established media playback.
+     }
+   }
+   function gainValue(track,value){
+     const gain=clamp(value);
+     if(track.gainNode&&audioContext){
+       track.gainNode.gain.setValueAtTime(gain,audioContext.currentTime);
+     }else track.el.volume=gain;
    }
    function persist(){
      try{store?.setItem(PREF,JSON.stringify({enabled,volume}));}catch(_){}
@@ -166,7 +192,7 @@
        }
        const fade=envelope(a.currentTime,duration);
        const gain=(enabled&&unlocked)?tr.mix*volume*fade:0;
-       a.volume=clamp(gain);
+       gainValue(tr,gain);
        // Only the active track and any tail of a crossfade keep decoding.
        if(a.paused&&gain>0.0001)tryPlay(name);
        if(name!==mode&&tr.mix<0.0005&&!a.paused)a.pause();
@@ -186,6 +212,8 @@
    function unlock(){
      unlocked=true;
      if(!enabled)return;
+     ensureWebAudio();
+     if(audioContext?.state==="suspended")audioContext.resume().catch(()=>onStatus("Tap ♫ again to unlock iPhone audio."));
      const tr=tracks[mode];tr.mix=Math.max(tr.mix,0);
      const now=performance.now();
      tween(mode,1,1700,now);
@@ -197,7 +225,7 @@
      enabled=Boolean(next);persist();
      if(enabled){unlock();onStatus("Music on · "+(mode==="main"?"A New Journey":"Wizard Life"));}
      else{
-       for(const key of ["main","battle"]){tracks[key].el.pause();tracks[key].el.volume=0;}
+       for(const key of ["main","battle"]){tracks[key].el.pause();gainValue(tracks[key],0);}
        stopFrame();unlocked=false;onStatus("Music off");
      }
      return enabled;
@@ -237,11 +265,14 @@
      else if(lastProximity&&now-lastThreat>6400){lastProximity=false;setMode("main");}
    }
    function suspend(){
-     for(const key of ["main","battle"]){tracks[key].el.pause();tracks[key].el.volume=0;}
+     for(const key of ["main","battle"]){tracks[key].el.pause();gainValue(tracks[key],0);}
      stopFrame();
    }
    function resume(){
-     if(enabled&&unlocked){startFrame();tryPlay(mode);}
+     if(enabled&&unlocked){
+       if(audioContext?.state==="suspended")audioContext.resume().catch(()=>onStatus("Tap ♫ to resume audio."));
+       startFrame();tryPlay(mode);
+     }
    }
    function destroy(){
      suspend();
@@ -249,6 +280,7 @@
        tracks[k].el.removeAttribute("src");tracks[k].el.load();
        if(urlByTrack[k])URL.revokeObjectURL(urlByTrack[k]);
      }
+     audioContext?.close().catch(()=>{});
    }
    return {initialize,unlock,setEnabled,setVolume,selectFiles,setMode,updateWorld,
      suspend,resume,destroy,get enabled(){return enabled;},get volume(){return volume;},
