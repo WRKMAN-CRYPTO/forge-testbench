@@ -57,9 +57,9 @@
   art.addEventListener("error",failed);
   // Works even without a separately hosted binary asset. Original user artwork
   // is packed in title-art.js as an AVIF data URL for reliable GitHub Pages delivery.
-  if(typeof root?.WRKMAN_WANDRUNE_ART==="string"&&
-     root.WRKMAN_WANDRUNE_ART.startsWith("data:image/avif;base64,")){
-    art.src=root.WRKMAN_WANDRUNE_ART;
+  if(typeof window!=="undefined"&&typeof window.WRKMAN_WANDRUNE_ART==="string"&&
+     window.WRKMAN_WANDRUNE_ART.startsWith("data:image/avif;base64,")){
+    art.src=window.WRKMAN_WANDRUNE_ART;
   }
   if(art.complete){if(art.naturalWidth)loaded();else failed();}
   storedImage().then(blob=>{
