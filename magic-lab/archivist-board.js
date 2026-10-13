@@ -49,9 +49,11 @@
   const last=ob.lastPlayer||{vx:0,vy:0};
   const v={x:clamp((last.vx||0)/60,-BASE_SPEED,BASE_SPEED),
            y:clamp((last.vy||0)/60,-BASE_SPEED,BASE_SPEED)};
-  const ramp=clamp((tick-2)/9,0,1),blend=.38*(1-ramp);
-  const x=ob.player.x+(wish.x*BASE_SPEED*(1-blend)+v.x*blend)*tick;
-  const y=ob.player.y+(wish.y*BASE_SPEED*(1-blend)+v.y*blend)*tick;
+  // Momentum already observed cannot disappear just because the rollout
+  // samples a later tick. "Hold" means no *new* input, not instant braking.
+  const inertia=Math.min(tick,name==="hold"?35:12)*.55;
+  const x=ob.player.x+wish.x*BASE_SPEED*tick+v.x*inertia;
+  const y=ob.player.y+wish.y*BASE_SPEED*tick+v.y*inertia;
   return bounded({x,y});
  }
  function nearTerrain(point,ob){
