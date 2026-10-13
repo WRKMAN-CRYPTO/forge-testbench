@@ -1,4 +1,4 @@
-/* WANDRUNE 060 | Archivist physical boss combat adapter.
+/* WANDRUNE 061 | Archivist physical boss combat adapter.
  * Mind may decide and invent; only this layer is permitted to spawn projectiles.
  * The existing Matter and combat damage loops remain authoritative.
  */
@@ -19,7 +19,7 @@
  }
  function fire(s,e,plan,Body){
   if(!M||!e.alive||!plan||s.projectiles.length>=31)return false;
-  const shots=M.planDirections(e.archivist,plan,e.body.position,s.player);
+  const shots=M.planDirections(e.archivist,plan,e.body.position,plan.target||s.player);
   const left=Math.min(35-s.projectiles.length,
    16-s.projectiles.filter(p=>p.body?.archive).length);
   if(left<=0)return false;
@@ -31,13 +31,16 @@
    b.gameTag="ember";b.labAlive=true;b.owner=e.id;
    b.labBorn=s.time.now;b.labDeflected=false;
    b.archive={element:plan.element,motif:plan.motif,name:plan.name,
+    tactic:plan.tactic||"probe",stage:plan.stage||"single",
     damage:plan.element==="lightning"?15:plan.element==="frost"?11:13,
     color:COLORS[plan.element]};
    Body.setVelocity(b,{x:dir.x*plan.speed,y:dir.y*plan.speed});
    s.projectiles.push({body:b,born:s.time.now,trail:[]});
   }
   s.burst(e.body.position.x,e.body.position.y,COLORS[plan.element],13,4);
-  s.announceCombat("THE ARCHIVIST INVENTS • "+plan.name.toUpperCase());
+  const description=plan.stage==="opening"?"OPENING GAMBIT":
+     plan.stage==="followup"?"COUNTERMOVE":"INVENTS";
+  s.announceCombat("ARCHIVIST "+description+" • "+plan.name.toUpperCase());
   return true;
  }
  function step(s,e,time,delta,Body,hitPlayer){
@@ -113,6 +116,20 @@
     g.lineBetween(x,y,x+Math.cos(a)*125,y+Math.sin(a)*125);
    }
   }
+  if(m?.pending){
+   // No concealed second shot: his intent to punish an escape is visible.
+   // The mark is a theory based on his past observations, not a live lock-on.
+   const from=m.pending.from;
+   const direction=Math.atan2(from.y-y,from.x-x);
+   const ax=-Math.sin(direction),ay=Math.cos(direction);
+   const guess={x:from.x+ax*m.pending.side*52,
+     y:from.y+ay*m.pending.side*52};
+   g.lineStyle(1.5,0xffcf97,.42+.30*pulse);
+   g.lineBetween(x,y,guess.x,guess.y);
+   g.strokeCircle(guess.x,guess.y,12+3*pulse);
+   g.lineStyle(1,0xe5d0ff,.33+.25*pulse);
+   g.strokeCircle(x,y,51+4*pulse);
+  }
   if(m?.state==="evade-bolt"){
    // Player-facing cue: the Archivist is reading an ACTUAL visible bolt.
    // A quick amber/cyan annotation, not immunity or a fake projectile.
@@ -125,7 +142,9 @@
    g.strokeCircle(x,y,36+4*pulse);
   }
   if(e.moodText?.active){
-   const state=m?.state==="evade-bolt"?"READING ARC / EVADE":
+   const state=m?.state==="countermove"?"COUNTERMOVE":
+    m?.state==="read-escape"?"READING ESCAPE":
+    m?.state==="evade-bolt"?"READING ARC / EVADE":
     m?.state==="inscribe"?"INSCRIBING":
     m?.state==="mislead"?"A FALSE TELL":
     m?.state==="experiment"?"EXPERIMENTING":"STUDYING";
