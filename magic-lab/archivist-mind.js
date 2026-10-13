@@ -1,4 +1,4 @@
-/* WANDRUNE 060 | The Archivist: Physical Threat Perception
+/* WANDRUNE 061 | The Archivist: Tactical Offense
  * No global player profiling. One creature, a bounded, imperfect memory.
  * Observes visible physical movement / nearby elemental matter, not rune layouts
  * or future inputs. Experimental physical projectile motifs are composable.
@@ -12,6 +12,7 @@
  const ADDRESS="721360",NAME="The Archivist",KEY="wrkman-wandrune-archivist-memory-v1",RANGE=530;
  const ELEMENTS=["arcane","frost","fire","lightning"];
  const MOTIFS=["lance","fan","pincer","spiral"];
+ const TACTICS=["probe","herd","bait"];
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  const fresh=()=>({version:1,encounters:0,defeats:0,wins:0,element:[0,0,0,0],dodges:[0,0],plans:[],lastLine:""});
  function validate(raw){
@@ -23,7 +24,7 @@
   if(Array.isArray(raw.plans))m.plans=raw.plans.slice(0,6).filter(x=>
    x&&MOTIFS.includes(x.motif)&&ELEMENTS.includes(x.element)&&
    Number.isFinite(x.score)).map(x=>({motif:x.motif,element:x.element,
-     lead:!!x.lead,feint:!!x.feint,score:clamp(x.score,-5,10)}));
+     lead:!!x.lead,feint:!!x.feint,tactic:TACTICS.includes(x.tactic)?x.tactic:"probe",score:clamp(x.score,-5,10)}));
   m.lastLine=String(raw.lastLine||"").slice(0,90);
   return m;
  }
@@ -37,7 +38,7 @@
  function make(storage,time=0){
   const prior=read(storage);
   return {prior,storage,started:time,nextThink:time,until:0,attackAt:time+2200,
-   state:"observe",intent:{x:0,y:0,speed:0},held:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0]},
+   state:"observe",intent:{x:0,y:0,speed:0},held:null,pending:null,lastPlayer:null,seen:{element:[0,0,0,0],dodges:[0,0]},
    learned:0,observedAt:time,pressure:{x:0,y:0,count:0},
    // Projectile impressions are held only during this physical encounter.
    boltSeen:null,dodgeUntil:0,dodgeCooldown:0,dodgeDirection:null,dodgeLaunch:false,
@@ -195,7 +196,7 @@
   const preferred=m.seen.element.map((x,i)=>x+m.prior.element[i]);
   const max=Math.max(...preferred);
   const dodge=m.seen.dodges.map((x,i)=>x+m.prior.dodges[i]);
-  const learnedPlan=m.prior.plans.find(p=>p.element===elem&&p.motif===motif);
+  const learnedPlan=m.prior.plans.find(p=>p.element===elem&&p.motif===motif&&(!p.tactic||p.tactic==="probe"));
   // Element counters are empirical guesses, not perfect immunities.
   let n=1+Math.min(2.2,(preferred[ELEMENTS.indexOf(elem)]||0)/Math.max(1,max)*1.2);
   if(elem==="lightning"&&max===preferred[1])n+=.7; // tries conduction after seeing frost
@@ -213,17 +214,69 @@
    const element=ELEMENTS[Math.floor(rand(m)*ELEMENTS.length)];
    const motif=MOTIFS[Math.floor(rand(m)*MOTIFS.length)];
    const lead=rand(m)<.45,feint=rand(m)<(.12+Math.min(.25,m.learned/80));
-   const candidate={element,motif,lead,feint,
+   const observedDodge=m.seen.dodges[0]+m.seen.dodges[1]+
+    m.prior.dodges[0]+m.prior.dodges[1];
+   const tactic=observedDodge>.8?
+      (rand(m)<.36?"probe":rand(m)<.53?"herd":"bait"):
+      (m.attacks>=1&&rand(m)<.52?"herd":"probe");
+   const candidate={element,motif,lead,feint,tactic,
      count:motif==="lance"?3:motif==="fan"?5:motif==="pincer"?4:6,
      spread:motif==="lance"?.11:motif==="fan"?.50:motif==="pincer"?.65:.84,
      speed:motif==="spiral"?5.9:motif==="lance"?8.0:6.6,
      name:(feint?"False ":"")+
        (motif==="pincer"?"Mirror":motif==="fan"?"Crown":motif==="lance"?"Needle":"Helix")+" of "+
        ({arcane:"Ink",frost:"Glass",fire:"Cinders",lightning:"Static"}[element])};
-   const scoreNow=weight(m,element,motif,lead,feint)+rand(m)*1.8;
+   const remembered=m.prior.plans.find(p=>p.element===element&&p.motif===motif&&
+      (p.tactic||"probe")===tactic);
+   const scoreNow=weight(m,element,motif,lead,feint)+
+      (remembered?.score||0)*.36+rand(m)*1.8+
+      (tactic==="herd"&&m.attacks>=1?.3:0);
    if(scoreNow>score){best=candidate;score=scoreNow;}
   }
   return best;
+ }
+
+ // Always spend one regular casting budget. A tactical attack divides it
+ // between a baiting opening and a delayed response to observed movement.
+ function dodgePreference(m){
+  const neg=m.seen.dodges[0]+m.prior.dodges[0]*.7;
+  const pos=m.seen.dodges[1]+m.prior.dodges[1]*.7;
+  return neg===pos?(m.attacks%2===0?1:-1):pos>neg?1:-1;
+ }
+ function openingPlan(m,plan,time,player){
+  const target={...(plan.tellTarget||player)};
+  if(plan.tactic!=="herd"&&plan.tactic!=="bait")
+   return {...plan,stage:"single",target};
+  const count=Math.max(1,Math.ceil(plan.count/2));
+  const side=dodgePreference(m);
+  m.pending={plan:{...plan},due:time+750,from:{x:player.x,y:player.y},
+   side,remaining:plan.count-count};
+  return {...plan,stage:"opening",count,target,
+   angleBias:-side*(plan.tactic==="bait"?.28:.17)};
+ }
+ function followupPlan(m,ob){
+  const pending=m.pending;
+  if(!pending||ob.time<pending.due)return null;
+  m.pending=null;
+  const last=m.lastPlayer||{x:ob.player.x,y:ob.player.y,vx:0,vy:0};
+  const base=pending.from;
+  const theta=Math.atan2(base.y-ob.pos.y,base.x-ob.pos.x);
+  const sideAxis={x:-Math.sin(theta),y:Math.cos(theta)};
+  const moved=(last.x-base.x)*sideAxis.x+(last.y-base.y)*sideAxis.y;
+  // Visible post-volley movement can overturn remembered habits.
+  // If the player stays still, the boss acts on a fallible theory.
+  const side=Math.abs(moved)>18?Math.sign(moved):pending.side;
+  const shift=clamp(Math.abs(moved)>.0?Math.abs(moved)*.40:46,34,75);
+  const target={
+   x:clamp(last.x+sideAxis.x*side*shift+
+     clamp(last.vx||0,-230,230)*.09,WORLD.left+75,WORLD.right-75),
+   y:clamp(last.y+sideAxis.y*side*shift+
+     clamp(last.vy||0,-230,230)*.09,WORLD.top+75,WORLD.bottom-75)
+  };
+  const plan={...pending.plan,stage:"followup",count:pending.remaining,target,
+   spread:Math.min(.26,pending.plan.spread*.70),angleBias:0};
+  m.state="countermove";m.quote="Let's see where you land.";
+  return plan;
  }
  function decide(m,ob){
   const {time,pos,player,health=1}=ob;
@@ -263,6 +316,7 @@
      m.boltDodges++;
      // A real threat can interrupt an experiment. That costs him the cast.
      if(m.held){m.held=null;m.attackAt=Math.max(m.attackAt,time+450);}
+     m.pending=null; // A genuine emergency forfeits an unfinished trap.
     }
    }
   }
@@ -279,18 +333,27 @@
    m.intent={x:bx-normal.y*.24*sidestep,
      y:by+normal.x*.24*sidestep,speed:3.8};
    if(m.held&&hz>2.2){
-    m.held=null;m.attackAt=time+680;
+    m.held=null;m.pending=null;m.attackAt=time+680;
     m.state="evade";return {move:m.intent};
    }
+  }
+  if(m.pending&&time>=m.pending.due){
+   const reply=followupPlan(m,ob);
+   if(reply)return {move:m.intent,release:reply};
+  }
+  if(m.pending){
+   m.state="read-escape";
+   return {move:m.intent,counterTell:{target:{...m.pending.from},side:m.pending.side}};
   }
   if(m.held){
    m.state=m.held.feint?"mislead":"inscribe";
    if(time>=m.until){
     const ready=m.held;m.held=null;m.lastPlan=ready;m.attacks++;
+    const release=openingPlan(m,ready,time,player);
     m.attackAt=time+clamp(3300-m.learned*15,2250,3400);
     m.state="experiment";
     m.quote="Experiment "+m.attacks+": "+ready.name+".";
-    return {move:m.intent,release:ready};
+    return {move:m.intent,release};
    }
    return {move:{x:0,y:0,speed:0},tell:m.held};
   }
@@ -343,7 +406,7 @@
  function planDirections(m,plan,origin,player){
   const latest=m.lastPlayer||{vx:0,vy:0};
   const lead=plan.lead?clamp(Math.hypot(latest.vx,latest.vy)*.34,0,90):0;
-  const theta=Math.atan2(player.y-origin.y+Math.sign(latest.vy)*lead,player.x-origin.x+Math.sign(latest.vx)*lead);
+  const theta=Math.atan2(player.y-origin.y+Math.sign(latest.vy)*lead,player.x-origin.x+Math.sign(latest.vx)*lead)+(plan.angleBias||0);
   const angles=[];
   for(let i=0;i<plan.count;i++){
    if(plan.motif==="lance")angles.push(theta+(i-1)*plan.spread*.55);
@@ -353,5 +416,5 @@
   }
   return angles;
  }
- return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,read,make,observe,invent,decide,onDamage,onHit,remember,planDirections,predictBolt,visibleBolts,chooseDodge});
+ return Object.freeze({ADDRESS,NAME,KEY,ELEMENTS,MOTIFS,TACTICS,read,make,observe,invent,decide,onDamage,onHit,remember,planDirections,predictBolt,visibleBolts,chooseDodge,openingPlan,followupPlan});
 });
