@@ -1,4 +1,4 @@
-/* WANDRUNE 064 | Archivist physical boss combat adapter.
+/* WANDRUNE 065 | Archivist physical boss combat adapter.
  * Mind may decide and invent; only this layer is permitted to spawn projectiles.
  * The existing Matter and combat damage loops remain authoritative.
  */
@@ -37,6 +37,8 @@
    Body.setVelocity(b,{x:dir.x*plan.speed,y:dir.y*plan.speed});
    s.projectiles.push({body:b,born:s.time.now,trail:[]});
   }
+  // Only actual physical releases produce information about player reactions.
+  if(e.archivist&&M.onVolley)M.onVolley(e.archivist,plan,s.time.now,s.player);
   s.burst(e.body.position.x,e.body.position.y,COLORS[plan.element],13,4);
   const description=plan.stage==="opening"?"OPENING GAMBIT":
      plan.stage==="followup"?"COUNTERMOVE":"INVENTS";
