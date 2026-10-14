@@ -306,7 +306,7 @@
   }
   for(const pulse of st.healFX){
    const q=clamp((time-pulse.born)/600,0,1);
-   if(!vfx?.effect(g,{effect:"healing",x:pulse.x,y:pulse.y,
+   if(!vfx?.effect?.(g,{effect:"healing",x:pulse.x,y:pulse.y,
       r:61,progress:q,alpha:1,time})){
    g.lineStyle(2.2,0x82e9b0,(1-q)*.8);g.strokeCircle(pulse.x,pulse.y,15+q*58);
    for(let i=0;i<12;i++){
