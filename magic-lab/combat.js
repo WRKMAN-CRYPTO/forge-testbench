@@ -902,6 +902,8 @@ function paint(s,g,time){
  for(const fx of c.blastFX){
   const p=clamp((time-fx.born)/fx.life,0,1),fade=1-p;
   const radius=(fx.chain?84:116)*Math.sqrt(Math.max(.15,fx.energy/100));
+  if(!s.elementVfx?.effect(g,{effect:"explosion",x:fx.x,y:fx.y,r:radius,
+     progress:p,alpha:fx.chain?.72:1,time,color:0xffa354})){
   g.fillStyle(0xffe5ab,(fx.chain?.26:.38)*fade*fade);
   g.fillCircle(fx.x,fx.y,8+radius*p*.78);
   g.fillStyle(0xff8249,.13*fade);
@@ -913,6 +915,7 @@ function paint(s,g,time){
    g.lineStyle(1.8+2.4*fade,i%2?0xff7e4e:0xffeeac,.63*fade);
    g.lineBetween(fx.x+Math.cos(angle)*inner,fx.y+Math.sin(angle)*inner,
     fx.x+Math.cos(angle)*outer,fx.y+Math.sin(angle)*outer);
+  }
   }
  }
  for(const fx of c.impactFX){
