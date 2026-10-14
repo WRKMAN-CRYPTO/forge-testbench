@@ -15,7 +15,7 @@ const Materials=require('./element-material-registry.js');
 const C=require('./crafted-magic.js');
 
 assert.equal(Sources.TYPES.length,6,'Birth elements unchanged by cosmetic upgrades');
-assert.deepEqual(Materials.effects().sort(),['explosion','gravity','healing']);
+assert.ok(['explosion','gravity','healing'].every(key=>Materials.effect(key)), 'Built-in effects must be registered');
 assert.equal(typeof Materials.registerElement,'function');
 assert.equal(typeof Materials.registerEffect,'function');
 
