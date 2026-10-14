@@ -1,4 +1,4 @@
-/* WANDRUNE 067 | Edict of Motion
+/* WANDRUNE 068 | Edict of Motion
  * A static, clearly-telegraphed area attack. It never follows the player.
  * The combat layer owns hitPlayer() so invulnerability/dash rules stay intact.
  */
@@ -9,7 +9,7 @@
  if(root)root.WRKMAN_ARCHIVIST_EDICT=api;
 })(typeof window!=="undefined"?window:globalThis,function(){
  "use strict";
- const RADIUS=82,WARN_MS=650,DAMAGE=16,AFTERGLOW=420;
+ const RADIUS=82,WARN_MS=450,DAMAGE=16,AFTERGLOW=420;
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
  function create(target,time){
   return {x:target.x,y:target.y,r:RADIUS,born:time,due:time+WARN_MS,
