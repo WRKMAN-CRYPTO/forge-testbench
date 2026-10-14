@@ -32,7 +32,7 @@
  // Boost opacity without introducing a floor, so the 800ms lifespan fades still vanish.
  // Frost keeps the restrained glass translucency that already looked right.
  const litAlpha=(alpha,element=0)=>clamp(Math.pow(clamp(alpha),element===3?.8:.55)*(element===4?1.035:1));
- function kind(element){return Number.isInteger(element)&&element>=0?materialFor(element).id??element:0;}
+ function kind(element){return Number.isInteger(element)&&element>=0&&(Registry?Registry.element(element).id===element:!!MATERIALS[element])?element:0;}
  function hash(v){let x=(Math.floor(v*9817)||1)>>>0;x^=x>>>16;x=Math.imul(x,0x7feb352d);x^=x>>>15;return (x>>>0)/4294967295;}
  function drawMaterial(ctx,element,seed,neutralColor=null){
   const m=materialFor(element),size=48,c=24,rad=15;
