@@ -576,10 +576,10 @@ check('only an actual projectile release creates a pressure observation',()=>{
 });
 check('Edict is a locked area with a readable window and safe escape',()=>{
  const m=Edict.create({x:400,y:300},1000);
- assert.equal(m.due,1850);assert.equal(m.r,82);assert.equal(m.damage,16);
- assert.equal(Edict.outcome(m,{x:400,y:300},1849),null);
- assert.equal(Edict.outcome(m,{x:400,y:300},1850).inside,true);
- assert.equal(Edict.outcome(m,{x:525,y:300},1850).inside,false);
+ assert.equal(m.due,1650);assert.equal(m.r,82);assert.equal(m.damage,16);
+ assert.equal(Edict.outcome(m,{x:400,y:300},1649),null);
+ assert.equal(Edict.outcome(m,{x:400,y:300},1650).inside,true);
+ assert.equal(Edict.outcome(m,{x:525,y:300},1650).inside,false);
  assert.deepEqual({x:m.x,y:m.y},{x:400,y:300},'target may never track the player');
 });
 check('ground Edict substitutes a normal cast without extra projectiles',()=>{
@@ -590,42 +590,42 @@ check('ground Edict substitutes a normal cast without extra projectiles',()=>{
  const active={kind:'edict',name:'Edict of Motion',target:{x:400,y:305}};
  assert.equal(Act.fire(scene,foe,active,{}),true);
  assert.equal(scene.projectiles.length,0);
- assert.equal(foe.archivist.edict.due,2850);
+ assert.equal(foe.archivist.edict.due,2650);
  assert.equal(Act.fire(scene,foe,active,{}),false,'no stacking a second mark');
 });
 check('Edict actually injures stationary player using existing damage pathway',()=>{
  const m=Brain.make(store,0);m.edict=Edict.create({x:400,y:305},1000);
- const scene={player:{x:400,y:305},time:{now:1850},
+ const scene={player:{x:400,y:305},time:{now:1650},
   combat:{hp:100,invulnUntil:0},dashUntil:0,announceCombat(){}};
  const foe={archivist:m};
  let calls=0;
  const hit=(s,damage)=>{calls++;s.combat.hp-=damage;};
- Act.tickHazards(scene,foe,1849,hit);
+ Act.tickHazards(scene,foe,1649,hit);
  assert.equal(calls,0);
- Act.tickHazards(scene,foe,1850,hit);
+ Act.tickHazards(scene,foe,1650,hit);
  assert.equal(calls,1);assert.equal(scene.combat.hp,84);
  assert.equal(m.edictStats.hits,1);
- Act.tickHazards(scene,foe,1860,hit);
+ Act.tickHazards(scene,foe,1660,hit);
  assert.equal(calls,1,'the same circle cannot damage twice');
 });
 check('leaving the circle avoids all damage, no chasing or invisible hitbox',()=>{
  const m=Brain.make(store,0);m.edict=Edict.create({x:400,y:305},1000);
- const scene={player:{x:530,y:305},time:{now:1850},
+ const scene={player:{x:530,y:305},time:{now:1650},
   combat:{hp:100,invulnUntil:0},dashUntil:0,announceCombat(){}};
- Act.tickHazards(scene,{archivist:m},1850,()=>{throw Error('escaped rune hit player')});
+ Act.tickHazards(scene,{archivist:m},1650,()=>{throw Error('escaped rune hit player')});
  assert.equal(m.edictStats.hits,0);
  assert.equal(m.edictStats.escaped,1);
 });
 check('lethal contact counts, dash immunity prevents damage',()=>{
  const make=(inv,dash)=>{
   const m=Brain.make(store,0);m.edict=Edict.create({x:400,y:305},1000);
-  const scene={player:{x:400,y:305},time:{now:1850},
+  const scene={player:{x:400,y:305},time:{now:1650},
    combat:{hp:3,invulnUntil:inv},dashUntil:dash,announceCombat(){}};
   const hit=(s,damage)=>{
    if(s.time.now<inv||s.time.now<dash)return;
    s.combat.hp=100; // existing test mode recovers after lethal strike
   };
-  Act.tickHazards(scene,{archivist:m},1850,hit);
+  Act.tickHazards(scene,{archivist:m},1650,hit);
   return m.edictStats;
  };
  assert.equal(make(0,0).hits,1,'lethal recovery is still a successful contact');
@@ -654,4 +654,50 @@ check('Edict outcomes persist without damaging older saved tactics',()=>{
  mem.data=JSON.stringify(legacy);
  assert.deepEqual(Brain.make(mem,0).prior.edict,{uses:0,hits:0,escaped:0});
 });
-console.log('Archivist 066 checks passed: '+passed);
+check('Edict warning lasts exactly 650ms without increasing the damage area',()=>{
+ assert.equal(Edict.WARN_MS,650);
+ assert.equal(Edict.RADIUS,82);
+ assert.equal(Edict.DAMAGE,16);
+ const mark=Edict.create({x:400,y:300},2000);
+ assert.equal(mark.due,2650);
+ assert.equal(Edict.outcome(mark,{x:493,y:300},2650).inside,true);
+ assert.equal(Edict.outcome(mark,{x:495,y:300},2650).inside,false);
+});
+check('impact shatters into angular rune fragments and expanding shock rings',()=>{
+ const calls=[],g=new Proxy({},{get(t,k){return (...xs)=>{
+  assert.ok(xs.every(v=>typeof v==='number'&&Number.isFinite(v)),'bad geometry '+k);
+  calls.push({name:k,args:xs});
+ };}});
+ const mark=Edict.create({x:400,y:300},1000);
+ Edict.paint(g,mark,1600);
+ const warning=calls.splice(0);
+ assert.ok(warning.some(x=>x.name==='strokeCircle'&&x.args[2]===82),
+   'charging stage must mark the actual danger boundary');
+ mark.resolved=true;mark.resolvedAt=1650;
+ Edict.paint(g,mark,1690);
+ const shattered=calls.splice(0);
+ assert.ok(shattered.filter(x=>x.name==='fillTriangle').length>=12,
+   'rune needs twelve sharply defined fragments');
+ assert.ok(shattered.filter(x=>x.name==='strokeCircle').length>=3,
+   'the explosion needs multiple outward shock fronts');
+ Edict.paint(g,mark,1650+Edict.AFTERGLOW+1);
+ assert.equal(calls.length,0,'afterglow should stop drawing');
+});
+check('an Edict visibly detonates exactly once even when dodged',()=>{
+ for(const escaped of [false,true]){
+  const m=Brain.make(store,0);m.edict=Edict.create({x:400,y:300},1000);
+  const bursts=[],shakes=[],scene={player:{x:escaped?530:400,y:300},
+   combat:{hp:100,invulnUntil:0},dashUntil:0,
+   burst(x,y,color,count){bursts.push({x,y,color,count})},
+   cameras:{main:{shake(...p){shakes.push(p)}}},
+   announceCombat(){}};
+  const hit=(s,n)=>{s.combat.hp-=n};
+  Act.tickHazards(scene,{archivist:m},1650,hit);
+  assert.equal(bursts.length,2);
+  assert.equal(shakes.length,1);
+  assert.equal(scene.combat.hp,escaped?100:84);
+  Act.tickHazards(scene,{archivist:m},1700,hit);
+  assert.equal(bursts.length,2,'particles cannot spawn twice');
+ }
+});
+console.log('Archivist 067 checks passed: '+passed);
