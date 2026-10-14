@@ -902,7 +902,7 @@ function paint(s,g,time){
  for(const fx of c.blastFX){
   const p=clamp((time-fx.born)/fx.life,0,1),fade=1-p;
   const radius=(fx.chain?84:116)*Math.sqrt(Math.max(.15,fx.energy/100));
-  if(!s.elementVfx?.effect(g,{effect:"explosion",x:fx.x,y:fx.y,r:radius,
+  if(!s.elementVfx?.effect?.(g,{effect:"explosion",x:fx.x,y:fx.y,r:radius,
      progress:p,alpha:fx.chain?.72:1,time,color:0xffa354})){
   g.fillStyle(0xffe5ab,(fx.chain?.26:.38)*fade*fade);
   g.fillCircle(fx.x,fx.y,8+radius*p*.78);
