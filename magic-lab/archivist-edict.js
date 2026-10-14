@@ -84,7 +84,7 @@
   for(let i=0;i<12;i++){
    const a=TAU*i/12+.17;
    const ca=Math.cos(a),sa=Math.sin(a);
-   const side=Math.sin(a+Math.PI*.5),sideY=Math.cos(a);
+   const side=-sa,sideY=ca;
    const inner=r*(.18+.35*p),tip=r*(.92+.55*burst);
    const width=(9-6*p)*(i%3===0?1.35:1);
    const bx=x+ca*inner,by=y+sa*inner;
