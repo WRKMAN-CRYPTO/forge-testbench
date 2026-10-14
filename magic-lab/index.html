@@ -1679,12 +1679,15 @@ class Lab extends Phaser.Scene{
    for(let i=0;i<20;i++){const a=i*2.399+time*.00022,r=(35+i*27)%f.r;g.fillStyle(0xc1edff,.22*q);g.fillCircle(f.x+Math.cos(a)*r,f.y+Math.sin(a)*r,2.2);}
   }
   for(const w of this.wells){const q=Math.min(1,(w.life-(time-w.born))/450),rot=time*.0016+w.phase;
+   if(!this.elementVfx?.effect(g,{effect:"gravity",x:w.x,y:w.y,r:w.r,
+      alpha:q,time,progress:Math.min(1,(time-w.born)/w.life)})){
    g.fillStyle(color.well,.06*q);g.fillCircle(w.x,w.y,w.r);
    g.lineStyle(1,0xc1a3ff,.30*q);g.strokeCircle(w.x,w.y,w.r);
    for(let i=0;i<4;i++){const r=28+i*29+Math.sin(time*.003+i)*3,a=rot*(1+(i%2)*-.4)+i*1.7;
     g.lineStyle(2,0xb39aff,(.32+i*.08)*q);g.beginPath();g.arc(w.x,w.y,r,a,a+Math.PI*1.25);g.strokePath();}
    g.fillStyle(0x9477ff,.52*q);g.fillCircle(w.x,w.y,15);
    g.fillStyle(0xe3d8ff,.8*q);g.fillCircle(w.x,w.y,5);
+   }
   }
   for(const r of this.rings){const p=(time-r.born)/r.life;
    g.lineStyle(6*(1-p)+1,r.c,(1-p)*.85);g.strokeCircle(r.x,r.y,12+p*197);}
