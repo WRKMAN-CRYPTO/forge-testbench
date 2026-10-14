@@ -1,4 +1,4 @@
-/* WANDRUNE 057 | Stable Glow + Luminance Upgrade
+/* WANDRUNE 069 | Stable Glow + Luminance Upgrade
  * Purely visual. No forces, no collisions, no timers, no agent mutations.
  * One texture atlas set and capped, recyclable sprites. Every other agent
  * receives inexpensive elemental geometry through the existing Graphics pass.
@@ -10,7 +10,7 @@
  if(root)root.WRKMAN_ELEMENT_VFX=api;
 })(typeof globalThis==="object"?globalThis:null,function(){
  "use strict";
- const VERSION="057",PREF="wrkman-wandrune056-vfx-quality",TWO_PI=Math.PI*2;
+ const VERSION="069",PREF="wrkman-wandrune056-vfx-quality",TWO_PI=Math.PI*2;
  const QUALITY=Object.freeze({
    low:Object.freeze({sprites:0,motes:26,lights:0,detail:0}),
    medium:Object.freeze({sprites:300,motes:105,lights:2,detail:1}),
@@ -23,15 +23,19 @@
   3:Object.freeze({key:"frost",glow:0xa2eaff,center:"#ffffff",mid:"#bff2ff",edge:"#467fa8"}),
   4:Object.freeze({key:"lightning",glow:0xa9e5ff,center:"#ffffff",mid:"#f3faff",edge:"#408de8"})
  });
+ const Registry=typeof globalThis==="object"&&globalThis.WRKMAN_MATERIAL_REGISTRY?
+    globalThis.WRKMAN_MATERIAL_REGISTRY:
+    typeof require==="function"?require("./element-material-registry.js"):null;
+ const materialFor=id=>Registry?.element(id)||MATERIALS[id]||MATERIALS[0];
  const safeQuality=x=>QUALITY[x]?x:"medium";
  const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
  // Boost opacity without introducing a floor, so the 800ms lifespan fades still vanish.
  // Frost keeps the restrained glass translucency that already looked right.
  const litAlpha=(alpha,element=0)=>clamp(Math.pow(clamp(alpha),element===3?.8:.55)*(element===4?1.035:1));
- function kind(element){return Number.isInteger(element)&&MATERIALS[element]?element:0;}
+ function kind(element){return Number.isInteger(element)&&element>=0?materialFor(element).id??element:0;}
  function hash(v){let x=(Math.floor(v*9817)||1)>>>0;x^=x>>>16;x=Math.imul(x,0x7feb352d);x^=x>>>15;return (x>>>0)/4294967295;}
  function drawMaterial(ctx,element,seed,neutralColor=null){
-  const m=MATERIALS[element],size=48,c=24,rad=15;
+  const m=materialFor(element),size=48,c=24,rad=15;
   ctx.clearRect(0,0,size,size);
   const grad=ctx.createRadialGradient(20,17,1,24,24,19);
   grad.addColorStop(0,neutralColor||m.center);
@@ -45,7 +49,7 @@
   }
   ctx.save();ctx.translate(c,c);
   ctx.beginPath();
-  const sides=element===3?6:element===4?8:element===1?9:element===2?10:7;
+  const sides=element===3?6:element===4?8:element===1?9:element===2?10:m.shape==="crystal"?6:7;
   for(let k=0;k<sides;k++){
    const t=k*TWO_PI/sides-Math.PI/2;
    const jitter=element===2?.95:(.81+hash(seed+k*3)*.28);
@@ -93,6 +97,16 @@
     ctx.strokeStyle=k%2?"#d2fbffae":"#14548788";ctx.lineWidth=1.35;ctx.stroke();
    }
    ctx.fillStyle="#ffffffcc";ctx.beginPath();ctx.ellipse(-6,-8,3,1.6,-.6,0,TWO_PI);ctx.fill();
+  }else if(element>4){
+   if(typeof m.drawTexture==="function")m.drawTexture(ctx,seed);
+   else{
+    for(let k=0;k<7;k++){
+     const a=k*TWO_PI/7,rr=9+4*hash(seed+k*11);
+     ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);
+     ctx.strokeStyle=m.center;ctx.lineWidth=1.2;ctx.stroke();
+    }
+    ctx.fillStyle=m.mid;ctx.fillRect(-2,-2,4,4);
+   }
   }else{
    // Arcane: inner gemstone, etched glyph geometry and animated purple tint.
    for(let k=0;k<5;k++){
@@ -124,7 +138,7 @@
  }
  // Radial alpha image, not a PointLight shader. No hard white circles.
  // Soft halos are wholly transparent at their edges, independent of renderer.
- function makeHalo(scene,key,fire=false){
+ function makeHalo(scene,key,fire=false,material=null){
   if(scene.textures.exists(key))return;
   if(typeof document==="undefined")return;
   const canvas=document.createElement("canvas");canvas.width=canvas.height=96;
@@ -134,6 +148,11 @@
    glow.addColorStop(0,"rgba(255,199,106,.47)");
    glow.addColorStop(.26,"rgba(255,141,62,.33)");
    glow.addColorStop(.60,"rgba(252,96,38,.105)");
+  }else if(material){
+   const v=material.glow,c=[(v>>16)&255,(v>>8)&255,v&255].join(",");
+   glow.addColorStop(0,"rgba("+c+",.43)");
+   glow.addColorStop(.32,"rgba("+c+",.27)");
+   glow.addColorStop(.64,"rgba("+c+",.075)");
   }else{
    glow.addColorStop(0,"rgba(161,225,255,.48)");
    glow.addColorStop(.26,"rgba(96,174,255,.31)");
@@ -145,10 +164,10 @@
  }
  function install(scene){
   if(!scene?.textures||!scene.add)return null;
-  const prefix="wandrune-mat056-";
+  const prefix="wandrune-mat069-";
   const keys={};
   for(let element=1;element<=4;element++){
-   const key=prefix+MATERIALS[element].key;
+   const key=prefix+materialFor(element).key;
    factoryImage(scene,key,element,element*97);
    keys[element]=key;
   }
@@ -166,7 +185,19 @@
     keys[palette+"_"+i]=key;
    }
   }
-  const glowKeys={1:prefix+"halo-fire-057",4:prefix+"halo-lightning-057"};
+  const glowKeys={1:prefix+"halo-fire-069",4:prefix+"halo-lightning-069"};
+  function ensureMaterial(id){
+   const m=materialFor(id);
+   if(!m||!Number.isInteger(id)||id<=0)return;
+   if(!keys[id]){
+    const key=prefix+m.key;
+    factoryImage(scene,key,id,id*97);keys[id]=key;
+   }
+   if(m.light&&!glowKeys[id]){
+    const key=prefix+"halo-"+m.key;
+    makeHalo(scene,key,false,m);glowKeys[id]=key;
+   }
+  }
   makeHalo(scene,glowKeys[1],true);
   makeHalo(scene,glowKeys[4],false);
   let q="medium";
@@ -204,11 +235,12 @@
   }
   function paint(g,opts){
    const {x,y,r,element=0,alpha=.8,time=0,seed=0,texture="flat",palette="flame",progress=.44,angle=0}=opts;
-   const e=kind(element),radius=Math.max(.8,r),illum=litAlpha(alpha,e);
+   const e=kind(element),radius=Math.max(.8,r),illum=litAlpha(alpha,e),material=materialFor(e);
+   if(e>4)ensureMaterial(e);
    // Only the intended recipe leaf shape stays leaf-shaped.
    if(texture==="leaf"){
     const nx=Math.cos(angle),ny=Math.sin(angle),px=-ny,py=nx;
-    g.fillStyle(e?([0,0xffb669,0x7ce8ff,0xb5edff,0xffeeae][e]):opts.color,illum);
+    g.fillStyle(e?(e>4?material.rgb:[0,0xffb669,0x7ce8ff,0xb5edff,0xffeeae][e]):opts.color,illum);
     g.fillPoints([
      {x:x-nx*radius*1.45,y:y-ny*radius*1.45},
      {x:x+px*radius*.72,y:y+py*radius*.72},
@@ -228,7 +260,7 @@
     sprite.setRotation(e===3?Math.sin(seed)*.1:e===1?Math.sin(time*.0008+seed)*.12:0);
    }else{
     // All unsprited agents still have faceted material and luminescent core.
-    const col=e===0?opts.color:[0,0xffa347,0x61d7fb,0xb6ecff,0xffed9a][e];
+    const col=e===0?opts.color:(e>4?material.rgb:[0,0xffa347,0x61d7fb,0xb6ecff,0xffed9a][e]);
     g.fillStyle(col,illum);
     const sides=e===3?6:e===4?7:6;
     const points=[];
@@ -238,7 +270,7 @@
     }
     g.fillPoints(points,true);
     if(QUALITY[q].detail>0||e===4){
-     const light=e===1?0xffe7a0:e===2?0xcaffff:e===3?0xe7fbff:0xffffff;
+     const light=e>4?parseInt(material.center.slice(1),16):e===1?0xffe7a0:e===2?0xcaffff:e===3?0xe7fbff:0xffffff;
      g.fillStyle(light,clamp(illum*(e===4?.86:.6)));
      g.fillCircle(x-radius*.21,y-radius*.24,Math.max(.42,radius*(e===4?.38:.25)));
     }
@@ -294,6 +326,13 @@
     }else if(a.element===2){
      const x=a.x+Math.cos(ph+t*.9)*(a.r*1.4+3),y=a.y+Math.sin(ph+t*.9)*(a.r*1.4+3);
      overlay.lineStyle(.7,0xc5fbff,.15+.37*f);overlay.strokeCircle(x,y,1.2+f);
+    }else if(a.element>4){
+     const material=materialFor(a.element);
+     if(typeof material.drawMote==="function")material.drawMote(overlay,a,{time,f,phase:ph});
+     else{
+      const x=a.x+Math.cos(ph+t*.65)*(a.r+3),y=a.y+Math.sin(ph+t*.65)*(a.r+3);
+      overlay.fillStyle(material.rgb,.22+.36*f);overlay.fillCircle(x,y,.65+.85*f);
+     }
     }
    }
    for(let i=previous;i>used;i--)pool[i-1].setVisible(false);
@@ -305,7 +344,7 @@
    if(settings.lights){
     const camera=scene.cameras?.main?.worldView;
     for(const a of anchors){
-     if(a.element!==4&&!(q==="high"&&a.element===1))continue;
+     if(!materialFor(a.element).light||(q==="medium"&&a.element===1))continue;
      if(camera&&!camera.contains(a.x,a.y))continue;
      const key=a.element+":"+Math.floor(a.x/110)+":"+Math.floor(a.y/110);
      let bucket=buckets.get(key);
@@ -314,7 +353,7 @@
     }
    }
    const targets=[...buckets.values()].sort((a,b)=>
-     (b.count+(b.element===4?.4:0))-(a.count+(a.element===4?.4:0))||
+     (b.count+materialFor(b.element).lightPriority*.2)-(a.count+materialFor(a.element).lightPriority*.2)||
      a.key.localeCompare(b.key)).slice(0,settings.lights);
    const dt=lastGlowTime?clamp(time-lastGlowTime,8,55):16;
    lastGlowTime=time;
@@ -356,9 +395,10 @@
    for(const x of glows)x.destroy();
    overlay.destroy();
   }
-  return {begin,paint,paintImpact,extras,setQuality,get quality(){return q;},
+  function effect(g,opts){return Registry?.paintEffect(g,opts)||false;}
+  return {begin,paint,paintImpact,extras,effect,setQuality,get quality(){return q;},
     get stats(){return {sprites:used,agents:lastActive,motes:lastMotes,lights:glows.filter(x=>x.visible).length};},
     destroy};
  }
- return Object.freeze({VERSION,PREF,QUALITY,MATERIALS,safeQuality,hash,drawMaterial,install});
+ return Object.freeze({VERSION,PREF,QUALITY,MATERIALS,registry:Registry,safeQuality,hash,drawMaterial,install});
 });
