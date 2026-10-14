@@ -306,11 +306,14 @@
   }
   for(const pulse of st.healFX){
    const q=clamp((time-pulse.born)/600,0,1);
+   if(!vfx?.effect(g,{effect:"healing",x:pulse.x,y:pulse.y,
+      r:61,progress:q,alpha:1,time})){
    g.lineStyle(2.2,0x82e9b0,(1-q)*.8);g.strokeCircle(pulse.x,pulse.y,15+q*58);
    for(let i=0;i<12;i++){
     const a=i*TAU/12+time*.0014,r=9+q*45;
     g.fillStyle(i%2?0x8ce8b7:0xcfffe0,(1-q)*.9);
     hex(g,pulse.x+Math.cos(a)*r,pulse.y+Math.sin(a)*r,2.3*(1-q)+.4);
+   }
    }
   }
   }
