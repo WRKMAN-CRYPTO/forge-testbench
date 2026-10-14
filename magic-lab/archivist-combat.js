@@ -1,4 +1,4 @@
-/* WANDRUNE 066 | Archivist physical boss combat adapter.
+/* WANDRUNE 067 | Archivist physical boss combat adapter.
  * Mind may decide and invent; only this layer is permitted to spawn projectiles.
  * The existing Matter and combat damage loops remain authoritative.
  */
@@ -111,6 +111,11 @@
     hitPlayer(s,mark.damage,mark.x,mark.y,"Edict of Motion");
    }
    mark.resolved=true;mark.resolvedAt=time;mark.inside=result.inside;
+   // The spell detonates visually even after a successful dodge. Neither
+   // particles nor camera effects expand the actual damage area.
+   s.burst?.(mark.x,mark.y,0xb982ff,17,6);
+   s.burst?.(mark.x,mark.y,0xffd6a6,7,4);
+   s.cameras?.main?.shake?.(105,.0016);
    M.onEdictOutcome(m,{hit,escaped:!result.inside});
    if(!result.inside)s.announceCombat("EDICT EVADED • POSITION VACATED");
   }
