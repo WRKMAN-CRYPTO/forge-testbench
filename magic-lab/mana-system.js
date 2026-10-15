@@ -37,7 +37,10 @@
    // One cast is at most 200 agents, not one global population budget.
    const settings=recipe?.settings||{},population=clamp(Math.round(finite(settings.population,200)),1,200);
    const delivery=settings.delivery==='world'?8:settings.delivery==='placed'?5:0;
-   return Math.ceil(12+population*.23+delivery);
+   // Concentrating a spell into fewer real agents makes precision casting
+   // affordable without raising the established 200-agent mana price.
+   const Presence=typeof globalThis==='object'?globalThis.WRKMAN_SPELL_PRESENCE:null;
+   return Math.ceil(12+population*.23+delivery-(Presence?.manaDiscount(population)||0));
   }
   function canCast(recipe){return mana+1e-8>=cost(recipe)}
   function spendForCast(recipe,time=0){
