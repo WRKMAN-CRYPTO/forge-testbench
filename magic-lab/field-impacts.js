@@ -10,6 +10,7 @@
  'use strict';
  const CELL=96,KEY_ORIGIN=65536,KEY_SPAN=131072;
  const Runes=typeof globalThis==='object'?globalThis.WRKMAN_SWARM_RUNES:null;
+ const Presence=typeof globalThis==='object'?globalThis.WRKMAN_SPELL_PRESENCE:null;
  const key=(x,y)=>(x+KEY_ORIGIN)*KEY_SPAN+(y+KEY_ORIGIN);
  // Relative movement catches both fast particles and moving targets.
  // Returns first intersection fraction or null.
@@ -102,17 +103,29 @@
    const weight=Runes?Runes.mass(a):1;
    spentMass+=weight;
    first.massHits=(first.massHits||0)+weight;
+   // Focus is energy per cast, not fabricated mass or an enlarged hitbox.
+   // A single normal hex has meaningful precision impact when it connects.
+   if(cast.focus?.impactBonus&&weight===1)
+    first.focusHits=(first.focusHits||0)+cast.focus.impactBonus;
    if(!first.elements)first.elements=[0,0,0,0,0];
    const composition=Runes?Runes.composition(a):null;
    if(composition){for(let element=1;element<5;element++)first.elements[element]+=composition[element]}
    else if(a.element>=1&&a.element<=4)first.elements[a.element]+=weight;
    // One small impact mark per subset. Never one Phaser emitter per agent.
    if(first.impacts<=3&&cast.impactFX.length<96){
-    cast.impactFX.push({
-     x:ax+(tx-ax)*earliest,
-     y:ay+(ty-ay)*earliest,
-     born:time,color:a.element?([0,0xff6b32,0x44c9ed,0xa7d8ff,0xffe65a][a.element]||0xffa768):
-      first.kind==='enemy'?0xffa768:0xe2d5b0});
+    const x=ax+(tx-ax)*earliest,y=ay+(ty-ay)*earliest;
+    const color=a.element?([0,0xff6b32,0x44c9ed,0xa7d8ff,0xffe65a][a.element]||0xffa768):
+      first.kind==='enemy'?0xffa768:0xe2d5b0;
+    cast.impactFX.push({x,y,born:time,color});
+    if(cast.focus?.focused){
+     // Persist impact FX at scene scope, including when this was the last
+     // live agent and the parent world cast is removed next frame.
+     Presence?.accent(scene,'impact',x,y,time,color,cast.focus.population,
+      Math.atan2(ty-ay,tx-ax));
+     Presence?.play('impact',cast.focus.population,{
+      enabled:scene.craftedAudioEnabled!==false,volume:scene.craftedAudioVolume??.65
+     });
+    }
    }
   }
   agents.length=remaining;
@@ -128,9 +141,9 @@
     Elements.agentContacts(scene,t.obj.body,t.obj,t.elements,t.to.x,t.to.y,time,Combat);
    }
    if(t.kind==='enemy'&&Combat.hitEnemy)
-    Combat.hitEnemy(scene,t.obj,Math.min(t.massHits>t.impacts?70:28,Math.max(2,Math.round(t.massHits*1.7))),'crafted-field');
+    Combat.hitEnemy(scene,t.obj,Math.min(t.massHits>t.impacts?70:28,Math.max(2,Math.round(t.massHits*1.7))+(t.focusHits||0)),'crafted-field');
    else if(t.kind==='stone'&&Combat.damagePillar)
-    Combat.damagePillar(scene,t.obj,Math.min(t.massHits>t.impacts?72:30,Math.max(2,Math.round(t.massHits*2))),'crafted-field');
+    Combat.damagePillar(scene,t.obj,Math.min(t.massHits>t.impacts?72:30,Math.max(2,Math.round(t.massHits*2))+(t.focusHits||0)),'crafted-field');
   }
   if(consumed){
    cast.free=0;cast.offscreen=0;
