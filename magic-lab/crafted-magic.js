@@ -18,6 +18,7 @@
  if(!Sources)throw Error('Elemental spawn pixels 048 are missing');
  const Runes=typeof globalThis==='object'?globalThis.WRKMAN_SWARM_RUNES:null;
  if(!Runes)throw Error('Swarm rune language 050 missing');
+ const Presence=typeof globalThis==='object'?globalThis.WRKMAN_SPELL_PRESENCE:null;
  const N=32,MASK=-1,TAU=Math.PI*2,SAVE_KEY='wrkman-arcane-lab034-crafted-field-v1',SOURCE_KEY='wrkman-agent-field-v1';
  const palettes={arcane:[[92,139,244],[176,121,250],[223,193,255]],flame:[[208,65,39],[253,126,49],[255,213,105]],healing:[[66,184,144],[144,231,119],[240,235,149]],void:[[100,67,157],[179,72,199],[255,134,202]]};
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t;
@@ -86,7 +87,7 @@
    const color=a.element?Sources.byId(a.element).rgb:
      (Math.round(c[0])<<16)|(Math.round(c[1])<<8)|Math.round(c[2]);
    const radius=(cfg.mode==='ab'?1.2+3.1*clamp(a.progress||0,0,1):2.8)+
-    (Runes.mass(a)>1?Runes.radius(a):0);
+    (Runes.mass(a)>1?Runes.radius(a):0)+(st.focus?.radiusBonus||0);
    const vx=st.delivery==='world'?
     a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
    const vy=st.delivery==='world'?
@@ -143,6 +144,7 @@
    {x:p.x+forward.x*30,y:p.y+forward.y*30};
   const duration=cfg.settings.lifespan*1000;
   const st={recipe:cfg,starts,agents:[],born:now,expires:now+duration,nextHeal:now+3000,
+   focus:Presence?.profile(cfg.settings.population)||null,
    healLinked:!!healLinked,healFX:[],impactFX:[],pulses:0,collisions:0,consumed:0,agedOut:0,targetPrev:new Map(),
    delivery,center,forward,right,scale:delivery==='placed'?260:290,
    worldW:360,worldH:500,motionTime:0,free:0,offscreen:0,spawnX:.5,spawnY:.5,
@@ -157,11 +159,17 @@
    st.agents.push(agent);
   }
   Runes.onBirth(st);
+  if(st.focus?.focused){
+   const first=st.agents[0],element=first?.element||0;
+   const tint=first?.element?Sources.byId(element).rgb:0xb8d9ff;
+   Presence.accent(scene,'launch',p.x,p.y,now,tint,cfg.settings.population,Math.atan2(forward.y,forward.x));
+   Presence.play('cast',cfg.settings.population,{enabled:scene.craftedAudioEnabled!==false,volume:scene.craftedAudioVolume??.65});
+  }
   if(delivery==='world'){if(!scene.craftedShots)scene.craftedShots=[];scene.craftedShots.push(st)}
   else scene.craftedAura=st;
   return true;
  }
- function stop(scene,onlyAura=false){scene.craftedAura=null;if(!onlyAura){scene.craftedShots=[];scene.craftedFades=[]}}
+ function stop(scene,onlyAura=false){scene.craftedAura=null;if(!onlyAura){scene.craftedShots=[];scene.craftedFades=[];scene.craftedAccentFX=[]}}
  function stepOne(scene,st,time,delta,Combat){
   // Age out individual agents BEFORE advancing motion or checking hits.
   // Zero-agent casts expire immediately without imposing any total swarm cap.
@@ -226,6 +234,7 @@
   scene.craftedFades=remaining;
  }
  function step(scene,time,delta,Combat){
+  Presence?.step(scene,time);
   if(scene.craftedAura){stepOne(scene,scene.craftedAura,time,delta,Combat);
    if(scene.craftedAura.expired)scene.craftedAura=null}
   if(scene.craftedShots?.length){
@@ -259,10 +268,10 @@
    const col=a.element?Sources.byId(a.element).rgb:
      (Math.round(c[0])<<16)|(Math.round(c[1])<<8)|Math.round(c[2]);
    const r=(cfg.mode==='ab'?1.2+3.1*clamp(a.progress,0,1):2.8)+
-     (Runes.mass(a)>1?Runes.radius(a):0)+Math.sin(st.motionTime*3.3+a.seed)*.28;
+     (Runes.mass(a)>1?Runes.radius(a):0)+(st.focus?.radiusBonus||0)+Math.sin(st.motionTime*3.3+a.seed)*.28;
    if(a.tail?.length){
     const first=worldPosition(st,a,a.tail[0][0],a.tail[0][1]);
-    g.lineStyle(Math.max(.55,r*.6),col,.075*light);
+    g.lineStyle(Math.max(.55,r*.6),col,st.focus?.focused?st.focus.trailAlpha*light:.075*light);
     for(let k=1;k<a.tail.length;k++){
      const next=worldPosition(st,a,a.tail[k][0],a.tail[k][1]);
      g.lineBetween(first.x,first.y,next.x,next.y);
@@ -270,6 +279,10 @@
     }
     g.lineBetween(first.x,first.y,x,y);
    }
+   const worldVx=st.delivery==='world'?a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
+   const worldVy=st.delivery==='world'?a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
+   if(st.focus?.focused)Presence.paintFocused(g,{x,y,r,time,seed:a.seed||i,
+    angle:Math.atan2(worldVy,worldVx),element:a.element||0,color:col,profile:st.focus});
    if(vfx){
     const vx=st.delivery==='world'?a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
     const vy=st.delivery==='world'?a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
@@ -314,6 +327,9 @@
    }
   }
   }
+  // Casting and impact signatures outlive the final agent. They are purely
+  // visual scene-owned events, not another agent or collision.
+  Presence?.paintAccents(scene,g,time);
   // Visual-only death trails. They draw even after the parent cast is removed
   // and its gameplay capacity is free; no Phaser bodies, timers or damage.
   for(const batch of scene.craftedFades||[]){
