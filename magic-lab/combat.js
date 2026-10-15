@@ -692,7 +692,7 @@ function step(s,time,delta){
  c.impactFX=c.impactFX.filter(f=>time-f.born<f.life);
  c.blastFX=c.blastFX.filter(f=>time-f.born<f.life);
  for(const f of c.fields){
-  if(time<f.nextTick)continue;
+  if(f.hostile||time<f.nextTick)continue;
   f.nextTick=time+260;
   for(const e of c.enemies){
    if(!e.alive||distance(e.body.position,f)>f.r+e.r)continue;
@@ -715,7 +715,7 @@ function step(s,time,delta){
   }
   if(!e.alive)continue;
   if(e.type==="archivist"&&Archive?.tickHazards)
-   Archive.tickHazards(s,e,time,hitPlayer);
+   Archive.tickHazards(s,e,time,hitPlayer,Body);
   // Stagger suspends intent, not physics: sliding bodies continue to move
   // under their actual velocity, gravity and impacts.
   if(time<e.staggerUntil){
