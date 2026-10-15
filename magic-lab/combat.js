@@ -334,7 +334,14 @@ function paintEnvironment(s,g,time){
 
 function hitPlayer(s,amount,x,y,source){
  const c=s.combat,time=now(s);
- if(time<c.invulnUntil||time<s.dashUntil)return;
+ if(time<c.invulnUntil)return;
+ // A genuine incoming hit avoided during DASH is one perfect-dodge event.
+ // Mana deduplicates the contact spam belonging to the same maneuver.
+ if(time<s.dashUntil){
+  s.mana?.emit('perfectDodge',{dashId:s.dashUntil,time,source});
+  return;
+ }
+ s.mana?.emit('playerDamaged',{amount,time,source});
  c.hp=Math.max(0,c.hp-amount);
  c.invulnUntil=time+850;
  // The wizard is currently a kinematic sprite, not a Matter body.
@@ -410,7 +417,13 @@ function hitEnemy(s,e,amount,kind){
   // This does not redirect their momentum or give the body immunity.
   if(kind==='crafted-field')amount*=e.territory.state==='windup'?.46:.73;
  }
+ const priorHP=e.hp;
  e.hp=Math.max(0,e.hp-amount);
+ // Single authoritative damage ingress for all future spells and physics.
+ // Award based on real HP removed, after enemy resistance, not raw claims.
+ if(e.type!=='mossling')s.mana?.emit('enemyDamaged',{
+  damage:priorHP-e.hp,enemyType:e.type,enemyId:e.id,kind,time:now(s)
+ });
  if(e.archivist&&Archive)Archive.damaged(e,amount,now(s));
  e.hitAt=now(s);
  if(e.hp>0)return false;
@@ -420,7 +433,10 @@ function hitEnemy(s,e,amount,kind){
   s.announceCombat("THE ARCHIVIST • Defeat was informative. I will remember fragments.");
  }
  e.moodText?.destroy();
- if(e.type!=="mossling")s.combat.kills++;
+ if(e.type!=="mossling"){
+  s.combat.kills++;
+  s.mana?.emit('enemyDefeated',{enemyType:e.type,enemyId:e.id,kind,time:now(s)});
+ }
  queueBurnDetonation(s,e,e.burn);
  e.burn=null;
  s.removal.push(e.body);
