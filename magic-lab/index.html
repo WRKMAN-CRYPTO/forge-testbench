@@ -770,7 +770,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <div class="menuCaption">CRAFTED FIELD / SPELL LINK</div>
     <div id="craftRecipeName">FIRE RING · DEMO RECIPE</div>
     <div class="craftActions">
-     <button type="button" id="craftHealToggle">HEAL LINK: ON</button>
+     <button type="button" id="craftHealToggle" disabled>HEAL LINK: RESERVED FOR SWARM MAGIC</button>
      <button type="button" id="craftImport">IMPORT JSON</button>
      <a class="craftLink" href="../agent-field/?v=0.5" target="_blank" rel="noopener noreferrer">FIELD LAB ↗</a>
     </div>
@@ -824,7 +824,7 @@ if(window.WRKMAN_WANDRUNE_ART){
 </div>
 <!-- 053: Bestiary stores local reference records, not live combat settings. -->
 <div id="bestiaryOverlay" role="dialog" aria-modal="true" aria-label="Creature bestiary" hidden>
- <iframe id="bestiaryFrame" src="./bestiary.html?v=068" title="WRKMAN Magic Lab Bestiary"></iframe>
+ <iframe id="bestiaryFrame" src="./bestiary.html?v=072" title="WRKMAN Magic Lab Bestiary"></iframe>
 </div>
 <!-- The wardrobe is a separate presentation layer, never a gameplay control. -->
 <div id="skinOverlay" role="dialog" aria-modal="true" aria-labelledby="skinTitle" hidden>
@@ -2204,7 +2204,7 @@ $("copy").onclick=async()=>{
   wizardSkin:activeSkin,keeperSkins:[...keepers].sort((a,b)=>a-b),
   spells:equipped.map((id,i)=>({id,slot:i+1})),
   library:spells.slice(),
-  notes:"Six rune slots, portable Agent Field physics, Aura, World Emission and Placed Field, full-population simulation with separate draw budget, and linked Minor Heal."};
+  notes:"Only constructed swarm magic may be cast by the wizard. The Archivist inherits all seven former non-swarm spells. Each swarm cast has a 200-agent cap; rendering and simultaneous casts remain separate."};
  try{await navigator.clipboard.writeText(JSON.stringify(build,null,2));announce("BUILD COPIED • Experimental recipe JSON on clipboard.");}
  catch(_){announce("Clipboard unavailable; open this page in a secure browser context.");}
 };
