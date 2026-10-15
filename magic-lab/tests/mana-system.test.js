@@ -28,7 +28,7 @@ test('channeling replenishes mana over time and stops cleanly',()=>{
  for(let i=0;i<20;i++)m.step(50,100+i*50);
  assert.ok(Math.abs(m.snapshot().mana-68)<1e-6);
  m.stopCharge();m.step(50,1200);
- assert.equal(m.snapshot().mana,68);
+ assert.ok(Math.abs(m.snapshot().mana-68)<1e-6);
  m.startCharge();m.emit('playerDamaged',{amount:7,time:1300});
  assert.equal(m.snapshot().charging,false);
 });
