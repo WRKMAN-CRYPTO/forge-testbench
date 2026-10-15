@@ -712,6 +712,23 @@ header .actions{display:flex;gap:6px}
 #archivistFill{display:block;height:100%;width:100%;background:linear-gradient(90deg,#7370b1,#e8c3ff);
  transition:width .15s ease}
 @media(max-width:760px){#archivistBar{left:33%;width:34%;min-width:155px;top:5px;padding:3px 7px}}
+
+/* 073 / The Mana Cycle is a separate resource layer, not a swarm budget. */
+.manaRow{height:16px;display:flex;align-items:center;gap:5px;margin-top:4px}
+.manaGlyph{color:#7cdcff;font-size:14px;text-shadow:0 0 8px #39cfff}
+.manaTrack{height:9px;flex:1;min-width:25px;background:#0a1b36;border:1px solid #448eb6;border-radius:6px;overflow:hidden}
+#manaFill{width:100%;height:100%;background:linear-gradient(90deg,#2667df,#7ce2ff);box-shadow:0 0 9px #66d5ff;transition:width .12s linear}
+#manaValue{font:900 10px ui-monospace,monospace;color:#b3eeff;min-width:38px;text-align:right}
+.manaMeta{display:flex;justify-content:space-between;gap:5px;color:#b7d6ed;font:850 9px ui-monospace,monospace}
+#essenceValue{color:#f6d48b}
+#charge{position:absolute;z-index:11;right:calc(208px + env(safe-area-inset-right));bottom:calc(21px + env(safe-area-inset-bottom));width:70px;height:58px;min-height:0;padding:3px;touch-action:none;-webkit-user-select:none;user-select:none;border:2px solid #75c4ed;border-radius:16px;color:#d8f5ff;background:#174265cd;box-shadow:0 3px 12px #06151dc4;font:900 10px ui-monospace,monospace;letter-spacing:.035em}
+#charge.charging{background:#216fa8e8;border-color:#c0efff;box-shadow:0 0 20px #52ccff99,inset 0 0 12px #4dbaff85}
+#charge:active{transform:scale(.97)}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:600px){
+ .manaRow{height:13px;margin-top:2px}.manaTrack{height:7px}
+ #manaValue{font-size:9px}.manaMeta{font-size:8px}
+ #charge{width:64px;height:58px;right:calc(205px + env(safe-area-inset-right));font-size:9px}
+}
 </style>
 </head>
 <body>
@@ -749,11 +766,13 @@ if(window.WRKMAN_WANDRUNE_ART){
    <div class="healthTrack" role="meter" aria-label="Health"><div id="healthFill"></div></div>
    <b id="playerHP">100%</b></div>
   <div class="healthMeta"><span>FOES <b id="enemies">4</b></span><span>✧ <b id="phaseStatus">DRY</b></span></div>
+  <div class="manaRow"><span class="manaGlyph">✦</span><div class="manaTrack" role="meter" aria-label="Mana" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><div id="manaFill"></div></div><b id="manaValue">100</b></div>
+  <div class="manaMeta"><span id="manaMode">READY</span><span>ESSENCE ✧ <b id="essenceValue">0</b></span></div>
  </div>
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / WANDRUNE</strong><span>BUILD 072 • THE INHERITANCE</span></div>
+   <div class="menuHeader"><strong>W / WANDRUNE</strong><span>BUILD 073 • THE MANA CYCLE</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="gateMenuOpen" type="button">✧ DIAL GATE</button>
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
@@ -813,13 +832,14 @@ if(window.WRKMAN_WANDRUNE_ART){
   <div id="archivistTrack"><span id="archivistFill"></span></div></div>
  <div id="craftHud" hidden>⬡ FIELD ACTIVE</div><div id="regionTitle" hidden></div><button id="gateNearby" type="button" hidden>✧ DIAL GATE</button><div id="portalNearby" hidden></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">SWARM MAGIC • TAP ORB TO CAST</div>
 <button class="minibtn" id="dash" type="button" aria-label="Dash in movement direction">DASH</button>
+<button id="charge" type="button" aria-label="Hold to channel mana">✦ CHARGE</button>
 <div id="wheelDock" aria-label="Swarm magic caster">
  <div id="wheelSlots" role="group" aria-label="Equipped spells"></div>
  <button id="wheelHub" type="button" aria-expanded="false" aria-label="Cast the equipped swarm recipe">
   <span id="wheelGlyph" aria-hidden="true">⬡</span><span id="wheelName">FIELD</span>
  </button>
  <div id="wheelReadout" aria-live="polite">TAP TO CAST</div>
-</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" role="dialog" aria-modal="true" aria-labelledby="labWelcomeTitle"><div id="modal"><h1 id="labWelcomeTitle">Wandrune Field Guide</h1><p class="modalIntro">Review the controls and magic systems. <b>Return to the game when ready.</b></p><div id="modalScroll"><details id="labGuide"><summary>CONTROLS &amp; FULL FIELD GUIDE</summary><div id="modalGuideContent"><p>Create a swarm spell in the Forge, then see how the agents move through the world.</p><p><b>Phone:</b> Hold sideways. Left thumb moves, DASH remains nearby, and the right thumb taps the ⬡ CAST orb to release your equipped swarm spell. Open SPELL FORGE to edit its recipe. For a PLACED FIELD, tap the world to choose the target.</p><p><b>CRAFTED MAGIC:</b> The Spell Forge is your only spellcasting school. Paint a 32×32 field, configure its element sources and six runes, then save and equip. Each cast can birth at most <b>200 agents</b>; you may overlap multiple world emissions, subject to performance and future mana costs. Aura follows you, World Emission releases independent agents, and Placed Field targets a chosen location. Rendering quality is a separate setting and does not limit casting. Previously saved recipes remain available, with any oversized population clamped to 200 when loaded. Minor Heal's old automatic link is retired until healing becomes swarm magic.</p><p><b>CONVERGENCE RUNE:</b> Paint ⟡ onto selected cells in Spell Forge to give ONLY agents that cross those cells an enduring regrouping instinct. When an agent is not actively Seeker-hunting, it steers back toward compatible marked agents of the same elemental birth. Seeker gets priority, and Convergence does not merge bodies. Use the forged preview and the spell HUD to count marked and regrouping agents.</p><p><b>Spell origins:</b> The Archivist now owns the old non-swarm spells: Arc Bolt, Gravity Well, Kinetic Pulse, Frost Field, Flame Field, Detonation, and Spark. They cannot be equipped or cast by the player.</p><p><b>THE ARCHIVIST:</b> His Stargate address remains ✶ ☽ ◇ ✦ ⬡ ☼ (721360), WEST portal from the sanctuary. He retains his invented material volleys, EDICT OF MOTION, imperfect memory, dodges, and judgment. He now alternates these with the seven former player spells. Arc Bolt is a real moving projectile; Gravity pulls physical bodies and the wizard; Pulse shoves; Frost chills; Flame lingers; Detonation releases an impulse; Spark conducts through connected vapor. Each legacy spell consumes a normal attack, and ground attacks have visible warning rings. No extra HP or casting-speed bonuses were added.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Your swarm agents can already carry fire, water, frost, and lightning into the environment. Use their interactions to create steam, cold, conduction, and chain reactions. The legacy one-button versions now belong to the Archivist.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The stone pillars are solid and destructible. Swarm impacts, collisions and enemy attacks can break them into physical debris. Gravity and explosions continue to affect real bodies.</p><p><b>PC:</b> WASD or arrows move; mouse aims or targets a placed swarm field; click casts. The CAST orb equips your current swarm recipe; SPACE dashes, E spawns an experiment object, and R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p></div></details></div><div id="modalFooter"><button id="begin" type="button">BACK TO WANDRUNE →</button><span>HOW TO PLAY IS ALWAYS AVAILABLE UNDER ☰</span></div></div></div></div>
+</div><div id="missing">The Phaser engine could not load. Check your connection, then reload the page.</div><div id="instructions" role="dialog" aria-modal="true" aria-labelledby="labWelcomeTitle"><div id="modal"><h1 id="labWelcomeTitle">Wandrune Field Guide</h1><p class="modalIntro">Review the controls and magic systems. <b>Return to the game when ready.</b></p><div id="modalScroll"><details id="labGuide"><summary>CONTROLS &amp; FULL FIELD GUIDE</summary><div id="modalGuideContent"><p>Create a swarm spell in the Forge, then see how the agents move through the world.</p><p><b>Phone:</b> Hold sideways. Left thumb moves, DASH remains nearby, and the right thumb taps the ⬡ CAST orb to release your equipped swarm spell. Open SPELL FORGE to edit its recipe. For a PLACED FIELD, tap the world to choose the target.</p><p><b>CRAFTED MAGIC:</b> The Spell Forge is your only spellcasting school. Paint a 32×32 field, configure its element sources and six runes, then save and equip. Each cast can birth at most <b>200 agents</b>; you may overlap multiple world emissions, subject to performance and future mana costs. Aura follows you, World Emission releases independent agents, and Placed Field targets a chosen location. Rendering quality is a separate setting and does not limit casting. Previously saved recipes remain available, with any oversized population clamped to 200 when loaded. Minor Heal's old automatic link is retired until healing becomes swarm magic.</p><p><b>CONVERGENCE RUNE:</b> Paint ⟡ onto selected cells in Spell Forge to give ONLY agents that cross those cells an enduring regrouping instinct. When an agent is not actively Seeker-hunting, it steers back toward compatible marked agents of the same elemental birth. Seeker gets priority, and Convergence does not merge bodies. Use the forged preview and the spell HUD to count marked and regrouping agents.</p><p><b>Spell origins:</b> The Archivist now owns the old non-swarm spells: Arc Bolt, Gravity Well, Kinetic Pulse, Frost Field, Flame Field, Detonation, and Spark. They cannot be equipped or cast by the player.</p><p><b>MANA CYCLE:</b> Hold CHARGE (or C on keyboard) to channel mana. Charging slows movement and stops when you take damage. Damage enemies to generate combat momentum and mana; defeating enemies grants extra mana and permanent Essence. A precisely timed DASH that prevents an incoming hit grants mana. Mana costs scale with the population and delivery of each cast. A 200-agent world emission costs 66 mana. Ingenious mana-positive spells are allowed; no global swarm population cap has been added. Essence is saved on this device for upcoming crafting and rune upgrades.</p><p><b>THE ARCHIVIST:</b> His Stargate address remains ✶ ☽ ◇ ✦ ⬡ ☼ (721360), WEST portal from the sanctuary. He retains his invented material volleys, EDICT OF MOTION, imperfect memory, dodges, and judgment. He now alternates these with the seven former player spells. Arc Bolt is a real moving projectile; Gravity pulls physical bodies and the wizard; Pulse shoves; Frost chills; Flame lingers; Detonation releases an impulse; Spark conducts through connected vapor. Each legacy spell consumes a normal attack, and ground attacks have visible warning rings. No extra HP or casting-speed bonuses were added.</p><p><b>THE FIRST GATE:</b> Find the circular gateway near your starting position, or open ☰ → DIAL GATE. Enter six glyphs in order, then ENGAGE. Every sequence generates one repeatable region, an arrival sanctuary and four connected arenas. Walk into a glowing edge portal to visit a neighboring arena. The gate journal remembers discovered addresses; HOME LAB returns to the original practice world. Terrain resets when revisited, but the same address always generates the same starting geography.</p><p><b>CAMERA / EXPLORATION:</b> The wizard has a soft-follow camera. Walk beyond the original rings to discover other test pads in every direction. Swipe the move stick while casting at visible world points. RESET returns to the starting chamber.</p><p><b>WILDLIFE:</b> The arena now has 18 tiny residents: ants, pillbugs, and moths. Watch them wander while you stand still. They sense moving objects, warmth, cold, flashes, and ground disturbances, not spell names. Ants sometimes carry crumbs and may startle their neighbors. Pillbugs curl up; moths flutter toward gentle light but shy away from dangerous heat. Walk far from home to find more residents. They are not enemies and do not count toward KOs.</p><p><b>Combat:</b> Watch the Charger wind up before it rushes. Redirect its momentum. Ember Wisps shoot physical firebolts. Flame causes damage over time and Burn. Cinderheart is active automatically, detonating burning enemies when Burn expires or they fall; chain strength drops with each generation.</p><p><b>ELEMENTAL PHASES:</b> Your swarm agents can already carry fire, water, frost, and lightning into the environment. Use their interactions to create steam, cold, conduction, and chain reactions. The legacy one-button versions now belong to the Archivist.</p><p><b>HUE FORGE:</b> Tap HUES to dye robe, scarf, and trim independently on wizard 03, 06, 08, or 16. Explore 24 named starter colors; unknown hues remain locked for future exploration. Saves stay on this device.</p><p><b>SKINS:</b> Tap SKINS to compare 20 numbered wizard designs. Tap to equip and star your keepers. Choices are saved on this device; appearances do not alter physics, hitboxes, speed or spells.</p><p><b>NEW • FRACTURE PHYSICS:</b> The stone pillars are solid and destructible. Swarm impacts, collisions and enemy attacks can break them into physical debris. Gravity and explosions continue to affect real bodies.</p><p><b>PC:</b> WASD or arrows move; mouse aims or targets a placed swarm field; click casts. The CAST orb equips your current swarm recipe; SPACE dashes, E spawns an experiment object, and R resets.</p><p>Nothing is networked yet. This chamber is the solo physics foundation for our co-op game.</p></div></details></div><div id="modalFooter"><button id="begin" type="button">BACK TO WANDRUNE →</button><span>HOW TO PLAY IS ALWAYS AVAILABLE UNDER ☰</span></div></div></div></div>
 <div id="log" role="status" aria-live="polite">WANDRUNE • Invent your magic in the Spell Forge.</div>
 </div>
 <!-- 053: Bestiary stores local reference records, not live combat settings. -->
@@ -927,7 +947,8 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./archivist-legacy.js?v=072r"></script>
 <script src="./archivist-inheritance.js?v=072r"></script>
 <script src="./archivist-combat.js?v=072r"></script>
-<script src="./combat.js?v=072r"></script>
+<script src="./combat.js?v=073"></script>
+<script src="./mana-system.js?v=073"></script>
 <script src="./elements.js?v=072r"></script>
 <script src="./hue-forge.js?v=012"></script>
 <script src="./spell-loadout.js?v=072r"></script>
@@ -1083,6 +1104,7 @@ function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
 const color={bolt:0xffdc8d,well:0xb994ff,pulse:0x84ecdb,frost:0x96d8ff,flame:0xff8c43,detonate:0xffd084,lightning:0x94e4ff};
 if(!window.Phaser||!window.WRKMAN_COMBAT){$("missing").style.display="block";$("missing").textContent="The game engine or combat module did not load. Please reload with a connection.";return;}
 const Combat=window.WRKMAN_COMBAT;
+const Mana=window.WRKMAN_MANA||null;
 const Elements=window.WRKMAN_ELEMENTS||null; // optional so core gameplay survives a failed download
 const Wildlife=window.WRKMAN_WILDLIFE||null; // optional ambient world, never required for combat
 const Regions=window.WRKMAN_REGIONS||null; // optional canonical region generator
@@ -1096,10 +1118,12 @@ class Lab extends Phaser.Scene{
   // CRITICAL: the level must never wait on optional character cosmetics.
   // Asset downloads begin only AFTER the playable world exists.
  }
- constructor(){super("lab");this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];this.region=null;this.sectorIndex=0;this.travelLock=0;}
+ constructor(){super("lab");this.mana=null;this.player={x:265,y:307,vx:0,vy:0};this.aim={x:1,y:0};this.lastCast=0;this.dashUntil=0;this.lastTime=0;this.deflections=0;this.impacts=0;this.dummyHP=400;this.actors=[];this.projectiles=[];this.wells=[];this.frosts=[];this.fx=[];this.rings=[];this.removal=[];this.region=null;this.sectorIndex=0;this.travelLock=0;}
  create(){
   try {
   scene=this;
+  // Shared event-driven resources live on the scene, not individual spells.
+  this.mana=Mana?Mana.create({storage:gameStorage}):null;
   $("labState").textContent="SCENE";
   // Start with our built-in vector wizard. Art upgrades asynchronously;
   // failure cannot interrupt enemy spawning, input, or combat setup.
@@ -1325,6 +1349,7 @@ class Lab extends Phaser.Scene{
   return false;
  }
  resetLab(){
+  this.mana?.resetCombat(); // Mana refills; persistent Essence never resets.
   if(Crafted)Crafted.stop(this);
   if(this.craftedDraw)this.craftedDraw.clear();
   $("craftHud").hidden=true;
@@ -1391,6 +1416,12 @@ class Lab extends Phaser.Scene{
  }
  cast(type,tx,ty){
   if(type!=="crafted"||!started||this.time.now<this.lastCast)return;
+  // Releasing an Aura is free. No mana is spent on a failed deployment.
+  const releasingAura=!!(this.craftedAura&&craftedRecipe?.settings?.delivery!=="world");
+  if(!releasingAura&&this.mana&&!this.mana.canCast(craftedRecipe)){
+   announce("NEED "+this.mana.cost(craftedRecipe)+" MANA • HOLD ✦ CHARGE OR FIGHT");
+   return;
+  }
   const cost={bolt:190,well:520,pulse:600,frost:680,flame:800,detonate:480,lightning:570,crafted:650};
   this.lastCast=this.time.now+cost[type];
   let aim={...this.aim};
@@ -1412,11 +1443,13 @@ class Lab extends Phaser.Scene{
                                 y:clamp(Number.isFinite(ty)?ty:py+aim.y*170,MINY+30,MAXY-30)}:
                  mode==="world"?{x:px+aim.x*500,y:py+aim.y*500}:null;
     const deployed=Crafted.start(this,craftedRecipe,craftedHealLinked,target);
-    if(deployed)announce("CRAFTED "+mode.toUpperCase()+" • "+craftedRecipe.name+
+    if(deployed){
+     this.mana?.spendForCast(craftedRecipe,this.time.now);
+     announce("CRAFTED "+mode.toUpperCase()+" • "+craftedRecipe.name+
       " • "+craftedRecipe.settings.population+" NEW HEXES"+
       " • "+(craftedHealLinked?"MINOR HEAL LINK / 3s":"LINK OFF")+
       " • HEX LIFE "+craftedRecipe.settings.lifespan.toFixed(1)+"s + FADE");
-    else announce("AURA ALREADY ACTIVE • Release or redeploy your current Aura before casting another.");
+    }else announce("AURA ALREADY ACTIVE • Release or redeploy your current Aura before casting another.");
    }
   }else if(type==="bolt"){
    const b=this.matter.add.circle(px+aim.x*28,py+aim.y*28,8,{restitution:.65,frictionAir:.0015,density:.005});
@@ -1554,12 +1587,14 @@ class Lab extends Phaser.Scene{
   if(!started)return; // Title gate controls starting the game.
   try {
   delta=Math.min(delta,50);const t=delta/16.667;
+  this.mana?.step(delta,time);
   const mv=this.getMove(),combat=this.combat;
   const staggered=combat&&time<combat.playerStaggerUntil;
   // Input is briefly damped after a strong hit. Knockback is a separate
   // velocity, integrated over successive frames with exponential drag.
   // This preserves responsive input and does not snap the wizard on impact.
-  const steer=staggered?.24:time<(combat?.playerFrostSlowUntil||0)?.56:1;
+  const steer=(staggered?.24:time<(combat?.playerFrostSlowUntil||0)?.56:1)*
+   (this.mana?.snapshot().charging?.36:1);
   this.player.vx=mv.x*4.4*steer;this.player.vy=mv.y*4.4*steer;
   const knock=combat?.playerKnock||{x:0,y:0};
   const nextX=this.player.x+(this.player.vx+knock.x)*t;
@@ -1567,6 +1602,11 @@ class Lab extends Phaser.Scene{
   this.player.x=clamp(nextX,MINX+20,MAXX-20);
   this.player.y=clamp(nextY,MINY+20,MAXY-20);
   Combat.resolvePlayerEnvironment(this,time);
+  if(this.mana?.snapshot().charging&&time-(this.lastChargeGlow||0)>165){
+   this.lastChargeGlow=time;
+   this.rings.push({x:this.player.x,y:this.player.y,r:10,life:360,born:time,c:0x69cfff});
+   if(this.rings.length>36)this.rings.shift();
+  }
   if(Regions&&this.checkTravel(time))return;
   if(this.cameraFocus){this.cameraFocus.x=this.player.x;this.cameraFocus.y=this.player.y;}
   if(combat){
@@ -1629,8 +1669,18 @@ class Lab extends Phaser.Scene{
    }
   }
   // UI-only health meter, independent of damage and physical simulation.
-  if((this.hudFrame=(this.hudFrame||0)+1)%4===0)
+  if((this.hudFrame=(this.hudFrame||0)+1)%4===0){
    $("healthFill").style.width=clamp(Number(this.combat?.hp??100),0,100)+"%";
+   const m=this.mana?.snapshot();
+   if(m){
+    $("manaFill").style.width=(100*m.mana/m.maxMana).toFixed(1)+"%";
+    $("manaValue").textContent=Math.floor(m.mana)+"/"+m.maxMana;
+    $("manaMode").textContent=m.charging?"✦ CHANNELING":m.combo>1?"⚔ MOMENTUM ×"+m.combo:"READY";
+    $("essenceValue").textContent=m.essence.toLocaleString();
+    $("charge").classList.toggle("charging",m.charging);
+    document.querySelector(".manaTrack")?.setAttribute("aria-valuenow",String(Math.floor(m.mana)));
+   }
+  }
   if(Elements&&this.elementWorld&&this.elementWorldFrame++%15===0){
    const phase=Elements.snapshot(this);
    $("phaseStatus").textContent=phase.clouds?"VAPOR "+phase.clouds:phase.frozen?"ICE "+phase.frozen:"DRY";
@@ -2199,6 +2249,34 @@ $("notes").onclick=()=>{
 };
 $("reset").onclick=()=>{scene?.resetLab();};
 bindInstantPress($("dash"),()=>scene?.dash());
+// Independent hold input: the other thumb may keep steering or tapping spells.
+const chargeButton=$("charge");let chargingPointer=null;
+function canChannel(){
+ return started&&scene&&scene.mana&&$("gameMenu").hidden&&
+  $("spellbookOverlay").hidden&&$("skinOverlay").hidden&&$("instructions").classList.contains("show")===false;
+}
+function stopChannel(pointer=null){
+ if(pointer!==null&&pointer!==chargingPointer)return;
+ chargingPointer=null;scene?.mana?.stopCharge();
+ chargeButton.classList.remove("charging");
+}
+chargeButton.addEventListener("pointerdown",e=>{
+ if(!canChannel())return;
+ chargingPointer=e.pointerId;scene.mana.startCharge();
+ chargeButton.classList.add("charging");
+ try{chargeButton.setPointerCapture(e.pointerId)}catch(_){}
+ e.preventDefault();e.stopPropagation();
+});
+document.addEventListener("pointerup",e=>stopChannel(e.pointerId));
+document.addEventListener("pointercancel",e=>stopChannel(e.pointerId));
+chargeButton.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("keydown",e=>{
+ if(e.code!=="KeyC"||e.repeat||!canChannel())return;
+ scene.mana.startCharge();e.preventDefault();
+});
+document.addEventListener("keyup",e=>{if(e.code==="KeyC")scene?.mana?.stopCharge()});
+window.addEventListener("blur",()=>stopChannel());
+
 $("copy").onclick=async()=>{
  const build={format:"wrkman-spell-lab",version:2,fieldPower:power,
   wizardSkin:activeSkin,keeperSkins:[...keepers].sort((a,b)=>a-b),
