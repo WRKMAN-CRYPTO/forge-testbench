@@ -1,6 +1,6 @@
 /* WANDRUNE 072 | Non-invasive Archivist legacy spell inheritance.
  * Wraps the existing decision system, preserving its reflexes and cooldowns.
- * Every third planned attack uses one original spell as an alternative.
+ * Opening exchange and roughly every third attack may use inherited magic.
  */
 (function(root,factory){
  const base=root?.WRKMAN_ARCHIVIST||
@@ -15,9 +15,9 @@
  "use strict";
  function decide(m,ob){
   const intent=base.decide(m,ob);
-  if(!intent?.tell||!m.held||m.held.kind||m.attacks<2||
-     m.attacks%3!==2)return intent;
-  m.legacyIndex??=0;
+  if(!intent?.tell||!m.held||m.held.kind||
+     !(m.attacks===0||m.attacks%3===2))return intent;
+  m.legacyIndex??=Math.max(0,Math.floor(m.prior?.encounters||0));
   const id=legacy.ORDER[m.legacyIndex++%legacy.ORDER.length];
   const original=m.held;
   // Keep all the original brain's thinking and eventual normal attack cost.
