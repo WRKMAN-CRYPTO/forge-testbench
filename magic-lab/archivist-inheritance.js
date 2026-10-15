@@ -8,14 +8,16 @@
  const legacy=root?.WRKMAN_ARCHIVIST_LEGACY||
    (typeof require==="function"?require("./archivist-legacy.js"):null);
  if(!base||!legacy)return;
+ if(base.LEGACY_SPELLS){if(typeof module==="object"&&module.exports)module.exports=base;return;}
  const api=factory(base,legacy);
  if(typeof module==="object"&&module.exports)module.exports=api;
  if(root)root.WRKMAN_ARCHIVIST=api;
 })(typeof window!=="undefined"?window:globalThis,function(base,legacy){
  "use strict";
  function decide(m,ob){
+  const alreadyCasting=!!m.held;
   const intent=base.decide(m,ob);
-  if(!intent?.tell||!m.held||m.held.kind||
+  if(alreadyCasting||!intent?.tell||!m.held||m.held.kind||
      !(m.attacks===0||m.attacks%3===2))return intent;
   m.legacyIndex??=Math.max(0,Math.floor(m.prior?.encounters||0));
   const id=legacy.ORDER[m.legacyIndex++%legacy.ORDER.length];
