@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title desc">
+  <title id="title">WRKMAN compact maker's mark</title>
+  <desc id="desc">A classic W held inside a muted inner ring and warm gold circular rim.</desc>
+  <!-- Source: the user-approved Bloomsmith header mark, 2026-10-15. -->
+  <circle cx="32" cy="32" r="30.7" fill="none" stroke="#dbba7d" stroke-width="1.65"/>
+  <circle cx="32" cy="32" r="22.65" fill="none" stroke="#a6b59d" stroke-opacity=".51" stroke-width="1.02"/>
+  <path d="M 10.39 19.69 L 10.39 20.79 L 12.03 21.33 L 14.77 24.62 L 21.33 44.85 L 22.43 45.95 L 24.62 45.95 L 25.71 44.85 L 26.26 41.57 L 30.63 29.54 L 30.63 27.9 L 31.73 26.8 L 32.82 28.44 L 34.46 34.46 L 35.56 36.1 L 38.84 45.95 L 41.57 45.95 L 44.85 38.29 L 48.68 25.71 L 49.78 23.52 L 51.97 21.33 L 53.61 20.79 L 53.61 19.69 L 43.76 19.69 L 43.76 20.79 L 45.4 20.79 L 47.59 22.43 L 47.59 24.62 L 46.5 26.8 L 46.5 28.44 L 44.85 32.27 L 43.76 37.2 L 42.67 38.84 L 40.48 34.46 L 35.56 19.69 L 32.27 19.69 L 31.73 20.24 L 30.09 25.16 L 30.09 26.8 L 27.35 33.91 L 27.35 35.56 L 25.71 38.29 L 20.24 22.97 L 20.24 21.88 L 21.88 20.79 L 23.52 20.79 L 23.52 19.69 Z" fill="#dbba7d"/>
+</svg>
