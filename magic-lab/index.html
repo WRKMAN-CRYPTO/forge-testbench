@@ -753,7 +753,7 @@ if(window.WRKMAN_WANDRUNE_ART){
  <div id="menuRoot" class="menuRoot">
   <button id="gameMenuToggle" type="button" aria-controls="gameMenu" aria-expanded="false" aria-label="Open game menu">☰</button>
   <div id="gameMenu" role="group" aria-label="Game menu" hidden>
-   <div class="menuHeader"><strong>W / WANDRUNE</strong><span>BUILD 069 • LIVING MATERIALS</span></div>
+   <div class="menuHeader"><strong>W / WANDRUNE</strong><span>BUILD 071 • PER-CAST SWARM CAP</span></div>
    <div class="menuActionGrid">
     <button class="minibtn" id="gateMenuOpen" type="button">✧ DIAL GATE</button>
     <button class="minibtn" id="spellbookOpen" type="button">📖 SPELLBOOK</button>
@@ -937,11 +937,11 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./field-impacts.js?v=050"></script>
 <script src="./element-material-registry.js?v=069"></script>
 <script src="./element-vfx.js?v=069"></script>
-<script src="./crafted-magic.js?v=069"></script>
+<script src="./crafted-magic.js?v=071"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=050"></script>
 <script src="./scroll-generator.js?v=047"></script>
-<script src="./spell-forge.js?v=058"></script>
+<script src="./spell-forge.js?v=071"></script>
 <script src="./music.js?v=054"></script>
 <script src="./title-screen.js?v=055"></script>
 <script>
@@ -1414,7 +1414,7 @@ class Lab extends Phaser.Scene{
       " • "+craftedRecipe.settings.population+" NEW HEXES"+
       " • "+(craftedHealLinked?"MINOR HEAL LINK / 3s":"LINK OFF")+
       " • HEX LIFE "+craftedRecipe.settings.lifespan.toFixed(1)+"s + FADE");
-    else announce("SPELL CAPACITY • Up to 3 WORLD emissions, 6,000 agents total. Wait for a cast to expire or RESET.");
+    else announce("AURA ALREADY ACTIVE • Release or redeploy your current Aura before casting another.");
    }
   }else if(type==="bolt"){
    const b=this.matter.add.circle(px+aim.x*28,py+aim.y*28,8,{restitution:.65,frictionAir:.0015,density:.005});
