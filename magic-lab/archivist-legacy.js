@@ -76,6 +76,20 @@
    s.combat.blastFX.push({x:fx.x,y:fx.y,born:time,life:530,energy:100,chain:false,hostile:true});
    if(s.combat.blastFX.length>24)s.combat.blastFX.shift();
    s.rings?.push({x:fx.x,y:fx.y,r:12,life:480,born:time,c:v.color});
+   // Original detonation also imparts a real velocity impulse to nearby
+   // non-static physics objects. The hostile spell does not hurt its owner.
+   for(const actor of [...(s.actors||[]),...(s.projectiles||[])]){
+    const b=actor.body;if(!b?.position||b.isStatic||b.labAlive===false)continue;
+    const dx=b.position.x-fx.x,dy=b.position.y-fx.y,range=Math.hypot(dx,dy);
+    if(range>=146)continue;
+    const rad=Math.max(18,range),angle=((b.id||1)*2.39996323)%(Math.PI*2);
+    const nx=range>.001?dx/rad:Math.cos(angle),ny=range>.001?dy/rad:Math.sin(angle);
+    const vx=(b.velocity?.x||0)+nx*19.2*(1-range/146);
+    const vy=(b.velocity?.y||0)+ny*19.2*(1-range/146);
+    const mult=Math.min(1,25/Math.max(1,Math.hypot(vx,vy)));
+    Body?.setVelocity?.(b,{x:vx*mult,y:vy*mult});
+   }
+   try{if(typeof window!=="undefined")window.WRKMAN_ELEMENTS?.impulse?.(s,fx.x,fx.y,100);}catch(_){}
    if(inside)hitPlayer(s,19,fx.x,fx.y,"Archivist Detonation");
    s.burst?.(fx.x,fx.y,v.color,40,8);
    s.cameras?.main?.shake?.(115,.0025);
@@ -120,5 +134,26 @@
    hitPlayer(s,5,f.x,f.y,"Archivist Flame Field");
   }
  }
- return Object.freeze({ORDER,SPELLS,cast,tick});
+ function paint(s,e,g,time){
+  for(const mark of (e.archivist?.legacyEffects||[])){
+   if(mark.resolved)continue;
+   const spec=SPELLS[mark.type],progress=clamp((time-mark.born)/(mark.due-mark.born),0,1);
+   const pulse=.5+.5*Math.sin(time*.02),alpha=.32+.47*progress;
+   g.fillStyle(spec.color,.09+.10*progress);
+   g.fillCircle(mark.x,mark.y,mark.r);
+   g.lineStyle(2.3+progress*1.3,spec.color,alpha);
+   g.strokeCircle(mark.x,mark.y,mark.r);
+   g.lineStyle(1.2,0xfff2c6,.20+.46*progress);
+   g.strokeCircle(mark.x,mark.y,mark.r*(.84-.57*progress));
+   for(let i=0;i<(mark.type==="lightning"?9:mark.type==="frost"?6:8);i++){
+    const angle=i*Math.PI*2/(mark.type==="lightning"?9:mark.type==="frost"?6:8);
+    g.lineStyle(1.5,spec.color,.36+.35*pulse);
+    g.lineBetween(mark.x+Math.cos(angle)*mark.r*.77,
+     mark.y+Math.sin(angle)*mark.r*.77,
+     mark.x+Math.cos(angle)*mark.r,
+     mark.y+Math.sin(angle)*mark.r);
+   }
+  }
+ }
+ return Object.freeze({ORDER,SPELLS,cast,tick,paint});
 });
