@@ -729,6 +729,25 @@ header .actions{display:flex;gap:6px}
  #manaValue{font-size:9px}.manaMeta{font-size:8px}
  #charge{width:64px;height:58px;right:calc(205px + env(safe-area-inset-right));font-size:9px}
 }
+/* Mobile input polish: prevent iOS text loupe, copy callout, and accidental
+   text selection on the game itself. Never disable selection in the field
+   guide or editable interfaces such as Spell Forge. */
+#stageWrap,#stageWrap *,#healthHud,#healthHud *,#gameMenuToggle,
+#titleOverlay,#titleOverlay *{
+ -webkit-touch-callout:none;
+ -webkit-user-select:none;
+ user-select:none;
+}
+#stageWrap img,#titleArtwork{-webkit-user-drag:none}
+#instructions,#instructions *{
+ -webkit-touch-callout:default;
+ -webkit-user-select:text;
+ user-select:text;
+}
+#instructions input,#instructions textarea{
+ -webkit-user-select:text;
+ user-select:text;
+}
 </style>
 </head>
 <body>
@@ -2782,8 +2801,30 @@ addEventListener("blur",()=>{joyPointer=null;joyTouchId=null;neutralStick();});
 
 // The arena is a game surface, not a browser editing surface. Prevent the
 // desktop right-click menu without affecting menus outside the arena.
-$("stageWrap").addEventListener("contextmenu",event=>event.preventDefault());
-
+const inGameManual=target=>target instanceof Element&&Boolean(target.closest(
+ "#instructions, input, textarea, select, [contenteditable], [contenteditable=true]"
+));
+const gameSurface=$("stageWrap");
+// Suppress the native long-press loupe/selection menu during play, but not
+// selectable documentation or actual editor controls.
+gameSurface.addEventListener("contextmenu",event=>{
+ if(!inGameManual(event.target))event.preventDefault();
+});
+gameSurface.addEventListener("selectstart",event=>{
+ if(!inGameManual(event.target))event.preventDefault();
+});
+gameSurface.addEventListener("dragstart",event=>{
+ if(!inGameManual(event.target))event.preventDefault();
+});
+// The HUD and title page are game controls, not selectable web prose.
+for(const el of [$("healthHud"),$("gameMenuToggle"),$("titleOverlay")]){
+ el.addEventListener("contextmenu",event=>{
+  if(!inGameManual(event.target))event.preventDefault();
+ });
+ el.addEventListener("selectstart",event=>{
+  if(!inGameManual(event.target))event.preventDefault();
+ });
+}
 // Capture canvas touches directly so Phaser's pointer management cannot
 // eat the second thumb while the first is held on the external joystick.
 $("stage").addEventListener("touchstart",e=>{
