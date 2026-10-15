@@ -1557,7 +1557,7 @@ class Lab extends Phaser.Scene{
   // Input is briefly damped after a strong hit. Knockback is a separate
   // velocity, integrated over successive frames with exponential drag.
   // This preserves responsive input and does not snap the wizard on impact.
-  const steer=staggered?.24:1;
+  const steer=staggered?.24:time<(combat?.playerFrostSlowUntil||0)?.56:1;
   this.player.vx=mv.x*4.4*steer;this.player.vy=mv.y*4.4*steer;
   const knock=combat?.playerKnock||{x:0,y:0};
   const nextX=this.player.x+(this.player.vx+knock.x)*t;
@@ -1592,6 +1592,7 @@ class Lab extends Phaser.Scene{
     }
    }
    for(const f of this.frosts){if(dist(b.position,f)<f.r){
+    if(f.hostile&&b.enemyRef?.id===f.owner)continue;
     const slow=Math.pow(.969,t);
     MatterBody.setVelocity(b,{x:b.velocity.x*slow,y:b.velocity.y*slow});
    }}
