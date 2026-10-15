@@ -1010,7 +1010,7 @@ let lookPalettes=Hue?Hue.read(gameStorage):{};
 const huePreviewCache=new Map();
 let hueSkin=Hue?.validSkin(activeSkin)?activeSkin:8;
 let hueChannel="robe";
-const spells=["bolt","well","pulse","frost","flame","detonate","lightning","crafted"];
+const spells=["crafted"];
 // Cast semantics are explicit for each ability, ready to become spell metadata.
 const spellInfo={
  bolt:{name:"ARC BOLT",button:"quick",origin:"aim",hint:"ARC BOLT • TAP AGAIN TO FIRE"},
@@ -1025,7 +1025,7 @@ const spellInfo={
 // The module is a UI/state layer, not a prerequisite for the combat engine.
 // If its CDN-style asset is unavailable, the six default runes still work.
 const Loadout=window.WRKMAN_SPELL_LOADOUT||(()=>{
- const DEFAULT=["bolt","well","frost","flame","detonate","lightning"],GLYPH={bolt:"✦",well:"◉",pulse:"◎",frost:"❄",flame:"♨",detonate:"✹",lightning:"⚡",crafted:"⬡"};
+ const DEFAULT=["crafted"],GLYPH={bolt:"✦",well:"◉",pulse:"◎",frost:"❄",flame:"♨",detonate:"✹",lightning:"⚡",crafted:"⬡"};
  // Match the standalone 029 module if the script fails to download.
  const FAN=[[-90,112],[-120,112],[-150,112],[-90,165],[-120,165],[-150,165]];
  const pos=i=>{const [deg,r]=FAN[i]||[-90,0];return {x:r*Math.cos(deg*Math.PI/180),y:r*Math.sin(deg*Math.PI/180)};};
@@ -1033,7 +1033,7 @@ const Loadout=window.WRKMAN_SPELL_LOADOUT||(()=>{
  assign:(arr,index,id)=>{const x=arr.slice(),old=x.indexOf(id);if(old>=0&&old!==index)x[old]=x[index];x[index]=id;return x;},
  pos,gesture:(x,y)=>{const len=Math.hypot(x,y);if(len<40)return {action:"cast",index:-1};
   if(x>12||y>8||len<70||len>201)return {action:"cancel",index:-1};
-  let idx=-1,best=Infinity;for(let i=0;i<6;i++){const p=pos(i),d=Math.hypot(x-p.x,y-p.y);if(d<best){idx=i;best=d;}}
+  let idx=-1,best=Infinity;for(let i=0;i<DEFAULT.length;i++){const p=pos(i),d=Math.hypot(x-p.x,y-p.y);if(d<best){idx=i;best=d;}}
   return best<=40?{action:"select",index:idx}:{action:"cancel",index:-1};}};
 })();
 let equipped=Loadout.read(gameStorage);
@@ -1087,7 +1087,7 @@ const Regions=window.WRKMAN_REGIONS||null; // optional canonical region generato
 const Crafted=window.WRKMAN_CRAFTED_MAGIC||null;
 const ElementVFX=window.WRKMAN_ELEMENT_VFX||null;
 let craftedRecipe=Crafted?Crafted.read(gameStorage):null;
-let craftedHealLinked=gameStorage.getItem("wrkman-arcane-lab034-heal-linked")!=="false";
+let craftedHealLinked=false; // Restore healing when swarm-healing mechanics are ready.
 const MatterBody=Phaser.Physics.Matter.Matter.Body;
 class Lab extends Phaser.Scene{
  preload(){
@@ -1388,7 +1388,7 @@ class Lab extends Phaser.Scene{
   this.burst(this.player.x,this.player.y,0x8ddcff,14,5);
  }
  cast(type,tx,ty){
-  if(!started||this.time.now<this.lastCast)return;
+  if(type!=="crafted"||!started||this.time.now<this.lastCast)return;
   const cost={bolt:190,well:520,pulse:600,frost:680,flame:800,detonate:480,lightning:570,crafted:650};
   this.lastCast=this.time.now+cost[type];
   let aim={...this.aim};
@@ -1809,7 +1809,7 @@ if(typeof ResizeObserver!=="undefined"){
 }
 // Initial Phaser scale scheduling occurs after boot at the bottom of this script.
 function quickCast(type){
- if(!scene||!started)return;
+ if(type!=="crafted"||!scene||!started)return;
  // Quick-cast is for aim-based and self-centered abilities only.
  // A targeted spell never guesses a placement point.
  if(spellInfo[type].button!=="quick")return;
