@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17271e">
+<meta name="description" content="Bloomsmith: grow one-of-a-kind procedural botanical artwork.">
+<title>Bloomsmith | A Little Garden of Possibilities</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231b3426'/%3E%3Ccircle cx='32' cy='29' r='20' fill='none' stroke='%23d7bc81' stroke-width='2'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-size='31' font-weight='bold' fill='%23f4e8ca'%3EW%3C/text%3E%3C/svg%3E">
+<style>
+:root{--forest:#17271e;--forest2:#22392b;--cream:#eee8d8;--ink:#263628;--line:rgba(244,236,217,.2);--gold:#dbba7d;--muted:#bbc7b5;--panel:rgba(255,255,255,.044)}
+*{box-sizing:border-box}
+html{background:var(--forest)}
+body{margin:0;color:var(--cream);background:radial-gradient(ellipse 65% 50% at 5% 4%,#2e4631 0%,transparent 70%),var(--forest);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100dvh;-webkit-tap-highlight-color:transparent}
+button,canvas,.stage,.chip,.swatch{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid #f3d58d;outline-offset:3px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.shell{max-width:1390px;margin:0 auto;padding:23px clamp(15px,3vw,46px) 32px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px 21px;border-bottom:1px solid var(--line)}
+.brand{display:flex;gap:12px;align-items:center;font-size:.92rem;letter-spacing:.21em;font-weight:750}
+.brandmark{width:39px;height:39px;border:1px solid var(--gold);color:var(--gold);border-radius:50%;display:grid;place-items:center;position:relative;font-family:Georgia,serif;font-size:23px;font-weight:bold;letter-spacing:0}
+.brandmark:after{content:"";position:absolute;inset:5px;border:1px solid #a6b59d66;border-radius:50%}
+.topnote{color:#b6c4b3;text-transform:uppercase;letter-spacing:.19em;font-size:.62rem;text-align:right;line-height:1.6}
+.workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,360px);align-items:start;gap:clamp(23px,3.2vw,52px);padding-top:30px}
+.gallery{min-width:0;display:flex;flex-direction:column;align-items:center}
+.gallery-head{width:100%;display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:13px}
+.eyebrow{font-size:.63rem;text-transform:uppercase;letter-spacing:.26em;color:#c6d2bc;font-weight:700}
+.seed-pill{border:1px solid #526750;color:#d6d9c2;border-radius:99px;background:#223628;padding:8px 12px;font-size:.69rem;letter-spacing:.11em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stage{position:relative;width:min(100%,780px);aspect-ratio:10 / 11;border-radius:17px;overflow:hidden;background:#e8e1c9;box-shadow:0 21px 72px #090f0a88,0 0 0 1px #f4e5bd24;isolation:isolate;touch-action:manipulation}
+.stage:after{position:absolute;inset:10px;content:"";border:1px solid #a7a27e42;border-radius:10px;pointer-events:none}
+#bloomCanvas{width:100%;height:100%;display:block;touch-action:manipulation}
+.canvas-corner{position:absolute;bottom:18px;left:22px;color:#4b654c;font-family:Georgia,serif;font-size:12px;pointer-events:none;letter-spacing:.04em}
+.canvas-corner small{display:block;font:9px ui-sans-serif,sans-serif;letter-spacing:.17em;color:#8a9175;margin-top:4px}
+.stage-button{position:absolute;right:16px;bottom:17px;border:1px solid #596c4e55;background:#eff0dcbb;backdrop-filter:blur(6px);color:#345038;border-radius:25px;padding:9px 13px;font-size:11px;font-weight:700;letter-spacing:.07em}
+.gallery-foot{color:#b4c1af;font-size:.72rem;letter-spacing:.055em;margin:14px 5px 0;text-align:center}
+.panel{padding:8px 0 16px;max-width:500px}
+.overline{color:var(--gold);font-size:.64rem;letter-spacing:.25em;font-weight:700}
+h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(37px,4vw,55px);line-height:1.06;letter-spacing:-.045em;margin:19px 0 12px}
+h1 em{color:#e8ca9f;font-weight:400}
+.intro{line-height:1.65;color:#becbbc;font-size:.87rem;max-width:34ch;margin:0 0 27px}
+.section{border-top:1px solid var(--line);padding:18px 0 17px}
+.section-title{display:flex;align-items:center;justify-content:space-between;color:#eae9d9;font-size:.76rem;font-weight:720;margin-bottom:12px;letter-spacing:.035em}
+.section-title span{color:#94aa98;font:11px Georgia,serif;font-style:italic}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid #516954;background:#ffffff08;border-radius:999px;padding:10px 14px;color:#d1dccd;font-size:.75rem;min-height:39px;transition:background .15s,border-color .15s}
+.chip[aria-pressed="true"]{background:#e9e1cb;color:#283b2e;border-color:#e9e1cb;font-weight:700}
+.chip:active,.action:active,.swatch:active{transform:scale(.975)}
+.swatches{display:flex;gap:11px;flex-wrap:wrap;padding:4px 0}
+.swatch{height:35px;width:35px;min-height:35px;border:0;border-radius:50%;position:relative;background:var(--paint);box-shadow:inset 0 0 0 2px #ffffff66,0 1px 7px #08140b66}
+.swatch[aria-pressed="true"]:after{content:"";position:absolute;inset:-5px;border:1.5px solid #f3d597;border-radius:50%}
+.swatch-name{margin-top:11px;color:#b9cbb4;font:italic 13px Georgia,serif}
+.range-row{display:flex;gap:15px;align-items:center}
+.range-row input{width:100%;accent-color:#e4c88e;min-height:34px;cursor:pointer}
+.range-value{font:15px Georgia,serif;color:#e8d6ae;min-width:43px;text-align:right}
+.action{border:1px solid var(--line);background:#263b2b;color:#f4ecda;border-radius:11px;min-height:50px;padding:12px 13px;display:flex;align-items:center;justify-content:center;gap:9px;font-size:.8rem;font-weight:730;letter-spacing:.04em}
+.action.primary{background:#e9cf96;color:#263927;border-color:#e9cf96;font-weight:850}
+.action.muted{background:#ffffff08}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 12px}
+.action.primary{grid-column:span 2;font-size:.9rem;min-height:58px}
+.action .symbol{font-size:17px;font-weight:400}
+.microcopy{font-size:.69rem;color:#9fb4a0;line-height:1.6;text-align:center}
+.favorites{display:flex;gap:8px;overflow:auto;scrollbar-width:thin;padding:1px 2px 8px;min-height:45px}
+.favorite{flex:none;min-width:84px;max-width:102px;border:1px solid #526651;background:#283e2e;border-radius:8px;color:#e3dcc4;text-align:left;padding:9px;font:12px Georgia,serif}
+.favorite i{display:block;width:22px;height:8px;border-radius:12px;background:var(--paint);margin:0 0 6px}
+.empty{color:#92a692;font:italic 13px Georgia,serif;margin:2px 0}
+.status{min-height:19px;color:#e9ca8f;font-size:.75rem;text-align:center;margin:8px 0 0}
+.footer{font-size:10px;color:#90a38f;text-align:center;margin:38px 0 6px;letter-spacing:.14em;text-transform:uppercase}
+@media(min-width:960px){.panel{position:sticky;top:17px}.stage{max-height:calc(100dvh - 170px);width:auto;max-width:100%}.gallery{min-height:400px}}
+@media(max-width:959px){.workspace{display:flex;flex-direction:column;align-items:center;padding-top:17px;gap:16px}.gallery,.panel{width:100%;max-width:600px}.panel{padding-top:3px}.panel-intro{display:none}.stage{max-width:520px}.gallery-head{margin-bottom:10px}.section{padding:15px 0 14px}.actions{grid-template-columns:1fr 1fr}.footer{margin-top:22px}}
+@media(max-width:390px){.shell{padding-left:12px;padding-right:12px}.brand{font-size:.8rem;gap:8px}.topnote{font-size:.53rem}.chip{padding:9px 11px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="topbar">
+  <div class="brand"><span class="brandmark" aria-hidden="true">W</span><span>BLOOMSMITH</span></div>
+  <div class="topnote">A LITTLE GARDEN OF POSSIBILITIES<br>FORGED BY WRKMAN · V 1.0</div>
+</header>
+<main class="workspace">
+<section class="gallery" aria-label="Flower artwork">
+  <div class="gallery-head"><span class="eyebrow" id="flowerName">BOTANICAL STUDY · 001</span><span class="seed-pill" id="seedTag">SEED 000000</span></div>
+  <div class="stage" id="stage">
+    <canvas id="bloomCanvas" role="img" aria-label="Procedurally drawn botanical flower" title="Double tap to grow another flower"></canvas>
+    <div class="canvas-corner"><span id="latinName">Flora imaginaria</span><small>THE BLOOMSMITH COLLECTION</small></div>
+    <button class="stage-button" type="button" id="canvasSurprise" aria-label="Grow a new flower">↻ ANOTHER BLOOM</button>
+  </div>
+  <p class="gallery-foot">Every flower begins with a number. None grows quite the same. ✦</p>
+</section>
+<aside class="panel">
+  <div class="panel-intro">
+    <div class="overline">✦ BOTANICAL ATELIER / NO. 01</div>
+    <h1>Grow a little<br><em>wonder.</em></h1>
+    <p class="intro">A garden where mathematics dreams in petals. Choose a flower, whisper a color, and see what takes root.</p>
+  </div>
+  <div class="section">
+    <div class="section-title">01 &nbsp; Choose your bloom <span>six wild souls</span></div>
+    <div class="chips" id="speciesControls" role="group" aria-label="Flower species"></div>
+  </div>
+  <div class="section">
+    <div class="section-title">02 &nbsp; Paint with nature <span>palette</span></div>
+    <div class="swatches" id="paletteControls" role="group" aria-label="Petal color"></div>
+    <div id="paletteName" class="swatch-name">Antique rose</div>
+  </div>
+  <div class="section">
+    <div class="section-title"><label for="fullness">03 &nbsp; Petal abundance</label><span>lush or delicate</span></div>
+    <div class="range-row"><input type="range" id="fullness" min="35" max="100" value="70" step="5" aria-label="Petal abundance"><output class="range-value" id="fullnessValue" for="fullness">70%</output></div>
+  </div>
+  <div class="actions">
+    <button class="action primary" id="generate" type="button"><span class="symbol">✺</span> Grow another flower</button>
+    <button class="action muted" id="saveImage" type="button"><span class="symbol">↓</span> Save artwork</button>
+    <button class="action muted" id="favorite" type="button" aria-pressed="false"><span class="symbol">♡</span> Keep this bloom</button>
+    <button class="action muted" id="share" type="button" style="grid-column:span 2"><span class="symbol">↗</span> Copy this flower's seed link</button>
+  </div>
+  <section class="section" aria-label="Saved flowers">
+    <div class="section-title">YOUR LITTLE GREENHOUSE <span id="savedCount">0 saved</span></div>
+    <div class="favorites" id="favorites"></div>
+  </section>
+  <div class="status" role="status" aria-live="polite" id="status"></div>
+  <p class="microcopy">Made of curves, color, and a little happy chance.<br>No accounts. No uploads. Your garden stays yours.</p>
+</aside>
+</main>
+<footer class="footer">W / WRKMAN · CLOCK IN. GROW SOMETHING.</footer>
+</div>
+<script>
+(function(){
+'use strict';
+var species=[
+ {id:'dahlia',label:'Dahlia',latin:'Dahlia aurora',layers:6,petals:17,length:240,width:53,center:28,point:0.95},
+ {id:'peony',label:'Peony',latin:'Paeonia somnium',layers:5,petals:13,length:237,width:95,center:32,point:0.20},
+ {id:'cosmos',label:'Cosmos',latin:'Cosmos stellata',layers:3,petals:9,length:257,width:103,center:49,point:0.10},
+ {id:'lotus',label:'Lotus',latin:'Nelumbo luminis',layers:5,petals:12,length:247,width:76,center:33,point:0.95},
+ {id:'anemone',label:'Anemone',latin:'Anemone noctis',layers:4,petals:11,length:240,width:95,center:55,point:0.15},
+ {id:'aster',label:'Aster',latin:'Aster astralis',layers:5,petals:23,length:233,width:33,center:37,point:0.95}
+];
+var palettes=[
+ {id:'rose',name:'Antique rose',base:'#92344d',mid:'#d47682',light:'#ffccaf',dark:'#682c42',heart:'#deab66'},
+ {id:'gold',name:'Sunlit amber',base:'#b65d2c',mid:'#eeb061',light:'#ffe3a7',dark:'#78402c',heart:'#b47435'},
+ {id:'violet',name:'Twilight lavender',base:'#5d508f',mid:'#9a85cf',light:'#ded1fb',dark:'#41345b',heart:'#efcc85'},
+ {id:'blue',name:'Blue hour',base:'#38587e',mid:'#739bbe',light:'#c6e4e5',dark:'#22344c',heart:'#f6d5a0'},
+ {id:'cream',name:'Moonlit pearl',base:'#b5a9a0',mid:'#e9d8ca',light:'#fff6e4',dark:'#867b83',heart:'#dbb878'},
+ {id:'coral',name:'Wild coral',base:'#a94350',mid:'#ef8a78',light:'#ffd3a4',dark:'#753b4b',heart:'#e5af64'},
+ {id:'mint',name:'Secret jade',base:'#47785f',mid:'#96b795',light:'#e3e6b5',dark:'#325c4b',heart:'#d2bb70'}
+];
+var canvas=document.getElementById('bloomCanvas');
+var ctx=canvas.getContext('2d',{alpha:false});
+if(!ctx){document.getElementById('status').textContent='This browser cannot draw flowers.';return;}
+var state={seed:100183,species:'peony',palette:'rose',fullness:70};
+var storageKey='wrkman.bloomsmith.v1';
+var favorites=[];
+var bloomStart=0, animationId=0, lastFrame=0, elapsed=1;
+var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var $=function(id){return document.getElementById(id);};
+var clamp=function(v,a,b){return Math.max(a,Math.min(b,v));};
+var itemById=function(list,id){return list.find(function(v){return v.id===id;})||list[0];};
+var safeSeed=function(n){n=Number(n);return Number.isInteger(n)&&n>0&&n<1000000000?n:100183;};
+function randomSeed(){if(window.crypto&&crypto.getRandomValues){var a=new Uint32Array(1);crypto.getRandomValues(a);return 1+a[0]%999999998;}return 1+Math.floor(Math.random()*999999998);}
+function rngFactory(seed){var t=seed>>>0;return function(){t+=0x6D2B79F5;var x=t;x=Math.imul(x^(x>>>15),x|1);x^=x+Math.imul(x^(x>>>7),x|61);return ((x^(x>>>14))>>>0)/4294967296;};}
+function readStorage(){try{var obj=JSON.parse(localStorage.getItem(storageKey)||'{}');if(obj.version===1&&Array.isArray(obj.favorites)){favorites=obj.favorites.filter(isValid).slice(0,18);}if(obj.last&&isValid(obj.last))state=obj.last;}catch(e){favorites=[];}}
+function isValid(v){return !!(v&&Number.isInteger(v.seed)&&v.seed>0&&v.seed<1000000000&&species.some(function(s){return s.id===v.species;})&&palettes.some(function(p){return p.id===v.palette;})&&Number.isInteger(v.fullness)&&v.fullness>=35&&v.fullness<=100);}
+function persist(){try{localStorage.setItem(storageKey,JSON.stringify({version:1,last:state,favorites:favorites}));}catch(e){announce('Browser storage is unavailable. Your flower still works.');}}
+function fromURL(){var q=new URLSearchParams(location.search);if(!q.has('seed'))return;var candidate={seed:safeSeed(Number(q.get('seed'))),species:q.get('species'),palette:q.get('palette'),fullness:Number(q.get('fullness'))};if(isValid(candidate))state=candidate;}
+function syncURL(){var query=new URLSearchParams({seed:String(state.seed),species:state.species,palette:state.palette,fullness:String(state.fullness)});try{history.replaceState(null,'',location.pathname+'?'+query.toString()+location.hash);}catch(e){}}
+function hexRgb(v){v=v.replace('#','');return [parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16)];}
+function blend(a,b,t){var A=hexRgb(a),B=hexRgb(b);return 'rgb('+A.map(function(v,i){return Math.round(v+(B[i]-v)*t);}).join(',')+')';}
+function rgba(a,t){var c=hexRgb(a);return 'rgba('+c.join(',')+','+t+')';}
+function announce(s){$('status').textContent=s;clearTimeout(announce.timer);announce.timer=setTimeout(function(){$('status').textContent='';},3800);}
+function buildControls(){
+ $('speciesControls').innerHTML='';
+ species.forEach(function(s){var b=document.createElement('button');b.type='button';b.className='chip';b.textContent=s.label;b.dataset.species=s.id;b.setAttribute('aria-pressed',String(state.species===s.id));b.addEventListener('click',function(){state.species=s.id;commit(true);});$('speciesControls').appendChild(b);});
+ $('paletteControls').innerHTML='';
+ palettes.forEach(function(p){var b=document.createElement('button');b.type='button';b.className='swatch';b.style.setProperty('--paint','linear-gradient(130deg,'+p.light+','+p.mid+' 55%,'+p.base+')');b.title=p.name;b.setAttribute('aria-label',p.name);b.setAttribute('aria-pressed',String(state.palette===p.id));b.addEventListener('click',function(){state.palette=p.id;commit(true);});$('paletteControls').appendChild(b);});
+}
+function syncControls(){
+ document.querySelectorAll('[data-species]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.species===state.species));});
+ $('paletteControls').querySelectorAll('button').forEach(function(b,i){b.setAttribute('aria-pressed',String(palettes[i].id===state.palette));});
+ $('paletteName').textContent=itemById(palettes,state.palette).name;
+ $('fullness').value=state.fullness;$('fullnessValue').textContent=state.fullness+'%';
+ $('seedTag').textContent='SEED '+String(state.seed).padStart(6,'0');
+ var s=itemById(species,state.species);$('flowerName').textContent='BOTANICAL STUDY · '+s.label.toUpperCase();$('latinName').textContent=s.latin;
+ var f=favorites.some(function(f){return same(f,state);});$('favorite').setAttribute('aria-pressed',String(f));$('favorite').innerHTML='<span class="symbol">'+(f?'♥':'♡')+'</span> '+(f?'In your greenhouse':'Keep this bloom');
+}
+function same(a,b){return a.seed===b.seed&&a.species===b.species&&a.palette===b.palette&&a.fullness===b.fullness;}
+function commit(animate){syncControls();syncURL();persist();startBloom(animate);}
+function newBloom(){state.seed=randomSeed();commit(true);announce('A new '+itemById(species,state.species).label.toLowerCase()+' has bloomed.');}
+function renderFavorites(){
+ $('favorites').innerHTML='';$('savedCount').textContent=favorites.length+' saved';
+ if(!favorites.length){var e=document.createElement('p');e.className='empty';e.textContent='Your future favorites will grow here.';$('favorites').appendChild(e);return;}
+ favorites.forEach(function(f){var p=itemById(palettes,f.palette),s=itemById(species,f.species),b=document.createElement('button');b.type='button';b.className='favorite';b.title='Restore '+s.label+' seed '+f.seed;b.style.setProperty('--paint','linear-gradient(90deg,'+p.base+','+p.light+')');var i=document.createElement('i');b.appendChild(i);b.appendChild(document.createTextNode(s.label));var sm=document.createElement('small');sm.style.display='block';sm.style.opacity='.7';sm.textContent='#'+f.seed;b.appendChild(sm);b.addEventListener('click',function(){state=Object.assign({},f);commit(true);announce('Welcome back, little flower.');});$('favorites').appendChild(b);});
+}
+function toggleFavorite(){
+ var index=favorites.findIndex(function(f){return same(f,state);});
+ if(index>=0){favorites.splice(index,1);announce('Bloom removed from your greenhouse.');}
+ else{favorites.unshift(Object.assign({},state));favorites=favorites.slice(0,18);announce('A flower for keeps. ♥');}
+ persist();syncControls();renderFavorites();
+}
+function background(c,W,H,rand){
+ var bg=c.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#f6f0df');bg.addColorStop(.55,'#ede7d1');bg.addColorStop(1,'#cdd4b9');c.fillStyle=bg;c.fillRect(0,0,W,H);
+ var haze=c.createRadialGradient(500,410,70,500,440,570);haze.addColorStop(0,'rgba(255,250,232,.85)');haze.addColorStop(.65,'rgba(255,255,245,.16)');haze.addColorStop(1,'rgba(77,117,85,.10)');c.fillStyle=haze;c.fillRect(0,0,W,H);
+ c.save();c.lineWidth=1;c.strokeStyle='rgba(93,105,73,.07)';
+ for(var r=180;r<650;r+=76){c.beginPath();c.ellipse(505,423,r,r*.96,-.12,0,Math.PI*2);c.stroke();}
+ c.restore();
+ // Paper freckles are deterministic for seed reproducibility.
+ for(var i=0;i<570;i++){var x=rand()*W,y=rand()*H;c.fillStyle=rand()>.5?'rgba(90,96,67,.065)':'rgba(255,255,254,.24)';c.fillRect(x,y,.4+rand()*1.25,.4+rand()*1.25);}
+}
+function drawLeaf(c,x,y,angle,len,w,rand){
+ c.save();c.translate(x,y);c.rotate(angle);
+ var g=c.createLinearGradient(-w,0,w,-len);g.addColorStop(0,'#244e39');g.addColorStop(.52,'#6a9366');g.addColorStop(1,'#bad0a0');
+ c.fillStyle=g;c.strokeStyle='#476848';c.lineWidth=1.2;
+ c.beginPath();c.moveTo(0,7);c.bezierCurveTo(-w*.92,-len*.32,-w*1.1,-len*.82,0,-len);c.bezierCurveTo(w*.66,-len*.78,w*.83,-len*.31,0,7);c.closePath();c.fill();c.stroke();
+ c.strokeStyle='rgba(228,239,179,.56)';c.lineWidth=1.1;c.beginPath();c.moveTo(0,4);c.quadraticCurveTo(-w*.1,-len*.5,0,-len*.94);c.stroke();
+ for(var v=1;v<=5;v++){var yy=-len*(v/7),span=w*Math.sin(Math.PI*v/7)*.61;c.lineWidth=.75;c.strokeStyle='rgba(224,235,187,.34)';c.beginPath();c.moveTo(0,yy);c.lineTo((v%2?1:-1)*span,yy-len*.09);c.stroke();}
+ c.restore();
+}
+function stem(c,rand,progress){
+ c.save();c.lineCap='round';var stem=c.createLinearGradient(450,550,550,550);stem.addColorStop(0,'#244a34');stem.addColorStop(.5,'#718c5b');stem.addColorStop(1,'#294b35');
+ c.strokeStyle='#3b5d43';c.lineWidth=17;c.beginPath();c.moveTo(507,500);c.bezierCurveTo(473,650,529,799,470,1112);c.stroke();
+ c.strokeStyle=stem;c.lineWidth=12;c.beginPath();c.moveTo(507,500);c.bezierCurveTo(473,650,529,799,470,1112);c.stroke();
+ c.strokeStyle='rgba(228,237,167,.37)';c.lineWidth=2.2;c.beginPath();c.moveTo(504,525);c.bezierCurveTo(477,660,527,809,468,1065);c.stroke();
+ // Secondary branches
+ c.strokeStyle='#597451';c.lineWidth=4.4;
+ c.beginPath();c.moveTo(500,690);c.quadraticCurveTo(437,688,377,631);c.stroke();
+ c.beginPath();c.moveTo(502,810);c.quadraticCurveTo(558,793,606,724);c.stroke();
+ c.beginPath();c.moveTo(487,928);c.quadraticCurveTo(434,914,389,852);c.stroke();
+ drawLeaf(c,376,633,-.65,171,48,rand);
+ drawLeaf(c,604,724,.56,164,48,rand);
+ drawLeaf(c,388,853,-.53,123,38,rand);
+ drawLeaf(c,501,788,-.08,119,35,rand);
+ c.restore();
+}
+function glow(c,palette,rand){
+ c.save();var g=c.createRadialGradient(500,437,65,500,440,365);g.addColorStop(0,rgba(palette.light,.24));g.addColorStop(.64,rgba(palette.mid,.13));g.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=g;c.fillRect(120,45,760,760);
+ for(var i=0;i<26;i++){var a=rand()*Math.PI*2,r=180+rand()*245,x=500+Math.cos(a)*r,y=435+Math.sin(a)*r;c.fillStyle=i%3===0?rgba(palette.mid,.19):'rgba(255,252,224,.73)';c.beginPath();c.arc(x,y,.7+rand()*2.1,0,7);c.fill();}
+ c.restore();
+}
+function paintPetal(c,angle,baseRadius,length,width,palette,rand,point,growth,layerIndex,layerCount){
+ var bend=(rand()-.5)*.34,asym=(rand()-.5)*.22,twist=(rand()-.5)*.18;
+ var L=length*(.88+rand()*.21)*growth;
+ var P=width*(.84+rand()*.35)*Math.sqrt(Math.max(.001,growth));
+ if(L<2||P<1)return;
+ var spread=baseRadius*growth;
+ c.save();c.translate(500+Math.cos(angle)*spread,433+Math.sin(angle)*spread);c.rotate(angle+Math.PI/2+twist);
+ c.globalAlpha=.91+(layerIndex/layerCount)*.09;
+ // Deep relief behind each individual petal.
+ c.shadowColor=rgba(palette.dark,.38);c.shadowBlur=7;c.shadowOffsetY=3;
+ c.beginPath();c.moveTo(0,9);
+ c.bezierCurveTo(-P*.48,-L*.14,-P*1.03,-L*.61,-P*(.64+asym),-L*(.91-point*.075));
+ if(point>.6){
+   c.quadraticCurveTo(-P*.31,-L*1.025,bend*L*.32,-L*(1.1+point*.06));
+   c.quadraticCurveTo(P*.4,-L*1.015,P*(.62-asym),-L*(.91-point*.08));
+ } else {
+   c.bezierCurveTo(-P*.63,-L*1.13,P*.38,-L*1.15,P*(.64-asym),-L*.91);
+ }
+ c.bezierCurveTo(P*1.12,-L*.59,P*.42,-L*.13,0,9);c.closePath();
+ var grad=c.createLinearGradient(-P*.35,5,P*.18,-L);
+ grad.addColorStop(0,blend(palette.dark,palette.base,.24));
+ grad.addColorStop(.22,blend(palette.base,palette.mid,.33));
+ grad.addColorStop(.64,blend(palette.mid,palette.light,.27+layerIndex/layerCount*.13));
+ grad.addColorStop(1,blend(palette.light,'#ffffff',.20));
+ c.fillStyle=grad;c.fill();
+ c.shadowColor='transparent';c.shadowBlur=0;c.shadowOffsetY=0;
+ c.strokeStyle=rgba(palette.dark,.36);c.lineWidth=1.7;c.stroke();
+ // Translucent satin folds: one cheek lit and the other in shadow.
+ c.save();c.clip();
+ var sheen=c.createLinearGradient(-P,0,P*.7,0);sheen.addColorStop(0,'rgba(255,255,255,0)');sheen.addColorStop(.24,'rgba(255,246,224,.29)');sheen.addColorStop(.65,'rgba(255,255,255,0)');sheen.addColorStop(1,rgba(palette.dark,.18));c.fillStyle=sheen;c.fillRect(-P*1.5,-L*1.3,P*3,L*1.5);
+ c.strokeStyle=rgba(palette.light,.42);c.lineWidth=1.8;c.beginPath();c.moveTo(0,1);c.bezierCurveTo(-P*.24,-L*.43,bend*L*.13,-L*.7,bend*L*.26,-L*.96);c.stroke();
+ c.strokeStyle=rgba(palette.dark,.12);c.lineWidth=1;
+ for(var i=1;i<=3;i++){var y=-L*(.26+i*.16);c.beginPath();c.moveTo(0,y*.9);c.quadraticCurveTo(P*.24,y-L*.03,P*(.31+rand()*.12),y-L*.14);c.stroke();c.beginPath();c.moveTo(-P*.05,y*.88);c.quadraticCurveTo(-P*.22,y-L*.05,-P*(.28+rand()*.13),y-L*.13);c.stroke();}
+ c.restore();
+ c.restore();
+}
+function drawDisk(c,s,p,rand,progress){
+ c.save();c.translate(500,433);
+ var R=s.center*(.7+.3*progress);
+ var dark=s.id==='anemone'?'#272638':s.id==='cosmos'?'#76512a':p.dark;
+ var shadow=c.createRadialGradient(-R*.2,-R*.25,2,0,0,R*1.25);
+ shadow.addColorStop(0,blend(p.heart,'#fff1b4',.45));shadow.addColorStop(.55,s.id==='anemone'?'#51465b':p.heart);shadow.addColorStop(1,dark);
+ c.fillStyle=shadow;c.beginPath();c.arc(0,0,R,0,Math.PI*2);c.fill();
+ c.strokeStyle=rgba(p.dark,.4);c.lineWidth=4;c.stroke();
+ var N=s.id==='anemone'?130:95;
+ for(var i=0;i<N;i++){var a=i*2.399963229728653,r=R*Math.sqrt((i+.5)/N)*.91,x=Math.cos(a)*r,y=Math.sin(a)*r,sz=(i%4===0?2.5:1.6)*(1.2-r/R*.5);c.fillStyle=i%5===0?'#fff3be':i%3===0?'#704f38':s.id==='anemone'?'#d0b6a5':'#ecca81';c.beginPath();c.ellipse(x,y,sz,sz*.9,0,0,7);c.fill();}
+ var stamens=s.id==='anemone'?44:28;
+ for(var k=0;k<stamens;k++){var aa=(k/stamens)*Math.PI*2+rand()*.18,outer=R*(.88+rand()*.44),inner=R*.58;c.strokeStyle=s.id==='anemone'?'#dac8c2':'#9d7b39';c.lineWidth=1.3;c.beginPath();c.moveTo(Math.cos(aa)*inner,Math.sin(aa)*inner);c.lineTo(Math.cos(aa)*outer,Math.sin(aa)*outer);c.stroke();c.fillStyle=k%3===0?'#fff1b3':p.heart;c.beginPath();c.arc(Math.cos(aa)*outer,Math.sin(aa)*outer,2+rand()*1.6,0,7);c.fill();}
+ c.restore();
+}
+function blossom(c,s,p,rand,fullness,progress){
+ glow(c,p,rand);
+ c.save();
+ // A gentle flower-head shadow gives the bloom depth against the parchment.
+ c.fillStyle='rgba(86,85,60,.035)';c.beginPath();c.ellipse(510,462,250,225,0,0,7);c.fill();
+ var density=.63+fullness/100*.67;
+ for(var layer=0;layer<s.layers;layer++){
+   var depth=layer/(s.layers-1);
+   var n=Math.max(6,Math.round(s.petals*density*(1.08-depth*.19)));
+   var radius=(70-depth*54)*(s.id==='cosmos'?.75:1);
+   var length=s.length*(1-depth*.51);
+   var width=s.width*(1-depth*.16);
+   var a0=rand()*Math.PI*2;
+   for(var i=0;i<n;i++){
+     var progressLocal=clamp((progress-layer*.075-i/n*.045)*1.55,0,1);
+     var grow=1-Math.pow(1-progressLocal,3);
+     var a=a0+i*Math.PI*2/n+(rand()-.5)*(.11+depth*.22);
+     paintPetal(c,a,radius,length,width,p,rand,s.point,grow,layer,s.layers);
+   }
+ }
+ drawDisk(c,s,p,rand,progress);
+ // An inner clutch of tightly curled petals makes dahlias and peonies feel full.
+ if(s.id==='dahlia'||s.id==='peony'){
+  for(var j=0;j<12;j++){var a=j*Math.PI*2/12+(rand()-.5)*.2;paintPetal(c,a,5,36,18,p,rand,.7,progress,6,6);}
+  c.fillStyle=p.heart;c.beginPath();c.arc(500,433,6,0,7);c.fill();
+ }
+ c.restore();
+}
+function render(c,w,h,progress,includeExport){
+ c.save();c.setTransform(w/1000,0,0,h/1100,0,0);
+ var rand=rngFactory(state.seed);
+ var s=itemById(species,state.species),p=itemById(palettes,state.palette);
+ background(c,1000,1100,rand);
+ stem(c,rand,progress);
+ blossom(c,s,p,rand,state.fullness,progress);
+ if(includeExport){
+  c.fillStyle='rgba(56,79,55,.66)';c.font='italic 17px Georgia';c.textAlign='right';c.fillText(s.latin,942,1050);
+  c.font='12px sans-serif';c.fillText('BLOOMSMITH · WRKMAN / '+state.seed,942,1076);
+ }
+ c.restore();
+}
+function sizeCanvas(){
+ var r=canvas.getBoundingClientRect();
+ var dpr=Math.min(window.devicePixelRatio||1,2);
+ var w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));
+ if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+ return {width:w,height:h};
+}
+function frame(now){
+ animationId=0;if(!document.hidden&&now-lastFrame<30&&elapsed<1){animationId=requestAnimationFrame(frame);return;}
+ lastFrame=now;elapsed=reduced?1:clamp((now-bloomStart)/1200,0,1);
+ var dim=sizeCanvas();render(ctx,dim.width,dim.height,elapsed,false);
+ if(elapsed<1&&!document.hidden)animationId=requestAnimationFrame(frame);
+}
+function startBloom(animate){
+ if(animationId){cancelAnimationFrame(animationId);animationId=0;}
+ elapsed=animate&&!reduced?0:1;
+ bloomStart=performance.now()-(elapsed*1200);
+ frame(performance.now()+31);
+}
+function saveImage(){
+ var off=document.createElement('canvas');off.width=1800;off.height=1980;
+ var out=off.getContext('2d',{alpha:false});if(!out){announce('Could not prepare an image.');return;}
+ render(out,off.width,off.height,1,true);
+ off.toBlob(function(blob){
+  if(!blob){announce('Your browser could not export this bloom.');return;}
+  var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='bloomsmith-'+state.species+'-'+state.seed+'.png';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},18000);announce('Your botanical portrait is ready to save.');
+ },'image/png');
+}
+function copyLink(){
+ var url=location.href;
+ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(function(){announce('Seed link copied. This flower can find you again.');},function(){fallbackCopy(url);});}
+ else fallbackCopy(url);
+}
+function fallbackCopy(url){
+ var box=document.createElement('textarea');box.value=url;box.style.cssText='position:fixed;left:-9999px;top:0;';document.body.appendChild(box);box.focus();box.select();
+ try{if(document.execCommand('copy'))announce('Seed link copied.');else announce('Select and copy this page link in your browser.');}catch(e){announce('Use your browser address bar to share this flower.');}box.remove();
+}
+function install(){
+ readStorage();fromURL();buildControls();syncControls();renderFavorites();
+ $('generate').addEventListener('click',newBloom);$('canvasSurprise').addEventListener('click',newBloom);
+ $('saveImage').addEventListener('click',saveImage);$('favorite').addEventListener('click',toggleFavorite);$('share').addEventListener('click',copyLink);
+ $('fullness').addEventListener('input',function(){state.fullness=Number(this.value);syncControls();syncURL();startBloom(false);});
+ $('fullness').addEventListener('change',function(){persist();startBloom(true);});
+ var timer=0;window.addEventListener('resize',function(){clearTimeout(timer);timer=setTimeout(function(){startBloom(false);},110);});
+ document.addEventListener('visibilitychange',function(){if(!document.hidden)startBloom(false);});
+ document.getElementById('stage').addEventListener('contextmenu',function(e){e.preventDefault();});
+ document.querySelectorAll('button').forEach(function(el){el.addEventListener('contextmenu',function(e){e.preventDefault();});});
+ syncURL();startBloom(true);
+}
+install();
+})();
+</script>
+</body>
+</html>
