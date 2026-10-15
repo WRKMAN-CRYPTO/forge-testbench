@@ -89,12 +89,12 @@
     const mult=Math.min(1,25/Math.max(1,Math.hypot(vx,vy)));
     Body?.setVelocity?.(b,{x:vx*mult,y:vy*mult});
    }
-   try{if(typeof window!=="undefined")window.WRKMAN_ELEMENTS?.impulse?.(s,fx.x,fx.y,100);}catch(_){}
+   try{globalThis.WRKMAN_ELEMENTS?.impulse?.(s,fx.x,fx.y,100);}catch(_){}
    if(inside)hitPlayer(s,19,fx.x,fx.y,"Archivist Detonation");
    s.burst?.(fx.x,fx.y,v.color,40,8);
    s.cameras?.main?.shake?.(115,.0025);
   }else if(fx.type==="lightning"){
-   const Element=typeof window!=="undefined"?window.WRKMAN_ELEMENTS:null;
+   const Element=typeof globalThis!=="undefined"?globalThis.WRKMAN_ELEMENTS:null;
    if(Element?.discharge)Element.discharge(s,fx.x,fx.y,null,{
     hostile:true,hitPlayer:(amount,x,y)=>hitPlayer(s,amount,x,y,"Archivist Spark")
    });else{
