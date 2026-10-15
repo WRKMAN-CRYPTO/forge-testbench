@@ -28,7 +28,7 @@
    const r=Math.hypot(x-15.5,y-15.5);
    values.push(r>8.3&&r<10.7?255:r>=10.7&&r<13.4?Math.round(clamp(245-(r-10.7)*74,35,245)):r>=13.4&&r<14.8?0:MASK);
   }
-  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:'FIRE RING',values,sources:Array(N*N).fill(0),runes:Array(N*N).fill(0),settings:{mode:'ab',palette:'flame',texture:'flat',population:200,delivery:'aura',swirl:26,momentum:62,light:62,renderLimit:1200,lifespan:5.5}};
+  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:'FIRE RING',values,sources:Array(N*N).fill(0),runes:Array(N*N).fill(0),settings:{mode:'ab',palette:'flame',texture:'flat',population:200,delivery:'aura',swirl:26,momentum:62,light:62,renderLimit:1200,lifespan:5.5,spawnMode:'grayscale'}};
  }
  function normalize(raw){
   if(!raw||raw.width!==N||raw.height!==N||!Array.isArray(raw.values)||raw.values.length!==1024)throw Error('Expected 32x32 Agent Field JSON');
@@ -41,6 +41,9 @@
   return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:String(raw.name||'CRAFTED FIELD').slice(0,48),values,sources,runes,
    settings:{mode:s.mode==='a'?'a':'ab',palette:palettes[s.palette]?s.palette:'flame',texture:s.texture==='leaf'?'leaf':'flat',
     population:Number.isFinite(s.population)?Math.round(clamp(s.population,1,MAX_CAST_AGENTS)):MAX_CAST_AGENTS,
+    // Missing setting belongs to an OLD saved recipe. Keep its emitter
+    // launch logic exactly as authored; new recipes default to grayscale.
+    spawnMode:s.spawnMode==='grayscale'?'grayscale':'emitters',
     delivery,swirl:n('swirl',26),momentum:n('momentum',62),light:n('light',62),
     lifespan:Number.isFinite(s.lifespan)?Math.round(clamp(s.lifespan,.5,30)*2)/2:5.5,
     renderLimit:Number.isFinite(s.renderLimit)?Math.round(clamp(s.renderLimit,1,MAX_DRAW)):DEFAULT_DRAW}};
@@ -130,7 +133,7 @@
   return removed;
  }
  function start(scene,recipe,healLinked=true,target=null){
-  const cfg=normalize(recipe),starts=Sources.startingCells(cfg.values,cfg.sources,Motion);
+  const cfg=normalize(recipe),starts=Sources.startingCells(cfg.values,cfg.sources,Motion,cfg.settings.spawnMode);
   // Each cast receives at most 200 birth agents. Prior casts and the separate
   // visual draw budget consume no casting capacity. Future mana will govern.
   if(cfg.settings.delivery!=='world'&&scene.craftedAura)return false;
