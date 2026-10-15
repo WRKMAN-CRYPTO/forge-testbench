@@ -187,7 +187,7 @@ const WORLD={left:-800,right:1760,top:-520,bottom:1120};
    c.vy+=(c.y-y)/d*kick;
   }
  }
- function discharge(s,x,y,combat){
+ function discharge(s,x,y,combat,options={}){
   const w=s.elementWorld||reset(s),now=s.time?.now||0;
   const near=w.clouds.filter(c=>dist(c,{x,y})<=c.radius+30&&c.mass>=.12)
    .sort((a,b)=>dist(a,{x,y})-dist(b,{x,y}));
@@ -206,12 +206,20 @@ const WORLD={left:-800,right:1760,top:-520,bottom:1120};
   }
   const bubbles=touched.length?touched.map(c=>({x:c.x,y:c.y,r:clamp(c.radius+26,55,160)})):
    [{x:clamp(x,WORLD.left,WORLD.right),y:clamp(y,WORLD.top,WORLD.bottom),r:36}];
-  let hits=0;
+  let hits=0,playerStruck=false;
   const struck=new Set();
   for(const c of touched)c.chargedUntil=now+500;
   for(const b of bubbles){
    if(w.flashes.length>=MAX_FLASHES)w.flashes.shift();
    w.flashes.push({x:b.x,y:b.y,r:b.r,born:now,until:now+550,wet:touched.length>0});
+   // Hostile ownership uses exactly these same vapor connectivity bubbles.
+   // A discharge can affect the wizard ONCE, never his own caster.
+   if(options.hostile&&!playerStruck&&s.player&&inside(s.player,b,b.r+12)){
+    playerStruck=true;
+    options.hitPlayer?.(touched.length?17:7,b.x,b.y);
+    hits++;
+   }
+   if(options.hostile)continue;
    for(const e of s.combat?.enemies||[]){
     if(!e.alive||struck.has(e)||!inside(e.body.position,b,b.r+e.r*.5))continue;
     struck.add(e);
