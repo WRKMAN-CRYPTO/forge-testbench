@@ -1147,6 +1147,8 @@ class Lab extends Phaser.Scene{
   });
   this.input.on("pointerdown",p=>{
    if(!started||$("instructions").classList.contains("show"))return;
+   // The secondary mouse button is not a cast or aim command.
+   if(p.event?.button===2||p.rightButtonDown?.())return;
    // The DOM capture listener owns phone taps; avoid duplicate casting.
    if(p.event?.pointerType==="touch"||p.event?.type?.startsWith("touch"))return;
    const pos=this.cameras.main.getWorldPoint(p.x,p.y);
@@ -2778,6 +2780,10 @@ joy.addEventListener("pointerup",joyPointerEnd);
 joy.addEventListener("pointercancel",joyPointerEnd);
 addEventListener("blur",()=>{joyPointer=null;joyTouchId=null;neutralStick();});
 
+// The arena is a game surface, not a browser editing surface. Prevent the
+// desktop right-click menu without affecting menus outside the arena.
+$("stageWrap").addEventListener("contextmenu",event=>event.preventDefault());
+
 // Capture canvas touches directly so Phaser's pointer management cannot
 // eat the second thumb while the first is held on the external joystick.
 $("stage").addEventListener("touchstart",e=>{
@@ -2797,7 +2803,7 @@ $("stage").addEventListener("touchstart",e=>{
  }
  e.preventDefault();
 },{passive:false,capture:true});
-$("stage").addEventListener("pointerdown",e=>{if(scene&&started&&e.pointerType!=="touch"){scene.manualAim=scene.time.now;}});
+$("stage").addEventListener("pointerdown",e=>{if(scene&&started&&e.pointerType!=="touch"&&e.button===0){scene.manualAim=scene.time.now;}});
 // ALL bindings, touch controls and hue menus now exist before Phaser starts.
 // With no mandatory preload, Phaser can call Lab.create synchronously.
 window.addEventListener("error",e=>{reportLabError("SCRIPT",e?.error||e?.message||"unknown script error");});
