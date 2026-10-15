@@ -1,4 +1,4 @@
-/* WANDRUNE 067 | Archivist physical boss combat adapter.
+/* WANDRUNE 072 | Archivist physical boss combat adapter.
  * Mind may decide and invent; only this layer is permitted to spawn projectiles.
  * The existing Matter and combat damage loops remain authoritative.
  */
@@ -9,9 +9,11 @@
 })(typeof window!=="undefined"?window:globalThis,function(){
  "use strict";
  const M=typeof window!=="undefined"?window.WRKMAN_ARCHIVIST:
-  typeof require==="function"?require("./archivist-mind.js"):null;
+  typeof require==="function"?require("./archivist-inheritance.js"):null;
  const Edict=typeof window!=="undefined"?window.WRKMAN_ARCHIVIST_EDICT:
   typeof require==="function"?require("./archivist-edict.js"):null;
+ const Legacy=typeof window!=="undefined"?window.WRKMAN_ARCHIVIST_LEGACY:
+  typeof require==="function"?require("./archivist-legacy.js"):null;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  const COLORS={arcane:0xcba5ff,frost:0xa7eefe,fire:0xffb76b,lightning:0xffed9f};
  function initialize(enemy,time){
@@ -21,6 +23,7 @@
  }
  function fire(s,e,plan,Body){
   if(!M||!e.alive||!plan)return false;
+  if(plan.kind==="legacy")return Legacy?.cast(s,e,plan,Body)||false;
   if(plan.kind==="edict"){
    if(!Edict||e.archivist.edict)return false;
    e.archivist.edict=Edict.create(plan.target||s.player,s.time.now);
@@ -97,7 +100,8 @@
   if(Math.hypot(pos.x-s.player.x,pos.y-s.player.y)<e.r+21)
    hitPlayer(s,8,pos.x,pos.y,"archivist pressure");
  }
- function tickHazards(s,e,time,hitPlayer){
+ function tickHazards(s,e,time,hitPlayer,Body){
+  Legacy?.tick(s,e,time,Body,hitPlayer);
   const m=e?.archivist,mark=m?.edict;
   if(!mark||!Edict)return;
   const result=Edict.outcome(mark,s.player,time);
@@ -124,6 +128,7 @@
  function paint(s,e,g,time){
   const p=e.body.position,x=p.x,y=p.y,m=e.archivist;
   if(Edict&&m?.edict)Edict.paint(g,m.edict,time);
+  Legacy?.paint(s,e,g,time);
   const pulse=.5+.5*Math.sin(time*.005+e.id),low=e.hp/e.maxHP<.25;
   g.fillStyle(0x6a5096,.11+.06*pulse);g.fillCircle(x,y,76);
   for(let i=0;i<6;i++){
@@ -216,7 +221,7 @@
  function defeated(e){return !!(M&&e.archivist&&M.remember(e.archivist,"defeat"))}
  function retreat(e){if(M&&e.archivist)M.remember(e.archivist,"retreat")}
  function projectileHit(s,shot){
-  if(!M||!shot.archive)return;
+  if(!M||!shot.archive||shot.archive.legacy)return;
   const e=s.combat.enemies.find(x=>x.id===shot.owner&&x.archivist);
   if(e)M.onHit(e.archivist,shot.archive);
  }
