@@ -1069,7 +1069,7 @@ function selectSpell(type){
   spellInfo.crafted.name=d==="placed"?"PLACED FIELD":d==="world"?"WORLD EMISSION":"BOUND FIELD";
  }
  selected=type;
- $("wheelGlyph").textContent=Loadout.GLYPH[type]||"✦";
+ $("wheelGlyph").textContent=Loadout.GLYPH[type]||"⬡";
  $("wheelName").textContent=spellInfo[type].name.split(" ")[0];
  $("castHint").textContent=spellInfo[type].name+
    (spellInfo[type].button==="target"?" • TAP ARENA TO PLACE":" • TAP ORB TO CAST");
@@ -1857,7 +1857,7 @@ function wheelShow(){
  if(!$("spellbookOverlay").hidden||!$("gameMenu").hidden||!started)return false;
  wheelDock.classList.add("open");
  wheelHub.setAttribute("aria-expanded","true");
- $("wheelReadout").textContent="SLIDE TO A RUNE";
+ $("wheelReadout").textContent="SWARM MAGIC • SLIDE OR CAST";
  wheelHot=-1;
  for(const el of wheelButtons)el.classList.remove("hot");
  return true;
@@ -1865,7 +1865,7 @@ function wheelShow(){
 function wheelHide(){
  wheelDock.classList.remove("open");
  wheelHub.setAttribute("aria-expanded","false");
- $("wheelReadout").textContent="HOLD + SLIDE TO EQUIP";
+ $("wheelReadout").textContent="TAP TO CAST";
  wheelHot=-1;
  for(const el of wheelButtons)el.classList.remove("hot");
 }
@@ -1893,7 +1893,7 @@ function wheelFinish(x,y,cancel=false){
   announce(spellInfo[selected].name+" EQUIPPED • "+(spellInfo[selected].button==="quick"?"Tap orb to cast.":"Tap arena to place."));
  }else if(result.action==="cast")wheelCast();
 }
-for(let i=0;i<6;i++){
+for(let i=0;i<equipped.length;i++){
  const button=document.createElement("button");button.type="button";button.className="wheelSlot";
  const point=Loadout.pos(i);
  // The hub is at 48px from the dock's bottom/right edge (14px inset +
@@ -1909,7 +1909,7 @@ for(let i=0;i<6;i++){
  wheelSlots.append(button);wheelButtons.push(button);
 }
 function refreshWheel(){
- for(let i=0;i<6;i++){
+ for(let i=0;i<equipped.length;i++){
   const id=equipped[i],b=wheelButtons[i];
   b.dataset.spell=id;
   b.querySelector(".wheelRune").textContent=Loadout.GLYPH[id]||"✦";
@@ -2004,7 +2004,7 @@ const bookOverlay=$("spellbookOverlay");
 function refreshSpellbook(){
  const slots=$("bookSlots"),library=$("bookLibrary");
  slots.replaceChildren();library.replaceChildren();
- for(let i=0;i<6;i++){
+ for(let i=0;i<equipped.length;i++){
   const spell=equipped[i],button=document.createElement("button");
   button.type="button";button.className="bookEntry"+(i===bookSlot?" active":"");
   button.setAttribute("aria-label","Select equipped slot "+(i+1)+": "+spellInfo[spell].name);
@@ -2044,7 +2044,7 @@ function openSpellbook(){
  neutralStick();joyPointer=null;joyTouchId=null;
  bookSlot=Math.max(0,equipped.indexOf(selected));
  refreshSpellbook();
- $("bookStatus").textContent="SIX SLOTS • SAVED LOCALLY • ROBES UNCHANGED";
+ $("bookStatus").textContent="SWARM MAGIC ONLY • RECIPES SAVED LOCALLY";
  $("spellbookDone").focus({preventScroll:true});
 }
 function closeSpellbook(){
@@ -2059,7 +2059,7 @@ $("bookDefaults").addEventListener("click",()=>{
  equipped=Loadout.DEFAULT.slice();
  Loadout.write(gameStorage,equipped);
  selected=equipped[0];refreshWheel();refreshSpellbook();
- $("bookStatus").textContent="DEFAULT SIX RESTORED • SAVED";
+ $("bookStatus").textContent="BOUND FIELD RESTORED • SAVED";
 });
 bookOverlay.addEventListener("keydown",e=>{
  if(e.key==="Escape"){e.preventDefault();e.stopPropagation();closeSpellbook();}
