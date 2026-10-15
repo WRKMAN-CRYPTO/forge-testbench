@@ -1,4 +1,4 @@
-/* WANDRUNE 058 / six composable runes
+/* WANDRUNE 077 / seven composable runes
  * Third 32x32 instruction layer, independent of grayscale and birth elements.
  * Conserves represented agent mass through merge and fracture.
  * Agents retain rune memory: learned behavior stays after leaving its pixel.
@@ -17,7 +17,8 @@
   Object.freeze({id:3,key:'impulse',name:'IMPULSE',color:'#a8e885',symbol:'I'}),
   Object.freeze({id:4,key:'seeker',name:'SEEKER',color:'#ff8cc0',symbol:'S'}),
   Object.freeze({id:5,key:'phase',name:'PHASE',color:'#90e4ef',symbol:'P'}),
-  Object.freeze({id:6,key:'convergence',name:'CONVERGENCE',color:'#92f0d9',symbol:'C'})
+  Object.freeze({id:6,key:'convergence',name:'CONVERGENCE',color:'#92f0d9',symbol:'C'}),
+  Object.freeze({id:7,key:'wall',name:'WALL',color:'#75c8e2',symbol:'▣'})
  ]);
  const byId=id=>TYPES[id]||TYPES[0];
  function normalize(raw){
@@ -88,7 +89,8 @@
  }
  function learn(cast,agent,index,time,arr,alive){
   const runes=cast.recipe.runes,code=runes[index];
-  if(!code)return [agent];
+  // WALL is an obstruction, never a learnable behavior or player buff.
+  if(!code||code===7)return [agent];
   agent.runeSeen=agent.runeSeen||new Set();
   if(agent.runeSeen.has(index))return [agent];
   agent.runeSeen.add(index);
@@ -149,6 +151,57 @@
    if(fn(cell)===false)break;
   }
  }
+ // Swept grid collision on normalized 32x32 cells. Clip the motion
+ // segment to the field boundary first, then walk exact tile crossings.
+ // No per-frame stepping cap: a fast agent cannot tunnel through walls.
+ // A born-inside-wall agent may leave, but cannot subsequently re-enter.
+ function resolveWall(st,a,startX=a.prevX??a.x,startY=a.prevY??a.y){
+  if(!st.wallCount||!Number.isFinite(startX)||!Number.isFinite(startY)||
+     !Number.isFinite(a.x)||!Number.isFinite(a.y))return false;
+  const x0=startX,y0=startY,dx=a.x-x0,dy=a.y-y0;
+  if(!dx&&!dy)return false;
+  let enter=0,exit=1,enteredX=false,enteredY=false;
+  for(const [p,d,axis] of [[x0,dx,0],[y0,dy,1]]){
+   if(d===0){if(p<0||p>=1)return false;continue}
+   const lo=(0-p)/d,hi=(1-p)/d,tmin=Math.min(lo,hi),tmax=Math.max(lo,hi);
+   if(tmin>enter+1e-12){enter=tmin;enteredX=axis===0;enteredY=axis===1}
+   else if(Math.abs(tmin-enter)<1e-12&&tmin>0){if(axis===0)enteredX=true;else enteredY=true}
+   exit=Math.min(exit,tmax);
+  }
+  if(exit<enter||enter>1||exit<0)return false;
+  const check=(ix,iy)=>ix>=0&&ix<32&&iy>=0&&iy<32&&st.wallMask[iy*32+ix]===1;
+  let cx=Math.max(0,Math.min(31,Math.floor((x0+dx*Math.min(exit,enter+1e-11))*32)));
+  let cy=Math.max(0,Math.min(31,Math.floor((y0+dy*Math.min(exit,enter+1e-11))*32)));
+  function collide(t,normalX,normalY){
+   const offset=1e-8/Math.max(Math.abs(dx),Math.abs(dy),1e-10);
+   const safe=Math.max(0,t-offset);
+   a.x=x0+dx*safe;a.y=y0+dy*safe;
+   if(normalX)a.vx=-a.vx*.58;
+   if(normalY)a.vy=-a.vy*.58;
+   st.wallHits=(st.wallHits||0)+1;
+   return true;
+  }
+  // When entering from outside, the first cell is a collision candidate.
+  if(enter>0&&check(cx,cy))return collide(enter,enteredX,enteredY);
+  const sx=Math.sign(dx),sy=Math.sign(dy);
+  let tx=sx?((cx+(sx>0?1:0))/32-x0)/dx:Infinity;
+  let ty=sy?((cy+(sy>0?1:0))/32-y0)/dy:Infinity;
+  const stepX=sx?1/(32*Math.abs(dx)):Infinity;
+  const stepY=sy?1/(32*Math.abs(dy)):Infinity;
+  // Every iteration enters at least one NEW cell, including sharp corners.
+  while(Math.min(tx,ty)<=exit+1e-12){
+   const t=Math.min(tx,ty);
+   if(t>1+1e-12)break;
+   const crossX=tx<=t+1e-12,crossY=ty<=t+1e-12;
+   const hitX=crossX&&check(cx+sx,cy);
+   const hitY=crossY&&check(cx,cy+sy);
+   const hitCorner=crossX&&crossY&&check(cx+sx,cy+sy);
+   if(hitX||hitY||hitCorner)return collide(t,hitX||hitCorner,hitY||hitCorner);
+   if(crossX){cx+=sx;tx+=stepX}
+   if(crossY){cy+=sy;ty+=stepY}
+  }
+  return false;
+ }
  function homeVector(st,point){
   if(st.delivery==='world'){
    const dx=point.x-st.center.x,dy=point.y-st.center.y;
@@ -181,6 +234,9 @@
     a.x-=dvx*scale/Math.max(1,st.worldW||360);
     a.y-=dvy*scale/Math.max(1,st.worldH||500);
    }
+   // Wall collision runs after real field physics, before other runes and
+   // before world impacts. Neither speed nor PHASE bypasses WALL.
+   if(st.wallCount)resolveWall(st,a);
    let batch=[a];
    traverse(a.prevX??a.x,a.prevY??a.y,a.x,a.y,index=>{
     if(!st.recipe.runes[index])return;
@@ -189,6 +245,11 @@
     batch=out;
     if(!batch.length){alive.delete(a);return false}
    });
+   // Fracture adds small positional offsets; don't introduce a child
+   // inside a wall that its parent never entered.
+   if(st.wallCount)for(const child of batch){
+    if(child!==a)resolveWall(st,child,a.x,a.y);
+   }
    next.push(...batch);
   }
   st.agents=next;
@@ -236,7 +297,18 @@
  }
  function configure(st){
   st.runeCount=st.recipe.runes.reduce((n,v)=>n+(v!==0),0);
+  // O(1) occupancy plus row-merged rectangles for cheap game/preview art.
+  st.wallMask=new Uint8Array(TOTAL);st.wallRects=[];st.wallCount=0;st.wallHits=0;
+  for(let y=0;y<N;y++){
+   for(let x=0;x<N;){
+    if(st.recipe.runes[y*N+x]!==7){x++;continue}
+    const start=x;
+    do{st.wallMask[y*N+x]=1;st.wallCount++;x++}
+    while(x<N&&st.recipe.runes[y*N+x]===7);
+    st.wallRects.push({x0:start/N,x1:x/N,y0:y/N,y1:(y+1)/N});
+   }
+  }
   st.runeAnchors=new Map();st.runeMerges=0;st.runeSplits=0;st.converging=0;
  }
- return Object.freeze({VERSION:'058',TYPES,byId,normalize,mass,radius,composition,combine,fracture,tile,traverse,configure,onBirth,advance});
+ return Object.freeze({VERSION:'077',TYPES,byId,normalize,mass,radius,composition,combine,fracture,tile,traverse,resolveWall,configure,onBirth,advance});
 });
