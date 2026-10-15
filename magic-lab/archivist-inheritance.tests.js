@@ -59,6 +59,18 @@ check('each inherited incantation uses one normal attack, never a free follow-up
   assert.ok(mind.attackAt>2650,'normal cooldown imposed');
  }
 });
+check('first attack uses inherited magic and rotates between encounters',()=>{
+ for(let encounter=0;encounter<7;encounter++){
+  const storage={getItem(){return JSON.stringify({version:1,encounters:encounter,
+   defeats:encounter,wins:0,plans:[]})}};
+  const m=Brain.make(storage,0);
+  m.attackAt=0;m.nextThink=0;
+  const result=Brain.decide(m,{time:2500,pos:{x:800,y:305},
+   player:{x:400,y:305},casts:[],shots:[]});
+  assert.equal(result.tell?.legacy,Legacy.ORDER[encounter]);
+  assert.equal(m.attacks,0,'telegraph never fires early');
+ }
+});
 check('Arc Bolt creates a real Matter projectile with legacy speed',()=>{
  const {s,boss,plan}=scenario('bolt');
  assert.equal(Act.fire(s,boss,plan,BODY),true);
