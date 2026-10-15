@@ -159,6 +159,12 @@
    st.agents.push(agent);
   }
   Runes.onBirth(st);
+  // A single world agent must depart from the casting hand, not appear
+  // somewhere around the average of the recipe's painted spawn region.
+  // Only the local-to-world origin changes; Motion still owns all movement.
+  if(delivery==='world'&&cfg.settings.population===1&&st.agents.length===1){
+   st.spawnX=st.agents[0].x;st.spawnY=st.agents[0].y;
+  }
   if(st.focus?.focused){
    const first=st.agents[0],element=first?.element||0;
    const tint=first?.element?Sources.byId(element).rgb:0xb8d9ff;
