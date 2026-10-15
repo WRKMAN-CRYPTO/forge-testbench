@@ -1978,8 +1978,9 @@ addEventListener("blur",()=>{wheelTouchId=null;wheelMouseId=null;wheelHide();});
 function craftRefresh(msg){
  $("craftRecipeName").textContent=craftedRecipe?(craftedRecipe.name+" · "+craftedRecipe.settings.delivery.toUpperCase()+" · "+craftedRecipe.settings.palette.toUpperCase()+" · 32×32"):"FIELD ENGINE UNAVAILABLE";
  if(selected==="crafted"&&craftedRecipe)selectSpell("crafted");
- $("craftHealToggle").textContent="HEAL LINK: "+(craftedHealLinked?"ON":"OFF");
- $("craftHealToggle").setAttribute("aria-pressed",String(craftedHealLinked));
+ $("craftHealToggle").textContent="HEAL LINK: RESERVED FOR SWARM MAGIC";
+ $("craftHealToggle").setAttribute("aria-pressed","false");
+ $("craftHealToggle").disabled=true;
  if(msg)$("craftHelp").textContent=msg;
 }
 craftRefresh();
@@ -1990,8 +1991,7 @@ $("craftSync").addEventListener("click",()=>{
  catch(e){craftRefresh(String(e.message||e));}
 });
 $("craftHealToggle").addEventListener("click",()=>{
- craftedHealLinked=!craftedHealLinked;gameStorage.setItem("wrkman-arcane-lab034-heal-linked",String(craftedHealLinked));
- craftRefresh("Link "+(craftedHealLinked?"ENABLED":"DISABLED")+" for the next cast. Active auras keep their original link.");
+ craftRefresh("Minor Heal is retired until we create healing swarm agents.");
 });
 $("craftImport").addEventListener("click",()=>$("craftFile").click());
 $("craftFile").addEventListener("change",async e=>{
@@ -2394,10 +2394,10 @@ if(Forge&&Crafted){
    getCurrent:()=>craftedRecipe,getHealLinked:()=>craftedHealLinked,
    onEquip:(recipe,heal)=>{
     craftedRecipe=Crafted.save(gameStorage,recipe);
-    craftedHealLinked=!!heal;
+    craftedHealLinked=false;
     gameStorage.setItem("wrkman-arcane-lab034-heal-linked",String(craftedHealLinked));
     if(!equipped.includes("crafted")){
-     equipped=Loadout.assign(equipped,5,"crafted");
+     equipped=Loadout.assign(equipped,0,"crafted");
      Loadout.write(gameStorage,equipped);
     }
     selected="crafted";refreshWheel();refreshSpellbook();craftRefresh(
