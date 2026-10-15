@@ -1,4 +1,4 @@
-/* WANDRUNE 077 / seven composable swarm runes
+/* WANDRUNE 078 / restored monochrome launch with elemental pixels
  * Field geometry remains the same portable WRKMAN_AGENT_FIELD_V1 recipe.
  * Editor and spell library never require Phaser; the game supplies pause/equip hooks.
  */
@@ -102,7 +102,7 @@
   document.head.append(style);
   const overlay=document.createElement('div');overlay.id='forgeOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','sfHeading');
   overlay.innerHTML=`<div class="sf-shell">
-   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>077 · SEVEN SWARM RUNES</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
+   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>078 · FIELD CONTROL</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
    <div class="sf-grid">
     <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><div class="sf-map-heading"><span id="sfMapCoords">CELL 16,16 · MAGENTA</span><strong id="sfZoomValue">1×</strong></div>
      <canvas id="sfMap" width="320" height="320" tabindex="0" class="sf-canvas" aria-label="32 by 32 instruction field. Zoom in, draw, or use arrows and Stamp Cell for exact placement"></canvas>
@@ -117,11 +117,13 @@
      <h3>ᚱ / RUNES · LEARN ON CONTACT</h3>
      <div class="sf-runes" id="sfRuneTools" role="group" aria-label="Rune painter"><button data-brush="rune1" title="Merge agents into one massive Behemoth">ᛒ BEHEMOTH</button><button data-brush="rune2" title="Split an agent into four mass-conserving shards">✳ FRACTURE</button><button data-brush="rune3" title="One-shot momentum kick">➤ IMPULSE</button><button data-brush="rune4" title="Seek nearby living enemies for two seconds">⌖ SEEKER</button><button data-brush="rune5" title="Pass through obstacles for two seconds; enemies still collide">◈ PHASE</button><button data-brush="rune6" title="Idle marked agents regroup with marked agents of the same element. Seeker hunting takes priority. No fusion.">⟡ CONVERGENCE</button><button data-brush="rune7" title="Solid wall: an agent cannot move into this painted cell. Bounces or slides along the boundary.">▣ WALL</button><button data-brush="rune0" title="Erase only the rune; keep source and grayscale intact">× ERASE RUNE</button></div>
      <div class="sf-caption">A rune is a third overlay. Put BEHEMOTH directly on an elemental spawn pixel to fuse its offspring. Place FRACTURE downstream to split stored mass into four shards. Impulse, Seeker, Phase, and Convergence affect only agents crossing their rune pixels. Convergence permanently marks those agents: when they have no Seeker target, they regroup with marked agents of the same element. Hunts come first. No automatic fusion or mass gain. WALL blocks entry into its 32×32 pixel for every agent, including phased agents. Paint lines to build corridors, cages, funnels and ricochet chambers. Agents born on a WALL pixel may leave, but cannot re-enter.</div>
-     <div class="sf-caption">Paint FIRE, WATER, FROST, or LIGHTNING emitters to spawn ONLY from painted source pixels. White/gray still guide movement, but stop creating neutral births while emitters exist. ◇ explicitly spawns NEUTRAL agents alongside elements; ◌ erases a source without touching grayscale. With no painted emitters, white defaults to the original neutral spawn behavior.</div>
+     <div class="sf-caption">Element pixels are a separate layer. In CLASSIC GRAYSCALE mode, white/brightest field pixels control births as before; color pixels only choose each birth's element using its nearest color mark, without changing movement or spawn positions. In EXPLICIT EMITTERS mode, colored pixels choose exact spawn locations. ◇ assigns neutral; ◌ removes a color mark without touching grayscale.</div>
     </section>
     <section class="sf-box"><h3>02 / SHAPE & LINK</h3><canvas id="sfPreview" width="360" height="500" class="sf-preview" aria-label="Animated preview of the field"></canvas><div class="sf-flex"><span class="sf-caption" id="sfPreviewMeta">PHYSICS 037</span><button id="sfReseed" type="button">↻ RESEED PREVIEW</button></div><label>PREVIEW AGENTS · 1 TO 200<input id="sfPreviewCount" type="number" min="1" max="200" step="1" inputmode="numeric" value="200" aria-label="Preview agent count"></label>
      <label>SPELL NAME <input id="sfName" maxlength="48" autocomplete="off" spellcheck="false" placeholder="Name your creation"></label>
      <div class="sf-flex"><label>NEUTRAL PALETTE<select id="sfPalette"><option value="flame">🔥 FLAME</option><option value="arcane">✦ ARCANE</option><option value="healing">♥ HEALING</option><option value="void">◈ VOID</option></select></label><label>MATERIAL<select id="sfTexture"><option value="flat">⬡ FLAT HEX</option><option value="leaf">🍃 LEAF</option></select></label></div>
+     <label>LAUNCH CONTROL<select id="sfSpawnMode" aria-label="Choose where agents are born"><option value="grayscale">⬜ CLASSIC GRAYSCALE · COLORS ARE MATERIAL</option><option value="emitters">🎯 EXPLICIT EMITTERS · COLORS ARE SPAWN POINTS</option></select></label>
+     <div class="sf-caption" id="sfSpawnModeHelp">CLASSIC: Preserve the original monochrome launch geometry. Place elemental pixels anywhere to tint nearby births. Your grayscale flow stays in charge.</div>
      <label>DELIVERY<select id="sfDelivery"><option value="aura">◯ AURA · FOLLOW ME</option><option value="world">↗ WORLD EMISSION · RELEASE AT AIM</option><option value="placed">⌖ PLACED FIELD · TAP LOCATION</option></select></label>
      <div class="sf-caption">WORLD EMISSION has no moving container. The center of your white starting region launches near the caster. The field rotates so DOWN on your map points along your aim. Every agent follows your instructions until impact or its individually chosen lifespan ends. All delivery modes share this rule. The original Agent·Field movement physics remains unchanged.</div>
      <div class="sf-flex"><label>BEHAVIOR<select id="sfMode"><option value="ab">A+B FIELD + BEHAVIOR</option><option value="a">A FOLLOW FIELD</option></select></label><label>AGENTS PER CAST · 1–200<input id="sfPopulation" type="number" min="1" max="200" step="1" inputmode="numeric" value="200" aria-label="Exact number of agents per cast"></label><button id="sfSolo" type="button" title="Instantly set your spell and preview to one agent">✦ SOLO</button></div>
@@ -174,7 +176,12 @@
    stamp,line,value,brush:()=>brush,checkpoint,undo,mark,status
   });
   function paintMap(){editor.paintMap()}
-  function refreshFields(){$('sfScrollSeed').value=item.origin?.seed||'';const s=draft.settings;$('sfName').value=draft.name;$('sfPalette').value=s.palette;$('sfTexture').value=s.texture;$('sfMode').value=s.mode;$('sfDelivery').value=s.delivery||'aura';$('sfLifespan').value=String(s.lifespan??5.5);$('sfLifespanVal').textContent=Number(s.lifespan??5.5).toFixed(1)+'s';$('sfRenderLimit').value=String([600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.renderLimit)<Math.abs(a-s.renderLimit)?b:a));$('sfPopulation').value=String(s.population);previewPopulation=s.population;$('sfPreviewCount').value=String(previewPopulation);for(const n of ['Swirl','Momentum','Light']){$('sf'+n).value=s[n.toLowerCase()];$('sf'+n+'Val').textContent=String(s[n.toLowerCase()])}$('sfHeal').checked=false;$('sfHeal').disabled=true;paintMap();resetParticles();$('sfDirty').textContent='SAVED';$('sfDirty').style.color='#9be6b7'}
+  function updateSpawnHelp(){
+   $('sfSpawnModeHelp').textContent=draft.settings.spawnMode==='grayscale'?
+    'CLASSIC: agents launch from the brightest grayscale pixels just as before. Color marks assign materials by nearest color. Flow and launch locations remain unchanged.':
+    'EMITTERS: the painted color pixels are explicit spawn points, overriding white starting areas. Existing spells keep this behavior unless you change it.';
+  }
+  function refreshFields(){$('sfScrollSeed').value=item.origin?.seed||'';const s=draft.settings;$('sfName').value=draft.name;$('sfPalette').value=s.palette;$('sfTexture').value=s.texture;$('sfMode').value=s.mode;$('sfDelivery').value=s.delivery||'aura';$('sfSpawnMode').value=s.spawnMode||'emitters';updateSpawnHelp();$('sfLifespan').value=String(s.lifespan??5.5);$('sfLifespanVal').textContent=Number(s.lifespan??5.5).toFixed(1)+'s';$('sfRenderLimit').value=String([600,1200,2400,6000].reduce((a,b)=>Math.abs(b-s.renderLimit)<Math.abs(a-s.renderLimit)?b:a));$('sfPopulation').value=String(s.population);previewPopulation=s.population;$('sfPreviewCount').value=String(previewPopulation);for(const n of ['Swirl','Momentum','Light']){$('sf'+n).value=s[n.toLowerCase()];$('sf'+n+'Val').textContent=String(s[n.toLowerCase()])}$('sfHeal').checked=false;$('sfHeal').disabled=true;paintMap();resetParticles();$('sfDirty').textContent='SAVED';$('sfDirty').style.color='#9be6b7'}
   function refreshLibrary(){const el=$('sfLibrary');el.replaceChildren();$('sfCount').textContent=library.items.length+'/'+MAX_SPELLS;for(const v of library.items){const b=document.createElement('button');b.type='button';b.className=v.id===library.selected?'active':'';const icon=document.createElement('span');icon.style.flex='0 0 auto';icon.textContent=v.origin?.kind==='random-scroll'?'📜':'⬡';const title=document.createElement('span');title.textContent=v.recipe.name;const link=document.createElement('small');link.textContent=(v.recipe.settings.delivery==='world'?'↗':v.recipe.settings.delivery==='placed'?'⌖':'◯')+'';b.append(icon,title,link);b.addEventListener('click',()=>select(v.id));el.append(b)}}
   function storeDraft(){draft=engine.normalize(draft);item.recipe=clone(draft);item.heal=heal;dirty=false;const good=saveLibrary();$('sfDirty').textContent=good?'SAVED':'SESSION';$('sfDirty').style.color=good?'#9be6b7':'#ffd89b';refreshLibrary();return good}
   function select(id){if(dirty)storeDraft();library.selected=id;item=find();draft=clone(item.recipe);heal=item.heal;undo=[];saveLibrary();refreshFields();refreshLibrary();status('Loaded '+item.recipe.name+(item.origin?.seed?' · scroll seed '+item.origin.seed:'')+'. Edit it or equip it.')}
@@ -182,9 +189,9 @@
   // Preview and world use the identical 32x32 interpreter. Lower preview
   // population changes density, never steering, momentum or lifetimes.
   function resetParticles(){
-   particles=[];previewGhosts=[];previewSeeded=false;previewDeath=0;previewStarts=Sources.startingCells(draft.values,draft.sources,Motion);
+   particles=[];previewGhosts=[];previewSeeded=false;previewDeath=0;previewStarts=Sources.startingCells(draft.values,draft.sources,Motion,draft.settings.spawnMode);
    previewClock=0;previewFrames=0;prevFrame=0;previewCast=null;
-   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+previewPopulation+' AGENTS';
+   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+previewPopulation+' AGENTS · '+(draft.settings.spawnMode==='grayscale'?'CLASSIC':'EMITTERS');
   }
   const pals={flame:['#dc4329','#fc9135','#ffe0a3'],arcane:['#5d8ff4','#bd82ef','#f0d4ff'],healing:['#49c7a0','#aee989','#f4f2a2'],void:['#63449e','#b54acb','#ff90d1']};
   function tick(now){
@@ -308,6 +315,13 @@
   $('sfGray').addEventListener('input',e=>{gray=Number(e.target.value);$('sfGrayVal').textContent=gray});
   $('sfRadius').addEventListener('input',e=>{brushRadius=Number(e.target.value);$('sfRadiusVal').textContent=brushRadius});
   $('sfName').addEventListener('input',e=>{draft.name=e.target.value.slice(0,48);mark()});
+  $('sfSpawnMode').addEventListener('change',e=>{
+   draft.settings.spawnMode=e.target.value==='grayscale'?'grayscale':'emitters';
+   updateSpawnHelp();mark();
+   status(draft.settings.spawnMode==='grayscale'?
+    'CLASSIC CONTROL restored • grayscale chooses launch, color pixels choose material. Save & equip to use.':
+    'EXPLICIT EMITTERS • marked element pixels choose the spawn location. Save & equip to use.');
+  });
   for(const [id,key] of [['sfPalette','palette'],['sfTexture','texture'],['sfMode','mode'],['sfDelivery','delivery'],['sfRenderLimit','renderLimit'],['sfLifespan','lifespan'],['sfSwirl','swirl'],['sfMomentum','momentum'],['sfLight','light']]){
    $(id).addEventListener(id.startsWith('sf')&&['swirl','momentum','light','lifespan'].includes(key)?'input':'change',e=>{draft.settings[key]=['population','renderLimit','lifespan','swirl','momentum','light'].includes(key)?Number(e.target.value):e.target.value;const label=$('sf'+key[0].toUpperCase()+key.slice(1)+'Val');if(label)label.textContent=key==='lifespan'?Number(e.target.value).toFixed(1)+'s':e.target.value;mark()});
   }
