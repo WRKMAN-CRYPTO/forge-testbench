@@ -1,4 +1,4 @@
-/* WANDRUNE 058 / six composable swarm runes
+/* WANDRUNE 077 / seven composable swarm runes
  * Field geometry remains the same portable WRKMAN_AGENT_FIELD_V1 recipe.
  * Editor and spell library never require Phaser; the game supplies pause/equip hooks.
  */
@@ -102,7 +102,7 @@
   document.head.append(style);
   const overlay=document.createElement('div');overlay.id='forgeOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','sfHeading');
   overlay.innerHTML=`<div class="sf-shell">
-   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>058 · SIX SWARM RUNES</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
+   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>077 · SEVEN SWARM RUNES</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
    <div class="sf-grid">
     <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><div class="sf-map-heading"><span id="sfMapCoords">CELL 16,16 · MAGENTA</span><strong id="sfZoomValue">1×</strong></div>
      <canvas id="sfMap" width="320" height="320" tabindex="0" class="sf-canvas" aria-label="32 by 32 instruction field. Zoom in, draw, or use arrows and Stamp Cell for exact placement"></canvas>
@@ -115,8 +115,8 @@
      <div class="sf-flex"><label>GRAY <span id="sfGrayVal">128</span><input type="range" id="sfGray" min="1" max="254" value="128"/></label><label>BRUSH SIZE <span id="sfRadiusVal">1</span><input type="range" id="sfRadius" min="1" max="4" value="1"/></label></div>
      <div class="sf-actions"><button id="sfUndo">↶ UNDO</button><button id="sfClear">CLEAR TO MAGENTA</button><button id="sfRing">◯ RING STARTER</button><button id="sfCurtain">☷ CURTAIN STARTER</button></div>
      <h3>ᚱ / RUNES · LEARN ON CONTACT</h3>
-     <div class="sf-runes" id="sfRuneTools" role="group" aria-label="Rune painter"><button data-brush="rune1" title="Merge agents into one massive Behemoth">ᛒ BEHEMOTH</button><button data-brush="rune2" title="Split an agent into four mass-conserving shards">✳ FRACTURE</button><button data-brush="rune3" title="One-shot momentum kick">➤ IMPULSE</button><button data-brush="rune4" title="Seek nearby living enemies for two seconds">⌖ SEEKER</button><button data-brush="rune5" title="Pass through obstacles for two seconds; enemies still collide">◈ PHASE</button><button data-brush="rune6" title="Idle marked agents regroup with marked agents of the same element. Seeker hunting takes priority. No fusion.">⟡ CONVERGENCE</button><button data-brush="rune0" title="Erase only the rune; keep source and grayscale intact">× ERASE RUNE</button></div>
-     <div class="sf-caption">A rune is a third overlay. Put BEHEMOTH directly on an elemental spawn pixel to fuse its offspring. Place FRACTURE downstream to split stored mass into four shards. Impulse, Seeker, Phase, and Convergence affect only agents crossing their rune pixels. Convergence permanently marks those agents: when they have no Seeker target, they regroup with marked agents of the same element. Hunts come first. No automatic fusion or mass gain.</div>
+     <div class="sf-runes" id="sfRuneTools" role="group" aria-label="Rune painter"><button data-brush="rune1" title="Merge agents into one massive Behemoth">ᛒ BEHEMOTH</button><button data-brush="rune2" title="Split an agent into four mass-conserving shards">✳ FRACTURE</button><button data-brush="rune3" title="One-shot momentum kick">➤ IMPULSE</button><button data-brush="rune4" title="Seek nearby living enemies for two seconds">⌖ SEEKER</button><button data-brush="rune5" title="Pass through obstacles for two seconds; enemies still collide">◈ PHASE</button><button data-brush="rune6" title="Idle marked agents regroup with marked agents of the same element. Seeker hunting takes priority. No fusion.">⟡ CONVERGENCE</button><button data-brush="rune7" title="Solid wall: an agent cannot move into this painted cell. Bounces or slides along the boundary.">▣ WALL</button><button data-brush="rune0" title="Erase only the rune; keep source and grayscale intact">× ERASE RUNE</button></div>
+     <div class="sf-caption">A rune is a third overlay. Put BEHEMOTH directly on an elemental spawn pixel to fuse its offspring. Place FRACTURE downstream to split stored mass into four shards. Impulse, Seeker, Phase, and Convergence affect only agents crossing their rune pixels. Convergence permanently marks those agents: when they have no Seeker target, they regroup with marked agents of the same element. Hunts come first. No automatic fusion or mass gain. WALL blocks entry into its 32×32 pixel for every agent, including phased agents. Paint lines to build corridors, cages, funnels and ricochet chambers. Agents born on a WALL pixel may leave, but cannot re-enter.</div>
      <div class="sf-caption">Paint FIRE, WATER, FROST, or LIGHTNING emitters to spawn ONLY from painted source pixels. White/gray still guide movement, but stop creating neutral births while emitters exist. ◇ explicitly spawns NEUTRAL agents alongside elements; ◌ erases a source without touching grayscale. With no painted emitters, white defaults to the original neutral spawn behavior.</div>
     </section>
     <section class="sf-box"><h3>02 / SHAPE & LINK</h3><canvas id="sfPreview" width="360" height="500" class="sf-preview" aria-label="Animated preview of the field"></canvas><div class="sf-flex"><span class="sf-caption" id="sfPreviewMeta">PHYSICS 037</span><button id="sfReseed" type="button">↻ RESEED PREVIEW</button></div><label>PREVIEW AGENTS · 1 TO 200<input id="sfPreviewCount" type="number" min="1" max="200" step="1" inputmode="numeric" value="200" aria-label="Preview agent count"></label>
@@ -229,6 +229,13 @@
    pc.fillStyle='#081724';pc.fillRect(0,0,w,h);
    pc.strokeStyle='#34535d88';pc.lineWidth=1;pc.beginPath();pc.ellipse(w*.5,h*.5,w*.42,h*.42,0,0,TAU);pc.stroke();
    if(draft.runes.includes(4)){pc.strokeStyle='#f5a1c9';pc.lineWidth=1.5;pc.beginPath();pc.arc(w*.73,h*.53,7,0,TAU);pc.stroke();}
+   // Same wall rectangles as the live game. They occupy field coordinates,
+   // not rendered bodies, and do not interact with the training target.
+   for(const rect of previewCast?.wallRects||[]){
+    const x=rect.x0*w,y=rect.y0*h,rw=(rect.x1-rect.x0)*w,rh=(rect.y1-rect.y0)*h;
+    pc.fillStyle='#4cc6fa30';pc.fillRect(x,y,rw,rh);
+    pc.strokeStyle='#8ddcfbb0';pc.lineWidth=1.2;pc.strokeRect(x+.5,y+.5,Math.max(0,rw-1),Math.max(0,rh-1));
+   }
    const visible=particles.length?particles:previewGhosts;
    const step=Math.max(1,Math.ceil(visible.length/1400));
    const fading=particles.length?1:previewGhosts.length?Math.pow(clamp(1-(previewClock-previewDeath)/.8,0,1),1.35):0;
@@ -273,7 +280,7 @@
     }
    }
    pc.globalAlpha=1;
-   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+particles.length+' BODIES / '+particles.reduce((n,a)=>n+Runes.mass(a),0)+' MASS · ⟡ '+particles.filter(a=>a.convergence).length+' MARKED / '+(previewCast?.converging||0)+' REGROUPING · '+previewGhosts.length+' FADING · '+(particles.length?stats.offscreen+' OUT':'RESEED TO REPLAY');
+   $('sfPreviewMeta').textContent='PHYSICS '+Motion.VERSION+' · '+particles.length+' BODIES / '+particles.reduce((n,a)=>n+Runes.mass(a),0)+' MASS · ⟡ '+particles.filter(a=>a.convergence).length+' MARKED / '+(previewCast?.converging||0)+' REGROUPING · ▣ '+(previewCast?.wallCount||0)+' WALLS / '+(previewCast?.wallHits||0)+' BLOCKS · '+previewGhosts.length+' FADING · '+(particles.length?stats.offscreen+' OUT':'RESEED TO REPLAY');
    rafId=requestAnimationFrame(tick);
   }
   $('sfReseed').addEventListener('click',()=>{resetParticles();status('Fresh agents seeded. After their chosen lifespan, agents keep moving as they fade.')});
