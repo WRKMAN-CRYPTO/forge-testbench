@@ -1,4 +1,4 @@
-/* WANDRUNE 078 / restored monochrome launch with elemental pixels
+/* WANDRUNE 079 / cardinal runes and thumb-friendly forge shelves
  * Field geometry remains the same portable WRKMAN_AGENT_FIELD_V1 recipe.
  * Editor and spell library never require Phaser; the game supplies pause/equip hooks.
  */
@@ -80,10 +80,19 @@
 #forgeOverlay .sf-nudge .sf-stamp{grid-column:span 2;font:800 10px system-ui;background:#746343;color:#fff0c3;border-color:#e0c18b}
 #forgeOverlay .sf-nudge .sf-empty{pointer-events:none;opacity:0}
 #forgeOverlay .sf-preview{width:100%;max-width:300px;aspect-ratio:360/500;display:block;margin:auto;background:#101822;border:1px solid #465967;border-radius:6px}
-#forgeOverlay .sf-tools{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
-#forgeOverlay .sf-runes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
-#forgeOverlay .sf-runes button{font:800 10px/1.3 system-ui;min-height:40px;padding:5px 3px}
-#forgeOverlay .sf-tools button{padding:5px 1px;font-size:11px;min-height:32px}
+/* Thumb-safe, categorized shelves. Tabs never change the armed brush. */
+#forgeOverlay .sf-tools{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+#forgeOverlay .sf-runes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#forgeOverlay .sf-runes button{font:850 12px/1.2 system-ui;min-height:52px;padding:8px 6px}
+#forgeOverlay .sf-tools button{padding:8px 3px;font-size:19px;min-height:48px}
+#forgeOverlay .sf-shelf-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+#forgeOverlay .sf-shelf-tabs button{font:850 11px/1.1 system-ui;min-height:44px;padding:7px 3px}
+#forgeOverlay .sf-tools [hidden],#forgeOverlay .sf-runes [hidden],#forgeOverlay #sfTools[hidden],#forgeOverlay #sfRuneShelf[hidden]{display:none!important}
+#forgeOverlay .sf-eraser{min-height:45px;border-color:#b9a38a;background:#342f29;color:#f8e4c9}
+#forgeOverlay .sf-brush-state{display:flex;align-items:center;justify-content:space-between;gap:5px;
+ font:850 11px/1.2 ui-monospace,monospace;color:#cdecee;background:#17303b;border:1px solid #4e8693;
+ padding:7px 10px;border-radius:9px}
+#forgeOverlay .sf-brush-state strong{font:950 12px ui-monospace,monospace;color:#fce2a5}
 #forgeOverlay .sf-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 #forgeOverlay .sf-flex{display:flex;align-items:center;gap:7px}#forgeOverlay .sf-flex>*{flex:1;min-width:0}
 #forgeOverlay .sf-library{max-height:min(350px,57vh);overflow:auto;display:grid;gap:5px;padding-right:3px}
@@ -102,7 +111,7 @@
   document.head.append(style);
   const overlay=document.createElement('div');overlay.id='forgeOverlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','sfHeading');
   overlay.innerHTML=`<div class="sf-shell">
-   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>078 · FIELD CONTROL</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
+   <div class="sf-header"><div class="sf-title" id="sfHeading">W / SPELL FORGE <small>079 · CARDINAL RUNES</small></div><span class="sf-badge" id="sfDirty">READY</span><button id="sfDone" type="button">BACK TO WORLD ✕</button></div>
    <div class="sf-grid">
     <section class="sf-box"><h3>01 / PAINT INSTRUCTIONS</h3><div class="sf-map-heading"><span id="sfMapCoords">CELL 16,16 · MAGENTA</span><strong id="sfZoomValue">1×</strong></div>
      <canvas id="sfMap" width="320" height="320" tabindex="0" class="sf-canvas" aria-label="32 by 32 instruction field. Zoom in, draw, or use arrows and Stamp Cell for exact placement"></canvas>
@@ -149,6 +158,58 @@
     </section>
    </div>
   </div>`;
+  // Create separate shelves instead of stacking 12 tiny rune buttons.
+  const tools=overlay.querySelector('#sfTools'),runeTools=overlay.querySelector('#sfRuneTools');
+  const brushState=document.createElement('div');
+  brushState.className='sf-brush-state';
+  brushState.innerHTML='<span>BRUSH ARMED</span><strong id="sfArmedBrush">⬜ WHITE</strong>';
+  tools.before(brushState);
+  const paintTabs=document.createElement('div');
+  paintTabs.id='sfPaintTabs';paintTabs.className='sf-shelf-tabs';
+  paintTabs.setAttribute('role','group');paintTabs.setAttribute('aria-label','Paint layer');
+  paintTabs.innerHTML='<button type="button" data-paint-tab="field">⬜ FIELD</button>'+
+   '<button type="button" data-paint-tab="element">🔥 ELEMENT</button>'+
+   '<button type="button" data-paint-tab="rune">ᚱ RUNES</button>';
+  tools.before(paintTabs);
+  const runeShelf=document.createElement('div');
+  runeShelf.id='sfRuneShelf';runeShelf.hidden=true;
+  const runeHeading=runeTools.previousElementSibling;
+  const runeInfo=runeTools.nextElementSibling;
+  runeHeading.before(runeShelf);
+  runeShelf.append(runeHeading);
+  const runeTabs=document.createElement('div');
+  runeTabs.id='sfRuneTabs';runeTabs.className='sf-shelf-tabs';
+  runeTabs.setAttribute('role','group');runeTabs.setAttribute('aria-label','Rune categories');
+  runeTabs.innerHTML='<button type="button" data-rune-tab="shape">▣ SHAPE</button>'+
+   '<button type="button" data-rune-tab="drive">↑ DRIVE</button>'+
+   '<button type="button" data-rune-tab="intent">⌖ INTENT</button>';
+  runeShelf.append(runeTabs,runeTools,runeInfo);
+  const cardinal=[
+   [8,'↑ NORTH','Force UP along map Y, independent of world rotation'],
+   [9,'↓ SOUTH','Force DOWN along map Y, independent of world rotation'],
+   [10,'← WEST','Force LEFT along map X, independent of world rotation'],
+   [11,'→ EAST','Force RIGHT along map X, independent of world rotation']
+  ];
+  for(const [code,label,hint] of cardinal){
+   const button=document.createElement('button');
+   button.type='button';button.dataset.brush='rune'+code;button.title=hint;
+   button.textContent=label;runeTools.append(button);
+  }
+  const groups={rune1:'shape',rune2:'shape',rune3:'drive',
+   rune4:'intent',rune5:'intent',rune6:'intent',rune7:'shape',
+   rune8:'drive',rune9:'drive',rune10:'drive',rune11:'drive'};
+  for(const b of runeTools.querySelectorAll('[data-brush]')){
+   b.dataset.family=groups[b.dataset.brush]||'shape';
+  }
+  const eraser=runeTools.querySelector('[data-brush="rune0"]');
+  eraser.classList.add('sf-eraser');eraser.textContent='× ERASE RUNE ONLY';
+  runeShelf.append(eraser);
+  const guide=document.createElement('div');
+  guide.className='sf-caption';
+  guide.textContent='N / S / W / E redirect momentum in the 32×32 map. '+
+   'Each fresh entry triggers them again; grayscale field movement continues. '+
+   'WORLD emissions rotate map directions with your aim.';
+  runeShelf.append(guide);
   document.body.append(overlay);
   const map=$('sfMap'),overview=$('sfOverview'),preview=$('sfPreview'),mc=map.getContext('2d'),oc=overview.getContext('2d'),pc=preview.getContext('2d');
   function status(msg){$('sfStatus').textContent=msg}
