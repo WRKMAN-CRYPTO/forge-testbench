@@ -1,4 +1,4 @@
-/* WRKMAN ARCANE LAB 049 / authoritative source-pixel spawning
+/* WANDRUNE 078 / independent element-pixel and grayscale spawn modes
  * Independent 32x32 birth layer. Grayscale still exclusively controls movement.
  * Each marked pixel is a spawn choice; the agent keeps its birth element.
  * No DOM, Phaser, hidden damage or randomness outside the supplied RNG.
@@ -27,14 +27,31 @@
    return v;
   });
  }
- function startingCells(values,sources,Motion){
-  // A painted emitter layer is authoritative: movement's white/gray cells
-  // remain physics instructions, NOT silent extra neutral births.
-  // Without any explicit emitters, preserve legacy grayscale spawning.
+ // Grayscale launch restores the monochrome rule: only the original
+ // brightest motion pixels can birth agents. Color pixels label the nearest
+ // launch pixel; they never move its location or alter the motion field.
+ // Explicit emitters retain the original elemental-source semantics.
+ function startingCells(values,sources,Motion,mode='emitters'){
   const painted=[];
   for(let index=0;index<TOTAL;index++){
    const source=sources[index];
    if(source!==0)painted.push({index,element:source===5?0:source});
+  }
+  if(mode==='grayscale'){
+   const origins=Motion.startingCells(values);
+   if(!painted.length)return origins.map(index=>({index,element:0}));
+   // Only 1024 cells exist. Do this once per recipe/cast, NEVER per agent
+   // or simulation frame. Precise nearest-color zones preserve placement.
+   return origins.map(index=>{
+    const x=index%N,y=Math.floor(index/N);
+    let nearest=painted[0],distance=Infinity;
+    for(const candidate of painted){
+     const dx=x-candidate.index%N,dy=y-Math.floor(candidate.index/N);
+     const d=dx*dx+dy*dy;
+     if(d<distance){distance=d;nearest=candidate;if(d===0)break}
+    }
+    return {index,element:nearest.element};
+   });
   }
   if(painted.length)return painted;
   return Motion.startingCells(values).map(index=>({index,element:0}));
@@ -47,5 +64,5 @@
   agent.sourceIndex=cell.index;
   return agent;
  }
- return Object.freeze({VERSION:'049',N,TOTAL,TYPES,byId,normalize,startingCells,spawn});
+ return Object.freeze({VERSION:'078',N,TOTAL,TYPES,byId,normalize,startingCells,spawn});
 });
