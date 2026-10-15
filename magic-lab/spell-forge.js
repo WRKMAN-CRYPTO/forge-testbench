@@ -430,7 +430,9 @@
   }
   $('sfHeal').addEventListener('change',e=>{heal=false;e.target.checked=false;});
   $('sfUndo').addEventListener('click',()=>{if(!undo.length){status('Nothing to undo.');return}restoreLayers(undo.pop());mark();paintMap()});
-  $('sfClear').addEventListener('click',()=>{checkpoint();draft.values.fill(-1);draft.sources.fill(0);draft.runes.fill(0);paintMap();mark();status('Movement, elemental emitters and runes cleared.')});
+  $('sfClear').addEventListener('click',()=>{
+   if(!window.confirm('Clear ALL THREE painted layers of this spell? You can Undo afterward.'))return;
+   checkpoint();draft.values.fill(-1);draft.sources.fill(0);draft.runes.fill(0);paintMap();mark();status('Movement, elemental emitters and runes cleared.')});
   $('sfRing').addEventListener('click',()=>{checkpoint();draft.values=engine.starter().values.slice();draft.sources.fill(0);draft.runes.fill(0);paintMap();mark();status('Ring template applied with no source or rune overlays.')});
   $('sfCurtain').addEventListener('click',()=>{checkpoint();draft.values.fill(-1);draft.sources.fill(0);draft.runes.fill(0);for(let x=0;x<N;x+=3){draft.values[x]=255;draft.values[N+x]=128;draft.values[2*N+x]=0}paintMap();mark();status('Curtain template applied. Experiment with the teeth.')});
   $('sfSave').addEventListener('click',()=>{storeDraft();status('Saved '+item.recipe.name+' to this device.')});
@@ -448,7 +450,9 @@
   $('sfScrollFresh').addEventListener('click',()=>unsealScroll(true));
   $('sfNew').addEventListener('click',()=>add(makeBlank(engine),'Blank field created. Paint, name, then save & equip.'));
   $('sfDuplicate').addEventListener('click',()=>{const copy=clone(draft);copy.name=(copy.name+' COPY').slice(0,48);add(copy,'Duplicated spell. Edit this copy without overwriting the original.')});
-  $('sfDelete').addEventListener('click',()=>{if(library.items.length<=1){status('Keep at least one spell. Use NEW BLANK to start fresh.');return}const deleted=find().recipe.name;library.items=library.items.filter(v=>v.id!==library.selected);library.selected=library.items[0].id;item=find();draft=clone(item.recipe);heal=item.heal;undo=[];dirty=false;saveLibrary();refreshFields();refreshLibrary();status('Deleted '+deleted+'. Your equipped aura is unchanged.')});
+  $('sfDelete').addEventListener('click',()=>{if(library.items.length<=1){status('Keep at least one spell. Use NEW BLANK to start fresh.');return}
+   if(!window.confirm('Delete saved spell "'+find().recipe.name+'"? This cannot be undone.'))return;
+   const deleted=find().recipe.name;library.items=library.items.filter(v=>v.id!==library.selected);library.selected=library.items[0].id;item=find();draft=clone(item.recipe);heal=item.heal;undo=[];dirty=false;saveLibrary();refreshFields();refreshLibrary();status('Deleted '+deleted+'. Your equipped aura is unchanged.')});
   $('sfExport').addEventListener('click',()=>{try{const cfg=engine.normalize(draft),blob=new Blob([JSON.stringify(cfg,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=(cfg.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'wrkman-spell')+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2500);status('Portable 32×32 field exported.')}catch(e){status('Export failed: '+e.message)}});
   $('sfImport').addEventListener('click',()=>$('sfFile').click());
   $('sfFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const raw=JSON.parse(await file.text());add(engine.normalize(raw),'Imported '+file.name+'. Save & equip to use it in combat.')}catch(err){status('Import failed: '+String(err.message||err))}finally{e.target.value=''}});
