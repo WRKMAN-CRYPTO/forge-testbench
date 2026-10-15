@@ -1,4 +1,4 @@
-/* WANDRUNE 077 / seven composable runes
+/* WANDRUNE 079 / eleven composable runes
  * Third 32x32 instruction layer, independent of grayscale and birth elements.
  * Conserves represented agent mass through merge and fracture.
  * Agents retain rune memory: learned behavior stays after leaving its pixel.
@@ -18,7 +18,11 @@
   Object.freeze({id:4,key:'seeker',name:'SEEKER',color:'#ff8cc0',symbol:'S'}),
   Object.freeze({id:5,key:'phase',name:'PHASE',color:'#90e4ef',symbol:'P'}),
   Object.freeze({id:6,key:'convergence',name:'CONVERGENCE',color:'#92f0d9',symbol:'C'}),
-  Object.freeze({id:7,key:'wall',name:'WALL',color:'#75c8e2',symbol:'▣'})
+  Object.freeze({id:7,key:'wall',name:'WALL',color:'#75c8e2',symbol:'▣'}),
+  Object.freeze({id:8,key:'north',name:'NORTH',color:'#b5e6ff',symbol:'↑'}),
+  Object.freeze({id:9,key:'south',name:'SOUTH',color:'#f6c98d',symbol:'↓'}),
+  Object.freeze({id:10,key:'west',name:'WEST',color:'#b6eeb7',symbol:'←'}),
+  Object.freeze({id:11,key:'east',name:'EAST',color:'#eebde7',symbol:'→'})
  ]);
  const byId=id=>TYPES[id]||TYPES[0];
  function normalize(raw){
@@ -87,10 +91,34 @@
   if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||y<0||x>=1||y>=1)return -1;
   return Math.floor(y*N)*N+Math.floor(x*N);
  }
+ // All steering stays in the local 32x32 field coordinate system.
+ // World emissions already rotate local x/y into world axes at render/hit.
+ const CARDINAL=Object.freeze({
+  8:Object.freeze({x:0,y:-1}), 9:Object.freeze({x:0,y:1}),
+  10:Object.freeze({x:-1,y:0}),11:Object.freeze({x:1,y:0})
+ });
+ function direct(agent,code){
+  const axis=CARDINAL[code];
+  if(!axis)return false;
+  // Redirect momentum without creating mass, clones, or permanent AI.
+  // The minimum speed makes a stationary hex answer the painted instruction;
+  // otherwise its current speed is preserved (including Impulse boosts).
+  const speed=Math.max(2,Math.hypot(agent.vx||0,agent.vy||0));
+  agent.vx=axis.x*speed;agent.vy=axis.y*speed;
+  return true;
+ }
  function learn(cast,agent,index,time,arr,alive){
   const runes=cast.recipe.runes,code=runes[index];
-  // WALL is an obstruction, never a learnable behavior or player buff.
+  // WALL is solid, not learnable. Directional pixels act on each ENTRY,
+  // not once per lifetime like other learned runes.
   if(!code||code===7)return [agent];
+  if(CARDINAL[code]){
+   direct(agent,code);
+   agent.directionAt=time;
+   agent.directionHits=(agent.directionHits||0)+1;
+   cast.directionHits=(cast.directionHits||0)+1;
+   return [agent];
+  }
   agent.runeSeen=agent.runeSeen||new Set();
   if(agent.runeSeen.has(index))return [agent];
   agent.runeSeen.add(index);
@@ -135,6 +163,9 @@
     produced=learn(cast,agent,source,cast.born||0,next,existing);
     if(!produced.length)existing.delete(agent);
    }
+   // Birth on a directional tile immediately sets heading; the first
+   // simulation step must not count the same tile a second time.
+   for(const child of produced)child.directionLastTile=source;
    next.push(...produced);
   }
   cast.agents=next;
@@ -239,9 +270,19 @@
    if(st.wallCount)resolveWall(st,a);
    let batch=[a];
    traverse(a.prevX??a.x,a.prevY??a.y,a.x,a.y,index=>{
-    if(!st.recipe.runes[index])return;
+    const code=st.recipe.runes[index];
     const out=[];
-    for(const item of batch)out.push(...learn(st,item,index,time,st.agents,alive));
+    for(const item of batch){
+     // Process empty cells as well, so leaving a cardinal tile re-arms it.
+     // A recurring crossing may redirect again, but sitting still on the
+     // same pixel cannot generate repeated activations.
+     if(code>=8&&code<=11){
+      if(item.directionLastTile!==index)out.push(...learn(st,item,index,time,st.agents,alive));
+      else out.push(item);
+     }else if(code)out.push(...learn(st,item,index,time,st.agents,alive));
+     else out.push(item);
+     for(const produced of out)produced.directionLastTile=index;
+    }
     batch=out;
     if(!batch.length){alive.delete(a);return false}
    });
@@ -266,6 +307,9 @@
    a.converging=false;
    const target=(a.seekUntil||0)>time?acquireTarget(st,scene,a):null;
    if(target){
+    // On the precise frame a cardinal rune redirects a seeker, its
+    // command wins. The seeker may resume steering on later frames.
+    if(a.directionAt===time)continue;
     const d=Math.hypot(target.dx,target.dy)||1;
     a.vx+=target.dx/d*.22*Math.min(2,dt*60);
     a.vy+=target.dy/d*.22*Math.min(2,dt*60);
@@ -308,7 +352,7 @@
     st.wallRects.push({x0:start/N,x1:x/N,y0:y/N,y1:(y+1)/N});
    }
   }
-  st.runeAnchors=new Map();st.runeMerges=0;st.runeSplits=0;st.converging=0;
+  st.runeAnchors=new Map();st.runeMerges=0;st.runeSplits=0;st.converging=0;st.directionHits=0;
  }
- return Object.freeze({VERSION:'077',TYPES,byId,normalize,mass,radius,composition,combine,fracture,tile,traverse,resolveWall,configure,onBirth,advance});
+ return Object.freeze({VERSION:'079',TYPES,byId,normalize,mass,radius,composition,combine,fracture,tile,traverse,resolveWall,direct,configure,onBirth,advance});
 });
