@@ -368,11 +368,53 @@
   $('sfPopulation').addEventListener('change',e=>setCount(e.target.value));
   $('sfSolo').addEventListener('click',()=>setCount(1));
    $('sfLifespan').addEventListener('change',()=>{resetParticles();status('Preview replaying with '+Number(draft.settings.lifespan).toFixed(1)+'s of active life, then an 0.8s fade.')});
-  function setBrush(b){brush=b.dataset.brush;
-   for(const n of overlay.querySelectorAll('[data-brush]'))n.classList.toggle('active',n===b)}
-  for(const group of ['sfTools','sfRuneTools'])$(group).addEventListener('click',e=>{
-   const b=e.target.closest('button[data-brush]');if(b)setBrush(b);
+  // Selecting a shelf is for navigation ONLY. The active brush remains
+  // clearly named until a deliberate brush-button tap.
+  const brushLabels={white:'⬜ WHITE',gray:'◧ GRAY',black:'⬛ BLACK',
+   mask:'🟪 MAGENTA',line:'↘ GRADIENT',src0:'◌ ERASE ELEMENT'};
+  let paintTab='field',runeTab='shape';
+  function brushLabel(id){
+   if(brushLabels[id])return brushLabels[id];
+   if(id.startsWith('src'))return 'ELEMENT '+Sources.byId(Number(id.slice(3))).name;
+   if(id.startsWith('rune'))return 'ᚱ '+Runes.byId(Number(id.slice(4))).name;
+   return id.toUpperCase();
+  }
+  function updateShelf(){
+   tools.hidden=paintTab==='rune';
+   runeShelf.hidden=paintTab!=='rune';
+   for(const button of tools.querySelectorAll('[data-brush]'))
+    button.hidden=(button.dataset.brush.startsWith('src')?'element':'field')!==paintTab;
+   for(const button of runeTools.querySelectorAll('[data-brush]'))
+    button.hidden=button.dataset.family!==runeTab;
+   for(const button of paintTabs.querySelectorAll('[data-paint-tab]')){
+    const on=button.dataset.paintTab===paintTab;
+    button.classList.toggle('active',on);button.setAttribute('aria-pressed',String(on));
+   }
+   for(const button of runeTabs.querySelectorAll('[data-rune-tab]')){
+    const on=button.dataset.runeTab===runeTab;
+    button.classList.toggle('active',on);button.setAttribute('aria-pressed',String(on));
+   }
+   $('sfArmedBrush').textContent=brushLabel(brush);
+   for(const button of overlay.querySelectorAll('button[data-brush]'))
+    button.classList.toggle('active',button.dataset.brush===brush);
+  }
+  function setBrush(b){
+   brush=b.dataset.brush;updateShelf();
+   status('ARMED '+brushLabel(brush)+' · draw on the 32×32 field to paint.');
+  }
+  paintTabs.addEventListener('click',e=>{
+   const button=e.target.closest('button[data-paint-tab]');
+   if(button){paintTab=button.dataset.paintTab;updateShelf();}
   });
+  runeTabs.addEventListener('click',e=>{
+   const button=e.target.closest('button[data-rune-tab]');
+   if(button){runeTab=button.dataset.runeTab;updateShelf();}
+  });
+  for(const group of [tools,runeShelf])group.addEventListener('click',e=>{
+   const button=e.target.closest('button[data-brush]');
+   if(button)setBrush(button);
+  });
+  updateShelf();
   $('sfGray').addEventListener('input',e=>{gray=Number(e.target.value);$('sfGrayVal').textContent=gray});
   $('sfRadius').addEventListener('input',e=>{brushRadius=Number(e.target.value);$('sfRadiusVal').textContent=brushRadius});
   $('sfName').addEventListener('input',e=>{draft.name=e.target.value.slice(0,48);mark()});
@@ -412,7 +454,7 @@
   $('sfFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const raw=JSON.parse(await file.text());add(engine.normalize(raw),'Imported '+file.name+'. Save & equip to use it in combat.')}catch(err){status('Import failed: '+String(err.message||err))}finally{e.target.value=''}});
   $('sfDone').addEventListener('click',()=>{close();onClose?.()});
   overlay.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();onClose?.()}});
-  function open(){if(opened)return;opened=true;overlay.hidden=false;item=find();draft=clone(item.recipe);heal=item.heal;dirty=false;undo=[];refreshFields();refreshLibrary();status('Forge open. Cast-time spells use saved snapshots, not live edits.');rafId=requestAnimationFrame(tick);$('sfDone').focus({preventScroll:true})}
+  function open(){if(opened)return;opened=true;overlay.hidden=false;item=find();draft=clone(item.recipe);heal=item.heal;dirty=false;undo=[];refreshFields();refreshLibrary();updateShelf();status('Forge ready • choose a layer, then arm your brush.');rafId=requestAnimationFrame(tick);$('sfDone').focus({preventScroll:true})}
   function close(){if(!opened)return;if(dirty){storeDraft();status('Changes auto-saved before leaving Forge.')}opened=false;overlay.hidden=true;cancelAnimationFrame(rafId);rafId=0;prevFrame=0}
   function adopt(recipe,linked){const cfg=engine.normalize(recipe);const same=find();if(same.recipe.name===cfg.name){same.recipe=clone(cfg);same.heal=linked!==false;saveLibrary();return true}if(library.items.length>=MAX_SPELLS)return false;library.items.push({id:uid(),recipe:clone(cfg),heal:linked!==false});library.selected=library.items[library.items.length-1].id;item=find();saveLibrary();return true}
   saveLibrary();refreshLibrary();refreshFields();
