@@ -29,7 +29,14 @@
     const v=values()[y*N+x];oc.fillStyle=v<0?'#ff00ff':'rgb('+v+','+v+','+v+')';
     oc.fillRect(x*w,y*w,w+.15,w+.15);
     const element=sources?.()[y*N+x]||0;
-    if(element&&sourceColor){oc.fillStyle=sourceColor(element);oc.fillRect(x*w,y*w,w+.15,w+.15)}
+    if(element&&sourceColor){
+     // Never hide the monochrome instruction underneath its material mark.
+     const tint=sourceColor(element);
+     oc.save();oc.globalAlpha=.32;oc.fillStyle=tint;
+     oc.fillRect(x*w,y*w,w+.15,w+.15);oc.restore();
+     oc.fillStyle=tint;
+     oc.fillRect(x*w+w*.58,y*w+w*.09,Math.max(.6,w*.32),Math.max(.6,w*.32));
+    }
     const rune=runes?.()[y*N+x]||0;
     if(rune){oc.fillStyle=runeColor?.(rune)||'#ffffff';oc.fillRect(x*w+.65,y*w+.65,Math.max(.8,w-1.3),Math.max(.8,w-1.3))}
    }
@@ -50,7 +57,15 @@
     mc.fillStyle=v<0?'#ff00ff':'rgb('+v+','+v+','+v+')';
     mc.fillRect((x-z.x)*side,(y-z.y)*side,side+.15,side+.15);
      const element=sources?.()[y*N+x]||0;
-     if(element&&sourceColor){mc.fillStyle=sourceColor(element);mc.fillRect((x-z.x)*side,(y-z.y)*side,side+.15,side+.15)}
+     if(element&&sourceColor){
+      const px=(x-z.x)*side,py=(y-z.y)*side,tint=sourceColor(element);
+      mc.save();mc.globalAlpha=.25;mc.fillStyle=tint;
+      mc.fillRect(px,py,side+.15,side+.15);mc.restore();
+      // Small solid material pip keeps the color visible at any zoom while
+      // the underlying black/gray/white motion remains readable.
+      mc.fillStyle=tint;
+      mc.fillRect(px+side*.65,py+side*.09,Math.max(1,side*.24),Math.max(1,side*.24));
+     }
      const rune=runes?.()[y*N+x]||0;
      if(rune){
       const px=(x-z.x)*side,py=(y-z.y)*side;
