@@ -21,13 +21,13 @@
  const N=32,MASK=-1,TAU=Math.PI*2,SAVE_KEY='wrkman-arcane-lab034-crafted-field-v1',SOURCE_KEY='wrkman-agent-field-v1';
  const palettes={arcane:[[92,139,244],[176,121,250],[223,193,255]],flame:[[208,65,39],[253,126,49],[255,213,105]],healing:[[66,184,144],[144,231,119],[240,235,149]],void:[[100,67,157],[179,72,199],[255,134,202]]};
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t;
- const DEFAULT_DRAW=200,MAX_DRAW=200,AGENT_MAX_AGE_MS=5500,FADE_MS=800,MAX_FADE_PARTICLES=200;
+ const MAX_CAST_AGENTS=200,DEFAULT_DRAW=1200,MAX_DRAW=6000,AGENT_MAX_AGE_MS=5500,FADE_MS=800,MAX_FADE_PARTICLES=6000;
  function starter(){
   const values=[];for(let y=0;y<N;y++)for(let x=0;x<N;x++){
    const r=Math.hypot(x-15.5,y-15.5);
    values.push(r>8.3&&r<10.7?255:r>=10.7&&r<13.4?Math.round(clamp(245-(r-10.7)*74,35,245)):r>=13.4&&r<14.8?0:MASK);
   }
-  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:'FIRE RING',values,sources:Array(N*N).fill(0),runes:Array(N*N).fill(0),settings:{mode:'ab',palette:'flame',texture:'flat',population:200,delivery:'aura',swirl:26,momentum:62,light:62,renderLimit:200,lifespan:5.5}};
+  return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:'FIRE RING',values,sources:Array(N*N).fill(0),runes:Array(N*N).fill(0),settings:{mode:'ab',palette:'flame',texture:'flat',population:200,delivery:'aura',swirl:26,momentum:62,light:62,renderLimit:1200,lifespan:5.5}};
  }
  function normalize(raw){
   if(!raw||raw.width!==N||raw.height!==N||!Array.isArray(raw.values)||raw.values.length!==1024)throw Error('Expected 32x32 Agent Field JSON');
@@ -39,7 +39,7 @@
   const delivery=s.delivery==='projectile'?'world':['aura','world','placed'].includes(s.delivery)?s.delivery:'aura';
   return {format:'WRKMAN_AGENT_FIELD_V1',width:N,height:N,mask:'#FF00FF',name:String(raw.name||'CRAFTED FIELD').slice(0,48),values,sources,runes,
    settings:{mode:s.mode==='a'?'a':'ab',palette:palettes[s.palette]?s.palette:'flame',texture:s.texture==='leaf'?'leaf':'flat',
-    population:Number.isFinite(s.population)?Math.round(clamp(s.population,1,200)):200,
+    population:Number.isFinite(s.population)?Math.round(clamp(s.population,1,MAX_CAST_AGENTS)):MAX_CAST_AGENTS,
     delivery,swirl:n('swirl',26),momentum:n('momentum',62),light:n('light',62),
     lifespan:Number.isFinite(s.lifespan)?Math.round(clamp(s.lifespan,.5,30)*2)/2:5.5,
     renderLimit:Number.isFinite(s.renderLimit)?Math.round(clamp(s.renderLimit,1,MAX_DRAW)):DEFAULT_DRAW}};
@@ -130,12 +130,9 @@
  }
  function start(scene,recipe,healLinked=true,target=null){
   const cfg=normalize(recipe),starts=Sources.startingCells(cfg.values,cfg.sources,Motion);
-  const existing=(scene.craftedShots||[]).reduce((n,cast)=>n+cast.agents.reduce((m,a)=>m+Runes.mass(a),0),0)+
-   (scene.craftedAura?.agents.reduce((m,a)=>m+Runes.mass(a),0)||0);
-  if(existing+cfg.settings.population>200)return false;
-  if(cfg.settings.delivery==='world'){
-   if((scene.craftedShots||[]).length>=3)return false;
-  }else if(scene.craftedAura)return false;
+  // Each cast receives at most 200 birth agents. Prior casts and the separate
+  // visual draw budget consume no casting capacity. Future mana will govern.
+  if(cfg.settings.delivery!=='world'&&scene.craftedAura)return false;
   const now=scene.time.now,delivery=cfg.settings.delivery,p=scene.player,aim=scene.aim||{x:1,y:0};
   const wanted=target&&Number.isFinite(target.x)&&Number.isFinite(target.y)?target:{x:p.x+aim.x*420,y:p.y+aim.y*420};
   const dx=wanted.x-p.x,dy=wanted.y-p.y,len=Math.hypot(dx,dy);
@@ -167,7 +164,7 @@
  function stop(scene,onlyAura=false){scene.craftedAura=null;if(!onlyAura){scene.craftedShots=[];scene.craftedFades=[]}}
  function stepOne(scene,st,time,delta,Combat){
   // Age out individual agents BEFORE advancing motion or checking hits.
-  // Zero-agent casts expire immediately, freeing spell slots and the 6k cap.
+  // Zero-agent casts expire immediately without imposing any total swarm cap.
   // Move an Aura's visual anchor to its latest location before freezing ghosts.
   if(st.delivery==='aura'){st.center.x=scene.player.x;st.center.y=scene.player.y}
   expireAgents(st,time,scene);
