@@ -274,9 +274,9 @@ async function rebuild(){
   if(decor){decor.destroy({children:true});decor=null;}
   if(glows){glows.destroy({children:true});glows=null;}
   objects=[];casting=[];
-  let n=LEVELS[level],random=rng(0x0e1e),t=textures[element];
+  drawBackdrop();let n=LEVELS[level],random=rng(0x0e1e),t=textures[element];
   decor=new P.Container();glows=new P.Container();layer=new P.Container();
-  app.stage.addChild(decor,glows,layer);
+  sceneRoot.addChild(decor,glows,layer);
   for(let c=0;c<n;c++){
    let pos=center(c,n);
    let disk=new P.Sprite(t.disk);disk.anchor.set(.5);decor.addChild(disk);
@@ -285,20 +285,20 @@ async function rebuild(){
    let bolts=null;if(element==='lightning'){bolts=new P.Graphics();decor.addChild(bolts);}
    casting.push({pos,disk,halo,ring,bolts});
   }
-  if(quality==='cinematic'){try{glows.filters=[new P.BlurFilter({strength:6,quality:2})];}catch(e){console.warn('BlurFilter fallback',e);}}
+  /* Filter configured per visual look, after sprite construction. */
   for(let i=0;i<n*PER;i++){
    let c=Math.floor(i/PER),sprite=new P.Sprite(t.dust[i%3]);sprite.anchor.set(.5);sprite.blendMode='add';layer.addChild(sprite);
    objects.push({sprite,c,u:random(),v:random(),z:random(),r:random(),j:random(),a:random()*Math.PI*2});
    if((i+1)%1600===0)await new Promise(resolve=>requestAnimationFrame(resolve));
   }
   ui.particles.textContent=objects.length.toLocaleString();ui.casts.textContent=n+' casts';ui.loadText.textContent=n+' × 200';
-  clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' PixiJS visuals · '+quality+' mode.');
+  applyLook();clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' PixiJS visuals · '+quality+' mode.');
   return true;
  }catch(e){console.error(e);setStatus('Build error: '+e.message);return false;}
  finally{busy=false;}
 }
 function simulate(t){
- const scale=radiusFor(casting.length),elapsed=t-pulseAt,burst=Math.max(0,1-elapsed/.7);
+ const scale=radiusFor(casting.length),elapsed=t-pulseAt,burst=Math.max(0,1-elapsed/.7),exposure=visualExposure();
  for(let k=0;k<objects.length;k++){
   const p=objects[k],s=p.sprite,pos=casting[p.c].pos;
   let life,x,y,size,alpha,rotation;
@@ -323,7 +323,7 @@ function simulate(t){
    x=pos.x+Math.cos(a)*d;y=pos.y+Math.sin(a)*d*.59;
    size=(5+p.z*15)*scale*(.8+life*.5)*(1+burst*.5);alpha=(.55+p.j*.45)*Math.min(1,(1-life)*4);rotation=a+Math.PI/2;
   }
-  s.position.set(x,y);s.rotation=rotation;s.width=size;s.height=size*1.9;s.alpha=Math.max(0,Math.min(1,alpha));
+  s.position.set(x,y);s.rotation=rotation;s.width=size;s.height=size*1.9;s.alpha=Math.max(0,Math.min(1,alpha*(look==='cataclysm'?1:look==='defined'?exposure:1)));
  }
 }
 function refreshStats(){
@@ -339,7 +339,7 @@ function frame(now){
  try{simulate(t);decorate(t);app.render();}catch(e){console.error(e);setStatus('Render failure: '+e.message);last=0;return;}
  let cost=performance.now()-start;
  if(dt>0){metrics.push(dt);costs.push(cost);if(metrics.length>250){metrics.shift();costs.shift();}}
- if(now-metricLast>450){refreshStats();metricLast=now;}
+ if(now-metricLast>450){refreshStats();countVisible();metricLast=now;}
 }
 function renderResults(){
  ui.results.replaceChildren();
@@ -356,7 +356,7 @@ async function ramp(){
  if(auto){abortRamp();return;}
  if(busy||!app)return;
  auto=true;stopped=false;const ticket=++autoEpoch;reports=[];renderResults();ui.ramp.textContent='■ STOP RAMP';ui.ramp.classList.add('stop');ui.progress.textContent='0 / '+LEVELS.length;lastStable=null;firstWeak=null;let badStreak=0;
- const buttons=document.querySelectorAll('[data-el],[data-q],#load,#reset');
+ const buttons=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],#load,#reset,#cameraZoom,#recenter,#sampleNow');
  buttons.forEach(x=>x.disabled=true);
  try{
  for(let i=0;i<LEVELS.length&&auto&&ticket===autoEpoch;i++){
@@ -367,7 +367,7 @@ async function ramp(){
   await delay(650);if(!auto||ticket!==autoEpoch)break;clearSamples();
   await delay(2000);if(!auto||ticket!==autoEpoch)break;
   const m=sample(),pass=m.samples>=30&&m.fps>=50&&m.p95<=25;
-  reports.push({casts:LEVELS[i],count:LEVELS[i]*PER,element,quality,passed:pass,
+  reports.push({casts:LEVELS[i],count:LEVELS[i]*PER,element,quality,layout,look,zoom,approxVisible:visibleApprox,passed:pass,
    fps:Number(m.fps.toFixed(2)),p95:Number(m.p95.toFixed(2)),cpu:Number(m.cpu.toFixed(2)),samples:m.samples});
   renderResults();
   if(pass){lastStable=LEVELS[i]*PER;badStreak=0;firstWeak=null;}
@@ -381,8 +381,8 @@ async function ramp(){
 }
 function trigger(){pulseAt=performance.now()/1000;let tint=TYPES[element].accent;ui.flash.style.background=tint;ui.flash.animate([{opacity:.3},{opacity:0}],{duration:470,easing:'ease-out'});}
 function report(){
- const data={app:'WRKMAN PixiJS 8 VFX Stress Lab',version:'0.3',date:new Date().toISOString(),renderer:'PixiJS 8.10.0 WebGL (sprites)',element,quality,particleCount:objects.length,visualsPerCast:PER,levels:LEVELS,threshold:{minFps:50,maxP95ms:25,consecutiveFailures:2},results:reports,highestPassingParticles:lastStable,
- current:sample(),device:navigator.userAgent,viewport:[innerWidth,innerHeight],pixelRatio:devicePixelRatio,notes:'Frame cadence via rAF. JS + render call time, not actual GPU execution. 2-second samples after 650ms settle, short-run only. No Wandrune code used.'};
+ const data={app:'WRKMAN PixiJS 8 VFX Stress Lab',version:'0.4',date:new Date().toISOString(),renderer:'PixiJS 8.10.0 WebGL (sprites)',element,quality,layout,look,camera:{x:camera.x,y:camera.y,zoom},approxVisible:visibleApprox,particleCount:objects.length,visualsPerCast:PER,levels:LEVELS,threshold:{minFps:50,maxP95ms:25,consecutiveFailures:2},results:reports,highestPassingParticles:lastStable,
+ current:sample(),device:navigator.userAgent,viewport:[innerWidth,innerHeight],pixelRatio:devicePixelRatio,notes:'Frame cadence via rAF. JS + render call time does not equal GPU execution time. Same total sprite count; layout and zoom affect approximate visible counts. Short ~2-second stages; no Wandrune code used.'};
  const dataStr=JSON.stringify(data,null,2);
  if(navigator.clipboard&&navigator.clipboard.writeText){
  navigator.clipboard.writeText(dataStr).then(()=>setStatus('Benchmark copied. Paste the report into our conversation.')).catch(()=>download(dataStr));
@@ -400,7 +400,7 @@ ui.ramp.addEventListener('click',ramp);
 $('pulse').addEventListener('click',trigger);$('stage').addEventListener('click',trigger);
 $('stage').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();trigger();}});
 $('copy').addEventListener('click',report);
-$('reset').addEventListener('click',async()=>{if(auto||busy)return;level=4;ui.load.value='4';reports=[];lastStable=null;firstWeak=null;renderResults();await rebuild();});
+$('reset').addEventListener('click',async()=>{if(auto||busy)return;level=4;ui.load.value='4';reports=[];lastStable=null;firstWeak=null;renderResults();cameraReset();await rebuild();});
 document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden&&auto)abortRamp();});
 window.addEventListener('pagehide',()=>{auto=false;});
 async function init(){
@@ -408,7 +408,7 @@ async function init(){
  if(!window.PIXI)throw new Error('Could not load PixiJS from CDN. Check your connection.');
  P=window.PIXI;app=new P.Application();
  await app.init({width:W,height:H,resolution:Math.min(2,devicePixelRatio||1),autoDensity:true,backgroundAlpha:0,antialias:false,preference:'webgl',powerPreference:'high-performance'});
- app.stop();ui.view.append(app.canvas);makeTextures();
+ app.stop();ui.view.append(app.canvas);sceneRoot=new P.Container();app.stage.addChild(sceneRoot);makeTextures();cameraReset();setLayoutInfo();
  await rebuild();running=true;requestAnimationFrame(frame);
  }catch(e){console.error(e);setStatus('Initialization failed: '+e.message);ui.view.innerHTML='<div class="error">PixiJS could not start. Try opening this over HTTPS with internet access and a WebGL-enabled browser.</div>';}
 }
