@@ -53,17 +53,49 @@ button.action.stop{border-color:#8e6170;background:#382030}
 .caveat{font-size:10px;color:#8198ad;line-height:1.6;margin-top:12px}.caveat b{color:#c3d5e3}
 .error{padding:20px;color:#ffb2ab;font-size:13px}
 @media(min-width:740px){.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}.section{margin-top:14px}.stats{gap:10px}.stat{padding:14px}h1{font-size:25px}}
+
+.tabs3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.compositionGrid{display:grid;grid-template-columns:1fr;gap:12px}
+.smallNote{color:#8ca5bb;font-size:11px;line-height:1.5;margin-top:8px}
+#stage{touch-action:none;user-select:none}
+.chipline{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.infoChip{font:800 10px ui-monospace,monospace;color:#b5d1e9;background:#12283b;border:1px solid #29475e;border-radius:8px;padding:5px 8px}
+@media(min-width:740px){.compositionGrid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <main>
 <header><div class="w">W</div><div><small>WRKMAN / EXPERIMENT 004</small><h1>Elemental Clarity Lab</h1></div><span class="badge">PIXIJS 8 ONLY</span></header>
 <p class="subtitle">Same spells. Three compositions. Three lighting treatments. Compare the painting before chasing raw FPS. Wandrune untouched.</p>
-<div class="stageWrap"><div id="stage" role="button" aria-label="Trigger an elemental pulse by tapping the stage" tabindex="0"><div id="view"></div><div id="flash"></div><div class="hud"><div class="hudTop"><span>WEBGL / PIXIJS 8</span><span>200 VISUALS PER CAST</span></div><div class="hudBot"><strong id="elementTitle">FIRE</strong><div id="elementCaption">TURBULENCE / EMBERS / BLOOM</div></div></div></div></div>
+<div class="stageWrap"><div id="stage" role="button" aria-label="Trigger an elemental pulse by tapping the stage" tabindex="0"><div id="view"></div><div id="flash"></div><div class="hud"><div class="hudTop"><span id="sceneName">FIELD / DEFINED</span><span id="visibleCount">ON SCREEN: --</span></div><div class="hudBot"><strong id="elementTitle">FIRE</strong><div id="elementCaption">TURBULENCE / EMBERS / BLOOM</div></div></div></div></div>
 <div class="stats"><div class="stat"><label>FPS</label><strong id="fps">--</strong></div><div class="stat"><label>P95 frame</label><strong id="p95">--</strong><small> milliseconds</small></div><div class="stat"><label>JS + render</label><strong id="cpu">--</strong><small> ms average</small></div><div class="stat"><label>Visuals</label><strong id="particles">2,000</strong><small id="casts">10 casts</small></div></div>
 <div class="controls"><section class="section"><div class="sectionTitle">01 / Choose the effect</div><div class="tabs" id="elements"><button data-el="fire" aria-pressed="true">🔥 Fire</button><button data-el="lightning" aria-pressed="false">⚡ Bolt</button><button data-el="ice" aria-pressed="false">❄️ Ice</button><button data-el="gravity" aria-pressed="false">🪐 Gravity</button></div><div class="sectionTitle" style="margin-top:17px">02 / Visual quality</div><div class="mode" id="quality"><button data-q="cinematic" aria-pressed="true">✧ Cinematic</button><button data-q="lean" aria-pressed="false">Lean</button></div><label class="rangeTitle" for="load">03 / Concurrent casts <span id="loadText">10 × 200</span></label><input id="load" type="range" min="0" max="12" step="1" value="4"><div class="rangeEnds"><span>200</span><span>2,000</span><span>25,600</span></div></section>
 <section class="section"><div class="sectionTitle">04 / Find the breaking point</div><div class="actions"><button class="action primary" id="ramp">▶ AUTO STRESS</button><button class="action" id="pulse">✦ PULSE</button><button class="action" id="copy">Copy results</button><button class="action" id="reset">Reset bench</button></div><div class="readout" id="notice" aria-live="polite">Loading PixiJS 8…</div><div class="sectionTitle" style="margin-top:15px">Load results <span id="progress" style="float:right;color:#86c9e1"></span></div><div class="results" id="results"><div style="color:#647f98;font-size:11px">Run AUTO STRESS to collect a performance curve on this device.</div></div></section></div>
-<div class="caveat"><b>What this tests:</b> PixiJS 8 WebGL sprites with enhanced per-cast visuals, 200 animated visuals per cast. The automatic ramp measures frame cadence and full JavaScript update + render call, and stops after two successive stages below the target (50 FPS or P95 over 25 ms). <b>What it cannot test:</b> actual GPU execution time, device temperature, thermal throttling over long sessions, or Wandrune gameplay. A benchmark ceiling is not necessarily a crash point. PixiJS downloads once from jsDelivr.</div>
+<section class="section" id="compositionPanel">
+<div class="sectionTitle">05 / Composition</div>
+<div class="compositionGrid">
+<div><div class="tabs tabs3" id="layouts">
+<button data-layout="cluster" aria-pressed="false">☄️ Cluster</button>
+<button data-layout="field" aria-pressed="true">✦ Field</button>
+<button data-layout="world" aria-pressed="false">🌐 World</button>
+</div><div class="smallNote" id="layoutNote">All casts distributed across the visible arena. Same simulation work as Cluster.</div>
+<div class="chipline"><span class="infoChip" id="layoutSize">WORLD: 760 × 466</span><span class="infoChip" id="onScreen">~-- visible visuals</span></div>
+</div>
+<div><div class="sectionTitle">06 / Lighting treatment</div>
+<div class="tabs tabs3" id="looks">
+<button data-look="reference" aria-pressed="false">Original</button>
+<button data-look="defined" aria-pressed="true">Defined</button>
+<button data-look="cataclysm" aria-pressed="false">☀️ Unbound</button>
+</div><div class="smallNote" id="lookNote">Controlled glow, mostly normal-blended cores and selected additive sparks. No particle reduction.</div>
+</div>
+</div>
+<label class="rangeTitle" for="cameraZoom">07 / Camera zoom <span id="zoomText">100%</span></label>
+<input id="cameraZoom" type="range" min="0" max="5" step="1" value="3">
+<div class="rangeEnds"><span>33% / wide view</span><span>100%</span><span>160% / detail</span></div>
+<div class="actions"><button class="action" id="recenter">⌖ Recenter view</button><button class="action" id="sampleNow">◈ Capture reading</button></div>
+<div class="smallNote">Drag across the scene to pan. Tap to pulse. At 100% with Cluster or Field, the same active particles appear in the arena; World and zoom can change the number visible. These are visual layout tests, not collision or gameplay physics.</div>
+</section>
+<div class="caveat"><b>What this tests:</b> PixiJS 8 WebGL sprites with enhanced per-cast visuals, 200 animated visuals per cast. The automatic ramp measures frame cadence and full JavaScript update + render call, and stops after two successive stages below the target (50 FPS or P95 over 25 ms). <b>What it cannot test:</b> actual GPU execution time, device temperature, thermal throttling over long sessions, or Wandrune gameplay. A benchmark ceiling is not necessarily a crash point. Defined adjusts blending, opacity and glow without reducing sprite counts. World zoom changes visible fraction, so compare FPS only at matching camera and scene settings. PixiJS downloads once from jsDelivr.</div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js"></script>
 <script>
@@ -78,7 +110,7 @@ lightning:{title:'LIGHTNING',sub:'BRANCHING / ARCS / IONIZATION',accent:'#8fd7ff
 ice:{title:'ICE',sub:'CRYSTALS / FRACTURE / SHATTER',accent:'#88f8ff',rgb:[113,236,255]},
 gravity:{title:'GRAVITY',sub:'ACCRETION / SINGULARITY / COLLAPSE',accent:'#c58dff',rgb:[180,111,255]}
 };
-let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,pulseFlash=null,stopped=false;
+let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,sceneRoot=null,backdrop=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,pulseFlash=null,stopped=false,layout='field',look='defined',zoom=1,camera={x:W*.5,y:H*.5},visibleApprox=0;const ZOOMS=[.33,.50,.75,1,1.25,1.6];
 function rng(seed){let x=seed>>>0;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;};}
 function delay(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 function round(n){return Number.isFinite(n)?n.toFixed(1):'--';}
