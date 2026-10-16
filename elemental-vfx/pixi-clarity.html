@@ -48,7 +48,7 @@ button.action.primary{background:linear-gradient(105deg,#f4ad67,#ffdc9a);color:#
 button.action.stop{border-color:#8e6170;background:#382030}
 .readout{margin-top:12px;background:#0d1b2a;border:1px solid #36526a;border-radius:11px;color:#b3c7d9;padding:11px 12px;font-size:11px;min-height:44px}
 .result{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #23384d;font:700 11px ui-monospace,monospace;color:#bdd0df}
-.result:last-child{border-bottom:0}.result.bad strong{color:#ffb0a1}.result.ok strong{color:#a6edcb}
+.result:last-child{border-bottom:0}.result span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.result strong{white-space:nowrap}.result.bad strong{color:#ffb0a1}.result.ok strong{color:#a6edcb}
 .results{max-height:255px;overflow:auto;overscroll-behavior:contain}
 .caveat{font-size:10px;color:#8198ad;line-height:1.6;margin-top:12px}.caveat b{color:#c3d5e3}
 .error{padding:20px;color:#ffb2ab;font-size:13px}
@@ -345,7 +345,7 @@ function renderResults(){
  ui.results.replaceChildren();
  if(!reports.length){ui.results.textContent='No measurements yet.';return;}
  for(let r of reports){let div=document.createElement('div');div.className='result '+(r.passed?'ok':'bad');
- let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' visuals';
+ let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' · '+(r.look||look).toUpperCase()+' / '+(r.layout||layout).toUpperCase();
  let b=document.createElement('strong');b.textContent=round(r.fps)+' FPS · '+round(r.p95)+' ms P95';
  div.append(a,b);ui.results.append(div);}
 }
