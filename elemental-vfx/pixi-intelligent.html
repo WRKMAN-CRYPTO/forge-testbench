@@ -292,7 +292,7 @@ async function rebuild(){
  if(busy||!P)return false;
  busy=true;setStatus('Allocating '+(LEVELS[level]*PER).toLocaleString()+' animated visuals…');
  try{
-  if(layer){try{layer.destroy({children:true});}catch(e){console.warn('Particle layer cleanup:',e);layer.destroy();}layer=null;}
+  if(layer){try{layer.destroy({children:true});}catch(e){console.warn('Layer cleanup fallback:',e);if(!layer.destroyed){try{layer.destroy();}catch(ignore){console.warn(ignore);}}}layer=null;}
   if(decor){decor.destroy({children:true});decor=null;}
   if(glows){glows.destroy({children:true});glows=null;}
   objects=[];casting=[];
@@ -402,7 +402,7 @@ function renderResults(){
  ui.results.replaceChildren();
  if(!reports.length){ui.results.textContent='No measurements yet.';return;}
  for(let r of reports){let div=document.createElement('div');div.className='result '+(r.passed?'ok':'bad');
- let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' · '+(r.strategy||'BASELINE').toUpperCase()+' · '+(r.look||look).toUpperCase()+' / '+(r.layout||layout).toUpperCase();
+ let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' total / '+(r.submitted??r.count).toLocaleString()+' drawn · '+(r.strategy||'BASELINE').toUpperCase();
  let b=document.createElement('strong');b.textContent=round(r.fps)+' FPS · '+round(r.p95)+' ms P95';
  div.append(a,b);ui.results.append(div);}
 }
