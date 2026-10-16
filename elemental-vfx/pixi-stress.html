@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b16">
+<title>WRKMAN • VFX Stress Lab / Experiment 003</title>
+<style>
+:root{color-scheme:dark;--line:#28394f;--muted:#899cb5;--ink:#eef6ff;--amber:#f9c779;--panel:#101b2b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:#080d17;color:var(--ink);font:13px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+body{background:radial-gradient(ellipse at 50% -10%,#28344f 0%,transparent 55%),#070b14}
+button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}button:disabled{opacity:.44;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+main{width:min(100%,960px);margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) 14px calc(40px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;gap:11px}header .w{border:1px solid #ffcd82;border-radius:10px;transform:rotate(-8deg);display:grid;place-items:center;font:1000 28px/1 system-ui;width:40px;height:40px;color:var(--amber);box-shadow:0 0 18px #b4832b38}
+h1{font-size:19px;letter-spacing:-.6px;margin:0}header small{font:800 10px ui-monospace,monospace;letter-spacing:1.9px;color:var(--amber)}
+.badge{margin-left:auto;color:#a3ead0;background:#16332f;padding:6px 8px;border:1px solid #27544d;border-radius:20px;white-space:nowrap;font-size:9px;font-weight:900}
+.subtitle{color:#95a9bb;font-size:12px;margin:12px 0}
+.stageWrap{position:relative;border-radius:17px;overflow:hidden;border:1px solid #37516a;background:radial-gradient(ellipse at 50% 48%,#24304c 0%,#10192c 44%,#060b17 78%);box-shadow:0 14px 52px #0009}
+#stage{position:relative;width:100%;aspect-ratio:760/466;overflow:hidden;touch-action:manipulation;cursor:pointer}
+#view{position:absolute;inset:0}#view canvas{display:block;width:100%!important;height:100%!important}
+#stage:before{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(#a5c2e408 1px,transparent 1px),linear-gradient(90deg,#a5c2e408 1px,transparent 1px);background-size:30px 30px}
+.hud{pointer-events:none;position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:12px}
+.hudTop{display:flex;justify-content:space-between;color:#9fc4e1;font:800 9px ui-monospace,monospace;letter-spacing:1.2px}
+.hudTop span{background:#071320b9;border:1px solid #ffffff21;border-radius:8px;padding:6px 8px}
+.hudBot strong{font-size:clamp(25px,6.7vw,51px);line-height:1;font-weight:1000;letter-spacing:-1.5px;text-shadow:0 0 18px #000;opacity:.94}.hudBot div{font:800 10px ui-monospace,monospace;letter-spacing:1.5px;color:#a4bed7;margin-top:6px}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:12px 0}
+.stat{background:#101b29;border:1px solid #283b50;border-radius:11px;padding:9px;min-width:0}
+.stat label{display:block;font-size:9px;font-weight:900;letter-spacing:1px;color:#8ea5bb;text-transform:uppercase}
+.stat strong{display:block;margin-top:3px;font:900 clamp(15px,3.3vw,23px) ui-monospace,monospace;white-space:nowrap}
+.stat small{font:500 9px ui-monospace,monospace;color:#768ba0}
+.section{background:linear-gradient(150deg,#111d2c,#0d1724);border:1px solid #27394d;padding:13px;border-radius:14px;margin-top:11px}
+.sectionTitle{color:#9fb1c5;font-size:10px;letter-spacing:1.7px;font-weight:1000;text-transform:uppercase;margin-bottom:8px}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.tabs button{background:#162234;border:1px solid #30465d;color:#afbed0;font-size:11px;font-weight:850;border-radius:10px;padding:11px 2px;min-height:44px}
+.tabs button[aria-pressed=true]{color:#fff5e8;border-color:#dcad6d;background:linear-gradient(#4a3c37,#292634);box-shadow:inset 0 1px #fddca444}
+.mode{display:flex;gap:8px;margin-top:10px}.mode button{background:#132236;border:1px solid #34506b;padding:8px 12px;border-radius:9px;color:#dbe8f1;font-weight:850;flex:1}
+.mode button[aria-pressed=true]{background:#254051;border-color:#8bc2db;color:#fff}
+label.rangeTitle{display:flex;align-items:center;justify-content:space-between;color:#a6b5c7;font-weight:800;margin-top:12px;font-size:11px}
+#loadText{color:var(--amber);font:900 12px ui-monospace,monospace}
+input[type=range]{width:100%;accent-color:#efb875;height:27px;margin:5px 0}
+.rangeEnds{display:flex;justify-content:space-between;color:#68849e;font:700 10px ui-monospace,monospace}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+button.action{min-height:48px;border-radius:10px;border:1px solid #47637c;color:#e8f2fc;background:#1c3144;font-weight:900;font-size:12px}
+button.action.primary{background:linear-gradient(105deg,#f4ad67,#ffdc9a);color:#231509;border-color:#ffe1ac}
+button.action.stop{border-color:#8e6170;background:#382030}
+.readout{margin-top:12px;background:#0d1b2a;border:1px solid #36526a;border-radius:11px;color:#b3c7d9;padding:11px 12px;font-size:11px;min-height:44px}
+.result{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #23384d;font:700 11px ui-monospace,monospace;color:#bdd0df}
+.result:last-child{border-bottom:0}.result.bad strong{color:#ffb0a1}.result.ok strong{color:#a6edcb}
+.results{max-height:255px;overflow:auto;overscroll-behavior:contain}
+.caveat{font-size:10px;color:#8198ad;line-height:1.6;margin-top:12px}.caveat b{color:#c3d5e3}
+.error{padding:20px;color:#ffb2ab;font-size:13px}
+@media(min-width:740px){.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}.section{margin-top:14px}.stats{gap:10px}.stat{padding:14px}h1{font-size:25px}}
+</style>
+</head>
+<body>
+<main>
+<header><div class="w">W</div><div><small>WRKMAN / EXPERIMENT 003</small><h1>Elemental VFX Stress Lab</h1></div><span class="badge">PIXIJS 8 ONLY</span></header>
+<p class="subtitle">Beautiful first. Then load until the frames buckle. Independent rendering test, no Wandrune gameplay code.</p>
+<div class="stageWrap"><div id="stage" role="button" aria-label="Trigger an elemental pulse by tapping the stage" tabindex="0"><div id="view"></div><div id="flash"></div><div class="hud"><div class="hudTop"><span>WEBGL / PIXIJS 8</span><span>200 VISUALS PER CAST</span></div><div class="hudBot"><strong id="elementTitle">FIRE</strong><div id="elementCaption">TURBULENCE / EMBERS / BLOOM</div></div></div></div></div>
+<div class="stats"><div class="stat"><label>FPS</label><strong id="fps">--</strong></div><div class="stat"><label>P95 frame</label><strong id="p95">--</strong><small> milliseconds</small></div><div class="stat"><label>JS + render</label><strong id="cpu">--</strong><small> ms average</small></div><div class="stat"><label>Visuals</label><strong id="particles">2,000</strong><small id="casts">10 casts</small></div></div>
+<div class="controls"><section class="section"><div class="sectionTitle">01 / Choose the effect</div><div class="tabs" id="elements"><button data-el="fire" aria-pressed="true">🔥 Fire</button><button data-el="lightning" aria-pressed="false">⚡ Bolt</button><button data-el="ice" aria-pressed="false">❄️ Ice</button><button data-el="gravity" aria-pressed="false">🪐 Gravity</button></div><div class="sectionTitle" style="margin-top:17px">02 / Visual quality</div><div class="mode" id="quality"><button data-q="cinematic" aria-pressed="true">✧ Cinematic</button><button data-q="lean" aria-pressed="false">Lean</button></div><label class="rangeTitle" for="load">03 / Concurrent casts <span id="loadText">10 × 200</span></label><input id="load" type="range" min="0" max="12" step="1" value="4"><div class="rangeEnds"><span>200</span><span>2,000</span><span>25,600</span></div></section>
+<section class="section"><div class="sectionTitle">04 / Find the breaking point</div><div class="actions"><button class="action primary" id="ramp">▶ AUTO STRESS</button><button class="action" id="pulse">✦ PULSE</button><button class="action" id="copy">Copy results</button><button class="action" id="reset">Reset bench</button></div><div class="readout" id="notice" aria-live="polite">Loading PixiJS 8…</div><div class="sectionTitle" style="margin-top:15px">Load results <span id="progress" style="float:right;color:#86c9e1"></span></div><div class="results" id="results"><div style="color:#647f98;font-size:11px">Run AUTO STRESS to collect a performance curve on this device.</div></div></section></div>
+<div class="caveat"><b>What this tests:</b> PixiJS 8 WebGL sprites with enhanced per-cast visuals, 200 animated visuals per cast. The automatic ramp measures frame cadence and full JavaScript update + render call, and stops after two successive stages below the target (50 FPS or P95 over 25 ms). <b>What it cannot test:</b> actual GPU execution time, device temperature, thermal throttling over long sessions, or Wandrune gameplay. A benchmark ceiling is not necessarily a crash point. PixiJS downloads once from jsDelivr.</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js"></script>
+<script>
+(function(){
+'use strict';
+const W=760,H=466,PER=200,LEVELS=[1,2,4,8,10,12,16,24,32,48,64,96,128];
+const $=id=>document.getElementById(id);
+const ui={view:$('view'),notice:$('notice'),fps:$('fps'),p95:$('p95'),cpu:$('cpu'),particles:$('particles'),casts:$('casts'),load:$('load'),loadText:$('loadText'),ramp:$('ramp'),results:$('results'),progress:$('progress'),flash:$('flash')};
+const TYPES={
+fire:{title:'FIRE',sub:'TURBULENCE / EMBERS / BLOOM',accent:'#ff9a59',rgb:[255,132,50]},
+lightning:{title:'LIGHTNING',sub:'BRANCHING / ARCS / IONIZATION',accent:'#8fd7ff',rgb:[92,183,255]},
+ice:{title:'ICE',sub:'CRYSTALS / FRACTURE / SHATTER',accent:'#88f8ff',rgb:[113,236,255]},
+gravity:{title:'GRAVITY',sub:'ACCRETION / SINGULARITY / COLLAPSE',accent:'#c58dff',rgb:[180,111,255]}
+};
+let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,pulseFlash=null,stopped=false;
+function rng(seed){let x=seed>>>0;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;};}
+function delay(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+function round(n){return Number.isFinite(n)?n.toFixed(1):'--';}
+function setStatus(msg){ui.notice.textContent=msg;}
+function percentile(v,p){if(!v.length)return NaN;let a=v.slice().sort((a,b)=>a-b);return a[Math.floor((a.length-1)*p)];}
+function sample(){let a=metrics.length?metrics.reduce((s,v)=>s+v,0)/metrics.length:NaN,b=costs.length?costs.reduce((s,v)=>s+v,0)/costs.length:NaN;return{fps:1000/a,p95:percentile(metrics,.95),cpu:b,samples:metrics.length};}
+function clearSamples(){metrics=[];costs=[];last=0;ui.fps.textContent='--';ui.p95.textContent='--';ui.cpu.textContent='--';}
+function texture(make){let canvas=document.createElement('canvas');canvas.width=canvas.height=128;let c=canvas.getContext('2d');make(c,64,64);return P.Texture.from(canvas);}
+function softBlob(col){return texture((g,x,y)=>{let h=g.createRadialGradient(x,y,1,x,y,62);h.addColorStop(0,'rgba('+col+',.95)');h.addColorStop(.09,'rgba('+col+',.75)');h.addColorStop(.27,'rgba('+col+',.30)');h.addColorStop(.65,'rgba('+col+',.08)');h.addColorStop(1,'rgba('+col+',0)');g.fillStyle=h;g.fillRect(0,0,128,128);});}
+function shapeTexture(kind,n){
+return texture((c,x,y)=>{
+let glow=c.createRadialGradient(x,y,0,x,y,55),rgb=TYPES[kind].rgb.join(',');
+glow.addColorStop(0,'rgba('+rgb+',.96)');glow.addColorStop(.12,'rgba('+rgb+',.47)');glow.addColorStop(.55,'rgba('+rgb+',.12)');glow.addColorStop(1,'rgba('+rgb+',0)');c.fillStyle=glow;c.fillRect(0,0,128,128);
+c.save();c.translate(x,y);c.shadowBlur=11;c.shadowColor=TYPES[kind].accent;
+if(kind==='fire'){
+ c.rotate((n-1)*.15);c.fillStyle=n===2?'#ffecac':'#ffbc76';c.beginPath();c.moveTo(0,-31);c.bezierCurveTo(20,-13,9,0,13,12);c.quadraticCurveTo(3,32,-12,15);c.bezierCurveTo(-19,-6,-3,-16,0,-31);c.fill();
+ c.fillStyle='#fff1be';c.beginPath();c.moveTo(0,-10);c.quadraticCurveTo(8,10,0,17);c.quadraticCurveTo(-6,5,0,-10);c.fill();
+}else if(kind==='lightning'){
+ c.fillStyle=n===0?'#faffff':'#a5f4ff';c.beginPath();c.moveTo(-6,-30);c.lineTo(12,-8);c.lineTo(0,-5);c.lineTo(13,30);c.lineTo(-13,0);c.lineTo(-1,-2);c.closePath();c.fill();
+}else if(kind==='ice'){
+ c.fillStyle=n===0?'#dffcff':'#8cefff';c.strokeStyle='#eafcff';c.lineWidth=2.1;c.beginPath();c.moveTo(0,-31);c.lineTo(11,-6);c.lineTo(3,30);c.lineTo(-11,-5);c.closePath();c.fill();c.stroke();
+ c.strokeStyle='#4ca9e8';c.lineWidth=1;c.beginPath();c.moveTo(0,-22);c.lineTo(0,21);c.moveTo(-8,-4);c.lineTo(8,-4);c.stroke();
+}else{
+ c.fillStyle=n===0?'#f4dcff':'#95f3ff';c.rotate(.4);c.beginPath();c.ellipse(0,0,4,28,0,0,Math.PI*2);c.fill();c.strokeStyle='#b5aaff';c.lineWidth=1;c.beginPath();c.moveTo(-9,-23);c.lineTo(8,19);c.stroke();
+}c.restore();
+});}
+function diskTexture(kind){
+const cv=document.createElement('canvas');cv.width=cv.height=512;const g=cv.getContext('2d'),r=rng(0x789f+kind.length*397),[rr,gg,bb]=TYPES[kind].rgb;
+g.translate(256,256);let h=g.createRadialGradient(0,0,2,0,0,248);
+let center=kind==='gravity'?'16,6,29':[rr,gg,bb].join(',');
+h.addColorStop(0,'rgba('+center+',.90)');h.addColorStop(.15,'rgba('+center+',.62)');h.addColorStop(.40,'rgba('+rr+','+gg+','+bb+',.25)');h.addColorStop(.7,'rgba('+rr+','+gg+','+bb+',.06)');h.addColorStop(1,'rgba('+rr+','+gg+','+bb+',0)');g.fillStyle=h;g.fillRect(-256,-256,512,512);
+g.save();g.rotate(kind==='gravity'?-.30:0);
+if(kind==='gravity'){
+ for(let j=0;j<53;j++){let a=r()*Math.PI*2,dist=62+j*2.5;g.beginPath();g.ellipse(0,0,dist,dist*.48,0,a,a+.4+r()*1.5);g.lineWidth=.6+r()*2.3;g.strokeStyle=j%5===0?'rgba(146,234,255,.8)':'rgba(191,114,255,.42)';g.stroke();}
+ for(let i=0;i<290;i++){let a=r()*Math.PI*2,d=64+r()*138;g.fillStyle=i%8===0?'rgba(227,246,255,.8)':'rgba(200,151,255,.4)';g.beginPath();g.arc(Math.cos(a)*d,Math.sin(a)*d*.5,.5+r()*1.5,0,Math.PI*2);g.fill();}
+ g.shadowBlur=16;g.shadowColor='#d591ff';g.strokeStyle='rgba(189,136,255,.85)';g.lineWidth=4;g.beginPath();g.ellipse(0,0,76,38,0,.22,5.55);g.stroke();g.shadowBlur=0;
+ g.fillStyle='#02050e';g.beginPath();g.ellipse(0,0,46,27,0,0,Math.PI*2);g.fill();g.strokeStyle='#b78dff';g.lineWidth=1.6;g.stroke();
+}else if(kind==='ice'){
+ for(let j=0;j<10;j++){let a=j*Math.PI/5,len=72+(j%3)*30;g.strokeStyle='rgba(206,250,255,.52)';g.lineWidth=3;g.beginPath();g.moveTo(0,0);g.lineTo(Math.cos(a)*len,Math.sin(a)*len);g.stroke();for(let k=1;k<4;k++){let d=k*len/4;let x=Math.cos(a)*d,y=Math.sin(a)*d;g.lineWidth=1.5;g.beginPath();g.moveTo(x-Math.cos(a+.65)*12,y-Math.sin(a+.65)*12);g.lineTo(x,y);g.lineTo(x-Math.cos(a-.65)*12,y-Math.sin(a-.65)*12);g.stroke();}}
+ g.strokeStyle='rgba(174,246,255,.6)';g.lineWidth=1.5;g.beginPath();g.arc(0,0,87,0,Math.PI*2);g.stroke();
+}else if(kind==='fire'){
+ for(let j=0;j<17;j++){let a=j*2.4,sz=40+r()*120;g.strokeStyle=j%3===0?'rgba(255,249,189,.46)':'rgba(255,132,42,.38)';g.lineWidth=2+r()*7;g.beginPath();g.moveTo(Math.sin(a)*15,22);g.bezierCurveTo(Math.sin(a)*sz*.38,-sz*.4,Math.sin(a+1)*sz*.6,-sz*.8,Math.sin(a*.7)*sz*.25,-sz);g.stroke();}
+}else{
+ for(let j=0;j<19;j++){let a=j*Math.PI*2/19,rad=95+(j%4)*14;g.strokeStyle=j%3===0?'rgba(227,249,255,.62)':'rgba(83,176,255,.4)';g.lineWidth=2;g.beginPath();g.moveTo(0,0);for(let k=1;k<=5;k++){let d=rad*k/5,ang=a+Math.sin(k*4+j*3)*.12;g.lineTo(Math.cos(ang)*d,Math.sin(ang)*d);}g.stroke();}
+}g.restore();return P.Texture.from(cv);
+}
+function makeTextures(){for(let kind of Object.keys(TYPES)){textures[kind]={dust:[],disk:diskTexture(kind)};for(let i=0;i<3;i++)textures[kind].dust.push(shapeTexture(kind,i));}}
+function center(c,total){if(total===1)return{x:W*.5,y:H*.47};let perRow=Math.ceil(Math.sqrt(total*W/H)),rows=Math.ceil(total/perRow),row=Math.floor(c/perRow),col=c%perRow;return{x:W*(col+.5)/perRow,y:H*(row+.5)/rows};}
+function radiusFor(n){let cols=Math.ceil(Math.sqrt(n*W/H));return Math.min(1,3.1/Math.sqrt(Math.max(1,cols)));}
+function decorate(now){
+ if(!casting.length)return;
+ const n=casting.length,rad=radiusFor(n),throb=.95+.06*Math.sin(now*1.6);
+ for(let i=0;i<n;i++){
+  let a=casting[i],pos=a.pos;
+  if(a.disk){a.disk.position.set(pos.x,pos.y);a.disk.rotation+=.0007*(element==='gravity'?1:-1);let sz=(element==='gravity'?400:320)*rad*throb; a.disk.width=sz;a.disk.height=sz;a.disk.alpha=quality==='cinematic'?.97:.43;}
+  if(a.halo){a.halo.position.set(pos.x,pos.y);a.halo.scale.set(rad*(1+Math.sin(now*3+i)*.07));a.halo.alpha=quality==='cinematic'?.47:0;}
+  if(a.ring){a.ring.visible=quality==='cinematic';a.ring.position.set(pos.x,pos.y);a.ring.rotation=now*(element==='gravity'?.4:-.15)+i*.2;a.ring.scale.set(rad*(.94+Math.sin(now*1.4)*.08));}
+  if(a.bolts&&element==='lightning'&&quality==='cinematic'&&animation%6===0){
+   const g=a.bolts;g.clear();let rnd=rng((Math.floor(now*15)*7919+i*2654435761)>>>0);
+   for(let b=0;b<4;b++){let angle=b*Math.PI/2+rnd()*.6,d=rad*(95+rnd()*40),xx=0,yy=0;
+    for(let k=1;k<=6;k++){let r=d*k/6,v=angle+(rnd()-.5)*.28,nx=Math.cos(v)*r,ny=Math.sin(v)*r;g.moveTo(xx,yy).lineTo(nx,ny).stroke({color:0xc7f3ff,width:Math.max(.7,rad*3*(1-k/9)),alpha:.52});xx=nx;yy=ny;}
+   }g.position.set(pos.x,pos.y);
+  }
+ }
+}
+function makeRing(){
+ let g=new P.Graphics();g.circle(0,0,95).stroke({color:TYPES[element].accent,width:1.5,alpha:.43});
+ g.circle(0,0,108).stroke({color:TYPES[element].accent,width:.8,alpha:.25});
+ for(let j=0;j<12;j++){let a=j*Math.PI/6;g.moveTo(Math.cos(a)*97,Math.sin(a)*97).lineTo(Math.cos(a)*111,Math.sin(a)*111).stroke({color:0xffffff,width:1.3,alpha:.62});}
+ return g;
+}
+async function rebuild(){
+ if(busy||!P)return false;
+ busy=true;setStatus('Allocating '+(LEVELS[level]*PER).toLocaleString()+' animated visuals…');
+ try{
+  if(layer){layer.destroy({children:true});layer=null;}
+  if(decor){decor.destroy({children:true});decor=null;}
+  if(glows){glows.destroy({children:true});glows=null;}
+  objects=[];casting=[];
+  let n=LEVELS[level],random=rng(0x0e1e),t=textures[element];
+  decor=new P.Container();glows=new P.Container();layer=new P.Container();
+  app.stage.addChild(decor,glows,layer);
+  for(let c=0;c<n;c++){
+   let pos=center(c,n);
+   let disk=new P.Sprite(t.disk);disk.anchor.set(.5);decor.addChild(disk);
+   let halo=new P.Sprite(t.disk);halo.anchor.set(.5);halo.width=halo.height=180;halo.blendMode='add';glows.addChild(halo);
+   let ring=makeRing();decor.addChild(ring);
+   let bolts=null;if(element==='lightning'){bolts=new P.Graphics();decor.addChild(bolts);}
+   casting.push({pos,disk,halo,ring,bolts});
+  }
+  if(quality==='cinematic'){try{glows.filters=[new P.BlurFilter({strength:6,quality:2})];}catch(e){console.warn('BlurFilter fallback',e);}}
+  for(let i=0;i<n*PER;i++){
+   let c=Math.floor(i/PER),sprite=new P.Sprite(t.dust[i%3]);sprite.anchor.set(.5);sprite.blendMode='add';layer.addChild(sprite);
+   objects.push({sprite,c,u:random(),v:random(),z:random(),r:random(),j:random(),a:random()*Math.PI*2});
+   if((i+1)%1600===0)await new Promise(resolve=>requestAnimationFrame(resolve));
+  }
+  ui.particles.textContent=objects.length.toLocaleString();ui.casts.textContent=n+' casts';ui.loadText.textContent=n+' × 200';
+  clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' PixiJS visuals · '+quality+' mode.');
+  return true;
+ }catch(e){console.error(e);setStatus('Build error: '+e.message);return false;}
+ finally{busy=false;}
+}
+function simulate(t){
+ const scale=radiusFor(casting.length),elapsed=t-pulseAt,burst=Math.max(0,1-elapsed/.7);
+ for(let k=0;k<objects.length;k++){
+  const p=objects[k],s=p.sprite,pos=casting[p.c].pos;
+  let life,x,y,size,alpha,rotation;
+  if(element==='fire'){
+   life=(p.u+t*(.2+p.z*.1))%1;
+   x=pos.x+(Math.sin(p.a+t*1.8)*(13+p.r*46)+Math.sin(t*3.7+p.u*23)*8)*scale;
+   y=pos.y+(45-life*(156+p.v*42))*scale;
+   size=(9+p.z*19)*scale*(1-life*.42)*(1+burst*.45);
+   alpha=(.4+p.j*.6)*Math.min(1,(1-life)*3);rotation=Math.sin(t+p.a)*.2;
+  }else if(element==='lightning'){
+   life=(p.u+t*(.42+p.z*.1))%1;
+   let a=Math.floor(p.v*11)*Math.PI*2/11+t*.11,d=(10+life*(95+p.r*70))*scale,j=Math.sin(life*28+p.j*43+t*23)*(4+p.z*12)*scale;
+   x=pos.x+Math.cos(a)*d+Math.sin(a)*j;y=pos.y+Math.sin(a)*d-Math.cos(a)*j;
+   size=(7+p.z*18)*scale*(1+burst*.7);alpha=(.35+p.r*.65)*(.3+.7*Math.pow(Math.sin(t*16+p.a),2));rotation=a;
+  }else if(element==='ice'){
+   life=(p.u+t*(.15+p.z*.07))%1;let d=(8+life*(124+p.r*70))*scale;
+   x=pos.x+Math.cos(p.a)*d;y=pos.y+Math.sin(p.a)*d*.80;
+   size=(7+p.z*20)*scale*(1-life*.37);alpha=(.5+p.j*.5)*Math.min(1,(1-life)*4);rotation=p.a+Math.PI/2+t*.08*(p.r-.5);
+  }else{
+   life=(p.u+t*(.12+p.z*.025))%1;
+   let d=(10+Math.pow(1-life,.9)*(152+p.r*78))*scale,a=p.a+t*.23+life*life*(6+p.z*8);
+   x=pos.x+Math.cos(a)*d;y=pos.y+Math.sin(a)*d*.59;
+   size=(5+p.z*15)*scale*(.8+life*.5)*(1+burst*.5);alpha=(.55+p.j*.45)*Math.min(1,(1-life)*4);rotation=a+Math.PI/2;
+  }
+  s.position.set(x,y);s.rotation=rotation;s.width=size;s.height=size*1.9;s.alpha=Math.max(0,Math.min(1,alpha));
+ }
+}
+function refreshStats(){
+ let m=sample();ui.fps.textContent=round(m.fps);ui.p95.textContent=round(m.p95);ui.cpu.textContent=round(m.cpu);
+}
+function frame(now){
+ requestAnimationFrame(frame);
+ if(!app||busy||document.hidden){last=0;return;}
+ animation++;
+ const dt=last?Math.min(1000,now-last):0;last=now;
+ let start=performance.now();
+ let t=now/1000;
+ try{simulate(t);decorate(t);app.render();}catch(e){console.error(e);setStatus('Render failure: '+e.message);last=0;return;}
+ let cost=performance.now()-start;
+ if(dt>0){metrics.push(dt);costs.push(cost);if(metrics.length>250){metrics.shift();costs.shift();}}
+ if(now-metricLast>450){refreshStats();metricLast=now;}
+}
+function renderResults(){
+ ui.results.replaceChildren();
+ if(!reports.length){ui.results.textContent='No measurements yet.';return;}
+ for(let r of reports){let div=document.createElement('div');div.className='result '+(r.passed?'ok':'bad');
+ let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' visuals';
+ let b=document.createElement('strong');b.textContent=round(r.fps)+' FPS · '+round(r.p95)+' ms P95';
+ div.append(a,b);ui.results.append(div);}
+}
+function abortRamp(){
+ if(auto){auto=false;autoEpoch++;ui.ramp.textContent='▶ AUTO STRESS';ui.ramp.classList.remove('stop');ui.progress.textContent='Stopped';setStatus('Auto ramp stopped. Measurements collected: '+reports.length+'.');}
+}
+async function ramp(){
+ if(auto){abortRamp();return;}
+ if(busy||!app)return;
+ auto=true;stopped=false;const ticket=++autoEpoch;reports=[];renderResults();ui.ramp.textContent='■ STOP RAMP';ui.ramp.classList.add('stop');ui.progress.textContent='0 / '+LEVELS.length;lastStable=null;firstWeak=null;let badStreak=0;
+ const buttons=document.querySelectorAll('[data-el],[data-q],#load,#reset');
+ buttons.forEach(x=>x.disabled=true);
+ try{
+ for(let i=0;i<LEVELS.length&&auto&&ticket===autoEpoch;i++){
+  level=i;ui.load.value=String(i);
+  let ok=await rebuild();if(!ok)break;
+  ui.progress.textContent=(i+1)+' / '+LEVELS.length;
+  setStatus('Measuring '+(LEVELS[i]*PER).toLocaleString()+' visuals; '+quality+' graphics active…');
+  await delay(650);if(!auto||ticket!==autoEpoch)break;clearSamples();
+  await delay(2000);if(!auto||ticket!==autoEpoch)break;
+  const m=sample(),pass=m.samples>=30&&m.fps>=50&&m.p95<=25;
+  reports.push({casts:LEVELS[i],count:LEVELS[i]*PER,element,quality,passed:pass,
+   fps:Number(m.fps.toFixed(2)),p95:Number(m.p95.toFixed(2)),cpu:Number(m.cpu.toFixed(2)),samples:m.samples});
+  renderResults();
+  if(pass){lastStable=LEVELS[i]*PER;badStreak=0;firstWeak=null;}
+  else{badStreak++;if(firstWeak===null)firstWeak=LEVELS[i]*PER;}
+  if(badStreak>=2){setStatus('Visual-quality threshold reached: first weak load '+firstWeak.toLocaleString()+' visuals. Last passing load: '+(lastStable===null?'none':lastStable.toLocaleString())+'. This is not a crash limit.');stopped=true;break;}
+ }
+ if(!stopped&&auto&&ticket===autoEpoch)setStatus('Ramp complete: '+reports.length+' levels. Last passing load: '+(lastStable===null?'none':lastStable.toLocaleString())+'. No sustained failure before cap, or an isolated weak stage.');
+ }catch(e){console.error(e);setStatus('Ramp interrupted: '+e.message);}
+ finally{if(ticket===autoEpoch){auto=false;ui.ramp.textContent='▶ AUTO STRESS';ui.ramp.classList.remove('stop');if(!stopped)ui.progress.textContent='Complete';}
+ buttons.forEach(x=>x.disabled=false);}
+}
+function trigger(){pulseAt=performance.now()/1000;let tint=TYPES[element].accent;ui.flash.style.background=tint;ui.flash.animate([{opacity:.3},{opacity:0}],{duration:470,easing:'ease-out'});}
+function report(){
+ const data={app:'WRKMAN PixiJS 8 VFX Stress Lab',version:'0.3',date:new Date().toISOString(),renderer:'PixiJS 8.10.0 WebGL (sprites)',element,quality,particleCount:objects.length,visualsPerCast:PER,levels:LEVELS,threshold:{minFps:50,maxP95ms:25,consecutiveFailures:2},results:reports,highestPassingParticles:lastStable,
+ current:sample(),device:navigator.userAgent,viewport:[innerWidth,innerHeight],pixelRatio:devicePixelRatio,notes:'Frame cadence via rAF. JS + render call time, not actual GPU execution. 2-second samples after 650ms settle, short-run only. No Wandrune code used.'};
+ const dataStr=JSON.stringify(data,null,2);
+ if(navigator.clipboard&&navigator.clipboard.writeText){
+ navigator.clipboard.writeText(dataStr).then(()=>setStatus('Benchmark copied. Paste the report into our conversation.')).catch(()=>download(dataStr));
+ }else download(dataStr);
+}
+function download(s){let blob=new Blob([s],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='wrkman-pixi-vfx-003.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),800);setStatus('Benchmark report downloaded.');}
+async function changeSetting(){
+ if(busy||auto)return;await rebuild();
+}
+$('elements').addEventListener('click',async e=>{let b=e.target.closest('[data-el]');if(!b||auto||busy||b.dataset.el===element)return;element=b.dataset.el;for(let el of document.querySelectorAll('[data-el]'))el.setAttribute('aria-pressed',String(el===b));$('elementTitle').textContent=TYPES[element].title;$('elementCaption').textContent=TYPES[element].sub;await changeSetting();});
+$('quality').addEventListener('click',async e=>{let b=e.target.closest('[data-q]');if(!b||auto||busy||b.dataset.q===quality)return;quality=b.dataset.q;for(let el of document.querySelectorAll('[data-q]'))el.setAttribute('aria-pressed',String(el===b));await changeSetting();});
+ui.load.addEventListener('input',()=>{ui.loadText.textContent=LEVELS[+ui.load.value]+' × 200';});
+ui.load.addEventListener('change',async()=>{if(auto||busy)return;level=+ui.load.value;await changeSetting();});
+ui.ramp.addEventListener('click',ramp);
+$('pulse').addEventListener('click',trigger);$('stage').addEventListener('click',trigger);
+$('stage').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();trigger();}});
+$('copy').addEventListener('click',report);
+$('reset').addEventListener('click',async()=>{if(auto||busy)return;level=4;ui.load.value='4';reports=[];lastStable=null;firstWeak=null;renderResults();await rebuild();});
+document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden&&auto)abortRamp();});
+window.addEventListener('pagehide',()=>{auto=false;});
+async function init(){
+ try{
+ if(!window.PIXI)throw new Error('Could not load PixiJS from CDN. Check your connection.');
+ P=window.PIXI;app=new P.Application();
+ await app.init({width:W,height:H,resolution:Math.min(2,devicePixelRatio||1),autoDensity:true,backgroundAlpha:0,antialias:false,preference:'webgl',powerPreference:'high-performance'});
+ app.stop();ui.view.append(app.canvas);makeTextures();
+ await rebuild();running=true;requestAnimationFrame(frame);
+ }catch(e){console.error(e);setStatus('Initialization failed: '+e.message);ui.view.innerHTML='<div class="error">PixiJS could not start. Try opening this over HTTPS with internet access and a WebGL-enabled browser.</div>';}
+}
+init();
+})();
+</script>
+</body></html>
