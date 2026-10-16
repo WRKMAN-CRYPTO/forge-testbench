@@ -80,3 +80,37 @@ Experiment 003 screenshots revealed that 4,800–6,400 bright fire sprites were 
 - Approximate visible count includes particle sprite centers with viewport padding, not the full area of glow.
 - Two-second stages do not measure thermal throttling; artistic readability must be judged visually.
 - Wandrune remains untouched. Future integration requires separate explicit user approval.
+
+## Experiment 005: Intelligent PixiJS VFX
+
+**URL:** https://forge-testbench.vercel.app/elemental-vfx/pixi-intelligent.html
+
+Goal: compare the rendering of identical animated sprite-state records across four approaches, without modifying Wandrune. Experiment 003 and 004 remain available.
+
+### Four modes
+
+- **Baseline:** all Sprites rendered; reproduces Experiment 004's regular PixiJS path.
+- **Cull:** every state is still updated, but off-screen PixiJS Sprites receive `renderable=false`. The app counts how many it submits versus skips.
+- **Smart LOD:** the same off-screen culling plus near/mid/far sampling, drawing all near sprites, half of mid sprites, and one-sixth of far sprites, with slight scale changes to preserve mass.
+- **Particle:** PixiJS 8 `ParticleContainer` and `Particle` with dynamic position, vertex/size, rotation and color; a single shared texture and blend mode for efficient batching. This is NOT pixel-identical to the other three modes, and no per-particle GPU culling is claimed.
+
+### Fair comparisons
+
+Select an element, lighting quality, composition, zoom and cast count once. Press **COMPARE 4 MODES**. The app sequentially constructs each renderer, resets the animation phase to the same origin, settles for 700 ms, collects 2.2 seconds of FPS/frame-time data, logs approximate visible counts and actual Sprite renderable submissions. Stops can be requested during the comparison. It restores the original mode afterward.
+
+For a high-load phone test: **Fire / Cinematic / World / Defined / 50% zoom / 128 casts (25,600 states)**, then Compare 4 Modes. Repeat with **Field** to avoid mistaking off-screen culling for a rendering-speed improvement. Test Gravity similarly.
+
+The separate AUTO STRESS button still ramps 200–25,600 **visual states**, stopping after two consecutive stages with FPS below 50 or P95 over 25ms. It runs the *selected* renderer mode.
+
+### Reporting and limitations
+
+- The 200 visual states per cast are preserved in every mode. No Wandrune simulation, mana, combat, swarm, runes or other gameplay code is touched.
+- On-screen counts are approximate and not GPU instrumented; submitted and skipped counters track the app's chosen Sprite `renderable` decisions, not GPU draw calls. ParticleContainer submits all its particles by design.
+- Frame timing is browser requestAnimationFrame cadence and JS+render call duration, not measured GPU execution time.
+- Smart LOD intentionally changes distant visual detail; compare readability along with frame timings.
+- ParticleContainer intentionally sacrifices per-particle artwork variants and blend control for faster batching. It may differ visually from Baseline.
+- Two-second samples cannot prove thermal stability. Report device behavior separately.
+
+Reference measured on user's iPhone, Experiment 003 Fire Cinematic: 3,200 at ~60 FPS, 4,800 at ~57.09 FPS P95 22 ms, 6,400 failed P95 26 ms. These are baseline observations, not guarantees for Experiment 005.
+
+**Integration rule:** This is a standalone `forge-testbench` lab. Wandrune stays untouched unless separately approved.
