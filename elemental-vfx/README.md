@@ -46,3 +46,37 @@ Do **not** change or connect this experiment to Wandrune without a separate expl
 - The separate previous [Experiment 002 bench](./index.html) remains intact.
 
 **Important:** Vercel project for forge-testbench is linked and deploys from GitHub, but its default deployment protection may require the owner's login. Do not relax security settings merely to share this link.
+
+
+## Experiment 004: PixiJS Clarity / Composition Lab
+
+Source: [pixi-clarity.html](./pixi-clarity.html)
+Production URL: https://forge-testbench.vercel.app/elemental-vfx/pixi-clarity.html
+
+Experiment 003 screenshots revealed that 4,800–6,400 bright fire sprites were visually merging. This experiment tests readability without forbidding spectacular overload.
+
+### Variables
+- Element: Fire, Lightning, Ice, Gravity.
+- Lighting: Original (additive), Defined (controlled glow and mostly normal blending), Unbound (amplified additive glow).
+- Composition: Cluster (overlapping casts), Field (same cast count distributed across viewport), World (3×3 terrain space with zoom and pan).
+- Camera: zoom 33%, 50%, 75%, 100%, 125%, 160%; drag the scene to pan.
+- Visual quality: Cinematic / Lean; 13 stress levels up to 25,600 visual particles.
+
+### Fixed constraints
+- Exactly 200 visual particles per cast; no reduction in Defined mode.
+- Deterministic seeded sprite properties. Same per-element trajectory equations as Experiment 003.
+- PixiJS 8.10.0 WebGL rendering; no Wandrune simulation, spell, collision, mana, or gameplay code imported or modified.
+
+### Phone test protocol
+1. Fire, Cinematic, 24 casts / 4,800 sprites, Field, 100% zoom.
+2. Switch Original, Defined and Unbound; wait 5 seconds in each and tap Capture reading.
+3. Switch Cluster and Field at the same particle count, compare clarity and performance.
+4. Explore World using the camera controls and visible-sprite estimate; do not interpret FPS as equal-workload when fewer sprites are onscreen.
+5. Run AUTO STRESS for the chosen effect and lighting, then Copy results for the JSON report.
+6. Repeat for Gravity, Lightning and Ice if useful.
+
+### Limits and release gate
+- FPS and P95 are browser animation-frame cadence; JS + render is CPU call duration, not GPU execution time.
+- Approximate visible count includes particle sprite centers with viewport padding, not the full area of glow.
+- Two-second stages do not measure thermal throttling; artistic readability must be judged visually.
+- Wandrune remains untouched. Future integration requires separate explicit user approval.
