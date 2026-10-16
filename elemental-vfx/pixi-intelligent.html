@@ -247,7 +247,9 @@ function visualExposure(){
  return look==='defined'?Math.max(.35,1/(1+Math.sqrt(Math.max(0,n-1))*(layout==='cluster'?.11:.04))):1;
 }
 function applyLook(){
- for(let i=0;i<objects.length;i++){
+ if(strategy==='particle'){
+  if(layer)layer.blendMode=look==='defined'?'normal':'add';
+ }else for(let i=0;i<objects.length;i++){
   // Same particles and trajectories across all treatments; only blending changes.
   objects[i].sprite.blendMode=look==='defined'?(i%11===0?'add':'normal'):'add';
  }
@@ -290,12 +292,12 @@ async function rebuild(){
  if(busy||!P)return false;
  busy=true;setStatus('Allocating '+(LEVELS[level]*PER).toLocaleString()+' animated visuals…');
  try{
-  if(layer){layer.destroy({children:true});layer=null;}
+  if(layer){try{layer.destroy({children:true});}catch(e){console.warn('Particle layer cleanup:',e);layer.destroy();}layer=null;}
   if(decor){decor.destroy({children:true});decor=null;}
   if(glows){glows.destroy({children:true});glows=null;}
   objects=[];casting=[];
   drawBackdrop();let n=LEVELS[level],random=rng(0x0e1e),t=textures[element];
-  decor=new P.Container();glows=new P.Container();layer=new P.Container();
+  decor=new P.Container();glows=new P.Container();layer=strategy==='particle'?new P.ParticleContainer({dynamicProperties:{position:true,vertex:true,rotation:true,color:true}}):new P.Container();
   sceneRoot.addChild(decor,glows,layer);
   for(let c=0;c<n;c++){
    let pos=center(c,n);
@@ -305,20 +307,25 @@ async function rebuild(){
    let bolts=null;if(element==='lightning'){bolts=new P.Graphics();decor.addChild(bolts);}
    casting.push({pos,disk,halo,ring,bolts});
   }
-  /* Filter configured per visual look, after sprite construction. */
+  /* ParticleContainer uses a shared particle texture; per-particle filters and blend modes are unavailable. */
   for(let i=0;i<n*PER;i++){
-   let c=Math.floor(i/PER),sprite=new P.Sprite(t.dust[i%3]);sprite.anchor.set(.5);sprite.blendMode='add';layer.addChild(sprite);
+   let c=Math.floor(i/PER),sprite;
+   if(strategy==='particle'){
+    sprite=new P.Particle({texture:t.dust[0],x:0,y:0,anchorX:.5,anchorY:.5,scaleX:1,scaleY:1,rotation:0,alpha:1});layer.addParticle(sprite);
+   }else{sprite=new P.Sprite(t.dust[i%3]);sprite.anchor.set(.5);sprite.blendMode='add';layer.addChild(sprite);}
    objects.push({sprite,c,u:random(),v:random(),z:random(),r:random(),j:random(),a:random()*Math.PI*2});
    if((i+1)%1600===0)await new Promise(resolve=>requestAnimationFrame(resolve));
   }
   ui.particles.textContent=objects.length.toLocaleString();ui.casts.textContent=n+' casts';ui.loadText.textContent=n+' × 200';
-  applyLook();clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' PixiJS visuals · '+quality+' mode.');
+  applyLook();clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' visuals · '+strategy.toUpperCase()+' · '+quality+'.');
   return true;
  }catch(e){console.error(e);setStatus('Build error: '+e.message);return false;}
  finally{busy=false;}
 }
 function simulate(t){
  const scale=radiusFor(casting.length),elapsed=t-pulseAt,burst=Math.max(0,1-elapsed/.7),exposure=visualExposure();
+ submitted=0;skipped=0;nearCount=0;midCount=0;farCount=0;
+
  for(let k=0;k<objects.length;k++){
   const p=objects[k],s=p.sprite,pos=casting[p.c].pos;
   let life,x,y,size,alpha,rotation;
@@ -343,11 +350,41 @@ function simulate(t){
    x=pos.x+Math.cos(a)*d;y=pos.y+Math.sin(a)*d*.59;
    size=(5+p.z*15)*scale*(.8+life*.5)*(1+burst*.5);alpha=(.55+p.j*.45)*Math.min(1,(1-life)*4);rotation=a+Math.PI/2;
   }
-  s.position.set(x,y);s.rotation=rotation;s.width=size;s.height=size*1.9;s.alpha=Math.max(0,Math.min(1,alpha*(look==='cataclysm'?1:look==='defined'?exposure:1)));
+  const outAlpha=Math.max(0,Math.min(1,alpha*(look==='cataclysm'?1:look==='defined'?exposure:1)));
+  if(strategy==='particle'){
+   // Fast path: the full ParticleContainer batch is submitted. No false claim of culling.
+   s.x=x;s.y=y;s.rotation=rotation;
+   s.scaleX=size/128;s.scaleY=size*1.9/128;s.alpha=outAlpha;
+   submitted++;
+  }else{
+   s.position.set(x,y);s.rotation=rotation;
+   let visible=true,detail=1;
+   if(strategy==='cull'||strategy==='adaptive'){
+    const px=(x-camera.x)*zoom+W*.5,py=(y-camera.y)*zoom+H*.5;
+    const margin=Math.max(30,size*1.5*zoom);
+    visible=px>=-margin&&px<=W+margin&&py>=-margin&&py<=H+margin;
+    if(visible&&strategy==='adaptive'){
+     const dx=px-W*.5,dy=py-H*.5,dist2=dx*dx+dy*dy;
+     if(dist2<170*170){nearCount++;}
+     else if(dist2<300*300){midCount++;detail=2;}
+     else{farCount++;detail=6;}
+     // Same source animation, less *drawn* detail at greater camera distance.
+     visible=(k%detail===0);
+    }
+   }
+   s.renderable=visible;
+   s.width=size*(detail===6?1.30:detail===2?1.12:1);
+   s.height=size*1.9*(detail===6?1.30:detail===2?1.12:1);
+   s.alpha=outAlpha;
+   if(visible)submitted++;else skipped++;
+  }
  }
 }
 function refreshStats(){
  let m=sample();ui.fps.textContent=round(m.fps);ui.p95.textContent=round(m.p95);ui.cpu.textContent=round(m.cpu);
+ $('renderedReadout').textContent='Submitted: '+submitted.toLocaleString();
+ $('culledReadout').textContent='Skipped: '+skipped.toLocaleString();
+ $('lodReadout').textContent='Near / mid / far: '+nearCount+' / '+midCount+' / '+farCount;
 }
 function frame(now){
  requestAnimationFrame(frame);
