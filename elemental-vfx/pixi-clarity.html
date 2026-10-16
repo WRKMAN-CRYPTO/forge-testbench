@@ -158,16 +158,100 @@ if(kind==='gravity'){
 }g.restore();return P.Texture.from(cv);
 }
 function makeTextures(){for(let kind of Object.keys(TYPES)){textures[kind]={dust:[],disk:diskTexture(kind)};for(let i=0;i<3;i++)textures[kind].dust.push(shapeTexture(kind,i));}}
-function center(c,total){if(total===1)return{x:W*.5,y:H*.47};let perRow=Math.ceil(Math.sqrt(total*W/H)),rows=Math.ceil(total/perRow),row=Math.floor(c/perRow),col=c%perRow;return{x:W*(col+.5)/perRow,y:H*(row+.5)/rows};}
-function radiusFor(n){let cols=Math.ceil(Math.sqrt(n*W/H));return Math.min(1,3.1/Math.sqrt(Math.max(1,cols)));}
+function worldSize(){return{w:W*(layout==='world'?3:1),h:H*(layout==='world'?3:1)};}
+function center(c,total){
+ const size=worldSize();
+ if(layout==='cluster'){
+  let ring=Math.floor(Math.sqrt(c)),a=c*2.3999632297;
+  let r=(9+ring*7)*Math.min(1,Math.sqrt(total)/7);
+  return{x:size.w/2+Math.cos(a)*r,y:size.h/2+Math.sin(a)*r*.66};
+ }
+ const perRow=Math.ceil(Math.sqrt(total*size.w/size.h)),rows=Math.ceil(total/perRow),row=Math.floor(c/perRow),col=c%perRow;
+ return{x:size.w*(col+.5)/perRow,y:size.h*(row+.5)/rows};
+}
+function radiusFor(n){
+ if(layout==='cluster')return 1;
+ let cols=Math.ceil(Math.sqrt(n*W/H/(layout==='world'?9:1)));
+ return Math.max(.24,Math.min(1,(layout==='world'?1.65:2.25)/Math.sqrt(Math.max(1,cols))));
+}
+function cameraReset(){
+ const s=worldSize();camera.x=s.w*.5;camera.y=s.h*.5;
+ zoom=layout==='world'?.5:1;
+ $('cameraZoom').value=String(ZOOMS.indexOf(zoom));
+ applyCamera();
+}
+function applyCamera(){
+ if(!sceneRoot)return;
+ sceneRoot.scale.set(zoom);
+ sceneRoot.position.set(W/2-camera.x*zoom,H/2-camera.y*zoom);
+ $('zoomText').textContent=Math.round(zoom*100)+'%';
+ const s=worldSize();$('layoutSize').textContent='WORLD: '+Math.round(s.w)+' × '+Math.round(s.h);
+}
+function setLayoutInfo(){
+ const messages={cluster:'Same casts concentrated into a small area. Overlap is intentional, even if it obliterates the screen.',
+ field:'All casts distributed across the visible arena. Same particle counts as Cluster.',
+ world:'A 3×3 arena with off-screen effects. Drag to pan and zoom to inspect.'};
+ const looks={reference:'Original Experiment 003 additive sprites and bright layered glows.',
+ defined:'Controlled glow, mostly normal-blended cores and selected additive sparks. Every particle remains.',
+ cataclysm:'Unrestricted additive blending and amplified glow. Yes, you can make a miniature sun.'};
+ $('layoutNote').textContent=messages[layout];$('lookNote').textContent=looks[look];
+ $('sceneName').textContent=layout.toUpperCase()+' / '+look.toUpperCase();
+}
+function drawBackdrop(){
+ if(backdrop){backdrop.destroy();backdrop=null;}
+ backdrop=new P.Graphics();sceneRoot.addChildAt(backdrop,0);
+ const s=worldSize(),step=76;
+ for(let x=0;x<=s.w;x+=step)backdrop.moveTo(x,0).lineTo(x,s.h).stroke({color:0x658eb6,width:.75,alpha:.14});
+ for(let y=0;y<=s.h;y+=step)backdrop.moveTo(0,y).lineTo(s.w,y).stroke({color:0x658eb6,width:.75,alpha:.14});
+ // Ambient geometry is purely rendered decoration, not collidable gameplay terrain.
+ let r=rng(0x5cbead+(layout==='world'?3:layout==='field'?2:1));
+ for(let i=0;i<(layout==='world'?130:17);i++){
+  const x=r()*s.w,y=r()*s.h,w=12+r()*41,h=7+r()*19;
+  backdrop.rect(x,y,w,h).fill({color:0x36536d,alpha:.12});
+  backdrop.rect(x,y,w,h).stroke({color:0x698cab,width:1,alpha:.23});
+  if(i%5===0)backdrop.circle(x+w/2,y+h/2,13+r()*19).stroke({color:0x6f849f,width:1,alpha:.13});
+ }
+}
+function countVisible(){
+ if(!objects.length)return;
+ const halfW=W/2,halfH=H/2;let n=0;
+ for(let p of objects){const x=(p.sprite.x-camera.x)*zoom+halfW,y=(p.sprite.y-camera.y)*zoom+halfH;
+  if(x>=-20&&x<=W+20&&y>=-30&&y<=H+30)n++;
+ }
+ visibleApprox=n;
+ $('visibleCount').textContent='~'+n.toLocaleString()+' VISIBLE';
+ $('onScreen').textContent='~'+n.toLocaleString()+' visible visuals';
+}
+function visualExposure(){
+ const n=casting.length;
+ return look==='defined'?Math.max(.35,1/(1+Math.sqrt(Math.max(0,n-1))*(layout==='cluster'?.11:.04))):1;
+}
+function applyLook(){
+ for(let i=0;i<objects.length;i++){
+  // Same particles and trajectories across all treatments; only blending changes.
+  objects[i].sprite.blendMode=look==='defined'?(i%11===0?'add':'normal'):'add';
+ }
+ for(let c of casting){
+  if(c.halo)c.halo.blendMode='add';
+  if(c.disk)c.disk.blendMode=look==='cataclysm'?'add':'normal';
+ }
+ if(glows){
+  if(quality==='cinematic'){
+   try{glows.filters=[new P.BlurFilter({strength:look==='cataclysm'?11:look==='defined'?3:6,quality:2})];}
+   catch(e){console.warn('BlurFilter unavailable',e);glows.filters=[];}
+  }else glows.filters=[];
+ }
+ setLayoutInfo();
+}
+
 function decorate(now){
  if(!casting.length)return;
  const n=casting.length,rad=radiusFor(n),throb=.95+.06*Math.sin(now*1.6);
  for(let i=0;i<n;i++){
   let a=casting[i],pos=a.pos;
-  if(a.disk){a.disk.position.set(pos.x,pos.y);a.disk.rotation+=.0007*(element==='gravity'?1:-1);let sz=(element==='gravity'?400:320)*rad*throb; a.disk.width=sz;a.disk.height=sz;a.disk.alpha=quality==='cinematic'?.97:.43;}
-  if(a.halo){a.halo.position.set(pos.x,pos.y);a.halo.scale.set(rad*(1+Math.sin(now*3+i)*.07));a.halo.alpha=quality==='cinematic'?.47:0;}
-  if(a.ring){a.ring.visible=quality==='cinematic';a.ring.position.set(pos.x,pos.y);a.ring.rotation=now*(element==='gravity'?.4:-.15)+i*.2;a.ring.scale.set(rad*(.94+Math.sin(now*1.4)*.08));}
+  if(a.disk){a.disk.position.set(pos.x,pos.y);a.disk.rotation+=.0007*(element==='gravity'?1:-1);let sz=(element==='gravity'?400:320)*rad*throb*(look==='cataclysm'?1.25:1); a.disk.width=sz;a.disk.height=sz;a.disk.alpha=look==='defined'?(quality==='cinematic'?.24:.12)*visualExposure():look==='cataclysm'?.95:quality==='cinematic'?.97:.43;}
+  if(a.halo){a.halo.position.set(pos.x,pos.y);a.halo.scale.set(rad*(1+Math.sin(now*3+i)*.07)*(look==='cataclysm'?1.4:1));a.halo.alpha=quality!=='cinematic'?0:look==='defined'?.14*visualExposure():look==='cataclysm'?.85:.47;}
+  if(a.ring){a.ring.visible=quality==='cinematic';a.ring.alpha=look==='defined'?.85:look==='cataclysm'?.3:1;a.ring.position.set(pos.x,pos.y);a.ring.rotation=now*(element==='gravity'?.4:-.15)+i*.2;a.ring.scale.set(rad*(.94+Math.sin(now*1.4)*.08));}
   if(a.bolts&&element==='lightning'&&quality==='cinematic'&&animation%6===0){
    const g=a.bolts;g.clear();let rnd=rng((Math.floor(now*15)*7919+i*2654435761)>>>0);
    for(let b=0;b<4;b++){let angle=b*Math.PI/2+rnd()*.6,d=rad*(95+rnd()*40),xx=0,yy=0;
