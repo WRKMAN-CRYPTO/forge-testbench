@@ -130,7 +130,7 @@ lightning:{title:'LIGHTNING',sub:'BRANCHING / ARCS / IONIZATION',accent:'#8fd7ff
 ice:{title:'ICE',sub:'CRYSTALS / FRACTURE / SHATTER',accent:'#88f8ff',rgb:[113,236,255]},
 gravity:{title:'GRAVITY',sub:'ACCRETION / SINGULARITY / COLLAPSE',accent:'#c58dff',rgb:[180,111,255]}
 };
-let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,sceneRoot=null,backdrop=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,stopped=false,layout='field',look='defined',zoom=1,camera={x:W*.5,y:H*.5},visibleApprox=0,strategy='baseline',submitted=0,skipped=0,nearCount=0,midCount=0,farCount=0,comparing=false,comparisonEpoch=0,compareResults=[];const ZOOMS=[.33,.50,.75,1,1.25,1.6];
+let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,sceneRoot=null,backdrop=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,stopped=false,layout='field',look='defined',zoom=1,camera={x:W*.5,y:H*.5},visibleApprox=0,strategy='baseline',submitted=0,skipped=0,nearCount=0,midCount=0,farCount=0,comparing=false,comparisonEpoch=0,compareResults=[],sceneOrigin=0;const ZOOMS=[.33,.50,.75,1,1.25,1.6];
 function rng(seed){let x=seed>>>0;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;};}
 function delay(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 function round(n){return Number.isFinite(n)?n.toFixed(1):'--';}
@@ -317,7 +317,7 @@ async function rebuild(){
    if((i+1)%1600===0)await new Promise(resolve=>requestAnimationFrame(resolve));
   }
   ui.particles.textContent=objects.length.toLocaleString();ui.casts.textContent=n+' casts';ui.loadText.textContent=n+' × 200';
-  applyLook();clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' visuals · '+strategy.toUpperCase()+' · '+quality+'.');
+  applyLook();sceneOrigin=performance.now();clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' visuals · '+strategy.toUpperCase()+' · '+quality+'.');
   return true;
  }catch(e){console.error(e);setStatus('Build error: '+e.message);return false;}
  finally{busy=false;}
@@ -392,7 +392,7 @@ function frame(now){
  animation++;
  const dt=last?Math.min(1000,now-last):0;last=now;
  let start=performance.now();
- let t=now/1000;
+ let t=(now-sceneOrigin)/1000;
  try{simulate(t);decorate(t);app.render();}catch(e){console.error(e);setStatus('Render failure: '+e.message);last=0;return;}
  let cost=performance.now()-start;
  if(dt>0){metrics.push(dt);costs.push(cost);if(metrics.length>250){metrics.shift();costs.shift();}}
@@ -410,7 +410,7 @@ function abortRamp(){
  if(auto){auto=false;autoEpoch++;ui.ramp.textContent='▶ AUTO STRESS';ui.ramp.classList.remove('stop');ui.progress.textContent='Stopped';setStatus('Auto ramp stopped. Measurements collected: '+reports.length+'.');}
 }
 async function ramp(){
- if(auto){abortRamp();return;}
+ if(auto){if(!comparing)abortRamp();return;}
  if(busy||!app)return;
  auto=true;stopped=false;const ticket=++autoEpoch;reports=[];renderResults();ui.ramp.textContent='■ STOP RAMP';ui.ramp.classList.add('stop');ui.progress.textContent='0 / '+LEVELS.length;lastStable=null;firstWeak=null;let badStreak=0;
  const buttons=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#compare');
@@ -436,7 +436,7 @@ async function ramp(){
  finally{if(ticket===autoEpoch){auto=false;ui.ramp.textContent='▶ AUTO STRESS';ui.ramp.classList.remove('stop');if(!stopped)ui.progress.textContent='Complete';}
  buttons.forEach(x=>x.disabled=false);}
 }
-function trigger(){pulseAt=performance.now()/1000;let tint=TYPES[element].accent;ui.flash.style.background=tint;ui.flash.animate([{opacity:.3},{opacity:0}],{duration:470,easing:'ease-out'});}
+function trigger(){pulseAt=(performance.now()-sceneOrigin)/1000;let tint=TYPES[element].accent;ui.flash.style.background=tint;ui.flash.animate([{opacity:.3},{opacity:0}],{duration:470,easing:'ease-out'});}
 function report(){
  const data={app:'WRKMAN PixiJS 8 Intelligent Rendering Lab',version:'0.5',date:new Date().toISOString(),renderer:strategy==='particle'?'PixiJS 8.10.0 ParticleContainer':'PixiJS 8.10.0 Sprites',element,quality,layout,look,strategy,submitted,skipped,nearCount,midCount,farCount,comparisonResults:compareResults,camera:{x:camera.x,y:camera.y,zoom},approxVisible:visibleApprox,particleCount:objects.length,visualsPerCast:PER,levels:LEVELS,threshold:{minFps:50,maxP95ms:25,consecutiveFailures:2},results:reports,highestPassingParticles:lastStable,
  current:sample(),device:navigator.userAgent,viewport:[innerWidth,innerHeight],pixelRatio:devicePixelRatio,notes:'Frame cadence via rAF. JS + render call time does not equal GPU execution time. Same total sprite count; layout and zoom affect approximate visible counts. Short ~2-second stages; no Wandrune code used.'};
@@ -510,14 +510,80 @@ stage.addEventListener('pointerup',e=>{
 });
 stage.addEventListener('pointercancel',e=>{pointers.delete(e.pointerId);gestureMoved=false;});
 
-document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden&&auto)abortRamp();});
+
+const STRATEGIES={
+ baseline:'Every Sprite is animated and submitted, even when beyond the camera. Full appearance reference.',
+ cull:'All particle states update, but outside-the-camera Sprites set renderable=false and are not drawn.',
+ adaptive:'Offscreen Sprites are not drawn; near detail is full, mid draws 1/2, far draws 1/6. Each keeps its underlying animated state.',
+ particle:'PixiJS 8 ParticleContainer batching. Every lightweight Particle is submitted; a shared texture and blend mode mean this is not pixel-identical to regular Sprites.'
+};
+function activateStrategy(){
+ for(const b of document.querySelectorAll('[data-strategy]'))b.setAttribute('aria-pressed',String(b.dataset.strategy===strategy));
+ $('strategyNote').textContent=STRATEGIES[strategy];
+ clearSamples();
+}
+$('strategies').addEventListener('click',async e=>{
+ const b=e.target.closest('[data-strategy]');
+ if(!b||auto||busy||b.dataset.strategy===strategy)return;
+ const old=strategy;strategy=b.dataset.strategy;activateStrategy();
+ const ok=await rebuild();
+ if(!ok){strategy=old;activateStrategy();await rebuild();setStatus('That renderer failed to initialize; restored '+old+'.');}
+});
+function stopComparison(){
+ if(!comparing)return;
+ comparing=false;comparisonEpoch++;
+ $('compareStop').disabled=true;setStatus('Comparison stop requested; returning to original mode.');
+}
+$('compareStop').addEventListener('click',stopComparison);
+$('compare').addEventListener('click',async()=>{
+ if(auto||busy||!app||comparing)return;
+ const initial=strategy,ticket=++comparisonEpoch,modes=['baseline','cull','adaptive','particle'];
+ comparing=true;auto=true;compareResults=[];
+ const controls=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#ramp,#compare');
+ controls.forEach(c=>c.disabled=true);
+ $('compareStop').disabled=false;$('progress').textContent='0 / 4';
+ let endedEarly=false;
+ try{
+  for(let i=0;i<modes.length;i++){
+   if(!comparing||ticket!==comparisonEpoch){endedEarly=true;break;}
+   strategy=modes[i];activateStrategy();
+   let ok=await rebuild();
+   if(!ok){setStatus('Unable to create '+strategy+' renderer.');endedEarly=true;break;}
+   $('progress').textContent=(i+1)+' / 4';
+   setStatus('A/B '+(i+1)+'/4: '+strategy.toUpperCase()+', '+objects.length.toLocaleString()+' particles. Letting effects settle…');
+   await delay(700);
+   if(!comparing||ticket!==comparisonEpoch){endedEarly=true;break;}
+   clearSamples();
+   await delay(2200);
+   if(!comparing||ticket!==comparisonEpoch){endedEarly=true;break;}
+   let m=sample(),okPerf=m.samples>=30&&m.fps>=50&&m.p95<=25;
+   const row={comparison:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,strategy,
+    zoom,approxVisible:visibleApprox,submitted,skipped,nearCount,midCount,farCount,
+    passed:okPerf,fps:+m.fps.toFixed(2),p95:+m.p95.toFixed(2),cpu:+m.cpu.toFixed(2),samples:m.samples};
+   compareResults.push(row);reports.push(row);renderResults();
+  }
+ }catch(e){console.error(e);setStatus('Comparison error: '+e.message);endedEarly=true;}
+ finally{
+  if(ticket===comparisonEpoch){comparing=false;}
+  auto=false;
+  $('compareStop').disabled=true;
+  controls.forEach(c=>c.disabled=false);
+  while(busy)await delay(25);
+  strategy=initial;activateStrategy();
+  await rebuild();
+  $('progress').textContent=endedEarly?'Partial ('+compareResults.length+'/4)':'Comparison complete';
+  setStatus(endedEarly?'Partial A/B recorded: '+compareResults.length+' modes.':'Four modes compared at the same load. Tap Copy results to send the performance and submitted-sprite counts.');
+ }
+});
+
+document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden){if(comparing)stopComparison();else if(auto)abortRamp();}});
 window.addEventListener('pagehide',()=>{auto=false;});
 async function init(){
  try{
  if(!window.PIXI)throw new Error('Could not load PixiJS from CDN. Check your connection.');
  P=window.PIXI;app=new P.Application();
  await app.init({width:W,height:H,resolution:Math.min(2,devicePixelRatio||1),autoDensity:true,backgroundAlpha:0,antialias:false,preference:'webgl',powerPreference:'high-performance'});
- app.stop();ui.view.append(app.canvas);sceneRoot=new P.Container();app.stage.addChild(sceneRoot);makeTextures();cameraReset();setLayoutInfo();
+ app.stop();ui.view.append(app.canvas);sceneRoot=new P.Container();app.stage.addChild(sceneRoot);makeTextures();cameraReset();setLayoutInfo();activateStrategy();
  await rebuild();running=true;requestAnimationFrame(frame);
  }catch(e){console.error(e);setStatus('Initialization failed: '+e.message);ui.view.innerHTML='<div class="error">PixiJS could not start. Try opening this over HTTPS with internet access and a WebGL-enabled browser.</div>';}
 }
