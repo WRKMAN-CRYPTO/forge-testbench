@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#111a1d"><meta name="apple-mobile-web-app-capable" content="yes">
+<title>Wandrune | The Hearthlands</title>
+<style>
+:root{color-scheme:dark;--ink:#f6e9ca;--muted:#acbdac;--gold:#f3cc83}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08131a;color:var(--ink);font-family:system-ui,-apple-system,sans-serif;touch-action:none;overscroll-behavior:none}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+#world{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 48%,transparent 36%,#0009 110%)}
+#top{position:fixed;z-index:6;top:0;left:0;right:0;display:flex;align-items:flex-start;gap:8px;padding:calc(7px + env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) 5px max(8px,env(safe-area-inset-left));background:linear-gradient(#08141aeb,#08141a80 70%,transparent);pointer-events:none}
+#brand{font:950 clamp(10px,1.9vw,15px)/1.2 ui-monospace,monospace;letter-spacing:.16em;white-space:nowrap}
+#brand span{display:block;font:800 9px/1.4 ui-monospace,monospace;color:#9daea9;letter-spacing:.08em}
+#location{font:800 11px/1.45 ui-monospace,monospace;color:#e2d4b4;min-width:0;flex:1;text-align:center;letter-spacing:.04em}
+#location small{display:block;font-size:9px;color:#c3cdbb}
+#top button{pointer-events:auto;border:1px solid #8c886a;background:#1b302dbf;color:#f1e7c5;padding:7px 9px;min-height:35px;border-radius:9px;font:900 10px ui-monospace,monospace}
+#top .active{border-color:#eacb88;color:#ffe7a9}
+#bottom{position:fixed;z-index:6;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;pointer-events:none;padding:0 max(13px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(13px,env(safe-area-inset-left))}
+#joy{position:relative;width:112px;height:112px;border:2px solid #c2d6c759;border-radius:50%;background:#14282155;pointer-events:auto;touch-action:none}
+#knob{position:absolute;left:32px;top:32px;width:44px;height:44px;border:2px solid #e0ebd7b8;border-radius:50%;background:#6d918872;box-shadow:0 0 15px #ddf7dc2a;pointer-events:none}
+#rightControls{display:flex;flex-direction:column;gap:7px;align-items:flex-end;pointer-events:auto}
+#nearText{max-width:240px;text-align:right;padding:6px 9px;border-radius:10px;background:#0c1a1dcc;color:#ffe5ac;font:800 10px/1.3 ui-monospace,monospace;border:1px solid #6c8a8065;min-height:27px}
+#interact{min-width:110px;min-height:59px;border:2px solid #d9bd7e;border-radius:18px;background:linear-gradient(#644b2c,#332c20);color:#fff0c7;font:950 14px ui-monospace,monospace;box-shadow:0 5px 18px #0008}
+#interact:disabled{opacity:.46;border-color:#62726d}
+#hint{position:fixed;z-index:4;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));pointer-events:none;background:#101d1dc9;border:1px solid #758e8250;border-radius:30px;padding:6px 13px;font:800 9px ui-monospace,monospace;color:#cadac9;white-space:nowrap}
+#status{position:fixed;z-index:5;top:calc(54px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);border:1px solid #ddb97d80;background:#172726ed;color:#f7db9b;border-radius:10px;padding:7px 12px;max-width:75vw;text-align:center;pointer-events:none;font:800 11px/1.4 ui-monospace,monospace;opacity:0;transition:opacity .35s}
+#status.visible{opacity:1}
+#dialogue[hidden],#journal[hidden]{display:none!important}
+#dialogue{position:fixed;z-index:15;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(610px,calc(100vw - 25px));max-height:min(58dvh,370px);overflow:auto;touch-action:pan-y;background:linear-gradient(145deg,#1d302b,#0d2022);border:1.5px solid #d7b878;border-radius:16px;padding:14px 16px;box-shadow:0 10px 60px #000e}
+#dialogue h2{margin:0 35px 6px 0;font:950 15px ui-monospace,monospace;letter-spacing:.06em;color:#ffe2a7}
+#dialogue p{margin:4px 0 12px;font:500 clamp(12px,2.3vw,15px)/1.55 Georgia,serif;color:#e6dfc8}
+#dialogue .footnote{color:#9ebcad;font:800 9px ui-monospace,monospace;letter-spacing:.04em}
+#dialogue button,#journal button{border:1px solid #c7a76d;border-radius:8px;background:#57462e;color:#ffe5b5;padding:7px 14px;font:900 11px ui-monospace,monospace}
+#dialogueClose{position:absolute;right:10px;top:10px}
+#journal{position:fixed;z-index:18;inset:0;display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top) 9px env(safe-area-inset-bottom);background:#040b0add;touch-action:pan-y}
+#journalPanel{width:min(680px,100%);max-height:93dvh;overflow-y:auto;background:linear-gradient(145deg,#273c34,#112322);border:1.5px solid #c8a772;border-radius:17px;padding:17px;box-shadow:0 20px 65px #000b}
+#journalHeader{display:flex;justify-content:space-between;align-items:center;gap:10px}
+#journal h2{font:950 17px ui-monospace,monospace;color:#ffdf9d;margin:0}
+#journal h3{font:900 12px ui-monospace,monospace;color:#c2ddc9;margin:14px 0 5px}
+#journal p,#journal li{font:13px/1.5 Georgia,serif;color:#e8e0ce}
+#journal ul{padding-left:21px;margin:7px 0 16px}
+#journal li{margin:0 0 8px}
+#quiet{font:800 10px ui-monospace,monospace;color:#b5c8ba;letter-spacing:.05em}
+#focusbar{position:fixed;z-index:5;top:calc(59px + env(safe-area-inset-top));left:max(9px,env(safe-area-inset-left));width:120px;height:11px;border:1px solid #c5a78b70;border-radius:7px;background:#182621bb;overflow:hidden}
+#focusFill{width:100%;height:100%;background:linear-gradient(90deg,#cc7967,#f1cb86)}
+#focusLabel{position:fixed;z-index:5;top:calc(75px + env(safe-area-inset-top));left:max(9px,env(safe-area-inset-left));font:800 9px ui-monospace,monospace;color:#ead5b1}
+#rotation{display:none}
+@media(pointer:fine){#joy{opacity:.36}#hint{display:block}}
+@media(max-height:480px){#top{padding-top:3px}#top button{padding:4px 7px;min-height:27px}#joy{width:88px;height:88px}#knob{width:34px;height:34px;left:25px;top:25px}#interact{min-height:48px}#dialogue{padding:9px 13px;max-height:72dvh}#dialogue p{font-size:12px;line-height:1.4}#status{top:36px}#focusbar{top:39px}#focusLabel{top:54px}}
+@media(max-width:580px) and (orientation:portrait) and (pointer:coarse){#rotation{display:flex;position:fixed;z-index:30;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:15px;background:#10231f;color:#fbe0a3;font:900 17px ui-monospace,monospace;text-align:center;padding:24px}#rotation span{font-size:45px;transform:rotate(-90deg)}}
+</style></head>
+<body>
+<canvas id="world" aria-label="Wandrune exploration world"></canvas><div id="vignette"></div>
+<div id="top"><div id="brand">W / WANDRUNE<span>THE HEARTHLANDS · 081</span></div><div id="location">THE OLD COTTAGE<small>THE WORLD DOESN'T WAIT FOR YOU</small></div><button id="journalBtn" type="button">✦ JOURNAL</button><button id="homeBtn" type="button">⌂ LAB</button></div>
+<div id="focusbar"><div id="focusFill"></div></div><div id="focusLabel">NERVE · 100</div>
+<div id="status" role="status" aria-live="polite"></div>
+<div id="bottom"><div id="joy" aria-label="Movement joystick"><div id="knob"></div></div><div id="rightControls"><div id="nearText" aria-live="polite">WANDER AND WONDER</div><button id="interact" type="button" disabled>◈ EXAMINE</button></div></div><div id="hint">WASD / ARROWS MOVE · E EXAMINE · J JOURNAL · TAP TO WALK</div>
+<div id="dialogue" role="dialog" aria-label="Discovery" hidden><button id="dialogueClose" aria-label="Close dialogue">✕</button><h2 id="dialogueTitle"></h2><p id="dialogueBody"></p><div class="footnote" id="dialogueFoot"></div></div>
+<div id="journal" role="dialog" aria-modal="true" aria-label="Exploration journal" hidden><div id="journalPanel"><div id="journalHeader"><h2>W / THE WANDERER'S LEDGER</h2><button id="journalClose">CLOSE ✕</button></div><p>Write down what you find. The world will not place a glowing arrow over its secrets.</p><h3>DISCOVERIES</h3><div id="journalList"></div><h3>THE MAP YOU KNOW</h3><p id="journalMap"></p><div id="quiet">SAVED TO THIS DEVICE · SPELLS UNCHANGED</div></div></div>
+<div id="rotation" role="status"><span>▭</span>TURN SIDEWAYS<small>Let the landscape fill your screen.</small></div>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id),cv=$("world"),ctx=cv.getContext("2d",{alpha:false});
+const W=1200,H=800,TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const SAVE="wandrune-hearthlands-081";
+const names={home:["THE OLD COTTAGE","One warm window against a very large world"],inside:["THE COTTAGE","Dust, oak beams, and things left unsaid"],wild:["THE THORNWOOD","A road the forest has nearly swallowed"],village:["BRIARWICK","Shelter, company, and the smell of bread"],deep:["THE UNFINISHED STAIR","Under the roots, something is listening"]};
+const clues={
+ letter:"A letter beside the cottage asks that the warm soil be left undisturbed.",
+ soil:"The garden is warm in one spot, even though the surrounding earth is cold.",
+ floor:"Symbols scratched beneath the workshop dust point toward an unfinished circle.",
+ bell:"Briarwick's bell rings at odd hours, even when the bellkeeper is away.",
+ mill:"The village millwheel turns without a stream. The miller says it has always done that.",
+ waystone:"A stone in Thornwood bears marks almost identical to the ones beneath the cottage.",
+ under:"An old stair beneath the forest leads to a chamber that refuses to explain itself.",
+ pulse:"Something below the earth responds to your footsteps, then falls silent.",
+ visitor:"Someone from Briarwick remembers the cottage's former occupant, but won't say why they left."
+};
+function load(){try{const s=JSON.parse(localStorage.getItem(SAVE)||"{}");return {seen:s.seen||{},discoveries:s.discoveries||{},zone: names[s.zone]?s.zone:"home"};}catch(_){return {seen:{},discoveries:{},zone:"home"};}}
+let memory=load(),zone=memory.zone,player={x:zone==="inside"?600:zone==="deep"?600:zone==="wild"?170:zone==="village"?135:545,y:zone==="inside"?600:zone==="deep"?580:420,face:1},focus=100;
+let keys={},joystick={x:0,y:0},joyId=null,waypoint=null,dialogue=false,journal=false,now=0,last=0,view={w:0,h:0,scale:1,cx:0,cy:0},near=null,statusUntil=0,screenShaking=0,hitUntil=0;
+const seeds=(a,b,c=11)=>{let n=Math.sin(a*127.1+b*311.7+c*74.7)*43758.5453;return n-Math.floor(n)};
+const point=(x,y)=>({x,y}),distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const exits={
+ home:[{x:1130,y:410,to:"wild",tx:120,ty:410,label:"ROAD INTO THORNWOOD"},{x:520,y:314,to:"inside",tx:600,ty:585,label:"ENTER COTTAGE"}],
+ inside:[{x:600,y:696,to:"home",tx:520,ty:500,label:"STEP OUTSIDE"}],
+ wild:[{x:85,y:410,to:"home",tx:1050,ty:410,label:"BACK TO THE COTTAGE"},{x:1124,y:410,to:"village",tx:120,ty:410,label:"LIGHTS OF BRIARWICK"},{x:590,y:127,to:"deep",tx:590,ty:610,label:"DESCEND THE OLD STAIR"}],
+ village:[{x:87,y:410,to:"wild",tx:1070,ty:410,label:"THORNWOOD ROAD"}],
+ deep:[{x:590,y:685,to:"wild",tx:585,ty:220,label:"RETURN TO DAYLIGHT"}]
+};
+const spots={
+ home:[
+  {id:"letter",x:319,y:470,name:"A folded letter",title:"A LETTER WITHOUT A NAME",desc:"The envelope is addressed simply: 'To whoever lives here next.' Inside, in careful ink: 'If the garden feels warm, please don't dig. Not until you know what you're hearing.'"},
+  {id:"soil",x:756,y:367,name:"The warm garden",title:"GROUND THAT REMEMBERS",desc:"The vegetables are healthy, but one bare patch of soil radiates the soft heat of a banked fire. No steam. No insects. The deeper you place your palm, the steadier the warmth."},
+  {id:"door",x:524,y:317,name:"The cottage door",to:"inside",tx:600,ty:575},
+  {id:"woodpile",x:284,y:307,name:"The old woodpile",title:"SMALL COMFORTS",desc:"Dry oak, stacked with the knots facing outward. Someone took care to prepare this place for winter. A tiny moth has made a home between two logs."}
+ ],
+ inside:[
+  {id:"floor",x:760,y:440,name:"Symbols beneath dust",title:"THE MARK UNDER THE FLOOR",desc:"With your sleeve you clear the dust. Three arcs surround an incomplete ring, drawn by someone who kept retracing the same final line. This is no ordinary carpenter's mark."},
+  {id:"hearth",x:375,y:300,name:"The fireplace",title:"A GOOD FIRE",desc:"The hearth is warm, though you haven't lit it. There's bread in a covered dish. For now, the world outside can wait.",restore:true},
+  {id:"workbench",x:827,y:272,name:"The workbench",title:"A PLACE TO INVENT",desc:"An ordinary workbench, scarred by years of experiments. No recipe books. A few odd pieces of copper, blue glass, and one brass screw filed into a star."},
+  {id:"stairs",x:530,y:397,name:"A sealed trapdoor",title:"THE DOOR THAT GOES NOWHERE",desc:"A wooden trapdoor is fixed into the floor. It has no hinges you can see. A faint vibration travels through it when you stand very still."}
+ ],
+ wild:[
+  {id:"waystone",x:646,y:311,name:"A carved waystone",title:"SOMEONE WAS HERE BEFORE",desc:"Beneath the moss, the old stone carries three arcs around an incomplete ring. Exactly the sort of design you'd expect to find indoors, not a day's walk into the woods."},
+  {id:"footprints",x:339,y:592,name:"Unusual footprints",title:"AN OLD TRAIL",desc:"Bootprints, then animal prints, then deep gouges in the ground. Something heavy was dragged toward the old staircase, but the trail stops at a tree."},
+  {id:"deepdoor",x:593,y:141,name:"Stairs under the roots",to:"deep",tx:590,ty:600},
+  {id:"camp",x:853,y:475,name:"An abandoned camp",title:"A STRANGER'S CAMP",desc:"A cold kettle. A broken lantern. Someone scratched a single word into a tin cup: 'LISTEN.' Nothing here seems worth stealing."}
+ ],
+ village:[
+  {id:"bell",x:623,y:242,name:"The bell tower",title:"THE BELL AT THE WRONG HOUR",desc:"The tower is empty. The bellkeeper's coat hangs on a peg. Still, a bell rings softly overhead, and the rope never moves."},
+  {id:"mill",x:970,y:325,name:"The turning millwheel",title:"A MILL WITHOUT WATER",desc:"The giant wheel is turning. Beneath it is dry stone, not a drop of water. The miller shrugs. 'A wheel's a wheel. Would you rather it stopped?'"},
+  {id:"visitor",x:454,y:529,name:"Mara, the baker",title:"THE BAKER REMEMBERS",desc:"Mara wipes flour from her hands. 'That house out in the clearing? Old Rowan lived there. Quiet sort. Always listening to the floor.' She looks toward the forest. 'Don't go below the roots after dark.'"},
+  {id:"smith",x:826,y:519,name:"Tovin, the smith",title:"THE SMITH'S ADVICE",desc:"Tovin sets down his hammer. 'Nothing wrong with curiosity. Trouble is, the woods are curious about you too.' He points at the lantern road. 'Keep the lights in sight.'"}
+ ],
+ deep:[
+  {id:"under",x:502,y:292,name:"An unfinished arch",title:"THE UNFINISHED STAIR",desc:"Stonework ends halfway through an arch, as if the builders stopped while the mortar was wet. The circle carved into its center has three gaps. None looks accidental."},
+  {id:"pulse",x:799,y:454,name:"A faint vibration",title:"A SOUND YOU CAN FEEL",desc:"The stone hums against your fingertips. A pulse travels down the corridor, then returns. Not an answer, exactly. More like something testing whether you are still there."}
+ ]
+};
+function save(){try{localStorage.setItem(SAVE,JSON.stringify({...memory,zone}));}catch(_){}}
+function announce(message){const el=$("status");el.textContent=message;el.classList.add("visible");statusUntil=performance.now()+2400}
+function record(id){if(clues[id]&&!memory.discoveries[id]){memory.discoveries[id]=Date.now();announce("✦ NEW NOTE RECORDED");}save()}
+function openDialogue(title,body,foot="PRESS ✕ OR E TO CONTINUE"){dialogue=true;waypoint=null;stopJoy();$("dialogueTitle").textContent=title;$("dialogueBody").textContent=body;$("dialogueFoot").textContent=foot;$("dialogue").hidden=false}
+function closeDialogue(){dialogue=false;$("dialogue").hidden=true}
+function travel(to,x,y){zone=to;player.x=x;player.y=y;waypoint=null;focus=Math.max(focus,(to==="home"||to==="inside"||to==="village")?70:focus);memory.seen[zone]=true;save();announce(names[zone][0]);updateLocation()}
+function examine(p){if(!p)return;if(p.to){travel(p.to,p.tx,p.ty);return}
+ if(p.restore)focus=100;
+ if(clues[p.id])record(p.id);
+ openDialogue(p.title||p.name.toUpperCase(),p.desc||"There is more here than first meets the eye.",p.restore?"A MOMENT OF PEACE · NERVE RESTORED":"THE WORLD GOES ON EVEN WHEN YOU STOP TO LOOK");
+}
+function updateLocation(){$("location").innerHTML=names[zone][0]+"<small>"+names[zone][1]+"</small>";$("focusFill").style.width=focus+"%";$("focusLabel").textContent="NERVE · "+Math.round(focus)}
+function openJournal(){closeDialogue();journal=true;waypoint=null;stopJoy();$("journal").hidden=false;
+ const ids=Object.keys(memory.discoveries),text=ids.length?"<ul>"+ids.map(id=>"<li>"+clues[id]+"</li>").join("")+"</ul>":"<p>Just a blank page. There is a great deal you haven't looked at yet.</p>";
+ $("journalList").innerHTML=text;
+ $("journalMap").textContent=["home","wild","village","inside","deep"].filter(id=>memory.seen[id]).map(id=>names[id][0]).join("  ✦  ")||names.home[0];
+ $("journalBtn").classList.add("active");
+}
+function closeJournal(){journal=false;$("journal").hidden=true;$("journalBtn").classList.remove("active")}
+$("journalBtn").onclick=()=>journal?closeJournal():openJournal();$("journalClose").onclick=closeJournal;
+$("dialogueClose").onclick=closeDialogue;
+$("homeBtn").onclick=()=>{location.href="./?v=081"};
+$("interact").onclick=()=>{if(!dialogue&&!journal)examine(near)};
+function stopJoy(){joystick.x=0;joystick.y=0;joyId=null;$("knob").style.transform="translate(0px,0px)"}
+function setJoy(ev){const r=$("joy").getBoundingClientRect(),x=ev.clientX-(r.left+r.width/2),y=ev.clientY-(r.top+r.height/2),d=Math.hypot(x,y),lim=r.width*.37;joystick.x=clamp(x/lim,-1,1);joystick.y=clamp(y/lim,-1,1);if(d>lim){joystick.x=x/d;joystick.y=y/d}$("knob").style.transform="translate("+joystick.x*lim+"px,"+joystick.y*lim+"px)"}
+$("joy").addEventListener("pointerdown",e=>{if(joyId!==null)return;joyId=e.pointerId;$("joy").setPointerCapture(e.pointerId);setJoy(e);e.preventDefault()});
+$("joy").addEventListener("pointermove",e=>{if(e.pointerId===joyId){setJoy(e);e.preventDefault()}});
+for(const event of ["pointerup","pointercancel","lostpointercapture"])$("joy").addEventListener(event,e=>{if(e.pointerId===joyId)stopJoy()});
+document.addEventListener("keydown",e=>{if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();keys[e.key.toLowerCase()]=true;
+ if(e.repeat)return;
+ if(e.key.toLowerCase()==="e"||e.key==="Enter"){if(dialogue)closeDialogue();else if(!journal)examine(near)}
+ if(e.key.toLowerCase()==="j"){journal?closeJournal():openJournal()}
+ if(e.key==="Escape"){if(journal)closeJournal();else if(dialogue)closeDialogue();}
+});
+document.addEventListener("keyup",e=>{keys[e.key.toLowerCase()]=false});
+window.addEventListener("blur",()=>{keys={};stopJoy();waypoint=null});
+cv.addEventListener("pointerdown",e=>{if(dialogue||journal||e.pointerType==="touch"&&joyId!==null)return;const x=(e.clientX-view.w/2)/view.scale+view.cx,y=(e.clientY-view.h/2)/view.scale+view.cy;
+ const p=[...spots[zone],...exits[zone]].find(p=>Math.hypot(p.x-x,p.y-y)<48);
+ if(p&&distance(player,p)<125){examine(p);return}
+ waypoint={x:clamp(x,50,W-50),y:clamp(y,70,H-60)};
+});
+function poly(pts,fill,stroke,width=1){ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke()}}
+function box(x,y,w,h,fill,stroke=null,r=0){ctx.fillStyle=fill;if(r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}else{ctx.fillRect(x,y,w,h);if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.strokeRect(x,y,w,h)}}}
+function circle(x,y,r,color){ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fillStyle=color;ctx.fill()}
+function ring(x,y,r,color,width=2){ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke()}
+function line(x,y,a,b,col,width=2){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(a,b);ctx.strokeStyle=col;ctx.lineWidth=width;ctx.stroke()}
+function text(s,x,y,size=14,color="#f2e6c8",align="center"){ctx.fillStyle=color;ctx.textAlign=align;ctx.font="800 "+size+"px ui-monospace,monospace";ctx.fillText(s,x,y)}
+function drawGround(){
+ const c={home:["#354c3b","#18302c"],wild:["#1c302f","#091f24"],village:["#4b523e","#26382f"],inside:["#5a4636","#352e2a"],deep:["#28343a","#121f29"]}[zone];
+ const gr=ctx.createLinearGradient(0,0,W,H);gr.addColorStop(0,c[0]);gr.addColorStop(1,c[1]);box(0,0,W,H,gr);
+ // Stable flecks, repeated only inside the visible world's rough bounds.
+ for(let i=0;i<550;i++){const x=seeds(i,2)*W,y=seeds(i,7)*H,n=seeds(i,11);circle(x,y,zone==="inside"||zone==="deep"?1.1:1+n*2.7,zone==="deep"?"#81948b16":zone==="wild"?"#8cb6a825":"#c3c39b22")}
+ if(zone==="inside"||zone==="deep"){
+  for(let x=70;x<W;x+=60)line(x,65,x,H-50,zone==="deep"?"#86939413":"#debd8950",2);
+  for(let y=80;y<H;y+=72)line(55,y,W-55,y,zone==="deep"?"#86939416":"#261b1930",3);
+  box(25,25,W-50,H-50,null); // decorative walls below
+  for(const [x,y,w,h] of [[35,30,W-70,32],[35,H-65,W-70,32],[35,30,32,H-60],[W-67,30,32,H-60]])box(x,y,w,h,zone==="deep"?"#46514c":"#6d5542","#1c2324");
+ }else{
+  // Diagonal worn road. Its destination remains physically discoverable.
+  ctx.strokeStyle=zone==="wild"?"#6d685447":"#b1a47c45";ctx.lineCap="round";ctx.lineWidth=105;ctx.beginPath();
+  ctx.moveTo(35,411);ctx.bezierCurveTo(340,423,570,415,780,413);ctx.bezierCurveTo(960,396,1080,406,1190,410);ctx.stroke();
+  ctx.strokeStyle="#d5c1a41f";ctx.lineWidth=67;ctx.stroke();
+ }
+}
+function tree(x,y,r,n=0){circle(x+7,y+15,r*.93,"#060d0c83");line(x+1,y+5,x+5,y+33,"#554b33",5);
+ circle(x-r*.21,y-r*.31,r*.8,zone==="wild"?"#24453b":"#426849");
+ circle(x+r*.31,y-r*.15,r*.74,zone==="wild"?"#234338":"#315d43");
+ circle(x-r*.02,y-r*.56,r*.7,zone==="wild"?"#3b5d4a":"#66845d");
+ for(let k=0;k<4;k++){const a=(k*2.4+n*TAU);circle(x+Math.cos(a)*r*.38,y-r*.4+Math.sin(a)*r*.3,3,"#b1b77d67")}
+}
+function drawForest(){
+ for(let i=0;i<115;i++){
+ const x=seeds(i,14)*W,y=seeds(i,51)*H;
+ if(y>340&&y<482)continue;
+ if(zone==="home"&&x>270&&x<790&&y>255&&y<625)continue;
+ if(zone==="village"&&x>250&&x<1060&&y>130&&y<665)continue;
+ if(zone==="wild"&&Math.hypot(x-590,y-155)<112)continue;
+ tree(x,y,19+seeds(i,65)*30,seeds(i,31));
+ }
+}
+function house(x,y,w,h,color,roof="#594c40"){circle(x+w/2,y+h/1.1,w*.7,"#08141945");box(x,y+20,w,h-20,color,"#1f2c24",7);
+ poly([[x-17,y+29],[x+w/2,y-h*.34],[x+w+17,y+29]],roof,"#9b8662",5);
+ box(x+w*.37,y+h*.47,w*.26,h*.53,"#332d25","#c6ab78",3);
+ for(const xx of [x+w*.16,x+w*.73]){box(xx,y+h*.43,w*.12,18,"#edc77c","#5a4531",3);circle(xx+w*.06,y+h*.48,27,"#f3bc6550")}
+}
+function lantern(x,y){circle(x,y+20,20,"#030c0d70");line(x,y+22,x,y-34,"#503f2b",6);box(x-10,y-49,20,25,"#d7aa64","#84683b",3);circle(x,y-37,22+Math.sin(now*.002)*2,"#ffda8641");circle(x,y-37,4,"#fff4d1")}
+function flower(x,y){circle(x,y,3,"#e6c7aa");for(let i=0;i<5;i++)circle(x+Math.cos(i*TAU/5)*6,y+Math.sin(i*TAU/5)*6,3.6,i%2?"#d1a3a3":"#f3daa2")}
+function rune(x,y,r=44){ring(x,y,r,"#7ed0c084",3);ctx.beginPath();ctx.arc(x,y,r*.64,.1,2.7);ctx.strokeStyle="#c8ddd5";ctx.lineWidth=3;ctx.stroke();ctx.beginPath();ctx.arc(x,y,r*.62,3.5,5.9);ctx.stroke();circle(x,y,4,"#dfeec9")}
+function drawHome(){
+ house(365,176,345,188,"#967856","#555e52");text("THE COTTAGE",544,202,17,"#ffebb9");
+ box(740,322,205,150,"#4b5137aa","#b6a36a",6);for(let i=0;i<20;i++)flower(757+(i%5)*41,342+Math.floor(i/5)*33);
+ circle(756,367,22,"#e4a16f30");ring(756,367,24,"#e8c78e45",3);
+ for(let i=0;i<9;i++)box(206+i*11,247,8,86,"#594935");box(212,300,130,15,"#302d24");
+ for(let i=0;i<7;i++)circle(190+i*18,338,18,"#795d38");
+ box(285,461,68,33,"#987d56","#342c29",4);line(299,461,321,438,"#dcbe89",2);
+ lantern(881,519);lantern(1110,405);text("TO THE FOREST →",1050,348,12,"#f6d49b");
+ for(let i=0;i<24;i++)flower(200+seeds(i,19)*730,585+seeds(i,22)*130);
+}
+function drawInterior(){
+ box(220,155,760,460,"#8c7055","#e0b981",9);
+ box(255,181,690,407,"#635040","#a0815c",7);
+ // Timber planks, a woven rug, and a small unlit hearth.
+ for(let i=0;i<17;i++)line(255,198+i*23,940,198+i*23,"#c8a17c22",2);
+ box(450,367,290,142,"#734d3e","#c9a16e",8);
+ for(let i=0;i<12;i++)line(475+i*20,377,475+i*20,503,"#aa77695e",4);
+ box(305,208,143,115,"#3a332e","#cfb080",6);circle(375,290,26,"#d7945360");circle(375,290,14,"#ffbe6d");circle(375,290,7,"#ffebac");
+ box(765,210,177,96,"#8c6846","#d1b888",5);for(let i=0;i<7;i++)circle(793+i*20,247,5,i%2?"#bb9459":"#acb6af");
+ for(let i=0;i<3;i++)ring(747+i*24,440,15+i*10,"#bfb6a178",2);
+ box(485,353,85,68,"#312b2a","#9c8a73",4);line(493,367,561,403,"#b6a987",2);
+ box(543,629,125,42,"#4a6a5f","#d9c58e",4);text("EXIT",603,656,13,"#f5d9a9");
+ for(let i=0;i<10;i++)circle(880+seeds(i,11)*45,410+seeds(i,91)*80,2,"#c7c5a79a");
+}
+function drawWild(){
+ // A stone step disappears into the roots at the north edge.
+ box(513,84,152,137,"#4f5950","#98a595",8);
+ for(let i=0;i<5;i++)box(523,103+i*22,133,13,i%2?"#424f4b":"#677468");
+ rune(646,311,36);
+ box(621,283,54,63,"#6d7a69","#a4aa80",9);
+ lantern(267,408);lantern(888,409);lantern(1064,417);
+ circle(854,466,50,"#9c684a28");circle(854,462,12,"#8a5c49");box(807,488,30,17,"#514535","#ad9472",3);
+ for(let i=0;i<36;i++){const x=seeds(i,21)*W,y=seeds(i,39)*H;if(y>345&&y<470)continue;circle(x,y,7+seeds(i,3)*7,"#435f4699")}
+ text("THE OLD STAIR",598,91,12,"#d2d5b0");text("← HEARTH",159,348,11,"#e2d3aa");text("BRIARWICK →",1072,352,11,"#e2d3aa");
+}
+function drawVillage(){
+ for(let x=250;x<1090;x+=28)box(x,140,7,450,"#88765866");
+ house(274,186,215,170,"#ae8661","#776258");text("BAKERY",380,229,16,"#ffebbb");
+ house(742,164,202,191,"#8c7860","#5e6670");text("SMITHY",836,217,16,"#f5e1ae");
+ box(572,170,106,135,"#8b8270","#514944",9);poly([[559,170],[627,92],[692,170]],"#5b5651","#d3b88e",4);
+ circle(624,216,30,"#6f6660");ring(624,210,16,"#edcb83",5);line(624,192,624,176,"#aa8e60",3);
+ // Dry mill, counterclockwise wheel visibly turning.
+ house(934,183,189,155,"#897c61","#546366");
+ const a=now*.0004;ring(974,325,59,"#947958",9);for(let i=0;i<8;i++){const q=a+i*TAU/8;line(974,325,974+Math.cos(q)*56,325+Math.sin(q)*56,"#b3a17e",7)}circle(974,325,12,"#d1b18b");
+ for(let i=0;i<6;i++)flower(500+i*40,566+Math.sin(i)*12);
+ lantern(191,412);lantern(690,496);lantern(1110,409);
+ text("← THORNWOOD",172,359,11,"#ecdaad");
+}
+function drawDeep(){
+ for(let i=0;i<10;i++){const x=145+i*93,y=215+(i%2)*19;box(x,y,41,310,"#4e5c5a","#7d8e82",6);line(x+20,y+9,x+20,y+300,"#22322f",2)}
+ ring(503,291,103,"#889f91",9);ring(503,291,70,"#647a78",4);rune(503,291,43);
+ circle(799,455,96,"#73d2c31e");ring(799,455,37+Math.sin(now*.002)*5,"#96e0c759",3);
+ box(514,635,156,64,"#384e47","#9b9f81",7);text("STAIRS UP",593,678,13,"#eedcb4");
+ for(let i=0;i<45;i++){const x=seeds(i,131)*W,y=seeds(i,89)*H;circle(x,y,1.5+seeds(i,28)*2,"#9fddd657")}
+}
+function drawMarker(p){const d=distance(player,p),close=d<105;const y=p.y-30;
+ circle(p.x,p.y+9,10,"#0c10125e");
+ ctx.globalAlpha=close?1:.62;circle(p.x,y,7+Math.sin(now*.005)*2,p.to?"#f6d18a":"#9bdbcd");ring(p.x,y,15+Math.sin(now*.003)*2,p.to?"#f8d993":"#b1e5d4",2);
+ if(close){const label=p.name||p.label||"EXAMINE";const tw=Math.min(270,Math.max(112,label.length*7+18));box(p.x-tw/2,y-48,tw,26,"#172725ec","#b5af84",7);text(label,p.x,y-31,11,"#f9e1aa")}
+ ctx.globalAlpha=1;
+}
+function drawHazards(){
+ if(zone!=="wild")return;
+ for(const h of hazards){const p=hazardPos(h);circle(p.x,p.y+13,25,"#07141b6e");circle(p.x,p.y,18,"#141f2de6");circle(p.x-7,p.y-3,3,"#de827b");circle(p.x+7,p.y-3,3,"#de827b");ring(p.x,p.y,24+Math.sin(now*.004+h.offset)*2,"#8e6c745b",2);
+ for(let i=0;i<3;i++){const angle=now*.001+i*TAU/3;circle(p.x+Math.cos(angle)*29,p.y+Math.sin(angle)*25,3,"#ad8ca281")}
+ }
+}
+const hazards=[{x:433,y:604,rx:111,ry:91,offset:1,speed:.00058},{x:777,y:588,rx:98,ry:83,offset:3.3,speed:.00073},{x:611,y:632,rx:86,ry:70,offset:5,speed:.00048}];
+function hazardPos(h){return {x:h.x+Math.cos(now*h.speed+h.offset)*h.rx,y:h.y+Math.sin(now*h.speed+h.offset)*h.ry}}
+function drawPlayer(){
+ const x=player.x,y=player.y,bob=Math.sin(now*.007)*1.6;
+ circle(x+3,y+15,20,"#071114aa");
+ // W insignia on a warm scarf; character stays small relative to the world.
+ poly([[x-15,y+10],[x-8,y-24+bob],[x+10,y-24+bob],[x+16,y+11]],"#365a66","#a8c5ba",2);
+ circle(x,y-21+bob,9,"#efcfaa");poly([[x-13,y-27+bob],[x,y-48+bob],[x+13,y-27+bob]],"#3f6270","#bcd2c5",2);
+ line(x-10,y-10+bob,x+15,y+9+bob,"#d4a87e",4);circle(x+15,y+9+bob,3,"#f2d196");
+ text("W",x,y+6+bob,12,"#f9dca0");
+ if(waypoint)ring(waypoint.x,waypoint.y,10+Math.sin(now*.006)*2,"#ffe4a494",2);
+}
+function render(t){
+ const w=view.w,h=view.h;ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle="#09161a";ctx.fillRect(0,0,w,h);
+ const quake=screenShaking>now?4:0;
+ const camX=clamp(player.x,w/(2*view.scale),W-w/(2*view.scale)),camY=clamp(player.y,h/(2*view.scale),H-h/(2*view.scale));
+ view.cx=Number.isFinite(camX)?camX:W/2;view.cy=Number.isFinite(camY)?camY:H/2;
+ ctx.setTransform(view.scale,0,0,view.scale,w/2-view.cx*view.scale+(quake?Math.sin(now*.16)*quake:0),h/2-view.cy*view.scale);
+ drawGround();
+ if(["home","wild","village"].includes(zone))drawForest();
+ if(zone==="home")drawHome();if(zone==="inside")drawInterior();if(zone==="wild")drawWild();if(zone==="village")drawVillage();if(zone==="deep")drawDeep();
+ // Warm motes near shelter; colder dots in the woods.
+ for(let i=0;i<28;i++){const x=(seeds(i,37)*W+Math.sin(now*.0004+i)*9),y=(seeds(i,57)*H+Math.cos(now*.0006+i)*12);circle(x,y,zone==="wild"?1.6:2.2,zone==="wild"?"#beddd85b":"#ffe4a155")}
+ drawHazards();for(const p of spots[zone])drawMarker(p);for(const e of exits[zone])drawMarker(e);
+ drawPlayer();
+ if(near){ring(near.x,near.y,33+Math.sin(now*.005)*2,"#e6d6a06e",2)}
+ // Dusk sinks into the dangerous woodland but never overrules visibility.
+ if(zone==="wild"){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle="#06131935";ctx.fillRect(0,0,w,h)}
+}
+function resize(){const dpr=Math.min(2,devicePixelRatio||1);view.w=innerWidth;view.h=innerHeight;cv.width=Math.round(view.w*dpr);cv.height=Math.round(view.h*dpr);cv.style.width=view.w+"px";cv.style.height=view.h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);view.scale=Math.min(view.w/890,view.h/520,1.6);view.scale=Math.max(.46,view.scale);view.dpr=dpr}
+function tick(t){const dt=Math.min(45,Math.max(0,t-last||16));last=t;now=t;
+ if(!dialogue&&!journal){
+  let vx=Number(Boolean(keys.d||keys.arrowright))-Number(Boolean(keys.a||keys.arrowleft))+joystick.x;
+  let vy=Number(Boolean(keys.s||keys.arrowdown))-Number(Boolean(keys.w||keys.arrowup))+joystick.y;
+  let m=Math.hypot(vx,vy);
+  if(m<.1&&waypoint){const dx=waypoint.x-player.x,dy=waypoint.y-player.y;m=Math.hypot(dx,dy);if(m<14)waypoint=null;else{vx=dx/m;vy=dy/m;m=1}}
+  if(m>.1){if(m>1){vx/=m;vy/=m}player.x=clamp(player.x+vx*dt*.21,55,W-55);player.y=clamp(player.y+vy*dt*.21,88,H-70);if(Math.abs(vx)>.1)player.face=Math.sign(vx);}
+  if((keys.w||keys.s||keys.a||keys.d||keys.arrowup||keys.arrowdown||keys.arrowleft||keys.arrowright||Math.hypot(joystick.x,joystick.y)>.1))waypoint=null;
+  for(const h of hazards){if(zone!=="wild")break;const p=hazardPos(h),d=distance(player,p);
+   // Steady lantern glow shelters travelers within 75 units.
+   const sheltered=[[267,408],[888,409],[1064,417]].some(([x,y])=>distance(player,{x,y})<85);
+   if(d<51&&!sheltered&&t>hitUntil){hitUntil=t+2300;focus=Math.max(0,focus-32);screenShaking=t+320;const dx=(player.x-p.x)/Math.max(1,d),dy=(player.y-p.y)/Math.max(1,d);player.x=clamp(player.x+dx*68,50,W-50);player.y=clamp(player.y+dy*68,80,H-60);announce("SOMETHING MOVES IN THE BRUSH • NERVE -32");
+    if(focus<=0){travel("home",1050,408);focus=55;openDialogue("BACK BY THE FIRE","You cannot remember the last stretch of the walk. The cottage window was the first thing you saw. Whatever was watching you in the trees didn't follow you home.");}
+   }
+  }
+  // Only resting places restore nerve. The wilderness does not.
+  if(["home","inside","village"].includes(zone))focus=Math.min(100,focus+dt*.018);
+  let nearest=null,dmin=Infinity;
+  for(const p of [...spots[zone],...exits[zone]]){const d=distance(player,p);if(d<dmin){dmin=d;nearest=p}}
+  near=dmin<85?nearest:null;$("interact").disabled=!near;$("nearText").textContent=near?(near.label||near.name||"EXAMINE").toUpperCase():"WANDER AND WONDER";
+  if(near)$("interact").textContent=near.to?"◈ ENTER":"◈ EXAMINE";else $("interact").textContent="◈ EXAMINE";
+  // Walking directly into a region edge changes the world, no menu required.
+  for(const e of exits[zone]){if(distance(player,e)<30){travel(e.to,e.tx,e.ty);break}}
+  if((Math.floor(t/150)%4)===0)updateLocation();
+ }
+ if(statusUntil&&t>statusUntil){$("status").classList.remove("visible");statusUntil=0}
+ ctx.setTransform(view.dpr,0,0,view.dpr,0,0);render(t);requestAnimationFrame(tick);
+}
+memory.seen[zone]=true;save();resize();addEventListener("resize",resize);updateLocation();
+requestAnimationFrame(tick);
+if(!sessionStorage.getItem("wandrune-hearthlands-intro")){sessionStorage.setItem("wandrune-hearthlands-intro","1");openDialogue("THE HOUSE AT THE EDGE OF THE WOODS","You have the key to a neglected cottage and very little else. Somewhere beyond the trees is a settlement called Briarwick. The old road is still passable, people say. They do not say by what.","NO QUEST MARKERS · EVERY DETAIL IS AN INVITATION, NOT AN ORDER")}
+})();
+</script></body></html>
