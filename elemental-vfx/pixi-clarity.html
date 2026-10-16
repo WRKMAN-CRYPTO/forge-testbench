@@ -397,10 +397,62 @@ $('quality').addEventListener('click',async e=>{let b=e.target.closest('[data-q]
 ui.load.addEventListener('input',()=>{ui.loadText.textContent=LEVELS[+ui.load.value]+' × 200';});
 ui.load.addEventListener('change',async()=>{if(auto||busy)return;level=+ui.load.value;await changeSetting();});
 ui.ramp.addEventListener('click',ramp);
-$('pulse').addEventListener('click',trigger);$('stage').addEventListener('click',trigger);
+$('pulse').addEventListener('click',trigger);/* Pointer-up triggers a pulse only when the gesture was not a drag. */
 $('stage').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();trigger();}});
 $('copy').addEventListener('click',report);
 $('reset').addEventListener('click',async()=>{if(auto||busy)return;level=4;ui.load.value='4';reports=[];lastStable=null;firstWeak=null;renderResults();cameraReset();await rebuild();});
+
+function activateGroup(selector,key,value){
+ for(let b of document.querySelectorAll(selector))b.setAttribute('aria-pressed',String(b.dataset[key]===value));
+}
+$('layouts').addEventListener('click',async e=>{
+ const b=e.target.closest('[data-layout]');if(!b||auto||busy||b.dataset.layout===layout)return;
+ layout=b.dataset.layout;activateGroup('[data-layout]','layout',layout);
+ cameraReset();await rebuild();setLayoutInfo();countVisible();
+});
+$('looks').addEventListener('click',e=>{
+ const b=e.target.closest('[data-look]');if(!b||auto||busy||b.dataset.look===look)return;
+ look=b.dataset.look;activateGroup('[data-look]','look',look);
+ applyLook();clearSamples();setStatus('Lighting changed to '+look+'. Same '+objects.length.toLocaleString()+' visual particles and trajectories.');
+});
+$('cameraZoom').addEventListener('input',e=>{
+ if(auto)return;
+ zoom=ZOOMS[+e.target.value];applyCamera();clearSamples();countVisible();
+});
+$('recenter').addEventListener('click',()=>{
+ if(auto)return;cameraReset();clearSamples();setStatus('Camera recentered.');
+});
+$('sampleNow').addEventListener('click',()=>{
+ if(auto||busy)return;
+ const m=sample();
+ if(m.samples<30){setStatus('Let the scene settle for at least 30 frames before capturing.');return;}
+ reports.push({manual:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,zoom,approxVisible:visibleApprox,
+  passed:m.fps>=50&&m.p95<=25,fps:+m.fps.toFixed(2),p95:+m.p95.toFixed(2),cpu:+m.cpu.toFixed(2),samples:m.samples});
+ renderResults();setStatus('Captured '+objects.length.toLocaleString()+' particles · '+look+' · '+layout+' · '+round(m.fps)+' FPS.');
+});
+const stage=$('stage'),pointers=new Map();
+let gestureMoved=false,gestureOrigin=null;
+function pointerPos(e){const r=stage.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};}
+stage.addEventListener('pointerdown',e=>{
+ if(auto)return;
+ stage.setPointerCapture(e.pointerId);
+ pointers.set(e.pointerId,pointerPos(e));gestureMoved=false;gestureOrigin=pointerPos(e);
+});
+stage.addEventListener('pointermove',e=>{
+ if(!pointers.has(e.pointerId)||auto)return;
+ const next=pointerPos(e),prior=pointers.get(e.pointerId),dx=next.x-prior.x,dy=next.y-prior.y;
+ if(Math.abs(next.x-gestureOrigin.x)+Math.abs(next.y-gestureOrigin.y)>8)gestureMoved=true;
+ if(gestureMoved){camera.x-=dx/zoom;camera.y-=dy/zoom;applyCamera();}
+ pointers.set(e.pointerId,next);
+});
+stage.addEventListener('pointerup',e=>{
+ if(!pointers.has(e.pointerId))return;
+ pointers.delete(e.pointerId);
+ if(gestureMoved){clearSamples();countVisible();}else if(!auto)trigger();
+ gestureMoved=false;
+});
+stage.addEventListener('pointercancel',e=>{pointers.delete(e.pointerId);gestureMoved=false;});
+
 document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden&&auto)abortRamp();});
 window.addEventListener('pagehide',()=>{auto=false;});
 async function init(){
