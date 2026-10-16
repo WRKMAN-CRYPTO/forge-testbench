@@ -264,28 +264,7 @@
   const cfg=st.recipe.settings,colors=palettes[cfg.palette];
   const vfx=scene.elementVfx||null;
   const light=.14+cfg.light/100*.84,alpha=.18+light*.63;
-  // Render the cast's own WALL geometry behind its agents. These are
-  // impassable cells in field space, NOT scenery or world collision bodies.
-  if(st.wallRects?.length){
-   const view=scene.cameras?.main?.worldView;
-   g.fillStyle(0x58b8ed,.10);
-   for(const rect of st.wallRects){
-    const corners=[
-     worldPosition(st,{x:rect.x0,y:rect.y0}),
-     worldPosition(st,{x:rect.x1,y:rect.y0}),
-     worldPosition(st,{x:rect.x1,y:rect.y1}),
-     worldPosition(st,{x:rect.x0,y:rect.y1})
-    ];
-    if(view&&corners.every(p=>p.x<view.x-15)||view&&corners.every(p=>p.x>view.right+15)||
-       view&&corners.every(p=>p.y<view.y-15)||view&&corners.every(p=>p.y>view.bottom+15))continue;
-    g.fillPoints(corners,true);
-    g.lineStyle(1,0x88d9fa,.30);
-    for(let k=0;k<4;k++){
-     const p=corners[k],q=corners[(k+1)%4];
-     g.lineBetween(p.x,p.y,q.x,q.y);
-    }
-   }
-  }
+  // WALL is invisible in the world; collision remains active in rune physics.
   const n=st.agents.length,budget=Math.min(n,cfg.renderLimit||DEFAULT_DRAW);
   const stride=Math.max(1,Math.ceil(n/budget));
   const camera=scene.cameras?.main?.worldView;
