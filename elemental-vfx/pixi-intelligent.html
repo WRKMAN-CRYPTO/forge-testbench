@@ -61,6 +61,9 @@ button.action.stop{border-color:#8e6170;background:#382030}
 .chipline{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
 .infoChip{font:800 10px ui-monospace,monospace;color:#b5d1e9;background:#12283b;border:1px solid #29475e;border-radius:8px;padding:5px 8px}
 @media(min-width:740px){.compositionGrid{grid-template-columns:1fr 1fr}}
+
+.tabs4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:410px){.tabs4 button{font-size:10px;letter-spacing:-.15px;padding-left:0;padding-right:0}}
 </style>
 </head>
 <body>
@@ -95,6 +98,23 @@ button.action.stop{border-color:#8e6170;background:#382030}
 <div class="actions"><button class="action" id="recenter">⌖ Recenter view</button><button class="action" id="sampleNow">◈ Capture reading</button></div>
 <div class="smallNote">Drag across the scene to pan. Tap to pulse. At 100% with Cluster or Field, the same active particles appear in the arena; World and zoom can change the number visible. These are visual layout tests, not collision or gameplay physics.</div>
 </section>
+<section class="section">
+<div class="sectionTitle">08 / Renderer strategy</div>
+<div class="tabs tabs4" id="strategies">
+<button data-strategy="baseline" aria-pressed="true">Baseline</button>
+<button data-strategy="cull" aria-pressed="false">Cull</button>
+<button data-strategy="adaptive" aria-pressed="false">Smart LOD</button>
+<button data-strategy="particle" aria-pressed="false">Particle</button>
+</div>
+<div class="smallNote" id="strategyNote">Every sprite is animated and submitted for rendering, including particles outside the camera.</div>
+<div class="chipline">
+<span class="infoChip" id="renderedReadout">Submitted: --</span>
+<span class="infoChip" id="culledReadout">Skipped: --</span>
+<span class="infoChip" id="lodReadout">Near / mid / far: --</span>
+</div>
+<div class="actions"><button class="action primary" id="compare">⚙ COMPARE 4 MODES</button><button class="action" id="compareStop" disabled>■ Stop comparison</button></div>
+<div class="smallNote">Comparison keeps the current element, camera, lighting, quality, sprite count and positions. Runs each renderer strategy in sequence. Note: Particle uses one shared texture and a single blend mode, so its appearance is not pixel-identical.</div>
+</section>
 <div class="caveat"><b>What this tests:</b> PixiJS 8 WebGL sprites with enhanced per-cast visuals, 200 animated visuals per cast. The automatic ramp measures frame cadence and full JavaScript update + render call, and stops after two successive stages below the target (50 FPS or P95 over 25 ms). <b>What it cannot test:</b> actual GPU execution time, device temperature, thermal throttling over long sessions, or Wandrune gameplay. A benchmark ceiling is not necessarily a crash point. Defined adjusts blending, opacity and glow without reducing sprite counts. World zoom changes visible fraction, so compare FPS only at matching camera and scene settings. PixiJS downloads once from jsDelivr.</div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js"></script>
@@ -110,7 +130,7 @@ lightning:{title:'LIGHTNING',sub:'BRANCHING / ARCS / IONIZATION',accent:'#8fd7ff
 ice:{title:'ICE',sub:'CRYSTALS / FRACTURE / SHATTER',accent:'#88f8ff',rgb:[113,236,255]},
 gravity:{title:'GRAVITY',sub:'ACCRETION / SINGULARITY / COLLAPSE',accent:'#c58dff',rgb:[180,111,255]}
 };
-let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,sceneRoot=null,backdrop=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,pulseFlash=null,stopped=false,layout='field',look='defined',zoom=1,camera={x:W*.5,y:H*.5},visibleApprox=0;const ZOOMS=[.33,.50,.75,1,1.25,1.6];
+let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,sceneRoot=null,backdrop=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,stopped=false,layout='field',look='defined',zoom=1,camera={x:W*.5,y:H*.5},visibleApprox=0,strategy='baseline',submitted=0,skipped=0,nearCount=0,midCount=0,farCount=0,comparing=false,comparisonEpoch=0,compareResults=[];const ZOOMS=[.33,.50,.75,1,1.25,1.6];
 function rng(seed){let x=seed>>>0;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;};}
 function delay(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 function round(n){return Number.isFinite(n)?n.toFixed(1):'--';}
@@ -345,7 +365,7 @@ function renderResults(){
  ui.results.replaceChildren();
  if(!reports.length){ui.results.textContent='No measurements yet.';return;}
  for(let r of reports){let div=document.createElement('div');div.className='result '+(r.passed?'ok':'bad');
- let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' · '+(r.look||look).toUpperCase()+' / '+(r.layout||layout).toUpperCase();
+ let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' · '+(r.strategy||'BASELINE').toUpperCase()+' · '+(r.look||look).toUpperCase()+' / '+(r.layout||layout).toUpperCase();
  let b=document.createElement('strong');b.textContent=round(r.fps)+' FPS · '+round(r.p95)+' ms P95';
  div.append(a,b);ui.results.append(div);}
 }
@@ -356,7 +376,7 @@ async function ramp(){
  if(auto){abortRamp();return;}
  if(busy||!app)return;
  auto=true;stopped=false;const ticket=++autoEpoch;reports=[];renderResults();ui.ramp.textContent='■ STOP RAMP';ui.ramp.classList.add('stop');ui.progress.textContent='0 / '+LEVELS.length;lastStable=null;firstWeak=null;let badStreak=0;
- const buttons=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],#load,#reset,#cameraZoom,#recenter,#sampleNow');
+ const buttons=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#compare');
  buttons.forEach(x=>x.disabled=true);
  try{
  for(let i=0;i<LEVELS.length&&auto&&ticket===autoEpoch;i++){
@@ -367,7 +387,7 @@ async function ramp(){
   await delay(650);if(!auto||ticket!==autoEpoch)break;clearSamples();
   await delay(2000);if(!auto||ticket!==autoEpoch)break;
   const m=sample(),pass=m.samples>=30&&m.fps>=50&&m.p95<=25;
-  reports.push({casts:LEVELS[i],count:LEVELS[i]*PER,element,quality,layout,look,zoom,approxVisible:visibleApprox,passed:pass,
+  reports.push({casts:LEVELS[i],count:LEVELS[i]*PER,element,quality,layout,look,strategy,zoom,approxVisible:visibleApprox,submitted,skipped,nearCount,midCount,farCount,passed:pass,
    fps:Number(m.fps.toFixed(2)),p95:Number(m.p95.toFixed(2)),cpu:Number(m.cpu.toFixed(2)),samples:m.samples});
   renderResults();
   if(pass){lastStable=LEVELS[i]*PER;badStreak=0;firstWeak=null;}
@@ -381,14 +401,14 @@ async function ramp(){
 }
 function trigger(){pulseAt=performance.now()/1000;let tint=TYPES[element].accent;ui.flash.style.background=tint;ui.flash.animate([{opacity:.3},{opacity:0}],{duration:470,easing:'ease-out'});}
 function report(){
- const data={app:'WRKMAN PixiJS 8 VFX Stress Lab',version:'0.4',date:new Date().toISOString(),renderer:'PixiJS 8.10.0 WebGL (sprites)',element,quality,layout,look,camera:{x:camera.x,y:camera.y,zoom},approxVisible:visibleApprox,particleCount:objects.length,visualsPerCast:PER,levels:LEVELS,threshold:{minFps:50,maxP95ms:25,consecutiveFailures:2},results:reports,highestPassingParticles:lastStable,
+ const data={app:'WRKMAN PixiJS 8 Intelligent Rendering Lab',version:'0.5',date:new Date().toISOString(),renderer:strategy==='particle'?'PixiJS 8.10.0 ParticleContainer':'PixiJS 8.10.0 Sprites',element,quality,layout,look,strategy,submitted,skipped,nearCount,midCount,farCount,comparisonResults:compareResults,camera:{x:camera.x,y:camera.y,zoom},approxVisible:visibleApprox,particleCount:objects.length,visualsPerCast:PER,levels:LEVELS,threshold:{minFps:50,maxP95ms:25,consecutiveFailures:2},results:reports,highestPassingParticles:lastStable,
  current:sample(),device:navigator.userAgent,viewport:[innerWidth,innerHeight],pixelRatio:devicePixelRatio,notes:'Frame cadence via rAF. JS + render call time does not equal GPU execution time. Same total sprite count; layout and zoom affect approximate visible counts. Short ~2-second stages; no Wandrune code used.'};
  const dataStr=JSON.stringify(data,null,2);
  if(navigator.clipboard&&navigator.clipboard.writeText){
  navigator.clipboard.writeText(dataStr).then(()=>setStatus('Benchmark copied. Paste the report into our conversation.')).catch(()=>download(dataStr));
  }else download(dataStr);
 }
-function download(s){let blob=new Blob([s],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='wrkman-pixi-vfx-003.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),800);setStatus('Benchmark report downloaded.');}
+function download(s){let blob=new Blob([s],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='wrkman-pixi-vfx-005.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),800);setStatus('Benchmark report downloaded.');}
 async function changeSetting(){
  if(busy||auto)return;await rebuild();
 }
@@ -400,7 +420,7 @@ ui.ramp.addEventListener('click',ramp);
 $('pulse').addEventListener('click',trigger);/* Pointer-up triggers a pulse only when the gesture was not a drag. */
 $('stage').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();trigger();}});
 $('copy').addEventListener('click',report);
-$('reset').addEventListener('click',async()=>{if(auto||busy)return;level=4;ui.load.value='4';reports=[];lastStable=null;firstWeak=null;renderResults();cameraReset();await rebuild();});
+$('reset').addEventListener('click',async()=>{if(auto||busy)return;level=4;ui.load.value='4';reports=[];lastStable=null;firstWeak=null;renderResults();compareResults=[];cameraReset();await rebuild();});
 
 function activateGroup(selector,key,value){
  for(let b of document.querySelectorAll(selector))b.setAttribute('aria-pressed',String(b.dataset[key]===value));
@@ -426,7 +446,7 @@ $('sampleNow').addEventListener('click',()=>{
  if(auto||busy)return;
  const m=sample();
  if(m.samples<30){setStatus('Let the scene settle for at least 30 frames before capturing.');return;}
- reports.push({manual:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,zoom,approxVisible:visibleApprox,
+ reports.push({manual:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,strategy,submitted,skipped,nearCount,midCount,farCount,zoom,approxVisible:visibleApprox,
   passed:m.fps>=50&&m.p95<=25,fps:+m.fps.toFixed(2),p95:+m.p95.toFixed(2),cpu:+m.cpu.toFixed(2),samples:m.samples});
  renderResults();setStatus('Captured '+objects.length.toLocaleString()+' particles · '+look+' · '+layout+' · '+round(m.fps)+' FPS.');
 });
