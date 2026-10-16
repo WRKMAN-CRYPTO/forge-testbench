@@ -32,3 +32,17 @@ Live-test path (when GitHub Pages is enabled for this repository): `/elemental-v
 
 ## Release gate
 Do **not** change or connect this experiment to Wandrune without a separate explicit approval after reviewing measured results. Preserve Wandrune logic and all non-rendering behavior.
+
+## Experiment 003: PixiJS 8 visual-quality stress lab
+
+- Page: [PixiJS cinematic stress bench](./pixi-stress.html) (same repository, independent of Wandrune).
+- Free-standing renderer-only test with Fire, Lightning, Ice, Gravity.
+- Main mode: **Cinematic**, using richer procedural textures, layered glows, animated lightning branches, crystal geometry, and gravity accretion detail.
+- Companion mode: Lean, same visual trajectories with reduced ornamental layers.
+- Starts at 2,000 animated visual sprites and ramps automatically through 200, 400, 800, 1,600, 2,000, 2,400, 3,200, 4,800, 6,400, 9,600, 12,800, 19,200 and 25,600 visuals (200 per cast).
+- Each stage settles for ~650 ms, samples for ~2 seconds, records average FPS, P95 rAF frame time and average JS+render-call duration. Aborts after **two consecutive** failing stages; fail means FPS below 50 or P95 above 25 ms, or insufficient frames. This is a smoothness threshold, not a device crash limit.
+- The app offers an on-screen measurement curve and a **Copy results** JSON action for reproducibility.
+- Static effects and positions are deterministic per rebuild. This is not a controlled GPU benchmark across different frame rates or thermal conditions.
+- The separate previous [Experiment 002 bench](./index.html) remains intact.
+
+**Important:** Vercel project for forge-testbench is linked and deploys from GitHub, but its default deployment protection may require the owner's login. Do not relax security settings merely to share this link.
