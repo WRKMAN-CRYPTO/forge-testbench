@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="083-pixi8-camera-registered",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="084-pixi8-material-fidelity",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -80,10 +80,13 @@
   const allowedLooks=["original","bright","formation"];
   const requested=allowedLooks.includes(opts.look)?opts.look:"formation";
   const initialLook=requested==="formation"&&!FORMATION?.analyze?"bright":requested;
+  const artStyles=["soft","forge","forge-hot"];
+  const selectedArt=artStyles.includes(opts.art)?opts.art:"forge";
   const state={active:false,ready:false,loading:false,error:null,records:[],drawn:0,
-   details:0,bulk:0,frame:0,look:initialLook,formations:0,formationSegments:0,canvasOffsetX:0,canvasOffsetY:0};
+   details:0,bulk:0,frame:0,look:initialLook,art:selectedArt,materialDrawn:0,artFallback:0,ambientDrawn:0,formations:0,formationSegments:0,canvasOffsetX:0,canvasOffsetY:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
-   registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=[],spritePool=[],disposed=false,heroUsed=0;
+   registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=[],spritePool=[],
+   restoredTextures=new Map(),accentGraphics=null,disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
    if(typeof opts.status==="function")try{opts.status(msg);}catch(_){}
@@ -98,6 +101,60 @@
    if(next!=="formation"){shapeGraphics?.clear();state.formations=0;state.formationSegments=0;}
    announce("PIXI LOOK · "+next.toUpperCase());
    return state.look;
+  }
+  const MATERIAL_KEYS=["arcane","fire","water","frost","lightning"];
+  const NEUTRAL_PALETTES=new Set(["flame","arcane","healing","void"]);
+  const exposedAlpha=(a,elem)=>Math.pow(clamp(a),elem===3?.8:.55);
+  function materialKey(r,element){
+   const base="wandrune-mat069-";
+   if(element>0)return base+MATERIAL_KEYS[element];
+   const palette=NEUTRAL_PALETTES.has(r.palette)?r.palette:"flame";
+   const progress=clamp(Number(r.progress)||0);
+   const tier=progress<.33?0:progress<.7?1:2;
+   return base+"neutral-"+palette+"-"+tier;
+  }
+  function materialTexture(r,element){
+   const key=materialKey(r,element);
+   if(restoredTextures.has(key))return restoredTextures.get(key);
+   // The Phaser material atlas is authoritative for Wandrune's visual style.
+   // It was authored by ElementVFX 069, and exists even while Pixi is active.
+   const image=scene.textures?.get?.(key)?.getSourceImage?.();
+   if(!image||!(image.width>0)||!(image.height>0))return null;
+   const t=P.Texture.from(image);
+   restoredTextures.set(key,t);
+   return t;
+  }
+  function setArt(next){
+   if(!artStyles.includes(next))return state.art;
+   state.art=next;
+   announce("PIXI ART · "+next.toUpperCase());
+   return state.art;
+  }
+  function paintAccents(){
+   if(!accentGraphics)return;
+   const g=accentGraphics;g.clear();state.ambientDrawn=0;
+   if(state.art!=="forge-hot")return;
+   const max=72;
+   for(const r of state.records){
+    if(state.ambientDrawn>=max)break;
+    if(!(r.agentIndex>=0)||r.agentIndex%13!==0||r.alpha<=.06)continue;
+    const elem=classify(r),t=(r.time||0)*.001;
+    const phase=(r.seed||0)*.731+(r.agentIndex||0)*.593;
+    const wobble=.6+.4*Math.sin(t*7+phase);
+    const angle=r.angle||0;
+    const nx=Math.cos(angle),ny=Math.sin(angle);
+    const col=elem===1?0xffd371:elem===3?0xe7fcff:elem===4?0xffffff:
+      elem===2?0xc9faff:(Number(r.color)||0xf5e6ff);
+    const radius=Math.max(.6,Math.min(4,(r.r||2)*.45));
+    g.circle(r.x,r.y,radius*(.65+.3*wobble)).fill({color:col,alpha:exposedAlpha(r.alpha,elem)*.60});
+    if(elem===1||elem===4){
+     const length=3+Math.min(7,(r.r||2)*1.5);
+     g.moveTo(r.x-nx*length*.3,r.y-ny*length*.3)
+      .lineTo(r.x+nx*length,r.y+ny*length)
+      .stroke({color:col,alpha:exposedAlpha(r.alpha,elem)*.43,width:.7});
+    }
+    state.ambientDrawn++;
+   }
   }
   function tracePaths(g,paths,width,color,alpha){
    // All vertices are the original Phaser-trail world positions.
@@ -219,7 +276,8 @@
     world=new P.Container();detailsLayer=new P.Container();
     shapeLayer=new P.Container();shapeLayer.blendMode="add";shapeGraphics=new P.Graphics();
     shapeLayer.addChild(shapeGraphics);
-    app.stage.addChild(world);world.addChild(shapeLayer,detailsLayer);
+    accentGraphics=new P.Graphics();
+    app.stage.addChild(world);world.addChild(shapeLayer,detailsLayer,accentGraphics);
     if(opts.alignDebug){
      registrationGraphics=new P.Graphics();
      world.addChild(registrationGraphics);
@@ -241,7 +299,7 @@
   function disable(reason){
    state.active=false;state.records.length=0;
    if(app?.canvas)app.canvas.style.display="none";
-   shapeGraphics?.clear();state.formations=0;state.formationSegments=0;
+   shapeGraphics?.clear();accentGraphics?.clear();state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
    announce("PHASER SWARM · SAFE FALLBACK");
   }
@@ -260,32 +318,44 @@
    try{
     state.frame++;heroUsed=0;
     for(const group of bulkGroups)if(group)group.used=0;
-    let detailed=0,bulk=0;
+    let detailed=0,bulk=0,materialDrawn=0,artFallback=0;
     for(const r of state.records){
      const elem=classify(r),index=Math.max(0,Number(r.agentIndex)||0);
      const hero=(index%10===0)||(r.r>9&&index%4===0);
      const variant=(Math.floor(index/3)+elem)%3;
      const radius=clamp(Number(r.r),.6,80);
-     const size=radius*(hero?6.0:4.3);
-     // Original demonstrates the translucency problem for an honest A/B.
-     // Bright and Formation restore the opacity missing from lightweight embers.
-     const alpha=clamp(clamp(r.alpha??.65)*
-      (state.look==="original"?(hero?.86:.62):(hero?1.12:1.22)));
-     const visualTint=typeof r.color==="number"&&Number.isFinite(r.color)?(r.color&0xffffff):0xffffff;
+     const texture=state.art==="soft"?null:materialTexture(r,elem);
+     const useMaterial=!!texture;
+     if(useMaterial)materialDrawn++;else if(state.art!=="soft")artFallback++;
+     // Native Wandrune material textures are 48x48 faceted art, not
+     // 128x128 glow clouds. Preserve the old renderer's ~3.2r footprint.
+     const size=radius*(useMaterial?3.2:(hero?6.0:4.3));
+     // Phaser's material response uses nonlinear opacity, without an
+     // artificial floor that would prevent a fading agent disappearing.
+     const alpha=useMaterial?exposedAlpha(r.alpha??.65,elem):
+      clamp(clamp(r.alpha??.65)*
+       (state.look==="original"?(hero?.86:.62):(hero?1.12:1.22)));
+     const visualTint=useMaterial?0xffffff:
+      typeof r.color==="number"&&Number.isFinite(r.color)?(r.color&0xffffff):0xffffff;
      if(hero){
       const sprite=allocateHero();
-      sprite.texture=textureSet[elem][variant];
+      sprite.texture=texture||textureSet[elem][variant];
       sprite.position.set(r.x,r.y);
-      sprite.rotation=r.angle||0;
-      sprite.width=size;sprite.height=size*1.55;
+      sprite.rotation=useMaterial?(elem===3?Math.sin(r.seed||0)*.1:elem===1?Math.sin((r.time||0)*.0008+(r.seed||0))*.12:0):(r.angle||0);
+      sprite.width=size;sprite.height=size*(useMaterial?1:1.55);
       sprite.alpha=alpha;sprite.visible=true;
       // Texture contains its own elemental glow, with bright hero accents.
       sprite.tint=visualTint;
       detailed++;
      }else{
       const particle=takeParticle(elem,variant);
-      particle.x=r.x;particle.y=r.y;particle.rotation=r.angle||0;
-      particle.scaleX=size/128;particle.scaleY=size*1.5/128;
+      const selectedTexture=texture||textureSet[elem][variant];
+      particle.texture=selectedTexture;
+      particle.x=r.x;particle.y=r.y;
+      particle.rotation=useMaterial?(elem===3?Math.sin(r.seed||0)*.1:0):(r.angle||0);
+      const sourceSide=useMaterial?48:128;
+      particle.scaleX=size/sourceSide;
+      particle.scaleY=size*(useMaterial?1:1.5)/sourceSide;
       particle.alpha=alpha;
       particle.tint=visualTint;
       bulk++;
@@ -293,7 +363,8 @@
     }
     // Never edits trajectory, collision, position or count: this is a
     // purely visual geometric interpretation of already-computed records.
-    paintFormations();
+    paintFormations();paintAccents();
+    state.materialDrawn=materialDrawn;state.artFallback=artFallback;
     for(let i=heroUsed;i<spritePool.length;i++)spritePool[i].visible=false;
     for(const group of bulkGroups)if(group)for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
     align();drawReference();app.render();
@@ -304,9 +375,9 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;shapeLayer=null;shapeGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups=[];spritePool=[];state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups=[];spritePool=[];restoredTextures.clear();state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,createBridge});
 });
