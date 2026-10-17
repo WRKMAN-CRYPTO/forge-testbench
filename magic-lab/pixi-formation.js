@@ -10,12 +10,36 @@
  if(root)root.WRKMAN_PIXI_FORMATIONS=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="081-formations";
+ const VERSION="082-trail-aligned";
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
  function quantile(arr,q){
   if(!arr.length)return 0;
   const sorted=arr.slice().sort((a,b)=>a-b),p=(sorted.length-1)*q,i=Math.floor(p);
   return sorted[i]+(sorted[Math.min(sorted.length-1,i+1)]-sorted[i])*(p-i);
+ }
+ // This samples only existing trails. The renderer never invents a path
+ // between spatially disconnected groups or offsets it by screen pixels.
+ function pathsFor(points,maxPaths=64){
+  const eligible=[];
+  for(const p of points){
+   if(!Array.isArray(p?.trail)||!p.trail.length)continue;
+   const path=[];
+   for(const t of p.trail){
+    if(!t||!Number.isFinite(t.x)||!Number.isFinite(t.y))continue;
+    if(path.length&&Math.hypot(t.x-path[path.length-1].x,t.y-path[path.length-1].y)<.4)continue;
+    path.push({x:t.x,y:t.y});
+   }
+   if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
+   if(!path.length||Math.hypot(p.x-path[path.length-1].x,p.y-path[path.length-1].y)>.4)
+    path.push({x:p.x,y:p.y});
+   if(path.length<2)continue;
+   let totalLength=0;
+   for(let k=1;k<path.length;k++)totalLength+=Math.hypot(path[k].x-path[k-1].x,path[k].y-path[k-1].y);
+   if(totalLength<3)continue;
+   eligible.push(path);
+  }
+  const stride=Math.max(1,Math.ceil(eligible.length/Math.max(1,Math.floor(maxPaths))));
+  return eligible.filter((_,i)=>i%stride===0);
  }
  function analyze(records,options={}){
   const minAgents=options.minAgents??24,maxFormations=options.maxFormations??10;
@@ -90,10 +114,12 @@
    const color=(clamp(Math.round(red/n),0,255)<<16)|
      (clamp(Math.round(green/n),0,255)<<8)|clamp(Math.round(blue/n),0,255);
    out.push({key,count:n,color,axis:{x:ux,y:uy},elongation,coherence,
-    alignment,occupancy:occupied/BIN_COUNT,segments});
+    alignment,occupancy:occupied/BIN_COUNT,segments,
+    paths:pathsFor(points,options.maxPaths??64),
+    meanRadius:points.reduce((sum,p)=>sum+p.r,0)/n});
    if(out.length>=maxFormations)break;
   }
   return out;
  }
- return Object.freeze({VERSION,analyze});
+ return Object.freeze({VERSION,analyze,pathsFor});
 });
