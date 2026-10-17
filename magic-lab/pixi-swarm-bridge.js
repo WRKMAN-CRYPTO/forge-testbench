@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="085-fire-cohesion-pass-c",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="085-fire-cohesion-pass-d",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -93,10 +93,12 @@
    fireShellGroups:0,fireShellPaths:0,fireShellVertices:0,fireShellSamples:0,
    fireShellWork:0,fireShellSkipped:0,fireShellMs:0,
    fireBody:opts.fireBody!==false&&!!FIRE_PERIMETER?.buildPerimeters,
-   fireBodyLayers:0,fireBodyFills:0};
+   fireBodyLayers:0,fireBodyFills:0,
+   fireHot:opts.fireHot!==false&&!!FIRE_PERIMETER?.buildPerimeters&&!!FIRE_CLUSTERS?.findClusters,
+   fireHotPaths:0,firePeakPaths:0,fireHotFills:0,fireHotGlows:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
    registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=new Map(),spritePool=[],
-   restoredTextures=new Map(),accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,fireBodyGraphics=null,disposed=false,heroUsed=0;
+   restoredTextures=new Map(),accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,fireBodyGraphics=null,fireHotGraphics=null,disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
    if(typeof opts.status==="function")try{opts.status(msg);}catch(_){}
@@ -203,6 +205,67 @@
    announce("FIRE BODY · "+(state.fireBody?"ON":"OFF"));
    return state.fireBody;
   }
+  function setFireHot(enabled){
+   state.fireHot=!!enabled&&!!FIRE_PERIMETER?.buildPerimeters&&!!FIRE_CLUSTERS?.findClusters;
+   if(!state.fireHot){
+    fireHotGraphics?.clear();
+    state.fireHotPaths=state.firePeakPaths=state.fireHotFills=state.fireHotGlows=0;
+   }
+   announce("FIRE HOT CORE · "+(state.fireHot?"ON":"OFF"));
+   return state.fireHot;
+  }
+  function drawFireHot(results){
+   if(!fireHotGraphics)return;
+   const g=fireHotGraphics;
+   g.clear();
+   state.fireHotFills=0;state.fireHotGlows=0;
+   if(!state.fireHot)return;
+   function polygon(path){
+    const points=path.points;
+    if(!path.closed||points.length<4)return false;
+    g.moveTo(points[0].x,points[0].y);
+    for(let i=1;i<points.length;i++)g.lineTo(points[i].x,points[i].y);
+    g.closePath();
+    return true;
+   }
+   for(const cl of results.shells){
+    // Hot effects come from the same measured density grid as Pass C.
+    // Never apply them to isolated embers or simply brighten every agent.
+    if(cl.count<4)continue;
+    for(const band of cl.hotBands||[]){
+     const peak=band.kind==="peak";
+     const color=peak?0xfff2be:0xffc65b;
+     const strength=cl.count<13?.58:1;
+     const alpha=(peak?.34:.27)*strength;
+     const paths=band.paths||[];
+     for(let i=0;i<paths.length;i++){
+      const p=paths[i];
+      if(!p.closed||p.depth%2!==0||!polygon(p))continue;
+      g.fill({color,alpha});
+      state.fireHotFills++;
+      // Preserve holes even in hollow hot fire. No glowing disk through
+      // the center of a ring, no bridge across disconnected embers.
+      for(let j=i+1;j<paths.length;j++){
+       const q=paths[j];
+       if(q.parent===i&&q.depth===p.depth+1&&q.closed&&polygon(q))
+        if(typeof g.cut==="function")g.cut();
+      }
+      // Soft inner light: two restrained concentric border treatments,
+      // still derived only from the original contour positions.
+      for(const halo of peak?[
+       {width:4.5,alpha:.09*strength},{width:1.4,alpha:.16*strength}
+      ]:[
+       {width:7,alpha:.06*strength},{width:2.5,alpha:.09*strength}
+      ]){
+       if(!polygon(p))continue;
+       g.stroke({color,alpha:halo.alpha,width:halo.width,
+        cap:"round",join:"round"});
+       state.fireHotGlows++;
+      }
+     }
+    }
+   }
+  }
   function drawFireBody(results){
    if(!fireBodyGraphics)return;
    fireBodyGraphics.clear();
@@ -248,19 +311,22 @@
   function paintFireShells(found){
    if(!fireShellGraphics)return;
    fireShellGraphics.clear();
-   if((!state.fireShell&&!state.fireBody)||!found||!FIRE_PERIMETER?.buildPerimeters)return;
+   if((!state.fireShell&&!state.fireBody&&!state.fireHot)||!found||!FIRE_PERIMETER?.buildPerimeters)return;
    const before=typeof performance!=="undefined"?performance.now():0;
    try{
     const results=FIRE_PERIMETER.buildPerimeters(found.groups,{
      maxGroups:3,sampleBudget:3500,
-     threshold:state.fireBody?.78:undefined,body:state.fireBody});
+     threshold:(state.fireBody||state.fireHot)?.78:undefined,body:state.fireBody,hot:state.fireHot});
     state.fireShellGroups=results.groups;
     state.fireShellPaths=results.paths;
     state.fireShellVertices=results.vertices;
     state.fireShellSamples=results.samples;
     state.fireShellWork=results.work;
     state.fireShellSkipped=results.skipped;
+    state.fireHotPaths=results.hotPaths;
+    state.firePeakPaths=results.peakPaths;
     drawFireBody(results);
+    drawFireHot(results);
     if(state.fireShell)for(const cl of results.shells){
      const factor=cl.count>=4?1:.65;
      // Boundary ONLY in Pass B: no opaque fill and no bright interior.
@@ -291,11 +357,11 @@
     state.fireShellMs=before?Math.round((performance.now()-before)*10)/10:0;
    }catch(error){
     console.warn("Nonfatal fire perimeter failure",error);
-    setFireShell(false);setFireBody(false);
+    setFireShell(false);setFireBody(false);setFireHot(false);
    }
   }
   function paintFireEffects(){
-   if(!state.fireDebug&&!state.fireShell&&!state.fireBody)return;
+   if(!state.fireDebug&&!state.fireShell&&!state.fireBody&&!state.fireHot)return;
    let found;
    try{
     // One clustering operation supplies BOTH the validated Pass A debug
@@ -304,7 +370,7 @@
      bounds:fireViewport(),radius:26,margin:36});
    }catch(error){
     console.warn("Nonfatal fire group failure",error);
-    setFireShell(false);setFireBody(false);setFireDebug(false);return;
+    setFireShell(false);setFireBody(false);setFireHot(false);setFireDebug(false);return;
    }
    paintFireShells(found);
    paintFireDebug(found);
@@ -480,8 +546,9 @@
     shapeLayer.addChild(shapeGraphics);
     accentGraphics=new P.Graphics();fireDebugGraphics=new P.Graphics();
     fireBodyGraphics=new P.Graphics();fireBodyGraphics.blendMode="normal";
+    fireHotGraphics=new P.Graphics();fireHotGraphics.blendMode="add";
     fireShellGraphics=new P.Graphics();fireShellGraphics.blendMode="add";
-    app.stage.addChild(world);world.addChild(shapeLayer,fireBodyGraphics,fireShellGraphics,detailsLayer,accentGraphics,fireDebugGraphics);
+    app.stage.addChild(world);world.addChild(shapeLayer,fireBodyGraphics,fireHotGraphics,fireShellGraphics,detailsLayer,accentGraphics,fireDebugGraphics);
     if(opts.alignDebug){
      registrationGraphics=new P.Graphics();
      world.addChild(registrationGraphics);
@@ -503,7 +570,7 @@
   function disable(reason){
    state.active=false;state.records.length=0;
    if(app?.canvas)app.canvas.style.display="none";
-   shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
+   shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();fireHotGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireHotFills=state.fireHotGlows=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
    announce("PHASER SWARM · SAFE FALLBACK");
   }
@@ -579,9 +646,9 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,createBridge});
 });
