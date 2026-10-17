@@ -1,4 +1,4 @@
-/* WANDRUNE / FIRE COHESION 085 : PASS B (SOFT SHARED PERIMETER)
+/* WANDRUNE / FIRE COHESION 085 : PASS D (DENSITY-BASED HOT CORE)
  * Pure visual scalar-field sampling + marching squares.
  * Input: groups from pixi-fire-clusters.js (already computed agent records).
  * Output: lightweight world-coordinate contours. No spell/gameplay mutation.
@@ -10,7 +10,7 @@
  if(root)root.WRKMAN_FIRE_PERIMETER=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="085-fire-cohesion-pass-c";
+ const VERSION="085-fire-cohesion-pass-d";
  // 512-point exponential falloff lookup for the visual-only density pass.
  // Indexing uses 128 steps per exponent unit, <0.4% local weight error.
  const GAUSS=new Float32Array(512);
@@ -163,27 +163,38 @@
    {level:threshold,kind:"body",paths},
    {level:1.6,kind:"dense",paths:trace(1.6)}
   ]:[];
-  return {count:agents.length,paths,bands,samples:nx*ny,work,
+  // One already-computed density grid supplies the hotter nested isovalues.
+  // 2.7 requires meaningful local cooperation; 4.8 is intentionally rare.
+  // No white-hot line is invented for a sparse pair or ordinary ember.
+  const hotBands=opts.hot?[
+   {level:2.7,kind:"hot",paths:trace(2.7)},
+   {level:4.8,kind:"peak",paths:trace(4.8)}
+  ]:[];
+  return {count:agents.length,paths,bands,hotBands,samples:nx*ny,work,
    bounds:{minX,minY,maxX:minX+width,maxY:minY+height}};
  }
  function buildPerimeters(groups,opts={}){
   const maxGroups=clamp(Math.floor(opts.maxGroups??4),0,12);
   const budget=clamp(Math.floor(opts.sampleBudget??4500),0,24000);
   const chosen=[],statistics={groups:0,paths:0,vertices:0,samples:0,work:0,
-   skipped:0,bodyPaths:0,budget,version:VERSION};
+   skipped:0,bodyPaths:0,hotPaths:0,peakPaths:0,budget,version:VERSION};
   for(const group of groups||[]){
    if(!group||group.count<2)continue;
    if(chosen.length>=maxGroups||statistics.samples+400>budget){statistics.skipped++;continue;}
    const remaining=budget-statistics.samples;
    const shell=buildOne(group,{maxSamples:Math.min(1100,remaining),
-    threshold:opts.threshold,body:!!opts.body});
+    threshold:opts.threshold,body:!!opts.body,hot:!!opts.hot});
    if(!shell||!shell.paths.length)continue;
    if(statistics.samples+shell.samples>budget){statistics.skipped++;continue;}
    statistics.samples+=shell.samples;statistics.work+=shell.work;
    statistics.groups++;statistics.paths+=shell.paths.length;
    for(const path of shell.paths)statistics.vertices+=path.points.length;
    for(const band of shell.bands)statistics.bodyPaths+=band.paths.length;
-   chosen.push({castIndex:group.castIndex,count:group.count,paths:shell.paths,bands:shell.bands});
+   for(const band of shell.hotBands){
+    if(band.kind==="peak")statistics.peakPaths+=band.paths.length;
+    else statistics.hotPaths+=band.paths.length;
+   }
+   chosen.push({castIndex:group.castIndex,count:group.count,paths:shell.paths,bands:shell.bands,hotBands:shell.hotBands});
   }
   return {...statistics,shells:chosen};
  }
