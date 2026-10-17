@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="084-pixi8-material-fidelity",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="085-fire-cohesion-pass-a",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -77,16 +77,20 @@
   const stage=opts.stage||win.document.getElementById("stage");
   if(!stage)throw Error("Wandrune stage not found");
   const FORMATION=win.WRKMAN_PIXI_FORMATIONS||null;
+  const FIRE_CLUSTERS=win.WRKMAN_FIRE_CLUSTERS||null;
   const allowedLooks=["original","bright","formation"];
   const requested=allowedLooks.includes(opts.look)?opts.look:"formation";
   const initialLook=requested==="formation"&&!FORMATION?.analyze?"bright":requested;
   const artStyles=["soft","forge","forge-hot"];
   const selectedArt=artStyles.includes(opts.art)?opts.art:"forge";
   const state={active:false,ready:false,loading:false,error:null,records:[],drawn:0,
-   details:0,bulk:0,frame:0,look:initialLook,art:selectedArt,materialDrawn:0,artFallback:0,ambientDrawn:0,formations:0,formationSegments:0,canvasOffsetX:0,canvasOffsetY:0};
+   details:0,bulk:0,frame:0,look:initialLook,art:selectedArt,materialDrawn:0,artFallback:0,ambientDrawn:0,formations:0,formationSegments:0,canvasOffsetX:0,canvasOffsetY:0,
+   fireDebug:!!opts.fireDebug&&!!FIRE_CLUSTERS?.findClusters,
+   fireCandidates:0,fireGroups:0,fireLargest:0,fireSingles:0,fireEdges:0,
+   fireVisibleGroups:0,fireNeighborChecks:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
    registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=new Map(),spritePool=[],
-   restoredTextures=new Map(),accentGraphics=null,disposed=false,heroUsed=0;
+   restoredTextures=new Map(),accentGraphics=null,fireDebugGraphics=null,disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
    if(typeof opts.status==="function")try{opts.status(msg);}catch(_){}
@@ -165,6 +169,71 @@
     for(let i=1;i<path.length;i++)g.lineTo(path[i].x,path[i].y);
    }
    g.stroke({width,color,alpha,cap:"round",join:"round"});
+  }
+  function setFireDebug(enabled){
+   state.fireDebug=!!enabled&&!!FIRE_CLUSTERS?.findClusters;
+   if(!state.fireDebug){
+    fireDebugGraphics?.clear();
+    state.fireCandidates=0;state.fireGroups=0;state.fireLargest=0;
+    state.fireSingles=0;state.fireEdges=0;state.fireVisibleGroups=0;
+   }
+   announce("FIRE CLUSTERS · "+(state.fireDebug?"DEBUG ON":"OFF"));
+   return state.fireDebug;
+  }
+  function fireViewport(){
+   const cam=scene.cameras?.main;
+   if(!cam?.getWorldPoint)return null;
+   const a=cam.getWorldPoint(0,0),b=cam.getWorldPoint(W,0),
+     c=cam.getWorldPoint(0,H),d=cam.getWorldPoint(W,H);
+   return {minX:Math.min(a.x,b.x,c.x,d.x),maxX:Math.max(a.x,b.x,c.x,d.x),
+    minY:Math.min(a.y,b.y,c.y,d.y),maxY:Math.max(a.y,b.y,c.y,d.y)};
+  }
+  function paintFireDebug(){
+   const g=fireDebugGraphics;if(!g)return;
+   g.clear();
+   if(!state.fireDebug||!FIRE_CLUSTERS?.findClusters)return;
+   let found;
+   try{
+    found=FIRE_CLUSTERS.findClusters(state.records,{bounds:fireViewport(),radius:26,margin:36});
+   }catch(error){
+    console.warn("Nonfatal fire clustering diagnostic:",error);
+    setFireDebug(false);return;
+   }
+   state.fireCandidates=found.candidates;state.fireGroups=found.activeClusters;
+   state.fireLargest=found.largest;state.fireSingles=found.singles;
+   state.fireEdges=found.links;state.fireNeighborChecks=found.checks;
+   // Debug only. Full detection remains uncapped; cap drawn geometry
+   // to avoid turning the diagnostic into the performance bottleneck.
+   const display=found.groups.slice(0,18);state.fireVisibleGroups=display.length;
+   let linesLeft=150;
+   for(const cl of display){
+    const color=cl.debugColor,h=cl.hull;
+    if(h.length>=3){
+     g.moveTo(h[0].x,h[0].y);
+     for(let k=1;k<h.length;k++)g.lineTo(h[k].x,h[k].y);
+     g.closePath().fill({color,alpha:.08});
+     g.stroke({color,alpha:.88,width:1.5,join:"round"});
+    }else if(h.length===2){
+     g.moveTo(h[0].x,h[0].y).lineTo(h[1].x,h[1].y)
+      .stroke({color,alpha:.9,width:2.5});
+    }
+    // Each connection represents an actual neighborhood union; these
+    // links are diagnostic only and do not create damage or physics.
+    const remaining=Math.min(linesLeft,Math.min(35,cl.edges.length));
+    if(remaining){
+     const stride=Math.max(1,Math.ceil(cl.edges.length/remaining));
+     let taken=0;
+     for(let j=0;j<cl.edges.length&&taken<remaining;j+=stride){
+      const edge=cl.edges[j];
+      g.moveTo(edge.a.x,edge.a.y).lineTo(edge.b.x,edge.b.y)
+       .stroke({color,alpha:.26,width:.8});
+      taken++;
+     }
+     linesLeft-=taken;
+    }
+    // Centroid anchor indicates a unique group in the overlay.
+    g.circle(cl.x,cl.y,3).fill({color,alpha:.94});
+   }
   }
   function paintFormations(){
    if(!shapeGraphics)return;
@@ -282,8 +351,8 @@
     world=new P.Container();detailsLayer=new P.Container();
     shapeLayer=new P.Container();shapeLayer.blendMode="add";shapeGraphics=new P.Graphics();
     shapeLayer.addChild(shapeGraphics);
-    accentGraphics=new P.Graphics();
-    app.stage.addChild(world);world.addChild(shapeLayer,detailsLayer,accentGraphics);
+    accentGraphics=new P.Graphics();fireDebugGraphics=new P.Graphics();
+    app.stage.addChild(world);world.addChild(shapeLayer,detailsLayer,accentGraphics,fireDebugGraphics);
     if(opts.alignDebug){
      registrationGraphics=new P.Graphics();
      world.addChild(registrationGraphics);
@@ -305,7 +374,7 @@
   function disable(reason){
    state.active=false;state.records.length=0;
    if(app?.canvas)app.canvas.style.display="none";
-   shapeGraphics?.clear();accentGraphics?.clear();state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
+   shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
    announce("PHASER SWARM · SAFE FALLBACK");
   }
@@ -369,7 +438,7 @@
     }
     // Never edits trajectory, collision, position or count: this is a
     // purely visual geometric interpretation of already-computed records.
-    paintFormations();paintAccents();
+    paintFormations();paintAccents();paintFireDebug();
     state.materialDrawn=materialDrawn;state.artFallback=artFallback;
     for(let i=heroUsed;i<spritePool.length;i++)spritePool[i].visible=false;
     for(const group of bulkGroups.values())for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
@@ -381,9 +450,9 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,createBridge});
 });
