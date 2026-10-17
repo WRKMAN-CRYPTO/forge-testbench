@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="085-fire-cohesion-pass-d",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="085-fire-cohesion-stabilized",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -79,6 +79,10 @@
   const FORMATION=win.WRKMAN_PIXI_FORMATIONS||null;
   const FIRE_CLUSTERS=win.WRKMAN_FIRE_CLUSTERS||null;
   const FIRE_PERIMETER=win.WRKMAN_FIRE_PERIMETER||null;
+  const FIRE_STABILITY=win.WRKMAN_FIRE_STABILITY||null;
+  const fireTracker=FIRE_STABILITY?.makeTracker?FIRE_STABILITY.makeTracker({
+   maxSlots:3,fadeMs:180,minHoldMs:230,challengerRatio:1.33,
+   challengeMs:170,heatHoldMs:110,heatFadeMs:190}):null;
   const allowedLooks=["original","bright","formation"];
   const requested=allowedLooks.includes(opts.look)?opts.look:"formation";
   const initialLook=requested==="formation"&&!FORMATION?.analyze?"bright":requested;
@@ -95,7 +99,10 @@
    fireBody:opts.fireBody!==false&&!!FIRE_PERIMETER?.buildPerimeters,
    fireBodyLayers:0,fireBodyFills:0,
    fireHot:opts.fireHot!==false&&!!FIRE_PERIMETER?.buildPerimeters&&!!FIRE_CLUSTERS?.findClusters,
-   fireHotPaths:0,firePeakPaths:0,fireHotFills:0,fireHotGlows:0};
+   fireHotPaths:0,firePeakPaths:0,fireHotFills:0,fireHotGlows:0,
+   fireStable:opts.fireStable!==false&&!!fireTracker,
+   fireStableSlots:0,fireStableGhosts:0,fireStableFading:0,
+   fireStableSwaps:0,fireStableHeldHot:0,fireStableCached:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
    registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=new Map(),spritePool=[],
    restoredTextures=new Map(),accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,fireBodyGraphics=null,fireHotGraphics=null,disposed=false,heroUsed=0;
@@ -188,6 +195,14 @@
    announce("FIRE CLUSTERS · "+(state.fireDebug?"DEBUG ON":"OFF"));
    return state.fireDebug;
   }
+  function setFireStable(enabled){
+   state.fireStable=!!enabled&&!!fireTracker;
+   fireTracker?.reset();
+   state.fireStableSlots=state.fireStableGhosts=state.fireStableFading=0;
+   state.fireStableSwaps=state.fireStableHeldHot=state.fireStableCached=0;
+   announce("FIRE STABILITY · "+(state.fireStable?"ON":"OFF"));
+   return state.fireStable;
+  }
   function setFireShell(enabled){
    state.fireShell=!!enabled&&!!FIRE_PERIMETER?.buildPerimeters&&!!FIRE_CLUSTERS?.findClusters;
    if(!state.fireShell){
@@ -236,7 +251,7 @@
      const peak=band.kind==="peak";
      const color=peak?0xfff2be:0xffc65b;
      const strength=cl.count<13?.58:1;
-     const alpha=(peak?.34:.27)*strength;
+     const alpha=(peak?.34:.27)*strength*(cl.opacity??1)*(band.opacity??1);
      const paths=band.paths||[];
      for(let i=0;i<paths.length;i++){
       const p=paths[i];
@@ -253,9 +268,9 @@
       // Soft inner light: two restrained concentric border treatments,
       // still derived only from the original contour positions.
       for(const halo of peak?[
-       {width:4.5,alpha:.09*strength},{width:1.4,alpha:.16*strength}
+       {width:4.5,alpha:.09*strength*(cl.opacity??1)*(band.opacity??1)},{width:1.4,alpha:.16*strength*(cl.opacity??1)*(band.opacity??1)}
       ]:[
-       {width:7,alpha:.06*strength},{width:2.5,alpha:.09*strength}
+       {width:7,alpha:.06*strength*(cl.opacity??1)*(band.opacity??1)},{width:2.5,alpha:.09*strength*(cl.opacity??1)*(band.opacity??1)}
       ]){
        if(!polygon(p))continue;
        g.stroke({color,alpha:halo.alpha,width:halo.width,
@@ -286,7 +301,7 @@
     const confidence=cl.count<=3?.22:cl.count<=12?.58:1;
     for(const band of cl.bands||[]){
      const dense=band.kind==="dense";
-     const opacity=(dense?.19:.16)*confidence;
+     const opacity=(dense?.19:.16)*confidence*(cl.opacity??1);
      const color=dense?0xffac49:0xff5922;
      // Contours are ordered by enclosed area with recorded nesting.
      // A hole contour is cut from its parent (PixiJS 8 Graphics.cut).
@@ -314,10 +329,26 @@
    if((!state.fireShell&&!state.fireBody&&!state.fireHot)||!found||!FIRE_PERIMETER?.buildPerimeters)return;
    const before=typeof performance!=="undefined"?performance.now():0;
    try{
-    const results=FIRE_PERIMETER.buildPerimeters(found.groups,{
+    let choice=null;
+    let groups=found.groups;
+    if(state.fireStable&&fireTracker){
+     const now=typeof performance!=="undefined"?performance.now():state.frame*16.667;
+     choice=fireTracker.step(found.groups,now);
+     groups=choice.slots.filter(slot=>slot.group).map(slot=>slot.group);
+     state.fireStableSlots=choice.selected;
+     state.fireStableGhosts=choice.ghosts;
+     state.fireStableFading=choice.fading;
+     state.fireStableSwaps=choice.swaps;
+    }
+    let results=FIRE_PERIMETER.buildPerimeters(groups,{
      maxGroups:3,sampleBudget:3500,
      threshold:(state.fireBody||state.fireHot)?.78:undefined,body:state.fireBody,hot:state.fireHot});
-    state.fireShellGroups=results.groups;
+    if(choice){
+     results=fireTracker.apply(results,choice);
+     state.fireStableHeldHot=results.heldHot;
+     state.fireStableCached=results.cachedShells;
+    }
+    state.fireShellGroups=choice?results.visibleShells:results.groups;
     state.fireShellPaths=results.paths;
     state.fireShellVertices=results.vertices;
     state.fireShellSamples=results.samples;
@@ -349,8 +380,8 @@
        g.moveTo(points[0].x,points[0].y);
        for(let i=1;i<points.length;i++)g.lineTo(points[i].x,points[i].y);
        if(path.closed)g.closePath();
-       g.stroke({width:band.width,color:band.color,alpha:band.alpha,
-        cap:"round",join:"round"});
+       g.stroke({width:band.width,color:band.color,
+        alpha:band.alpha*(cl.opacity??1),cap:"round",join:"round"});
       }
      }
     }
@@ -569,6 +600,9 @@
   }
   function disable(reason){
    state.active=false;state.records.length=0;
+   fireTracker?.reset();
+   state.fireStableSlots=state.fireStableGhosts=state.fireStableFading=0;
+   state.fireStableSwaps=state.fireStableHeldHot=state.fireStableCached=0;
    if(app?.canvas)app.canvas.style.display="none";
    shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();fireHotGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireHotFills=state.fireHotGlows=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
@@ -648,7 +682,7 @@
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
    app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,createBridge});
 });
