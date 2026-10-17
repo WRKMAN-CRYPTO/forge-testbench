@@ -22,7 +22,7 @@ equal(pair.links,1,"pair has one essential connection");
 const split=Clusters.findClusters([p(0,0),p(13,2),p(100,90),p(112,90)]);
 equal(split.activeClusters,2,"separated pairs remain distinct");
 equal(split.links,2,"two pairs produce two links");
-const mixed=Clusters.findClusters([p(0,0),p(8,0,1),p(0,0,0),p(8,0,0),
+const mixed=Clusters.findClusters([p(0,0,0),p(8,0,0),p(0,0,1),p(8,0,1),
  p(3,0,0,2),p(1,1,0,3),p(2,1,0,4)]);
 equal(mixed.activeClusters,2,"overlapping cast origins never merge");
 equal(mixed.candidates,4,"water/ice/lightning do not enter fire clustering");
