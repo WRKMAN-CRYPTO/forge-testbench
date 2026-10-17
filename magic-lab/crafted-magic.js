@@ -298,7 +298,10 @@
    if(pixi){
     pixi.paint({x,y,r,element:a.element||0,color:col,alpha,time,
       seed:a.seed||i,angle:Math.atan2(worldVy,worldVx),
-      texture:cfg.texture,palette:cfg.palette,progress:t,castIndex,agentIndex:i});
+      texture:cfg.texture,palette:cfg.palette,progress:t,castIndex,agentIndex:i,
+      // The original Phaser stroke above draws these same previous positions.
+      // The optional renderer needs the actual path, not a guessed centerline.
+      trail:a.tail?.length?a.tail.map(pt=>worldPosition(st,a,pt[0],pt[1])):null});
    }else if(vfx){
     const vx=st.delivery==='world'?a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
     const vy=st.delivery==='world'?a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
