@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b16">
+<title>WRKMAN • Hybrid Visuals Lab / Experiment 006</title>
+<style>
+:root{color-scheme:dark;--line:#28394f;--muted:#899cb5;--ink:#eef6ff;--amber:#f9c779;--panel:#101b2b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:#080d17;color:var(--ink);font:13px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+body{background:radial-gradient(ellipse at 50% -10%,#28344f 0%,transparent 55%),#070b14}
+button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}button:disabled{opacity:.44;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+main{width:min(100%,960px);margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) 14px calc(40px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;gap:11px}header .w{border:1px solid #ffcd82;border-radius:10px;transform:rotate(-8deg);display:grid;place-items:center;font:1000 28px/1 system-ui;width:40px;height:40px;color:var(--amber);box-shadow:0 0 18px #b4832b38}
+h1{font-size:19px;letter-spacing:-.6px;margin:0}header small{font:800 10px ui-monospace,monospace;letter-spacing:1.9px;color:var(--amber)}
+.badge{margin-left:auto;color:#a3ead0;background:#16332f;padding:6px 8px;border:1px solid #27544d;border-radius:20px;white-space:nowrap;font-size:9px;font-weight:900}
+.subtitle{color:#95a9bb;font-size:12px;margin:12px 0}
+.stageWrap{position:relative;border-radius:17px;overflow:hidden;border:1px solid #37516a;background:radial-gradient(ellipse at 50% 48%,#24304c 0%,#10192c 44%,#060b17 78%);box-shadow:0 14px 52px #0009}
+#stage{position:relative;width:100%;aspect-ratio:760/466;overflow:hidden;touch-action:manipulation;cursor:pointer}
+#view{position:absolute;inset:0}#view canvas{display:block;width:100%!important;height:100%!important}
+#stage:before{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(#a5c2e408 1px,transparent 1px),linear-gradient(90deg,#a5c2e408 1px,transparent 1px);background-size:30px 30px}
+.hud{pointer-events:none;position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:12px}
+.hudTop{display:flex;justify-content:space-between;color:#9fc4e1;font:800 9px ui-monospace,monospace;letter-spacing:1.2px}
+.hudTop span{background:#071320b9;border:1px solid #ffffff21;border-radius:8px;padding:6px 8px}
+.hudBot strong{font-size:clamp(25px,6.7vw,51px);line-height:1;font-weight:1000;letter-spacing:-1.5px;text-shadow:0 0 18px #000;opacity:.94}.hudBot div{font:800 10px ui-monospace,monospace;letter-spacing:1.5px;color:#a4bed7;margin-top:6px}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:12px 0}
+.stat{background:#101b29;border:1px solid #283b50;border-radius:11px;padding:9px;min-width:0}
+.stat label{display:block;font-size:9px;font-weight:900;letter-spacing:1px;color:#8ea5bb;text-transform:uppercase}
+.stat strong{display:block;margin-top:3px;font:900 clamp(15px,3.3vw,23px) ui-monospace,monospace;white-space:nowrap}
+.stat small{font:500 9px ui-monospace,monospace;color:#768ba0}
+.section{background:linear-gradient(150deg,#111d2c,#0d1724);border:1px solid #27394d;padding:13px;border-radius:14px;margin-top:11px}
+.sectionTitle{color:#9fb1c5;font-size:10px;letter-spacing:1.7px;font-weight:1000;text-transform:uppercase;margin-bottom:8px}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.tabs button{background:#162234;border:1px solid #30465d;color:#afbed0;font-size:11px;font-weight:850;border-radius:10px;padding:11px 2px;min-height:44px}
+.tabs button[aria-pressed=true]{color:#fff5e8;border-color:#dcad6d;background:linear-gradient(#4a3c37,#292634);box-shadow:inset 0 1px #fddca444}
+.mode{display:flex;gap:8px;margin-top:10px}.mode button{background:#132236;border:1px solid #34506b;padding:8px 12px;border-radius:9px;color:#dbe8f1;font-weight:850;flex:1}
+.mode button[aria-pressed=true]{background:#254051;border-color:#8bc2db;color:#fff}
+label.rangeTitle{display:flex;align-items:center;justify-content:space-between;color:#a6b5c7;font-weight:800;margin-top:12px;font-size:11px}
+#loadText{color:var(--amber);font:900 12px ui-monospace,monospace}
+input[type=range]{width:100%;accent-color:#efb875;height:27px;margin:5px 0}
+.rangeEnds{display:flex;justify-content:space-between;color:#68849e;font:700 10px ui-monospace,monospace}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+button.action{min-height:48px;border-radius:10px;border:1px solid #47637c;color:#e8f2fc;background:#1c3144;font-weight:900;font-size:12px}
+button.action.primary{background:linear-gradient(105deg,#f4ad67,#ffdc9a);color:#231509;border-color:#ffe1ac}
+button.action.stop{border-color:#8e6170;background:#382030}
+.readout{margin-top:12px;background:#0d1b2a;border:1px solid #36526a;border-radius:11px;color:#b3c7d9;padding:11px 12px;font-size:11px;min-height:44px}
+.result{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #23384d;font:700 11px ui-monospace,monospace;color:#bdd0df}
+.result:last-child{border-bottom:0}.result span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.result strong{white-space:nowrap}.result.bad strong{color:#ffb0a1}.result.ok strong{color:#a6edcb}
+.results{max-height:255px;overflow:auto;overscroll-behavior:contain}
+.caveat{font-size:10px;color:#8198ad;line-height:1.6;margin-top:12px}.caveat b{color:#c3d5e3}
+.error{padding:20px;color:#ffb2ab;font-size:13px}
+@media(min-width:740px){.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}.section{margin-top:14px}.stats{gap:10px}.stat{padding:14px}h1{font-size:25px}}
+
+.tabs3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.compositionGrid{display:grid;grid-template-columns:1fr;gap:12px}
+.smallNote{color:#8ca5bb;font-size:11px;line-height:1.5;margin-top:8px}
+#stage{touch-action:none;user-select:none}
+.chipline{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.infoChip{font:800 10px ui-monospace,monospace;color:#b5d1e9;background:#12283b;border:1px solid #29475e;border-radius:8px;padding:5px 8px}
+@media(min-width:740px){.compositionGrid{grid-template-columns:1fr 1fr}}
+
+.tabs4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:410px){.tabs4 button{font-size:10px;letter-spacing:-.15px;padding-left:0;padding-right:0}}
+</style>
+</head>
+<body>
+<main>
+<header><div class="w">W</div><div><small>WRKMAN / EXPERIMENT 006</small><h1>Hybrid VFX Lab</h1></div><span class="badge">PIXIJS 8 ONLY</span></header>
+<p class="subtitle">How much high-detail magic do we need? Blend full Sprites with fast ParticleContainers and measure the difference. Wandrune untouched.</p>
+<div class="stageWrap"><div id="stage" role="button" aria-label="Trigger an elemental pulse by tapping the stage" tabindex="0"><div id="view"></div><div id="flash"></div><div class="hud"><div class="hudTop"><span id="sceneName">FIELD / DEFINED</span><span id="visibleCount">ON SCREEN: --</span></div><div class="hudBot"><strong id="elementTitle">FIRE</strong><div id="elementCaption">TURBULENCE / EMBERS / BLOOM</div></div></div></div></div>
+<div class="stats"><div class="stat"><label>FPS</label><strong id="fps">--</strong></div><div class="stat"><label>P95 frame</label><strong id="p95">--</strong><small> milliseconds</small></div><div class="stat"><label>JS + render</label><strong id="cpu">--</strong><small> ms average</small></div><div class="stat"><label>Visuals</label><strong id="particles">2,000</strong><small id="casts">10 casts</small></div></div>
+<div class="controls"><section class="section"><div class="sectionTitle">01 / Choose the effect</div><div class="tabs" id="elements"><button data-el="fire" aria-pressed="true">🔥 Fire</button><button data-el="lightning" aria-pressed="false">⚡ Bolt</button><button data-el="ice" aria-pressed="false">❄️ Ice</button><button data-el="gravity" aria-pressed="false">🪐 Gravity</button></div><div class="sectionTitle" style="margin-top:17px">02 / Visual quality</div><div class="mode" id="quality"><button data-q="cinematic" aria-pressed="true">✧ Cinematic</button><button data-q="lean" aria-pressed="false">Lean</button></div><label class="rangeTitle" for="load">03 / Concurrent casts <span id="loadText">10 × 200</span></label><input id="load" type="range" min="0" max="12" step="1" value="4"><div class="rangeEnds"><span>200</span><span>2,000</span><span>25,600</span></div></section>
+<section class="section"><div class="sectionTitle">04 / Find the breaking point</div><div class="actions"><button class="action primary" id="ramp">▶ AUTO STRESS</button><button class="action" id="pulse">✦ PULSE</button><button class="action" id="copy">Copy results</button><button class="action" id="reset">Reset bench</button></div><div class="readout" id="notice" aria-live="polite">Loading PixiJS 8…</div><div class="sectionTitle" style="margin-top:15px">Load results <span id="progress" style="float:right;color:#86c9e1"></span></div><div class="results" id="results"><div style="color:#647f98;font-size:11px">Run AUTO STRESS to collect a performance curve on this device.</div></div></section></div>
+<section class="section" id="compositionPanel">
+<div class="sectionTitle">05 / Composition</div>
+<div class="compositionGrid">
+<div><div class="tabs tabs3" id="layouts">
+<button data-layout="cluster" aria-pressed="false">☄️ Cluster</button>
+<button data-layout="field" aria-pressed="true">✦ Field</button>
+<button data-layout="world" aria-pressed="false">🌐 World</button>
+</div><div class="smallNote" id="layoutNote">All casts distributed across the visible arena. Same simulation work as Cluster.</div>
+<div class="chipline"><span class="infoChip" id="layoutSize">WORLD: 760 × 466</span><span class="infoChip" id="onScreen">~-- visible visuals</span></div>
+</div>
+<div><div class="sectionTitle">06 / Lighting treatment</div>
+<div class="tabs tabs3" id="looks">
+<button data-look="reference" aria-pressed="false">Original</button>
+<button data-look="defined" aria-pressed="true">Defined</button>
+<button data-look="cataclysm" aria-pressed="false">☀️ Unbound</button>
+</div><div class="smallNote" id="lookNote">Controlled glow, mostly normal-blended cores and selected additive sparks. No particle reduction.</div>
+</div>
+</div>
+<label class="rangeTitle" for="cameraZoom">07 / Camera zoom <span id="zoomText">100%</span></label>
+<input id="cameraZoom" type="range" min="0" max="5" step="1" value="3">
+<div class="rangeEnds"><span>33% / wide view</span><span>100%</span><span>160% / detail</span></div>
+<div class="actions"><button class="action" id="recenter">⌖ Recenter view</button><button class="action" id="sampleNow">◈ Capture reading</button></div>
+<div class="smallNote">Drag across the scene to pan. Tap to pulse. At 100% with Cluster or Field, the same active particles appear in the arena; World and zoom can change the number visible. These are visual layout tests, not collision or gameplay physics.</div>
+</section>
+<section class="section">
+<div class="sectionTitle">08 / Renderer strategy</div>
+<div class="tabs tabs4" id="strategies">
+<button data-strategy="baseline" aria-pressed="true">Baseline</button>
+<button data-strategy="cull" aria-pressed="false">Cull</button>
+<button data-strategy="adaptive" aria-pressed="false">Smart LOD</button>
+<button data-strategy="particle" aria-pressed="false">Particle</button>
+</div>
+<div class="smallNote" id="strategyNote">Every sprite is animated and submitted for rendering, including particles outside the camera.</div>
+<div class="chipline">
+<span class="infoChip" id="renderedReadout">Submitted: --</span>
+<span class="infoChip" id="culledReadout">Skipped: --</span>
+<span class="infoChip" id="lodReadout">Near / mid / far: --</span>
+</div>
+<div class="actions"><button class="action primary" id="compare">⚙ COMPARE 4 MODES</button><button class="action" id="compareStop" disabled>■ Stop comparison</button></div>
+<div class="smallNote">Comparison keeps the current element, camera, lighting, quality, sprite count and positions. Runs each renderer strategy in sequence. Note: Particle uses one shared texture and a single blend mode, so its appearance is not pixel-identical.</div>
+</section>
+<div class="caveat"><b>What this tests:</b> PixiJS 8 WebGL sprites with enhanced per-cast visuals, 200 animated visuals per cast. The automatic ramp measures frame cadence and full JavaScript update + render call, and stops after two successive stages below the target (50 FPS or P95 over 25 ms). <b>What it cannot test:</b> actual GPU execution time, device temperature, thermal throttling over long sessions, or Wandrune gameplay. A benchmark ceiling is not necessarily a crash point. Defined adjusts blending, opacity and glow without reducing sprite counts. World zoom changes visible fraction, so compare FPS only at matching camera and scene settings. PixiJS downloads once from jsDelivr.</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js"></script>
+<script>
+(function(){
+'use strict';
+const W=760,H=466,PER=200,LEVELS=[1,2,4,8,10,12,16,24,32,48,64,96,128];
+const $=id=>document.getElementById(id);
+const ui={view:$('view'),notice:$('notice'),fps:$('fps'),p95:$('p95'),cpu:$('cpu'),particles:$('particles'),casts:$('casts'),load:$('load'),loadText:$('loadText'),ramp:$('ramp'),results:$('results'),progress:$('progress'),flash:$('flash')};
+const TYPES={
+fire:{title:'FIRE',sub:'TURBULENCE / EMBERS / BLOOM',accent:'#ff9a59',rgb:[255,132,50]},
+lightning:{title:'LIGHTNING',sub:'BRANCHING / ARCS / IONIZATION',accent:'#8fd7ff',rgb:[92,183,255]},
+ice:{title:'ICE',sub:'CRYSTALS / FRACTURE / SHATTER',accent:'#88f8ff',rgb:[113,236,255]},
+gravity:{title:'GRAVITY',sub:'ACCRETION / SINGULARITY / COLLAPSE',accent:'#c58dff',rgb:[180,111,255]}
+};
+let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,sceneRoot=null,backdrop=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,stopped=false,layout='field',look='defined',zoom=1,camera={x:W*.5,y:H*.5},visibleApprox=0,strategy='baseline',submitted=0,skipped=0,nearCount=0,midCount=0,farCount=0,comparing=false,comparisonEpoch=0,compareResults=[],sceneOrigin=0;const ZOOMS=[.33,.50,.75,1,1.25,1.6];
+function rng(seed){let x=seed>>>0;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;};}
+function delay(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+function round(n){return Number.isFinite(n)?n.toFixed(1):'--';}
+function setStatus(msg){ui.notice.textContent=msg;}
+function percentile(v,p){if(!v.length)return NaN;let a=v.slice().sort((a,b)=>a-b);return a[Math.floor((a.length-1)*p)];}
+function sample(){let a=metrics.length?metrics.reduce((s,v)=>s+v,0)/metrics.length:NaN,b=costs.length?costs.reduce((s,v)=>s+v,0)/costs.length:NaN;return{fps:1000/a,p95:percentile(metrics,.95),cpu:b,samples:metrics.length};}
+function clearSamples(){metrics=[];costs=[];last=0;ui.fps.textContent='--';ui.p95.textContent='--';ui.cpu.textContent='--';}
+function texture(make){let canvas=document.createElement('canvas');canvas.width=canvas.height=128;let c=canvas.getContext('2d');make(c,64,64);return P.Texture.from(canvas);}
+function softBlob(col){return texture((g,x,y)=>{let h=g.createRadialGradient(x,y,1,x,y,62);h.addColorStop(0,'rgba('+col+',.95)');h.addColorStop(.09,'rgba('+col+',.75)');h.addColorStop(.27,'rgba('+col+',.30)');h.addColorStop(.65,'rgba('+col+',.08)');h.addColorStop(1,'rgba('+col+',0)');g.fillStyle=h;g.fillRect(0,0,128,128);});}
+function shapeTexture(kind,n){
+return texture((c,x,y)=>{
+let glow=c.createRadialGradient(x,y,0,x,y,55),rgb=TYPES[kind].rgb.join(',');
+glow.addColorStop(0,'rgba('+rgb+',.96)');glow.addColorStop(.12,'rgba('+rgb+',.47)');glow.addColorStop(.55,'rgba('+rgb+',.12)');glow.addColorStop(1,'rgba('+rgb+',0)');c.fillStyle=glow;c.fillRect(0,0,128,128);
+c.save();c.translate(x,y);c.shadowBlur=11;c.shadowColor=TYPES[kind].accent;
+if(kind==='fire'){
+ c.rotate((n-1)*.15);c.fillStyle=n===2?'#ffecac':'#ffbc76';c.beginPath();c.moveTo(0,-31);c.bezierCurveTo(20,-13,9,0,13,12);c.quadraticCurveTo(3,32,-12,15);c.bezierCurveTo(-19,-6,-3,-16,0,-31);c.fill();
+ c.fillStyle='#fff1be';c.beginPath();c.moveTo(0,-10);c.quadraticCurveTo(8,10,0,17);c.quadraticCurveTo(-6,5,0,-10);c.fill();
+}else if(kind==='lightning'){
+ c.fillStyle=n===0?'#faffff':'#a5f4ff';c.beginPath();c.moveTo(-6,-30);c.lineTo(12,-8);c.lineTo(0,-5);c.lineTo(13,30);c.lineTo(-13,0);c.lineTo(-1,-2);c.closePath();c.fill();
+}else if(kind==='ice'){
+ c.fillStyle=n===0?'#dffcff':'#8cefff';c.strokeStyle='#eafcff';c.lineWidth=2.1;c.beginPath();c.moveTo(0,-31);c.lineTo(11,-6);c.lineTo(3,30);c.lineTo(-11,-5);c.closePath();c.fill();c.stroke();
+ c.strokeStyle='#4ca9e8';c.lineWidth=1;c.beginPath();c.moveTo(0,-22);c.lineTo(0,21);c.moveTo(-8,-4);c.lineTo(8,-4);c.stroke();
+}else{
+ c.fillStyle=n===0?'#f4dcff':'#95f3ff';c.rotate(.4);c.beginPath();c.ellipse(0,0,4,28,0,0,Math.PI*2);c.fill();c.strokeStyle='#b5aaff';c.lineWidth=1;c.beginPath();c.moveTo(-9,-23);c.lineTo(8,19);c.stroke();
+}c.restore();
+});}
+function diskTexture(kind){
+const cv=document.createElement('canvas');cv.width=cv.height=512;const g=cv.getContext('2d'),r=rng(0x789f+kind.length*397),[rr,gg,bb]=TYPES[kind].rgb;
+g.translate(256,256);let h=g.createRadialGradient(0,0,2,0,0,248);
+let center=kind==='gravity'?'16,6,29':[rr,gg,bb].join(',');
+h.addColorStop(0,'rgba('+center+',.90)');h.addColorStop(.15,'rgba('+center+',.62)');h.addColorStop(.40,'rgba('+rr+','+gg+','+bb+',.25)');h.addColorStop(.7,'rgba('+rr+','+gg+','+bb+',.06)');h.addColorStop(1,'rgba('+rr+','+gg+','+bb+',0)');g.fillStyle=h;g.fillRect(-256,-256,512,512);
+g.save();g.rotate(kind==='gravity'?-.30:0);
+if(kind==='gravity'){
+ for(let j=0;j<53;j++){let a=r()*Math.PI*2,dist=62+j*2.5;g.beginPath();g.ellipse(0,0,dist,dist*.48,0,a,a+.4+r()*1.5);g.lineWidth=.6+r()*2.3;g.strokeStyle=j%5===0?'rgba(146,234,255,.8)':'rgba(191,114,255,.42)';g.stroke();}
+ for(let i=0;i<290;i++){let a=r()*Math.PI*2,d=64+r()*138;g.fillStyle=i%8===0?'rgba(227,246,255,.8)':'rgba(200,151,255,.4)';g.beginPath();g.arc(Math.cos(a)*d,Math.sin(a)*d*.5,.5+r()*1.5,0,Math.PI*2);g.fill();}
+ g.shadowBlur=16;g.shadowColor='#d591ff';g.strokeStyle='rgba(189,136,255,.85)';g.lineWidth=4;g.beginPath();g.ellipse(0,0,76,38,0,.22,5.55);g.stroke();g.shadowBlur=0;
+ g.fillStyle='#02050e';g.beginPath();g.ellipse(0,0,46,27,0,0,Math.PI*2);g.fill();g.strokeStyle='#b78dff';g.lineWidth=1.6;g.stroke();
+}else if(kind==='ice'){
+ for(let j=0;j<10;j++){let a=j*Math.PI/5,len=72+(j%3)*30;g.strokeStyle='rgba(206,250,255,.52)';g.lineWidth=3;g.beginPath();g.moveTo(0,0);g.lineTo(Math.cos(a)*len,Math.sin(a)*len);g.stroke();for(let k=1;k<4;k++){let d=k*len/4;let x=Math.cos(a)*d,y=Math.sin(a)*d;g.lineWidth=1.5;g.beginPath();g.moveTo(x-Math.cos(a+.65)*12,y-Math.sin(a+.65)*12);g.lineTo(x,y);g.lineTo(x-Math.cos(a-.65)*12,y-Math.sin(a-.65)*12);g.stroke();}}
+ g.strokeStyle='rgba(174,246,255,.6)';g.lineWidth=1.5;g.beginPath();g.arc(0,0,87,0,Math.PI*2);g.stroke();
+}else if(kind==='fire'){
+ for(let j=0;j<17;j++){let a=j*2.4,sz=40+r()*120;g.strokeStyle=j%3===0?'rgba(255,249,189,.46)':'rgba(255,132,42,.38)';g.lineWidth=2+r()*7;g.beginPath();g.moveTo(Math.sin(a)*15,22);g.bezierCurveTo(Math.sin(a)*sz*.38,-sz*.4,Math.sin(a+1)*sz*.6,-sz*.8,Math.sin(a*.7)*sz*.25,-sz);g.stroke();}
+}else{
+ for(let j=0;j<19;j++){let a=j*Math.PI*2/19,rad=95+(j%4)*14;g.strokeStyle=j%3===0?'rgba(227,249,255,.62)':'rgba(83,176,255,.4)';g.lineWidth=2;g.beginPath();g.moveTo(0,0);for(let k=1;k<=5;k++){let d=rad*k/5,ang=a+Math.sin(k*4+j*3)*.12;g.lineTo(Math.cos(ang)*d,Math.sin(ang)*d);}g.stroke();}
+}g.restore();return P.Texture.from(cv);
+}
+function makeTextures(){for(let kind of Object.keys(TYPES)){textures[kind]={dust:[],disk:diskTexture(kind)};for(let i=0;i<3;i++)textures[kind].dust.push(shapeTexture(kind,i));}}
+function worldSize(){return{w:W*(layout==='world'?3:1),h:H*(layout==='world'?3:1)};}
+function center(c,total){
+ const size=worldSize();
+ if(layout==='cluster'){
+  let ring=Math.floor(Math.sqrt(c)),a=c*2.3999632297;
+  let r=(9+ring*7)*Math.min(1,Math.sqrt(total)/7);
+  return{x:size.w/2+Math.cos(a)*r,y:size.h/2+Math.sin(a)*r*.66};
+ }
+ const perRow=Math.ceil(Math.sqrt(total*size.w/size.h)),rows=Math.ceil(total/perRow),row=Math.floor(c/perRow),col=c%perRow;
+ return{x:size.w*(col+.5)/perRow,y:size.h*(row+.5)/rows};
+}
+function radiusFor(n){
+ if(layout==='cluster')return 1;
+ let cols=Math.ceil(Math.sqrt(n*W/H/(layout==='world'?9:1)));
+ return Math.max(.24,Math.min(1,(layout==='world'?1.65:2.25)/Math.sqrt(Math.max(1,cols))));
+}
+function cameraReset(){
+ const s=worldSize();camera.x=s.w*.5;camera.y=s.h*.5;
+ zoom=layout==='world'?.5:1;
+ $('cameraZoom').value=String(ZOOMS.indexOf(zoom));
+ applyCamera();
+}
+function applyCamera(){
+ if(!sceneRoot)return;
+ sceneRoot.scale.set(zoom);
+ sceneRoot.position.set(W/2-camera.x*zoom,H/2-camera.y*zoom);
+ $('zoomText').textContent=Math.round(zoom*100)+'%';
+ const s=worldSize();$('layoutSize').textContent='WORLD: '+Math.round(s.w)+' × '+Math.round(s.h);
+}
+function setLayoutInfo(){
+ const messages={cluster:'Same casts concentrated into a small area. Overlap is intentional, even if it obliterates the screen.',
+ field:'All casts distributed across the visible arena. Same particle counts as Cluster.',
+ world:'A 3×3 arena with off-screen effects. Drag to pan and zoom to inspect.'};
+ const looks={reference:'Original Experiment 003 additive sprites and bright layered glows.',
+ defined:'Controlled glow, mostly normal-blended cores and selected additive sparks. Every particle remains.',
+ cataclysm:'Unrestricted additive blending and amplified glow. Yes, you can make a miniature sun.'};
+ $('layoutNote').textContent=messages[layout];$('lookNote').textContent=looks[look];
+ $('sceneName').textContent=layout.toUpperCase()+' / '+look.toUpperCase();
+}
+function drawBackdrop(){
+ if(backdrop){backdrop.destroy();backdrop=null;}
+ backdrop=new P.Graphics();sceneRoot.addChildAt(backdrop,0);
+ const s=worldSize(),step=76;
+ for(let x=0;x<=s.w;x+=step)backdrop.moveTo(x,0).lineTo(x,s.h).stroke({color:0x658eb6,width:.75,alpha:.14});
+ for(let y=0;y<=s.h;y+=step)backdrop.moveTo(0,y).lineTo(s.w,y).stroke({color:0x658eb6,width:.75,alpha:.14});
+ // Ambient geometry is purely rendered decoration, not collidable gameplay terrain.
+ let r=rng(0x5cbead+(layout==='world'?3:layout==='field'?2:1));
+ for(let i=0;i<(layout==='world'?130:17);i++){
+  const x=r()*s.w,y=r()*s.h,w=12+r()*41,h=7+r()*19;
+  backdrop.rect(x,y,w,h).fill({color:0x36536d,alpha:.12});
+  backdrop.rect(x,y,w,h).stroke({color:0x698cab,width:1,alpha:.23});
+  if(i%5===0)backdrop.circle(x+w/2,y+h/2,13+r()*19).stroke({color:0x6f849f,width:1,alpha:.13});
+ }
+}
+function countVisible(){
+ if(!objects.length)return;
+ const halfW=W/2,halfH=H/2;let n=0;
+ for(let p of objects){const x=(p.sprite.x-camera.x)*zoom+halfW,y=(p.sprite.y-camera.y)*zoom+halfH;
+  if(x>=-20&&x<=W+20&&y>=-30&&y<=H+30)n++;
+ }
+ visibleApprox=n;
+ $('visibleCount').textContent='~'+n.toLocaleString()+' VISIBLE';
+ $('onScreen').textContent='~'+n.toLocaleString()+' visible visuals';
+}
+function visualExposure(){
+ const n=casting.length;
+ return look==='defined'?Math.max(.35,1/(1+Math.sqrt(Math.max(0,n-1))*(layout==='cluster'?.11:.04))):1;
+}
+function applyLook(){
+ if(strategy==='particle'){
+  if(layer)layer.blendMode=look==='defined'?'normal':'add';
+ }else for(let i=0;i<objects.length;i++){
+  // Same particles and trajectories across all treatments; only blending changes.
+  objects[i].sprite.blendMode=look==='defined'?(i%11===0?'add':'normal'):'add';
+ }
+ for(let c of casting){
+  if(c.halo)c.halo.blendMode='add';
+  if(c.disk)c.disk.blendMode=look==='cataclysm'?'add':'normal';
+ }
+ if(glows){
+  if(quality==='cinematic'){
+   try{glows.filters=[new P.BlurFilter({strength:look==='cataclysm'?11:look==='defined'?3:6,quality:2})];}
+   catch(e){console.warn('BlurFilter unavailable',e);glows.filters=[];}
+  }else glows.filters=[];
+ }
+ setLayoutInfo();
+}
+
+function decorate(now){
+ if(!casting.length)return;
+ const n=casting.length,rad=radiusFor(n),throb=.95+.06*Math.sin(now*1.6);
+ for(let i=0;i<n;i++){
+  let a=casting[i],pos=a.pos;
+  if(a.disk){a.disk.position.set(pos.x,pos.y);a.disk.rotation+=.0007*(element==='gravity'?1:-1);let sz=(element==='gravity'?400:320)*rad*throb*(look==='cataclysm'?1.25:1); a.disk.width=sz;a.disk.height=sz;a.disk.alpha=look==='defined'?(quality==='cinematic'?.24:.12)*visualExposure():look==='cataclysm'?.95:quality==='cinematic'?.97:.43;}
+  if(a.halo){a.halo.position.set(pos.x,pos.y);a.halo.scale.set(rad*(1+Math.sin(now*3+i)*.07)*(look==='cataclysm'?1.4:1));a.halo.alpha=quality!=='cinematic'?0:look==='defined'?.14*visualExposure():look==='cataclysm'?.85:.47;}
+  if(a.ring){a.ring.visible=quality==='cinematic';a.ring.alpha=look==='defined'?.85:look==='cataclysm'?.3:1;a.ring.position.set(pos.x,pos.y);a.ring.rotation=now*(element==='gravity'?.4:-.15)+i*.2;a.ring.scale.set(rad*(.94+Math.sin(now*1.4)*.08));}
+  if(a.bolts&&element==='lightning'&&quality==='cinematic'&&animation%6===0){
+   const g=a.bolts;g.clear();let rnd=rng((Math.floor(now*15)*7919+i*2654435761)>>>0);
+   for(let b=0;b<4;b++){let angle=b*Math.PI/2+rnd()*.6,d=rad*(95+rnd()*40),xx=0,yy=0;
+    for(let k=1;k<=6;k++){let r=d*k/6,v=angle+(rnd()-.5)*.28,nx=Math.cos(v)*r,ny=Math.sin(v)*r;g.moveTo(xx,yy).lineTo(nx,ny).stroke({color:0xc7f3ff,width:Math.max(.7,rad*3*(1-k/9)),alpha:.52});xx=nx;yy=ny;}
+   }g.position.set(pos.x,pos.y);
+  }
+ }
+}
+function makeRing(){
+ let g=new P.Graphics();g.circle(0,0,95).stroke({color:TYPES[element].accent,width:1.5,alpha:.43});
+ g.circle(0,0,108).stroke({color:TYPES[element].accent,width:.8,alpha:.25});
+ for(let j=0;j<12;j++){let a=j*Math.PI/6;g.moveTo(Math.cos(a)*97,Math.sin(a)*97).lineTo(Math.cos(a)*111,Math.sin(a)*111).stroke({color:0xffffff,width:1.3,alpha:.62});}
+ return g;
+}
+async function rebuild(){
+ if(busy||!P)return false;
+ busy=true;setStatus('Allocating '+(LEVELS[level]*PER).toLocaleString()+' animated visuals…');
+ try{
+  if(layer){try{layer.destroy({children:true});}catch(e){console.warn('Layer cleanup fallback:',e);if(!layer.destroyed){try{layer.destroy();}catch(ignore){console.warn(ignore);}}}layer=null;}
+  if(decor){decor.destroy({children:true});decor=null;}
+  if(glows){glows.destroy({children:true});glows=null;}
+  objects=[];casting=[];
+  drawBackdrop();let n=LEVELS[level],random=rng(0x0e1e),t=textures[element];
+  decor=new P.Container();glows=new P.Container();layer=strategy==='particle'?new P.ParticleContainer({dynamicProperties:{position:true,vertex:true,rotation:true,color:true}}):new P.Container();
+  sceneRoot.addChild(decor,glows,layer);
+  for(let c=0;c<n;c++){
+   let pos=center(c,n);
+   let disk=new P.Sprite(t.disk);disk.anchor.set(.5);decor.addChild(disk);
+   let halo=new P.Sprite(t.disk);halo.anchor.set(.5);halo.width=halo.height=180;halo.blendMode='add';glows.addChild(halo);
+   let ring=makeRing();decor.addChild(ring);
+   let bolts=null;if(element==='lightning'){bolts=new P.Graphics();decor.addChild(bolts);}
+   casting.push({pos,disk,halo,ring,bolts});
+  }
+  /* ParticleContainer uses a shared particle texture; per-particle filters and blend modes are unavailable. */
+  for(let i=0;i<n*PER;i++){
+   let c=Math.floor(i/PER),sprite;
+   if(strategy==='particle'){
+    sprite=new P.Particle({texture:t.dust[0],x:0,y:0,anchorX:.5,anchorY:.5,scaleX:1,scaleY:1,rotation:0,alpha:1});layer.addParticle(sprite);
+   }else{sprite=new P.Sprite(t.dust[i%3]);sprite.anchor.set(.5);sprite.blendMode='add';layer.addChild(sprite);}
+   objects.push({sprite,c,u:random(),v:random(),z:random(),r:random(),j:random(),a:random()*Math.PI*2});
+   if((i+1)%1600===0)await new Promise(resolve=>requestAnimationFrame(resolve));
+  }
+  ui.particles.textContent=objects.length.toLocaleString();ui.casts.textContent=n+' casts';ui.loadText.textContent=n+' × 200';
+  applyLook();sceneOrigin=performance.now();clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' visuals · '+strategy.toUpperCase()+' · '+quality+'.');
+  return true;
+ }catch(e){console.error(e);setStatus('Build error: '+e.message);return false;}
+ finally{busy=false;}
+}
+function simulate(t){
+ const scale=radiusFor(casting.length),elapsed=t-pulseAt,burst=Math.max(0,1-elapsed/.7),exposure=visualExposure();
+ submitted=0;skipped=0;nearCount=0;midCount=0;farCount=0;
+
+ for(let k=0;k<objects.length;k++){
+  const p=objects[k],s=p.sprite,pos=casting[p.c].pos;
+  let life,x,y,size,alpha,rotation;
+  if(element==='fire'){
+   life=(p.u+t*(.2+p.z*.1))%1;
+   x=pos.x+(Math.sin(p.a+t*1.8)*(13+p.r*46)+Math.sin(t*3.7+p.u*23)*8)*scale;
+   y=pos.y+(45-life*(156+p.v*42))*scale;
+   size=(9+p.z*19)*scale*(1-life*.42)*(1+burst*.45);
+   alpha=(.4+p.j*.6)*Math.min(1,(1-life)*3);rotation=Math.sin(t+p.a)*.2;
+  }else if(element==='lightning'){
+   life=(p.u+t*(.42+p.z*.1))%1;
+   let a=Math.floor(p.v*11)*Math.PI*2/11+t*.11,d=(10+life*(95+p.r*70))*scale,j=Math.sin(life*28+p.j*43+t*23)*(4+p.z*12)*scale;
+   x=pos.x+Math.cos(a)*d+Math.sin(a)*j;y=pos.y+Math.sin(a)*d-Math.cos(a)*j;
+   size=(7+p.z*18)*scale*(1+burst*.7);alpha=(.35+p.r*.65)*(.3+.7*Math.pow(Math.sin(t*16+p.a),2));rotation=a;
+  }else if(element==='ice'){
+   life=(p.u+t*(.15+p.z*.07))%1;let d=(8+life*(124+p.r*70))*scale;
+   x=pos.x+Math.cos(p.a)*d;y=pos.y+Math.sin(p.a)*d*.80;
+   size=(7+p.z*20)*scale*(1-life*.37);alpha=(.5+p.j*.5)*Math.min(1,(1-life)*4);rotation=p.a+Math.PI/2+t*.08*(p.r-.5);
+  }else{
+   life=(p.u+t*(.12+p.z*.025))%1;
+   let d=(10+Math.pow(1-life,.9)*(152+p.r*78))*scale,a=p.a+t*.23+life*life*(6+p.z*8);
+   x=pos.x+Math.cos(a)*d;y=pos.y+Math.sin(a)*d*.59;
+   size=(5+p.z*15)*scale*(.8+life*.5)*(1+burst*.5);alpha=(.55+p.j*.45)*Math.min(1,(1-life)*4);rotation=a+Math.PI/2;
+  }
+  const outAlpha=Math.max(0,Math.min(1,alpha*(look==='cataclysm'?1:look==='defined'?exposure:1)));
+  if(strategy==='particle'){
+   // Fast path: the full ParticleContainer batch is submitted. No false claim of culling.
+   s.x=x;s.y=y;s.rotation=rotation;
+   s.scaleX=size/128;s.scaleY=size*1.9/128;s.alpha=outAlpha;
+   submitted++;
+  }else{
+   s.position.set(x,y);s.rotation=rotation;
+   let visible=true,detail=1;
+   if(strategy==='cull'||strategy==='adaptive'){
+    const px=(x-camera.x)*zoom+W*.5,py=(y-camera.y)*zoom+H*.5;
+    const margin=Math.max(30,size*1.5*zoom);
+    visible=px>=-margin&&px<=W+margin&&py>=-margin&&py<=H+margin;
+    if(visible&&strategy==='adaptive'){
+     const dx=px-W*.5,dy=py-H*.5,dist2=dx*dx+dy*dy;
+     if(dist2<170*170){nearCount++;}
+     else if(dist2<300*300){midCount++;detail=2;}
+     else{farCount++;detail=6;}
+     // Same source animation, less *drawn* detail at greater camera distance.
+     visible=(k%detail===0);
+    }
+   }
+   s.renderable=visible;
+   s.width=size*(detail===6?1.30:detail===2?1.12:1);
+   s.height=size*1.9*(detail===6?1.30:detail===2?1.12:1);
+   s.alpha=outAlpha;
+   if(visible)submitted++;else skipped++;
+  }
+ }
+}
+function refreshStats(){
+ let m=sample();ui.fps.textContent=round(m.fps);ui.p95.textContent=round(m.p95);ui.cpu.textContent=round(m.cpu);
+ $('renderedReadout').textContent='Submitted: '+submitted.toLocaleString();
+ $('culledReadout').textContent='Skipped: '+skipped.toLocaleString();
+ $('lodReadout').textContent='Near / mid / far: '+nearCount+' / '+midCount+' / '+farCount;
+}
+function frame(now){
+ requestAnimationFrame(frame);
+ if(!app||busy||document.hidden){last=0;return;}
+ animation++;
+ const dt=last?Math.min(1000,now-last):0;last=now;
+ let start=performance.now();
+ let t=(now-sceneOrigin)/1000;
+ try{simulate(t);decorate(t);app.render();}catch(e){console.error(e);setStatus('Render failure: '+e.message);last=0;return;}
+ let cost=performance.now()-start;
+ if(dt>0){metrics.push(dt);costs.push(cost);if(metrics.length>250){metrics.shift();costs.shift();}}
+ if(now-metricLast>450){refreshStats();countVisible();metricLast=now;}
+}
+function renderResults(){
+ ui.results.replaceChildren();
+ if(!reports.length){ui.results.textContent='No measurements yet.';return;}
+ for(let r of reports){let div=document.createElement('div');div.className='result '+(r.passed?'ok':'bad');
+ let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' total / '+(r.submitted??r.count).toLocaleString()+' drawn · '+(r.strategy||'BASELINE').toUpperCase();
+ let b=document.createElement('strong');b.textContent=round(r.fps)+' FPS · '+round(r.p95)+' ms P95';
+ div.append(a,b);ui.results.append(div);}
+}
+function abortRamp(){
+ if(auto){auto=false;autoEpoch++;ui.ramp.textContent='▶ AUTO STRESS';ui.ramp.classList.remove('stop');ui.progress.textContent='Stopped';setStatus('Auto ramp stopped. Measurements collected: '+reports.length+'.');}
+}
+async function ramp(){
+ if(auto){if(!comparing)abortRamp();return;}
+ if(busy||!app)return;
+ auto=true;stopped=false;const ticket=++autoEpoch;reports=[];renderResults();ui.ramp.textContent='■ STOP RAMP';ui.ramp.classList.add('stop');ui.progress.textContent='0 / '+LEVELS.length;lastStable=null;firstWeak=null;let badStreak=0;
+ const buttons=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#compare');
+ buttons.forEach(x=>x.disabled=true);
+ try{
+ for(let i=0;i<LEVELS.length&&auto&&ticket===autoEpoch;i++){
+  level=i;ui.load.value=String(i);
+  let ok=await rebuild();if(!ok)break;
+  ui.progress.textContent=(i+1)+' / '+LEVELS.length;
+  setStatus('Measuring '+(LEVELS[i]*PER).toLocaleString()+' visuals; '+quality+' graphics active…');
+  await delay(650);if(!auto||ticket!==autoEpoch)break;clearSamples();
+  await delay(2000);if(!auto||ticket!==autoEpoch)break;
+  const m=sample(),pass=m.samples>=30&&m.fps>=50&&m.p95<=25;
+  reports.push({casts:LEVELS[i],count:LEVELS[i]*PER,element,quality,layout,look,strategy,zoom,approxVisible:visibleApprox,submitted,skipped,nearCount,midCount,farCount,passed:pass,
+   fps:Number(m.fps.toFixed(2)),p95:Number(m.p95.toFixed(2)),cpu:Number(m.cpu.toFixed(2)),samples:m.samples});
+  renderResults();
+  if(pass){lastStable=LEVELS[i]*PER;badStreak=0;firstWeak=null;}
+  else{badStreak++;if(firstWeak===null)firstWeak=LEVELS[i]*PER;}
+  if(badStreak>=2){setStatus('Visual-quality threshold reached: first weak load '+firstWeak.toLocaleString()+' visuals. Last passing load: '+(lastStable===null?'none':lastStable.toLocaleString())+'. This is not a crash limit.');stopped=true;break;}
+ }
+ if(!stopped&&auto&&ticket===autoEpoch)setStatus('Ramp complete: '+reports.length+' levels. Last passing load: '+(lastStable===null?'none':lastStable.toLocaleString())+'. No sustained failure before cap, or an isolated weak stage.');
+ }catch(e){console.error(e);setStatus('Ramp interrupted: '+e.message);}
+ finally{if(ticket===autoEpoch){auto=false;ui.ramp.textContent='▶ AUTO STRESS';ui.ramp.classList.remove('stop');if(!stopped)ui.progress.textContent='Complete';}
+ buttons.forEach(x=>x.disabled=false);}
+}
+function trigger(){pulseAt=(performance.now()-sceneOrigin)/1000;let tint=TYPES[element].accent;ui.flash.style.background=tint;ui.flash.animate([{opacity:.3},{opacity:0}],{duration:470,easing:'ease-out'});}
+function report(){
+ const data={app:'WRKMAN PixiJS 8 Intelligent Rendering Lab',version:'0.5',date:new Date().toISOString(),renderer:strategy==='particle'?'PixiJS 8.10.0 ParticleContainer':'PixiJS 8.10.0 Sprites',element,quality,layout,look,strategy,submitted,skipped,nearCount,midCount,farCount,comparisonResults:compareResults,camera:{x:camera.x,y:camera.y,zoom},approxVisible:visibleApprox,particleCount:objects.length,visualsPerCast:PER,levels:LEVELS,threshold:{minFps:50,maxP95ms:25,consecutiveFailures:2},results:reports,highestPassingParticles:lastStable,
+ current:sample(),device:navigator.userAgent,viewport:[innerWidth,innerHeight],pixelRatio:devicePixelRatio,notes:'Frame cadence via rAF. JS + render call time does not equal GPU execution time. Same total sprite count; layout and zoom affect approximate visible counts. Short ~2-second stages; no Wandrune code used.'};
+ const dataStr=JSON.stringify(data,null,2);
+ if(navigator.clipboard&&navigator.clipboard.writeText){
+ navigator.clipboard.writeText(dataStr).then(()=>setStatus('Benchmark copied. Paste the report into our conversation.')).catch(()=>download(dataStr));
+ }else download(dataStr);
+}
+function download(s){let blob=new Blob([s],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='wrkman-pixi-vfx-005.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),800);setStatus('Benchmark report downloaded.');}
+async function changeSetting(){
+ if(busy||auto)return;await rebuild();
+}
+$('elements').addEventListener('click',async e=>{let b=e.target.closest('[data-el]');if(!b||auto||busy||b.dataset.el===element)return;element=b.dataset.el;for(let el of document.querySelectorAll('[data-el]'))el.setAttribute('aria-pressed',String(el===b));$('elementTitle').textContent=TYPES[element].title;$('elementCaption').textContent=TYPES[element].sub;await changeSetting();});
+$('quality').addEventListener('click',async e=>{let b=e.target.closest('[data-q]');if(!b||auto||busy||b.dataset.q===quality)return;quality=b.dataset.q;for(let el of document.querySelectorAll('[data-q]'))el.setAttribute('aria-pressed',String(el===b));await changeSetting();});
+ui.load.addEventListener('input',()=>{ui.loadText.textContent=LEVELS[+ui.load.value]+' × 200';});
+ui.load.addEventListener('change',async()=>{if(auto||busy)return;level=+ui.load.value;await changeSetting();});
+ui.ramp.addEventListener('click',ramp);
+$('pulse').addEventListener('click',trigger);/* Pointer-up triggers a pulse only when the gesture was not a drag. */
+$('stage').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();trigger();}});
+$('copy').addEventListener('click',report);
+$('reset').addEventListener('click',async()=>{if(auto||busy)return;level=4;ui.load.value='4';reports=[];lastStable=null;firstWeak=null;renderResults();compareResults=[];cameraReset();await rebuild();});
+
+function activateGroup(selector,key,value){
+ for(let b of document.querySelectorAll(selector))b.setAttribute('aria-pressed',String(b.dataset[key]===value));
+}
+$('layouts').addEventListener('click',async e=>{
+ const b=e.target.closest('[data-layout]');if(!b||auto||busy||b.dataset.layout===layout)return;
+ layout=b.dataset.layout;activateGroup('[data-layout]','layout',layout);
+ cameraReset();await rebuild();setLayoutInfo();countVisible();
+});
+$('looks').addEventListener('click',e=>{
+ const b=e.target.closest('[data-look]');if(!b||auto||busy||b.dataset.look===look)return;
+ look=b.dataset.look;activateGroup('[data-look]','look',look);
+ applyLook();clearSamples();setStatus('Lighting changed to '+look+'. Same '+objects.length.toLocaleString()+' visual particles and trajectories.');
+});
+$('cameraZoom').addEventListener('input',e=>{
+ if(auto)return;
+ zoom=ZOOMS[+e.target.value];applyCamera();clearSamples();countVisible();
+});
+$('recenter').addEventListener('click',()=>{
+ if(auto)return;cameraReset();clearSamples();setStatus('Camera recentered.');
+});
+$('sampleNow').addEventListener('click',()=>{
+ if(auto||busy)return;
+ const m=sample();
+ if(m.samples<30){setStatus('Let the scene settle for at least 30 frames before capturing.');return;}
+ reports.push({manual:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,strategy,submitted,skipped,nearCount,midCount,farCount,zoom,approxVisible:visibleApprox,
+  passed:m.fps>=50&&m.p95<=25,fps:+m.fps.toFixed(2),p95:+m.p95.toFixed(2),cpu:+m.cpu.toFixed(2),samples:m.samples});
+ renderResults();setStatus('Captured '+objects.length.toLocaleString()+' particles · '+look+' · '+layout+' · '+round(m.fps)+' FPS.');
+});
+const stage=$('stage'),pointers=new Map();
+let gestureMoved=false,gestureOrigin=null;
+function pointerPos(e){const r=stage.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};}
+stage.addEventListener('pointerdown',e=>{
+ if(auto)return;
+ stage.setPointerCapture(e.pointerId);
+ pointers.set(e.pointerId,pointerPos(e));gestureMoved=false;gestureOrigin=pointerPos(e);
+});
+stage.addEventListener('pointermove',e=>{
+ if(!pointers.has(e.pointerId)||auto)return;
+ const next=pointerPos(e),prior=pointers.get(e.pointerId),dx=next.x-prior.x,dy=next.y-prior.y;
+ if(Math.abs(next.x-gestureOrigin.x)+Math.abs(next.y-gestureOrigin.y)>8)gestureMoved=true;
+ if(gestureMoved){camera.x-=dx/zoom;camera.y-=dy/zoom;applyCamera();}
+ pointers.set(e.pointerId,next);
+});
+stage.addEventListener('pointerup',e=>{
+ if(!pointers.has(e.pointerId))return;
+ pointers.delete(e.pointerId);
+ if(gestureMoved){clearSamples();countVisible();}else if(!auto)trigger();
+ gestureMoved=false;
+});
+stage.addEventListener('pointercancel',e=>{pointers.delete(e.pointerId);gestureMoved=false;});
+
+
+const STRATEGIES={
+ baseline:'Every Sprite is animated and submitted, even when beyond the camera. Full appearance reference.',
+ cull:'All particle states update, but outside-the-camera Sprites set renderable=false and are not drawn.',
+ adaptive:'Offscreen Sprites are not drawn; near detail is full, mid draws 1/2, far draws 1/6. Each keeps its underlying animated state.',
+ particle:'PixiJS 8 ParticleContainer batching. Every lightweight Particle is submitted; a shared texture and blend mode mean this is not pixel-identical to regular Sprites.'
+};
+function activateStrategy(){
+ for(const b of document.querySelectorAll('[data-strategy]'))b.setAttribute('aria-pressed',String(b.dataset.strategy===strategy));
+ $('strategyNote').textContent=STRATEGIES[strategy];
+ clearSamples();
+}
+$('strategies').addEventListener('click',async e=>{
+ const b=e.target.closest('[data-strategy]');
+ if(!b||auto||busy||b.dataset.strategy===strategy)return;
+ const old=strategy;strategy=b.dataset.strategy;activateStrategy();
+ const ok=await rebuild();
+ if(!ok){strategy=old;activateStrategy();await rebuild();setStatus('That renderer failed to initialize; restored '+old+'.');}
+});
+function stopComparison(){
+ if(!comparing)return;
+ comparing=false;comparisonEpoch++;
+ $('compareStop').disabled=true;setStatus('Comparison stop requested; returning to original mode.');
+}
+$('compareStop').addEventListener('click',stopComparison);
+$('compare').addEventListener('click',async()=>{
+ if(auto||busy||!app||comparing)return;
+ const initial=strategy,ticket=++comparisonEpoch,modes=['baseline','cull','adaptive','particle'];
+ comparing=true;auto=true;compareResults=[];
+ const controls=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#ramp,#compare');
+ controls.forEach(c=>c.disabled=true);
+ $('compareStop').disabled=false;$('progress').textContent='0 / 4';
+ let endedEarly=false;
+ try{
+  for(let i=0;i<modes.length;i++){
+   if(!comparing||ticket!==comparisonEpoch){endedEarly=true;break;}
+   strategy=modes[i];activateStrategy();
+   let ok=await rebuild();
+   if(!ok){setStatus('Unable to create '+strategy+' renderer.');endedEarly=true;break;}
+   $('progress').textContent=(i+1)+' / 4';
+   setStatus('A/B '+(i+1)+'/4: '+strategy.toUpperCase()+', '+objects.length.toLocaleString()+' particles. Letting effects settle…');
+   await delay(700);
+   if(!comparing||ticket!==comparisonEpoch){endedEarly=true;break;}
+   clearSamples();
+   await delay(2200);
+   if(!comparing||ticket!==comparisonEpoch){endedEarly=true;break;}
+   let m=sample(),okPerf=m.samples>=30&&m.fps>=50&&m.p95<=25;
+   const row={comparison:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,strategy,
+    zoom,approxVisible:visibleApprox,submitted,skipped,nearCount,midCount,farCount,
+    passed:okPerf,fps:+m.fps.toFixed(2),p95:+m.p95.toFixed(2),cpu:+m.cpu.toFixed(2),samples:m.samples};
+   compareResults.push(row);reports.push(row);renderResults();
+  }
+ }catch(e){console.error(e);setStatus('Comparison error: '+e.message);endedEarly=true;}
+ finally{
+  if(ticket===comparisonEpoch){comparing=false;}
+  auto=false;
+  $('compareStop').disabled=true;
+  controls.forEach(c=>c.disabled=false);
+  while(busy)await delay(25);
+  strategy=initial;activateStrategy();
+  await rebuild();
+  $('progress').textContent=endedEarly?'Partial ('+compareResults.length+'/4)':'Comparison complete';
+  setStatus(endedEarly?'Partial A/B recorded: '+compareResults.length+' modes.':'Four modes compared at the same load. Tap Copy results to send the performance and submitted-sprite counts.');
+ }
+});
+
+document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden){if(comparing)stopComparison();else if(auto)abortRamp();}});
+window.addEventListener('pagehide',()=>{auto=false;});
+async function init(){
+ try{
+ if(!window.PIXI)throw new Error('Could not load PixiJS from CDN. Check your connection.');
+ P=window.PIXI;app=new P.Application();
+ await app.init({width:W,height:H,resolution:Math.min(2,devicePixelRatio||1),autoDensity:true,backgroundAlpha:0,antialias:false,preference:'webgl',powerPreference:'high-performance'});
+ app.stop();ui.view.append(app.canvas);sceneRoot=new P.Container();app.stage.addChild(sceneRoot);makeTextures();cameraReset();setLayoutInfo();activateStrategy();
+ await rebuild();running=true;requestAnimationFrame(frame);
+ }catch(e){console.error(e);setStatus('Initialization failed: '+e.message);ui.view.innerHTML='<div class="error">PixiJS could not start. Try opening this over HTTPS with internet access and a WebGL-enabled browser.</div>';}
+}
+init();
+})();
+</script>
+</body></html>
