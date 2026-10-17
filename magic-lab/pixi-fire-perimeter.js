@@ -200,7 +200,7 @@
     if(band.kind==="peak")statistics.peakPaths+=band.paths.length;
     else statistics.hotPaths+=band.paths.length;
    }
-   chosen.push({castIndex:group.castIndex,count:group.count,paths:shell.paths,bands:shell.bands,hotBands:shell.hotBands});
+   chosen.push({castIndex:group.castIndex,trackId:group.trackId,count:group.count,paths:shell.paths,bands:shell.bands,hotBands:shell.hotBands});
   }
   return {...statistics,shells:chosen};
  }
