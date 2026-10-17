@@ -212,7 +212,11 @@
      g.moveTo(h[0].x,h[0].y);
      for(let k=1;k<h.length;k++)g.lineTo(h[k].x,h[k].y);
      g.closePath().fill({color,alpha:.08});
-     g.stroke({color,alpha:.88,width:1.5,join:"round"});
+     // A separate explicit path keeps the perimeter visible even when
+     // PixiJS consumes the fill path before its stroke pass.
+     g.moveTo(h[0].x,h[0].y);
+     for(let k=1;k<h.length;k++)g.lineTo(h[k].x,h[k].y);
+     g.closePath().stroke({color,alpha:.88,width:1.5,join:"round"});
     }else if(h.length===2){
      g.moveTo(h[0].x,h[0].y).lineTo(h[1].x,h[1].y)
       .stroke({color,alpha:.9,width:2.5});
