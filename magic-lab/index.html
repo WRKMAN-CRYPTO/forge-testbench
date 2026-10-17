@@ -813,6 +813,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <button class="minibtn" id="pixiFireShell" type="button" title="Pass B: shared plasma edge around nearby fire agents">PLASMA EDGE: ON</button>
     <button class="minibtn" id="pixiFireBody" type="button" title="Pass C: translucent density-based plasma material inside the shared fire boundary">PLASMA BODY: ON</button>
     <button class="minibtn" id="pixiFireHot" type="button" title="Pass D: real density-driven amber and pale-hot fire cores, only where agents cooperate">HOT CORE: ON</button>
+    <button class="minibtn" id="pixiFireStable" type="button" title="Keep nearby fire masses visually stable across frames; compare against the previous largest-three selection">STABLE FIRE: ON</button>
    </div>
    <div class="craftPanel" role="group" aria-label="Crafted spell linking">
     <div class="menuCaption">CRAFTED FIELD / SPELL LINK</div>
@@ -851,6 +852,7 @@ if(window.WRKMAN_WANDRUNE_ART){
      <div class="pill">PLASMA EDGE <b id="fireShellStatus">OFF</b></div>
      <div class="pill">PLASMA BODY <b id="fireBodyStatus">OFF</b></div>
      <div class="pill">HOT CORE <b id="fireHotStatus">OFF</b></div>
+     <div class="pill">FIRE STABILITY <b id="fireStableStatus">OFF</b></div>
      <div class="pill">DATA <b id="profileMode">SAVED</b></div>
      <div class="pill">MODE <b>SOLO / LOCAL</b></div>
     </div>
@@ -999,8 +1001,9 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./crafted-magic.js?v=082trail"></script>
 <script src="./pixi-formation.js?v=082trail"></script>
 <script src="./pixi-fire-clusters.js?v=085b"></script>
-<script src="./pixi-fire-perimeter.js?v=085d"></script>
-<script src="./pixi-swarm-bridge.js?v=085d"></script>
+<script src="./pixi-fire-perimeter.js?v=085stable"></script>
+<script src="./pixi-fire-stability.js?v=085stable"></script>
+<script src="./pixi-swarm-bridge.js?v=085stable"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1218,7 +1221,8 @@ class Lab extends Phaser.Scene{
     fireShell:new URLSearchParams(window.location.search).get("fireShell")!=="0",
     fireBody:new URLSearchParams(window.location.search).get("fireBody")!=="0",
     fireHot:new URLSearchParams(window.location.search).get("fireHot")!=="0",
-    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE"))return;
+    fireStable:new URLSearchParams(window.location.search).get("fireStable")!=="0",
+    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY"))return;
      const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
    if(this.pixiSpellRenderer){
@@ -1247,6 +1251,7 @@ class Lab extends Phaser.Scene{
     $("pixiFireShell").textContent="PLASMA EDGE: "+(this.pixiSpellRenderer.fireShell?"ON":"OFF");
     $("pixiFireBody").textContent="PLASMA BODY: "+(this.pixiSpellRenderer.fireBody?"ON":"OFF");
     $("pixiFireHot").textContent="HOT CORE: "+(this.pixiSpellRenderer.fireHot?"ON":"OFF");
+    $("pixiFireStable").textContent="STABLE FIRE: "+(this.pixiSpellRenderer.fireStable?"ON":"OFF");
     this.events.once("shutdown",()=>{
      this.events.off(Phaser.Scenes.Events.RENDER,renderPixiFrame);
      this.pixiSpellRenderer?.destroy();
@@ -1836,6 +1841,9 @@ class Lab extends Phaser.Scene{
       (p.fireBodyFills+" FILLS / "+p.fireBodyLayers+" DENSITY BANDS"):"OFF";
      $("fireHotStatus").textContent=p?.active&&p.fireHot?
       (p.fireHotPaths+" AMBER / "+p.firePeakPaths+" PALE / "+p.fireHotFills+" FILLS"):"OFF";
+     $("fireStableStatus").textContent=p?.active&&p.fireStable?
+      (p.fireStableSlots+" SLOTS / "+p.fireStableGhosts+" FADING OUT / "+
+       p.fireStableSwaps+" REPLACEMENTS / "+p.fireStableHeldHot+" HELD HEAT"):"OFF";
     }
    }catch(vfxError){
     // Optional graphics must NEVER take the game or agent simulation down.
@@ -3018,6 +3026,13 @@ $("pixiFireHot").addEventListener("click",()=>{
  if(!adapter){$("pixiFireHot").textContent="HOT CORE: UNAVAILABLE";return;}
  const enabled=adapter.setFireHot(!adapter.fireHot);
  $("pixiFireHot").textContent="HOT CORE: "+(enabled?"ON":"OFF");
+});
+// Stable rendering is presentation-only and can be A/B compared live.
+$("pixiFireStable").addEventListener("click",()=>{
+ const adapter=scene?.pixiSpellRenderer;
+ if(!adapter){$("pixiFireStable").textContent="STABLE FIRE: UNAVAILABLE";return;}
+ const enabled=adapter.setFireStable(!adapter.fireStable);
+ $("pixiFireStable").textContent="STABLE FIRE: "+(enabled?"ON":"OFF");
 });
 // Capture canvas touches directly so Phaser's pointer management cannot
 // eat the second thumb while the first is held on the external joystick.
