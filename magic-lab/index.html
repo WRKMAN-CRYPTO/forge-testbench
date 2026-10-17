@@ -1001,9 +1001,9 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./crafted-magic.js?v=082trail"></script>
 <script src="./pixi-formation.js?v=082trail"></script>
 <script src="./pixi-fire-clusters.js?v=085b"></script>
-<script src="./pixi-fire-perimeter.js?v=085stable"></script>
-<script src="./pixi-fire-stability.js?v=085stable"></script>
-<script src="./pixi-swarm-bridge.js?v=085stable"></script>
+<script src="./pixi-fire-perimeter.js?v=085fix2"></script>
+<script src="./pixi-fire-stability.js?v=085fix2"></script>
+<script src="./pixi-swarm-bridge.js?v=085fix2"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1221,7 +1221,7 @@ class Lab extends Phaser.Scene{
     fireShell:new URLSearchParams(window.location.search).get("fireShell")!=="0",
     fireBody:new URLSearchParams(window.location.search).get("fireBody")!=="0",
     fireHot:new URLSearchParams(window.location.search).get("fireHot")!=="0",
-    fireStable:new URLSearchParams(window.location.search).get("fireStable")==="1",
+    fireStable:new URLSearchParams(window.location.search).get("fireStable")!=="0",
     status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY"))return;
      const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
