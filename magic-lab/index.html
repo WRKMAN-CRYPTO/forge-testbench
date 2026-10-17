@@ -809,6 +809,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <button class="minibtn" id="pixiRendererMode" type="button" title="Switch crafted swarm visuals without changing physics or saves">RENDER: PHASER</button>
     <button class="minibtn" id="pixiLookMode" type="button" title="Cycle between original particle opacity, restored brightness, and geometry-aware formation glow">VFX: FORMATION</button>
     <button class="minibtn" id="pixiArtMode" type="button" title="Compare soft migration textures with authentic faceted Wandrune material artwork and sparse elemental accents">ART: FORGE</button>
+    <button class="minibtn" id="pixiFireDebug" type="button" title="Pass A: outline each nearby connected fire cluster, without adding damage, mass, glow or new physics">FIRE GROUPS: OFF</button>
    </div>
    <div class="craftPanel" role="group" aria-label="Crafted spell linking">
     <div class="menuCaption">CRAFTED FIELD / SPELL LINK</div>
@@ -843,6 +844,7 @@ if(window.WRKMAN_WANDRUNE_ART){
      <div class="pill">WILDLIFE <b id="wildlifeCount">0</b></div>
      <div class="pill">LAB <b id="labState">BOOT</b></div>
      <div class="pill">PIXICORE <b id="pixiFlowStatus">OFF</b></div>
+     <div class="pill">FIRE GROUPS <b id="fireClusterStatus">OFF</b></div>
      <div class="pill">DATA <b id="profileMode">SAVED</b></div>
      <div class="pill">MODE <b>SOLO / LOCAL</b></div>
     </div>
@@ -990,7 +992,8 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./element-vfx.js?v=069"></script>
 <script src="./crafted-magic.js?v=082trail"></script>
 <script src="./pixi-formation.js?v=082trail"></script>
-<script src="./pixi-swarm-bridge.js?v=084style"></script>
+<script src="./pixi-fire-clusters.js?v=085a"></script>
+<script src="./pixi-swarm-bridge.js?v=085a"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1201,7 +1204,8 @@ class Lab extends Phaser.Scene{
     width:W,height:H,stage:$("stage"),alignDebug:this.pixiAlignDiagnostic,
     look:new URLSearchParams(window.location.search).get("vfx")||"formation",
     art:new URLSearchParams(window.location.search).get("art")||"forge",
-    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE"))return;
+    fireDebug:new URLSearchParams(window.location.search).get("fireDebug")==="1",
+    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS"))return;
      const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
    if(this.pixiSpellRenderer){
@@ -1226,6 +1230,7 @@ class Lab extends Phaser.Scene{
     this.events.on(Phaser.Scenes.Events.RENDER,renderPixiFrame);
     $("pixiLookMode").textContent="VFX: "+this.pixiSpellRenderer.look.toUpperCase();
     $("pixiArtMode").textContent="ART: "+this.pixiSpellRenderer.art.toUpperCase();
+    $("pixiFireDebug").textContent="FIRE GROUPS: "+(this.pixiSpellRenderer.fireDebug?"ON":"OFF");
     this.events.once("shutdown",()=>{
      this.events.off(Phaser.Scenes.Events.RENDER,renderPixiFrame);
      this.pixiSpellRenderer?.destroy();
@@ -1793,6 +1798,8 @@ class Lab extends Phaser.Scene{
      const p=this.pixiSpellRenderer;
      $("pixiFlowStatus").textContent=p?.active?
       (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS"):"PHASER";
+     $("fireClusterStatus").textContent=p?.active&&p.fireDebug?
+      (p.fireGroups+" GROUPS / "+p.fireLargest+" MAX / "+p.fireSingles+" SOLO / "+p.fireEdges+" LINKS"):"OFF";
     }
    }catch(vfxError){
     // Optional graphics must NEVER take the game or agent simulation down.
@@ -2931,6 +2938,14 @@ $("pixiArtMode").addEventListener("click",()=>{
  const choices=["soft","forge","forge-hot"];
  const next=choices[(choices.indexOf(adapter.art)+1)%choices.length];
  $("pixiArtMode").textContent="ART: "+adapter.setArt(next).toUpperCase();
+});
+// Fire cohesion Pass A: debug-only spatial clustering. Absolutely no spell
+// instructions, damage or animation settings are persisted here.
+$("pixiFireDebug").addEventListener("click",()=>{
+ const adapter=scene?.pixiSpellRenderer;
+ if(!adapter){$("pixiFireDebug").textContent="FIRE GROUPS: UNAVAILABLE";return;}
+ const enabled=adapter.setFireDebug(!adapter.fireDebug);
+ $("pixiFireDebug").textContent="FIRE GROUPS: "+(enabled?"ON":"OFF");
 });
 // Capture canvas touches directly so Phaser's pointer management cannot
 // eat the second thumb while the first is held on the external joystick.
