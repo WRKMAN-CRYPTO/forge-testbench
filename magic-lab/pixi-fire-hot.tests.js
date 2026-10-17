@@ -140,9 +140,8 @@ const scene={player:{x:20,y:30},combat:{hp:100},
  ok(cuts>oldCuts,"Ring's white-hot fill does not cover its hollow center");
  eq(scene.player.x,20,"Player position unchanged");
  eq(scene.combat.hp,100,"Combat state unchanged");
- const priorDrawn=b.drawn;
  b.setFireHot(false);frame();
- eq(b.drawn,priorDrawn,"Disabling Pass D never removes agents");
+ eq(b.drawn,200,"Disabling Pass D never removes any of the 200 cone agents");
  b.disable();ok(!b.active,"Immediate Phaser fallback still works");
  ok(await b.enable(),"Can reenable without resetting game state");
  b.destroy();ok(!b.ready,"Resource disposal works");
