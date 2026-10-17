@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="082-pixi8-trail-aligned",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="083-pixi8-camera-registered",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -81,8 +81,9 @@
   const requested=allowedLooks.includes(opts.look)?opts.look:"formation";
   const initialLook=requested==="formation"&&!FORMATION?.analyze?"bright":requested;
   const state={active:false,ready:false,loading:false,error:null,records:[],drawn:0,
-   details:0,bulk:0,frame:0,look:initialLook,formations:0,formationSegments:0};
-  let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,textureSet=[],bulkGroups=[],spritePool=[],disposed=false,heroUsed=0;
+   details:0,bulk:0,frame:0,look:initialLook,formations:0,formationSegments:0,canvasOffsetX:0,canvasOffsetY:0};
+  let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
+   registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=[],spritePool=[],disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
    if(typeof opts.status==="function")try{opts.status(msg);}catch(_){}
@@ -158,6 +159,21 @@
    batch.pool.push(particle);
    return particle;
   }
+  function setReference(x,y){
+   if(!opts.alignDebug)return;
+   registrationPoint=Number.isFinite(x)&&Number.isFinite(y)?{x,y}:null;
+  }
+  function drawReference(){
+   if(!registrationGraphics)return;
+   const g=registrationGraphics;
+   g.clear();
+   if(!registrationPoint)return;
+   const {x,y}=registrationPoint;
+   // Same world point is magenta on Phaser and cyan on Pixi.
+   g.moveTo(x-11,y).lineTo(x+11,y).stroke({width:2,color:0x00ffff});
+   g.moveTo(x,y-11).lineTo(x,y+11).stroke({width:2,color:0x00ffff});
+   g.circle(x,y,6).stroke({width:1.5,color:0x00ffff});
+  }
   function align(){
    if(!app||!app.canvas)return;
    const phaserCanvas=stage.querySelector("canvas:not(.wandrune-pixi-canvas)");
@@ -166,6 +182,13 @@
    const cv=app.canvas;
    cv.style.left=(a.left-b.left)+"px";cv.style.top=(a.top-b.top)+"px";
    cv.style.width=a.width+"px";cv.style.height=a.height+"px";
+   if(opts.alignDebug&&state.frame%12===0){
+    // Measure actual DOM compositing difference separately from world
+    // transforms. If the two canvases disagree, we can identify the cause.
+    const pr=app.canvas.getBoundingClientRect();
+    state.canvasOffsetX=Math.round((pr.left-a.left)*10)/10;
+    state.canvasOffsetY=Math.round((pr.top-a.top)*10)/10;
+   }
    const cam=scene.cameras?.main;
    if(cam&&world){
     // Map the *actual Phaser camera inverse* to Pixi world transforms.
@@ -197,6 +220,10 @@
     shapeLayer=new P.Container();shapeLayer.blendMode="add";shapeGraphics=new P.Graphics();
     shapeLayer.addChild(shapeGraphics);
     app.stage.addChild(world);world.addChild(shapeLayer,detailsLayer);
+    if(opts.alignDebug){
+     registrationGraphics=new P.Graphics();
+     world.addChild(registrationGraphics);
+    }
     textureSet=ELEMENTS.map((_,e)=>[0,1,2].map(v=>makeTexture(win,P,e,v)));
     const cv=app.canvas;cv.classList.add("wandrune-pixi-canvas");
     Object.assign(cv.style,{position:"absolute",pointerEvents:"none",zIndex:"2",display:"block",maxWidth:"none",maxHeight:"none"});
@@ -269,7 +296,7 @@
     paintFormations();
     for(let i=heroUsed;i<spritePool.length;i++)spritePool[i].visible=false;
     for(const group of bulkGroups)if(group)for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
-    align();app.render();
+    align();drawReference();app.render();
     state.drawn=state.records.length;state.details=detailed;state.bulk=bulk;
     state.records.length=0;
    }catch(err){console.error("Wandrune Pixi overlay failed; keeping gameplay intact",err);disable(err?.message||err);}
@@ -277,9 +304,9 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;shapeLayer=null;shapeGraphics=null;bulkGroups=[];spritePool=[];state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups=[];spritePool=[];state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,createBridge});
 });
