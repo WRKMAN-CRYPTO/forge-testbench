@@ -62,8 +62,9 @@ button.action.stop{border-color:#8e6170;background:#382030}
 .infoChip{font:800 10px ui-monospace,monospace;color:#b5d1e9;background:#12283b;border:1px solid #29475e;border-radius:8px;padding:5px 8px}
 @media(min-width:740px){.compositionGrid{grid-template-columns:1fr 1fr}}
 
-.tabs4{grid-template-columns:repeat(4,minmax(0,1fr))}
-@media(max-width:410px){.tabs4 button{font-size:10px;letter-spacing:-.15px;padding-left:0;padding-right:0}}
+.tabs4{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:410px){.tabs4 button{font-size:9px;letter-spacing:-.25px;padding-left:0;padding-right:0}}
+#hybridPanel{margin-top:13px;border-top:1px solid #31465a;padding-top:12px}.ratioVisual{display:flex;gap:3px;height:14px;border-radius:30px;overflow:hidden;background:#223449;margin:8px 0}.ratioVisual .detailed{background:linear-gradient(90deg,#ffd79d,#f29d65);transition:width .25s}.ratioVisual .bulk{background:linear-gradient(90deg,#65aee9,#697bd4);flex:1}.mixLabel{font:800 11px ui-monospace,monospace;color:#b6d4ee}.mixLabel strong{color:#ffd29a}#detailInfo{line-height:1.6}
 </style>
 </head>
 <body>
@@ -101,19 +102,29 @@ button.action.stop{border-color:#8e6170;background:#382030}
 <section class="section">
 <div class="sectionTitle">08 / Renderer strategy</div>
 <div class="tabs tabs4" id="strategies">
-<button data-strategy="baseline" aria-pressed="true">Baseline</button>
+<button data-strategy="baseline" aria-pressed="false">Baseline</button>
 <button data-strategy="cull" aria-pressed="false">Cull</button>
 <button data-strategy="adaptive" aria-pressed="false">Smart LOD</button>
 <button data-strategy="particle" aria-pressed="false">Particle</button>
+<button data-strategy="hybrid" aria-pressed="true">★ Hybrid</button>
 </div>
-<div class="smallNote" id="strategyNote">Every sprite is animated and submitted for rendering, including particles outside the camera.</div>
+<div class="smallNote" id="strategyNote">A core of high-detail Sprites surrounded by lightweight embers in three ParticleContainer layers.</div>
 <div class="chipline">
 <span class="infoChip" id="renderedReadout">Submitted: --</span>
 <span class="infoChip" id="culledReadout">Skipped: --</span>
 <span class="infoChip" id="lodReadout">Near / mid / far: --</span>
+<span class="infoChip" id="mixReadout">Detail: -- / Bulk: --</span>
 </div>
-<div class="actions"><button class="action primary" id="compare">⚙ COMPARE 4 MODES</button><button class="action" id="compareStop" disabled>■ Stop comparison</button></div>
-<div class="smallNote">Comparison keeps the current element, camera, lighting, quality, sprite count and positions. Runs each renderer strategy in sequence. Note: Particle uses one shared texture and a single blend mode, so its appearance is not pixel-identical.</div>
+<div id="hybridPanel"><div class="sectionTitle">09 / High-detail share</div>
+<label class="rangeTitle" for="mixSlider"><span>Detailed Sprites versus bulk particles</span><span id="mixText" class="mixLabel">25% / 75%</span></label>
+<input id="mixSlider" type="range" min="0" max="5" value="2" step="1" aria-label="Share of detailed Sprites">
+<div class="rangeEnds"><span>0% detail</span><span>25%</span><span>50%</span><span>100% detail</span></div>
+<div class="ratioVisual" aria-hidden="true"><div class="detailed" id="ratioBar" style="width:25%"></div><div class="bulk"></div></div>
+<div class="smallNote" id="detailInfo">Every cast keeps 200 animated visual records. We retain important core shapes as individual Sprites.</div>
+<div class="actions"><button class="action primary" id="blendCompare">✦ COMPARE 6 RATIOS</button><button class="action" id="compare">Compare 4 methods</button></div>
+</div>
+<div class="actions"><button class="action" id="compareStop" disabled>■ Stop comparison</button></div>
+<div class="smallNote">Six-ratio test runs 0%, 10%, 25%, 50%, 75%, 100% detail at the same camera and particle count. Every particle keeps its deterministic position, but layering and texture variety differ. The four-method test remains available for reference.</div>
 </section>
 <div class="caveat"><b>What this tests:</b> PixiJS 8 WebGL sprites with enhanced per-cast visuals, 200 animated visuals per cast. The automatic ramp measures frame cadence and full JavaScript update + render call, and stops after two successive stages below the target (50 FPS or P95 over 25 ms). <b>What it cannot test:</b> actual GPU execution time, device temperature, thermal throttling over long sessions, or Wandrune gameplay. A benchmark ceiling is not necessarily a crash point. Defined adjusts blending, opacity and glow without reducing sprite counts. World zoom changes visible fraction, so compare FPS only at matching camera and scene settings. PixiJS downloads once from jsDelivr.</div>
 </main>
@@ -130,7 +141,7 @@ lightning:{title:'LIGHTNING',sub:'BRANCHING / ARCS / IONIZATION',accent:'#8fd7ff
 ice:{title:'ICE',sub:'CRYSTALS / FRACTURE / SHATTER',accent:'#88f8ff',rgb:[113,236,255]},
 gravity:{title:'GRAVITY',sub:'ACCRETION / SINGULARITY / COLLAPSE',accent:'#c58dff',rgb:[180,111,255]}
 };
-let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,sceneRoot=null,backdrop=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,stopped=false,layout='field',look='defined',zoom=1,camera={x:W*.5,y:H*.5},visibleApprox=0,strategy='baseline',submitted=0,skipped=0,nearCount=0,midCount=0,farCount=0,comparing=false,comparisonEpoch=0,compareResults=[],sceneOrigin=0;const ZOOMS=[.33,.50,.75,1,1.25,1.6];
+let element='fire',quality='cinematic',level=4,app=null,P=null,layer=null,decor=null,glows=null,sceneRoot=null,backdrop=null,objects=[],casting=[],textures={},running=false,busy=false,auto=false,autoEpoch=0,animation=0,last=0,metricLast=0,metrics=[],costs=[],reports=[],pulseAt=-999,lastStable=null,firstWeak=null,stopped=false,layout='field',look='defined',zoom=1,camera={x:W*.5,y:H*.5},visibleApprox=0,strategy='hybrid',detailRatio=25,detailTotal=0,bulkTotal=0,bulkLayers=[],submitted=0,skipped=0,nearCount=0,midCount=0,farCount=0,comparing=false,comparisonEpoch=0,compareResults=[],sceneOrigin=0;const ZOOMS=[.33,.50,.75,1,1.25,1.6],RATIOS=[0,10,25,50,75,100];
 function rng(seed){let x=seed>>>0;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;};}
 function delay(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 function round(n){return Number.isFinite(n)?n.toFixed(1):'--';}
