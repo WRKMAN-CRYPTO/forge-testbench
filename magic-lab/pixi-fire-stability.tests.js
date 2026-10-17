@@ -32,6 +32,8 @@ ok(initial.length===3,"initial slots filled");
 const preempt=Stability.makeTracker();
 let first=preempt.step([mass(1,70),mass(2,60),mass(3,50),mass(4,20)],0);
 const selectedBefore=first.slots.map(x=>x.id);
+// Give previously enhanced masses their rendered contour cache for fading.
+preempt.apply({shells:first.slots.map(x=>({trackId:x.id,castIndex:x.castIndex,count:x.count,paths:[],bands:[],hotBands:[]}))},first);
 const next=preempt.step([mass(1,70),mass(2,60),mass(3,50),mass(4,84)],20);
 eq(next.selected,3,"three active expensive field slots maintained");
 ok(next.slots.filter(x=>x.group).some(x=>!selectedBefore.includes(x.id)),
