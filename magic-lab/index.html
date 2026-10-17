@@ -853,7 +853,7 @@ if(window.WRKMAN_WANDRUNE_ART){
 <div id="menuShield" hidden aria-hidden="true"></div>
  <input type="file" id="musicFiles" accept="audio/mpeg,.mp3" multiple hidden>
 <div id="stageWrap"><div id="stage"></div>
- <div id="pixiAlignStats" hidden style="position:absolute;top:28%;left:10px;z-index:20;pointer-events:none;background:#021321dc;color:#b6f9f7;font:800 12px monospace;padding:7px 10px;border:1px solid #85e3dd;border-radius:8px;max-width:75%">REGISTRATION / WAITING</div>
+ <div id="pixiAlignStats" hidden style="position:absolute;top:28%;left:10px;z-index:20;pointer-events:none;background:#021321dc;color:#b6f9f7;font:800 12px monospace;padding:7px 10px;border:1px solid #85e3dd;border-radius:8px;white-space:pre-line;max-width:75%">REGISTRATION / WAITING</div>
  <div id="archivistBar" hidden><strong>THE ARCHIVIST</strong><small id="archivistThought">STUDYING</small><small id="archivistBoard">READING THE BOARD</small>
   <div id="archivistTrack"><span id="archivistFill"></span></div></div>
  <div id="craftHud" hidden>⬡ FIELD ACTIVE</div><div id="regionTitle" hidden></div><button id="gateNearby" type="button" hidden>✧ DIAL GATE</button><div id="portalNearby" hidden></div><div id="joystick"><div id="stick"></div></div><div id="cross">TAP ARENA TO AIM + CAST</div><div id="castHint" role="status" aria-live="polite">SWARM MAGIC • TAP ORB TO CAST</div>
@@ -1206,7 +1206,7 @@ class Lab extends Phaser.Scene{
     // Scene RENDER fires after the camera has finished rendering.
     // Keeps Pixi aligned with the same-frame Phaser camera, including
     // follow, zoom, bounds and phone ENVELOP scaling.
-    this.events.on(Phaser.Scenes.Events.RENDER,()=>{
+    const renderPixiFrame=()=>{
      try{
       this.pixiSpellRenderer?.end();
       if(this.pixiAlignDiagnostic&&this.pixiSpellRenderer?.active){
@@ -1220,9 +1220,13 @@ class Lab extends Phaser.Scene{
       console.warn("Pixi post-render failure; using Phaser",error);
       this.pixiSpellRenderer?.disable(error?.message||error);
      }
-    });
+    };
+    this.events.on(Phaser.Scenes.Events.RENDER,renderPixiFrame);
     $("pixiLookMode").textContent="VFX: "+this.pixiSpellRenderer.look.toUpperCase();
-    this.events.once("shutdown",()=>this.pixiSpellRenderer?.destroy());
+    this.events.once("shutdown",()=>{
+     this.events.off(Phaser.Scenes.Events.RENDER,renderPixiFrame);
+     this.pixiSpellRenderer?.destroy();
+    });
     if(PixiSwarm.wantPixi(window.location.search)){
      this.pixiSpellRenderer.enable().catch(error=>console.warn("Pixi visuals not available",error));
     }
