@@ -109,4 +109,30 @@ const old=Perimeter.buildPerimeters(Clusters.findClusters([
  {x:112,y:100,r:3,alpha:.9,element:1,agentIndex:1,castIndex:0}
 ]).groups,{body:true,hot:true});
 eq(old.groups,1,"original fire detector and field solver remain operational");
+// Regression for the bug where grid ceil(+1) exceeded maxSamples
+// and discarded the third of three actual 200-agent fire masses.
+const threeClouds=[];
+for(let castIndex=0;castIndex<3;castIndex++){
+ const cx=145+castIndex*220,cy=200+(castIndex%2)*150;
+ for(let i=0;i<200;i++){
+  const theta=i*2.39996,dist=Math.sqrt(i/200)*43;
+  threeClouds.push({castIndex,agentIndex:i,x:cx+dist*Math.cos(theta),
+   y:cy+dist*Math.sin(theta),r:3,alpha:.85,element:1});
+ }
+}
+const clouds=Clusters.findClusters(threeClouds);
+eq(clouds.groups.length,3,"three true 200-agent masses detected");
+const baked=Perimeter.buildPerimeters(clouds.groups,
+ {maxGroups:3,sampleBudget:3500,body:true,hot:true,threshold:.78});
+eq(baked.groups,3,"no blob starved by grid ceil overshoot");
+eq(baked.skipped,0,"third blob is not silently skipped");
+ok(baked.samples<=3500,"all three fit inside exact shared grid limit");
+const nonblocking=Stability.makeTracker();
+const selection=nonblocking.step(clouds.groups,0);
+const bakedStable=Perimeter.buildPerimeters(selection.slots.filter(x=>x.group).map(x=>x.group),
+ {maxGroups:3,sampleBudget:3500,body:true,hot:true,threshold:.78});
+eq(bakedStable.groups,3,"stable tracker still enhances all three 200-agent blobs");
+ok(selection.slots.filter(x=>x.group).every(x=>x.opacity>=.8),
+ "no new fire mass begins almost invisible");
+
 console.log("Fire 085 stability: "+assertions+" assertions passed.");
