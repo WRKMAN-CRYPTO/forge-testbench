@@ -32,21 +32,26 @@ ok(initial.length===3,"initial slots filled");
 const preempt=Stability.makeTracker();
 let first=preempt.step([mass(1,70),mass(2,60),mass(3,50),mass(4,20)],0);
 const selectedBefore=first.slots.map(x=>x.id);
-let sawRetiring=false,passed=false;
-for(let t=20;t<=1200;t+=20){
- const next=preempt.step([mass(1,70),mass(2,60),mass(3,50),mass(4,84)],t);
- ok(next.slots.length<=3,"challenger NEVER causes fourth simultaneous enhanced mass");
- if(next.slots.some(x=>x.retiring))sawRetiring=true;
- if(next.slots.some(x=>x.id!==selectedBefore[0]&&x.id!==selectedBefore[1]&&x.id!==selectedBefore[2]))passed=true;
+const next=preempt.step([mass(1,70),mass(2,60),mass(3,50),mass(4,84)],20);
+eq(next.selected,3,"three active expensive field slots maintained");
+ok(next.slots.filter(x=>x.group).some(x=>!selectedBefore.includes(x.id)),
+ "new genuinely large mass receives a field slot immediately");
+ok(next.slots.some(x=>x.ghost),"previous mass fades through cached cheap ghost");
+ok(next.slots.filter(x=>x.group).length<=3,
+ "ghosts never consume or inflate the THREE sampled fields");
+eq(preempt.diagnostics().swaps,1,"one stronger contender replaces the old incumbent");
+for(let t=40;t<=360;t+=20){
+ const p=preempt.step([mass(1,70),mass(2,60),mass(3,50),mass(4,84)],t);
+ eq(p.selected,3,"replacement does not starve current large groups");
 }
-ok(sawRetiring,"much larger challenger triggers delayed fade-out");
-ok(passed,"sustained larger challenger eventually gains a freed slot");
-eq(preempt.diagnostics().swaps,1,"replacement occurs once, not repeated thrashing");
+const sourceForTest=id=>({trackId:id,castIndex:0,count:80,paths:[],bands:[],hotBands:[]});
 const vanished=Stability.makeTracker();
 let before=null;
 for(let t=0;t<=200;t+=20)before=vanished.step([mass(1,80)],t);
 const priorAlpha=before.slots[0].opacity;
 let falling=[];
+const previouslySelected=before.slots[0];
+vanished.apply({shells:[sourceForTest(previouslySelected.id)]},before);
 for(let t=220;t<=480;t+=20){
  const state=vanished.step([],t);
  ok(state.slots.length<=1,"vanished blob uses only its old slot while fading");
