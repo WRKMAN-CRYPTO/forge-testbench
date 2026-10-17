@@ -1,4 +1,4 @@
-/* WRKMAN / FIELD PHYSICS 037
+/* WRKMAN / FIELD PHYSICS 038
  * Canonical interpretation of painted 32x32 instruction fields.
  * Shared by Agent Field editor, Stone Range, Spell Forge and the roguelike.
  * No DOM, Phaser or canvas dependency. All consumers pass geometry explicitly.
@@ -13,21 +13,27 @@
   else if(root)root.WRKMAN_FIELD_PHYSICS=api;
 })(typeof globalThis==='object'?globalThis:null,function(){
  'use strict';
- const N=32, TOTAL=1024, MASK=-1, TAU=Math.PI*2, VERSION='037';
+ const N=32, TOTAL=1024, MASK=-1, TAU=Math.PI*2, VERSION='038';
  const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
  const lerp=(a,b,t)=>a+(b-a)*t;
  function sample(field,nx,ny){
   if(!Number.isFinite(nx)||!Number.isFinite(ny)||nx<0||ny<0||nx>=1||ny>=1)return {valid:false,value:null};
-  const cx=nx*N,cy=ny*N,i=Math.floor(cx),j=Math.floor(cy);
-  if(field[j*N+i]===MASK)return {valid:false,value:null};
+  // Membership stays pixel-exact: magenta/MASK means no field force.
+  // Interpolation, however, must be CENTERED on pixel centers.
+  // Physics 037 incorrectly treated each pixel's top-left corner as its
+  // center, so right/bottom neighbors influenced it while left/top did not.
+  const homeX=Math.floor(nx*N),homeY=Math.floor(ny*N),home=field[homeY*N+homeX];
+  if(home===MASK)return {valid:false,value:null};
+  const cx=nx*N-.5,cy=ny*N-.5,i=Math.floor(cx),j=Math.floor(cy);
   const fx=cx-i,fy=cy-j;let sum=0,weight=0;
   for(let oy=0;oy<=1;oy++)for(let ox=0;ox<=1;ox++){
-   const x=Math.min(N-1,i+ox),y=Math.min(N-1,j+oy),v=field[y*N+x];
+   // At the outer border, repeat the edge pixel symmetrically.
+   const x=clamp(i+ox,0,N-1),y=clamp(j+oy,0,N-1),v=field[y*N+x];
    if(v===MASK)continue;
    const w=(ox?fx:1-fx)*(oy?fy:1-fy);
    sum+=v*w;weight+=w;
   }
-  return {valid:true,value:weight?sum/weight:field[j*N+i]};
+  return {valid:true,value:weight?sum/weight:home};
  }
  function gradient(field,nx,ny,value){
   const e=.72/N;
