@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="085-fire-cohesion-stabilized",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="085-fire-cohesion-nonblocking",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -81,8 +81,7 @@
   const FIRE_PERIMETER=win.WRKMAN_FIRE_PERIMETER||null;
   const FIRE_STABILITY=win.WRKMAN_FIRE_STABILITY||null;
   const fireTracker=FIRE_STABILITY?.makeTracker?FIRE_STABILITY.makeTracker({
-   maxSlots:3,fadeMs:180,minHoldMs:230,challengerRatio:1.33,
-   challengeMs:170,heatHoldMs:110,heatFadeMs:190}):null;
+   maxSlots:3,fadeMs:180,heatHoldMs:110,heatFadeMs:190}):null;
   const allowedLooks=["original","bright","formation"];
   const requested=allowedLooks.includes(opts.look)?opts.look:"formation";
   const initialLook=requested==="formation"&&!FORMATION?.analyze?"bright":requested;
