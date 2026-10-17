@@ -10,7 +10,7 @@
  if(root)root.WRKMAN_FIRE_PERIMETER=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="085-fire-perimeter-pass-b",BUCKET=40;
+ const VERSION="085-fire-perimeter-pass-b";
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
  const nodeKey=(x,y,edge)=>edge===0?"h:"+x+":"+y:
   edge===1?"v:"+(x+1)+":"+y:
@@ -22,13 +22,15 @@
   const padding=38;
   const minX=group.minX-padding,minY=group.minY-padding;
   const width=(group.maxX-group.minX)+2*padding,height=(group.maxY-group.minY)+2*padding;
-  const maxSamples=clamp(Math.floor(opts.maxSamples||3200),400,5000);
+  const maxSamples=clamp(Math.floor(opts.maxSamples||1900),400,3500);
   const step=Math.max(4.0,width/104,height/78,Math.sqrt(width*height/maxSamples));
   const nx=Math.max(3,Math.ceil(width/step)+1),ny=Math.max(3,Math.ceil(height/step)+1);
   const dx=width/(nx-1),dy=height/(ny-1);
   // Max 2σ support is small relative to bucket size. Query a 5×5 grid
   // to keep every influence exact within our chosen 2.9σ cutoff.
-  const buckets=new Map(),agents=[];
+  // Agent-first splatting avoids 25 bucket lookups at every grid vertex.
+  // Only grid nodes within each actual ember's influence are visited.
+  const agents=[];
   for(const p of members){
    if(!Number.isFinite(p.x)||!Number.isFinite(p.y)||!Number.isFinite(p.r))continue;
    const alpha=clamp(Number(p.alpha)||0,0,1);
@@ -37,27 +39,25 @@
    const a={x:p.x,y:p.y,sigma,inv:1/(2*sigma*sigma),
     cutoff:(2.7*sigma)**2,weight:alpha};
    agents.push(a);
-   const key=Math.floor(a.x/BUCKET)+":"+Math.floor(a.y/BUCKET);
-   if(!buckets.has(key))buckets.set(key,[]);
-   buckets.get(key).push(a);
   }
   if(agents.length<2)return null;
   const values=new Float32Array(nx*ny);
   let work=0;
-  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
-   const px=minX+i*dx,py=minY+j*dy;
-   const bx=Math.floor(px/BUCKET),by=Math.floor(py/BUCKET);
-   let density=0;
-   for(let oy=-2;oy<=2;oy++)for(let ox=-2;ox<=2;ox++){
-    const cell=buckets.get((bx+ox)+":"+(by+oy));
-    if(!cell)continue;
-    for(const a of cell){
-     const ex=px-a.x,ey=py-a.y,d2=ex*ex+ey*ey;
+  for(const a of agents){
+   const reach=Math.sqrt(a.cutoff);
+   const i0=clamp(Math.floor((a.x-reach-minX)/dx),0,nx-1),
+    i1=clamp(Math.ceil((a.x+reach-minX)/dx),0,nx-1),
+    j0=clamp(Math.floor((a.y-reach-minY)/dy),0,ny-1),
+    j1=clamp(Math.ceil((a.y+reach-minY)/dy),0,ny-1);
+   for(let j=j0;j<=j1;j++){
+    const ey=minY+j*dy-a.y,ey2=ey*ey,row=j*nx;
+    for(let i=i0;i<=i1;i++){
+     const ex=minX+i*dx-a.x,d2=ex*ex+ey2;
+     if(d2>a.cutoff)continue;
+     values[row+i]+=a.weight*Math.exp(-d2*a.inv);
      work++;
-     if(d2<a.cutoff)density+=a.weight*Math.exp(-d2*a.inv);
     }
    }
-   values[j*nx+i]=Math.min(6,density);
   }
   // Each marching-square edge has one stable grid-edge ID. Contour
   // assembly joins ONLY matching edge IDs, never distant agent heads.
@@ -150,15 +150,15 @@
    bounds:{minX,minY,maxX:minX+width,maxY:minY+height}};
  }
  function buildPerimeters(groups,opts={}){
-  const maxGroups=clamp(Math.floor(opts.maxGroups??8),0,12);
-  const budget=clamp(Math.floor(opts.sampleBudget??16000),0,24000);
+  const maxGroups=clamp(Math.floor(opts.maxGroups??5),0,12);
+  const budget=clamp(Math.floor(opts.sampleBudget??9000),0,24000);
   const chosen=[],statistics={groups:0,paths:0,vertices:0,samples:0,work:0,
    skipped:0,budget,version:VERSION};
   for(const group of groups||[]){
    if(!group||group.count<2)continue;
    if(chosen.length>=maxGroups||statistics.samples+400>budget){statistics.skipped++;continue;}
    const remaining=budget-statistics.samples;
-   const shell=buildOne(group,{maxSamples:Math.min(3200,remaining),threshold:opts.threshold});
+   const shell=buildOne(group,{maxSamples:Math.min(1900,remaining),threshold:opts.threshold});
    if(!shell||!shell.paths.length)continue;
    if(statistics.samples+shell.samples>budget){statistics.skipped++;continue;}
    statistics.samples+=shell.samples;statistics.work+=shell.work;
