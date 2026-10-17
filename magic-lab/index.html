@@ -806,6 +806,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <button class="minibtn" id="notes" type="button">HOW TO PLAY</button>
     <button class="minibtn" id="copy" type="button">COPY BUILD</button>
     <button class="minibtn" id="reset" type="button">RESET ARENA</button>
+    <button class="minibtn" id="pixiRendererMode" type="button" title="Switch crafted swarm visuals without changing physics or saves">RENDER: PHASER</button>
    </div>
    <div class="craftPanel" role="group" aria-label="Crafted spell linking">
     <div class="menuCaption">CRAFTED FIELD / SPELL LINK</div>
@@ -983,7 +984,8 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./field-impacts.js?v=076"></script>
 <script src="./element-material-registry.js?v=069"></script>
 <script src="./element-vfx.js?v=069"></script>
-<script src="./crafted-magic.js?v=078"></script>
+<script src="./crafted-magic.js?v=080p"></script>
+<script src="./pixi-swarm-bridge.js?v=080p"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1133,6 +1135,7 @@ const Wildlife=window.WRKMAN_WILDLIFE||null; // optional ambient world, never re
 const Regions=window.WRKMAN_REGIONS||null; // optional canonical region generator
 const Crafted=window.WRKMAN_CRAFTED_MAGIC||null;
 const ElementVFX=window.WRKMAN_ELEMENT_VFX||null;
+const PixiSwarm=window.WRKMAN_PIXI_SWARM||null;
 let craftedRecipe=Crafted?Crafted.read(gameStorage):null;
 let craftedHealLinked=false; // Restore healing when swarm-healing mechanics are ready.
 const MatterBody=Phaser.Physics.Matter.Matter.Body;
@@ -1181,6 +1184,20 @@ class Lab extends Phaser.Scene{
   this.g=this.add.graphics();this.drawFloor();
   this.draw=this.add.graphics().setDepth(4);
   this.craftedDraw=this.add.graphics().setDepth(5);
+  // 080: PixiJS 8 paints the crafted swarm only. Phaser/Matter remain the game.
+  // Optional transparent canvas never receives touches.
+  try{
+   this.pixiSpellRenderer=PixiSwarm?PixiSwarm.createBridge(this,{
+    width:W,height:H,stage:$("stage"),
+    status:message=>{const b=$("pixiRendererMode");if(b)b.textContent=message;}
+   }):null;
+   if(this.pixiSpellRenderer){
+    this.events.once("shutdown",()=>this.pixiSpellRenderer?.destroy());
+    if(PixiSwarm.wantPixi(window.location.search)){
+     this.pixiSpellRenderer.enable().catch(error=>console.warn("Pixi visuals not available",error));
+    }
+   }
+  }catch(error){this.pixiSpellRenderer=null;console.warn("Pixi bridge skipped; Phaser retained",error);}
   // 056: Optional presentation adapter. The normal renderer is the fallback.
   try{
    this.elementVfx=ElementVFX?ElementVFX.install(this):null;
@@ -1720,12 +1737,15 @@ class Lab extends Phaser.Scene{
   if(this.craftedDraw){
    this.craftedDraw.clear();
    try{
+    this.pixiSpellRenderer?.begin();
     this.elementVfx?.begin();
     if(Crafted)Crafted.draw(this,this.craftedDraw,this.time.now);
     this.elementVfx?.extras(this.time.now);
+    this.pixiSpellRenderer?.end();
    }catch(vfxError){
     // Optional graphics must NEVER take the game or agent simulation down.
     console.warn("Elemental visuals fell back to original draw",vfxError);
+    try{this.pixiSpellRenderer?.disable(vfxError?.message||"render error");}catch(_){}
     try{this.elementVfx?.destroy();}catch(_){}
     this.elementVfx=null;
     this.craftedDraw.clear();
@@ -1745,7 +1765,7 @@ class Lab extends Phaser.Scene{
   }else $("craftHud").hidden=true;
   if(!this.renderedFrame){
    this.renderedFrame=true;
-   $("labState").textContent="RUN"+(canvasDiagnostic?":C":":A");
+   $("labState").textContent="RUN"+(this.pixiSpellRenderer?.active?":P8":canvasDiagnostic?":C":":A");
   }
   }catch(error){
    if(!this.reportedFrameFailure){
@@ -2833,6 +2853,16 @@ for(const el of [$("healthHud"),$("gameMenuToggle"),$("titleOverlay")]){
   if(!inGameManual(event.target))event.preventDefault();
  });
 }
+// Switch visuals instantly, without changing the simulation or saved data.
+$("pixiRendererMode").addEventListener("click",()=>{
+ const adapter=scene?.pixiSpellRenderer;
+ if(!adapter){$("pixiRendererMode").textContent="RENDER: PHASER";return;}
+ if(adapter.active){adapter.disable();$("pixiRendererMode").textContent="RENDER: PHASER";}
+ else if(!adapter.loading){
+  $("pixiRendererMode").textContent="PIXI8 · LOADING";
+  adapter.enable().catch(e=>console.warn("Pixi swap failed",e));
+ }
+});
 // Capture canvas touches directly so Phaser's pointer management cannot
 // eat the second thumb while the first is held on the external joystick.
 $("stage").addEventListener("touchstart",e=>{
