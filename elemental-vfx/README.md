@@ -114,3 +114,31 @@ The separate AUTO STRESS button still ramps 200–25,600 **visual states**, stop
 Reference measured on user's iPhone, Experiment 003 Fire Cinematic: 3,200 at ~60 FPS, 4,800 at ~57.09 FPS P95 22 ms, 6,400 failed P95 26 ms. These are baseline observations, not guarantees for Experiment 005.
 
 **Integration rule:** This is a standalone `forge-testbench` lab. Wandrune stays untouched unless separately approved.
+
+## Experiment 006: Hybrid Visuals / PixiJS 8
+
+**Open:** https://forge-testbench.vercel.app/elemental-vfx/pixi-hybrid.html
+
+The user's Experiment 005 screenshot and benchmark showed that the single-texture ParticleContainer mode looked flat, even though at 25,600 fire particles it averaged 40.71 FPS versus 33.64 FPS for full Sprite rendering. This experiment explores the beauty/performance compromise.
+
+### The hybrid design
+- Per cast exactly **200 animated visual states** are generated with the same deterministic seed and trajectory equations used in Experiments 003–005.
+- A chosen fraction of those states uses full PixiJS Sprite objects and the existing three texture variations for prominent structure.
+- The remainder uses **three ParticleContainer batches**, each associated with one of the same three procedural textures. Every state continues updating every frame.
+- Detail importance is deterministically ranked per cast using brightness, size, and lifetime parameters. The high-detail fraction is **exact per cast**, not approximate.
+- Only the representation changes. This is an isolated rendering test, not a gameplay simulation or modification to Wandrune.
+
+### Experiments
+1. Open the Hybrid strategy and choose a ratio from **0%, 10%, 25%, 50%, 75%, 100% detailed Sprites**.
+2. Compare the visual personalities at Fire / Cinematic / Cluster / Defined, preferably 4,800 and 25,600 total states. Photograph 0%, 25%, 50% and 100% for subjective comparison.
+3. Run **COMPARE 6 RATIOS** for the same effect, camera, quality, lighting and count. Each ratio reconstructs the renderer but keeps the same seeded particle motion and sets its local animation phase to zero. It settles ~700 ms and samples ~2.2 s.
+4. Press **Copy results** and share the JSON, including per-ratio detailed/fast counts and FPS/P95.
+5. Repeat with Gravity, Lightning, and Ice. Use World and pan/zoom for off-screen load scenarios.
+
+### How to interpret
+- 0% hybrid uses three particle texture groups; the older **Particle** strategy uses a single texture. They should not be treated as pixel-identical.
+- 100% hybrid is regular Sprites but retains three empty lightweight containers, which may add a small overhead compared with Baseline.
+- A higher FPS is not automatically visually preferable; preserve texture depth and spell identity.
+- The browser-frame samples do not measure GPU execution time and are too short to assess thermal throttling.
+- The underlying 200 states per cast are NEVER reduced. Any future level-of-detail changes would affect rendering only.
+- Experiments 001–005 and all Wandrune code remain unchanged. Rendering integration requires separate user approval.
