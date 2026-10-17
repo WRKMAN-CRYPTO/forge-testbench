@@ -369,7 +369,7 @@ async function rebuild(){
    if((i+1)%1600===0)await new Promise(resolve=>requestAnimationFrame(resolve));
   }
   ui.particles.textContent=objects.length.toLocaleString();ui.casts.textContent=n+' casts';ui.loadText.textContent=n+' × 200';
-  applyLook();sceneOrigin=performance.now();clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' animated visuals · '+detailTotal.toLocaleString()+' detailed / '+bulkTotal.toLocaleString()+' lightweight.');
+  applyLook();sceneOrigin=performance.now();pulseAt=-999;clearSamples();setStatus('Ready: '+objects.length.toLocaleString()+' animated visuals · '+detailTotal.toLocaleString()+' detailed / '+bulkTotal.toLocaleString()+' lightweight.');
   return true;
  }catch(e){console.error(e);setStatus('Build error: '+e.message);return false;}
  finally{busy=false;}
@@ -634,6 +634,62 @@ $('compare').addEventListener('click',async()=>{
   await rebuild();
   $('progress').textContent=endedEarly?'Partial ('+compareResults.length+'/4)':'Comparison complete';
   setStatus(endedEarly?'Partial A/B recorded: '+compareResults.length+' modes.':'Four modes compared at the same load. Tap Copy results to send the performance and submitted-sprite counts.');
+ }
+});
+
+
+$('mixSlider').addEventListener('input',e=>{
+ detailRatio=RATIOS[+e.target.value];setMixLabel();
+});
+$('mixSlider').addEventListener('change',async e=>{
+ if(auto||busy)return;
+ detailRatio=RATIOS[+e.target.value];
+ if(strategy!=='hybrid'){strategy='hybrid';activateStrategy();}
+ await rebuild();setStatus('Hybrid blend: '+detailRatio+'% rich Sprites, '+(100-detailRatio)+'% lightweight Particles.');
+});
+$('blendCompare').addEventListener('click',async()=>{
+ if(auto||busy||!app||comparing)return;
+ const previous={strategy,detailRatio},ticket=++comparisonEpoch;
+ comparing=true;auto=true;compareResults=[];reports=[];renderResults();
+ const modes=RATIOS.slice();
+ const controls=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#ramp,#compare,#blendCompare,#mixSlider');
+ controls.forEach(x=>x.disabled=true);$('compareStop').disabled=false;
+ $('progress').textContent='0 / '+modes.length;
+ let incomplete=false;
+ try{
+  for(let i=0;i<modes.length;i++){
+   if(!comparing||ticket!==comparisonEpoch){incomplete=true;break;}
+   strategy='hybrid';detailRatio=modes[i];$('mixSlider').value=String(i);
+   activateStrategy();
+   const ok=await rebuild();
+   if(!ok){incomplete=true;break;}
+   $('progress').textContent=(i+1)+' / '+modes.length;
+   setStatus('Blend '+(i+1)+'/6: '+detailRatio+'% detailed · '+detailTotal.toLocaleString()+' rich / '+bulkTotal.toLocaleString()+' lightweight. Settling…');
+   await delay(700);
+   if(!comparing||ticket!==comparisonEpoch){incomplete=true;break;}
+   clearSamples();
+   await delay(2200);
+   if(!comparing||ticket!==comparisonEpoch){incomplete=true;break;}
+   const m=sample(),pass=m.samples>=30&&m.fps>=50&&m.p95<=25;
+   const row={comparison:true,kind:'hybrid-six-ratio',casts:LEVELS[level],count:objects.length,
+    element,quality,layout,look,strategy,detailRatio,detailTotal,bulkTotal,
+    zoom,approxVisible:visibleApprox,submitted,skipped,
+    passed:pass,fps:+m.fps.toFixed(2),p95:+m.p95.toFixed(2),cpu:+m.cpu.toFixed(2),samples:m.samples};
+   compareResults.push(row);reports.push(row);renderResults();
+  }
+ }catch(e){console.error(e);setStatus('Hybrid ratio comparison interrupted: '+e.message);incomplete=true;}
+ finally{
+  if(ticket===comparisonEpoch)comparing=false;
+  auto=false;$('compareStop').disabled=true;
+  controls.forEach(x=>x.disabled=false);
+  while(busy)await delay(25);
+  strategy=previous.strategy;detailRatio=previous.detailRatio;
+  $('mixSlider').value=String(RATIOS.indexOf(detailRatio));activateStrategy();
+  const restored=await rebuild();
+  $('progress').textContent=incomplete?'Partial ('+compareResults.length+'/6)':'All 6 ratios measured';
+  setStatus(restored?
+   (incomplete?'Partial ':'Complete ')+'six-ratio test: '+compareResults.length+' samples. Tap Copy results and send the JSON.':
+   'Comparison recorded but restoring the starting ratio failed; please tap Reset bench.');
  }
 });
 
