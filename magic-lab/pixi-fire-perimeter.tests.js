@@ -103,7 +103,7 @@ const scene={player:{x:55,y:77},combat:{hp:100},
  cameras:{main:{getWorldPoint(x,y){return{x,y}}}}};
 (async()=>{
  const bridge=Bridge.createBridge(scene,{window:win,stage,art:"soft",look:"bright",
-  fireShell:true,fireBody:false,fireDebug:false,width:960,height:600});
+  fireShell:true,fireBody:false,fireHot:false,fireDebug:false,width:960,height:600});
  ok(await bridge.enable(),"Pixi renderer loads independently");
  function frame(){bridge.begin();for(const p of stream)bridge.paint(p);bridge.end();}
  frame();
