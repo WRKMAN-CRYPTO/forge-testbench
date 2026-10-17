@@ -85,7 +85,7 @@
   const state={active:false,ready:false,loading:false,error:null,records:[],drawn:0,
    details:0,bulk:0,frame:0,look:initialLook,art:selectedArt,materialDrawn:0,artFallback:0,ambientDrawn:0,formations:0,formationSegments:0,canvasOffsetX:0,canvasOffsetY:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
-   registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=[],spritePool=[],
+   registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=new Map(),spritePool=[],
    restoredTextures=new Map(),accentGraphics=null,disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
@@ -189,16 +189,22 @@
     tracePaths(shapeGraphics,f.paths,Math.max(1.1,width*.35),hot,.12);
    }
   }
-  function getGroup(element,variant){
-   const i=element*3+variant;
-   if(!bulkGroups[i]){
+  function getGroup(texture,key){
+   let group=bulkGroups.get(key);
+   if(!group){
     const pool=[];
-    const container=new P.ParticleContainer({dynamicProperties:{position:true,vertex:true,rotation:true,color:true}});
+    // PixiJS 8 ParticleContainer requires a shared texture source.
+    // A separate container per material source keeps UVs static and fast.
+    const container=new P.ParticleContainer({
+     texture,
+     dynamicProperties:{position:true,vertex:true,rotation:true,uvs:false,color:true}
+    });
     container.blendMode="normal";
     world.addChildAt(container,world.children.indexOf(detailsLayer));
-    bulkGroups[i]={pool,container,used:0};
+    group={pool,container,used:0,sourceKey:key};
+    bulkGroups.set(key,group);
    }
-   return bulkGroups[i];
+   return group;
   }
   function allocateHero(){
    if(heroUsed<spritePool.length)return spritePool[heroUsed++];
@@ -207,10 +213,10 @@
    detailsLayer.addChild(sprite);spritePool.push(sprite);heroUsed++;
    return sprite;
   }
-  function takeParticle(element,variant){
-   const batch=getGroup(element,variant),index=batch.used++;
+  function takeParticle(texture,sourceKey){
+   const batch=getGroup(texture,sourceKey),index=batch.used++;
    if(index<batch.pool.length)return batch.pool[index];
-   const particle=new P.Particle({texture:textureSet[element][variant],
+   const particle=new P.Particle({texture,
     x:0,y:0,anchorX:.5,anchorY:.5,rotation:0,scaleX:1,scaleY:1,alpha:0});
    batch.container.addParticle(particle);
    batch.pool.push(particle);
@@ -317,7 +323,7 @@
    if(!state.active||!app)return;
    try{
     state.frame++;heroUsed=0;
-    for(const group of bulkGroups)if(group)group.used=0;
+    for(const group of bulkGroups.values())group.used=0;
     let detailed=0,bulk=0,materialDrawn=0,artFallback=0;
     for(const r of state.records){
      const elem=classify(r),index=Math.max(0,Number(r.agentIndex)||0);
@@ -348,9 +354,9 @@
       sprite.tint=visualTint;
       detailed++;
      }else{
-      const particle=takeParticle(elem,variant);
       const selectedTexture=texture||textureSet[elem][variant];
-      particle.texture=selectedTexture;
+      const sourceKey=useMaterial?"material:"+materialKey(r,elem):"soft:"+elem+":"+variant;
+      const particle=takeParticle(selectedTexture,sourceKey);
       particle.x=r.x;particle.y=r.y;
       particle.rotation=useMaterial?(elem===3?Math.sin(r.seed||0)*.1:0):(r.angle||0);
       const sourceSide=useMaterial?48:128;
@@ -366,7 +372,7 @@
     paintFormations();paintAccents();
     state.materialDrawn=materialDrawn;state.artFallback=artFallback;
     for(let i=heroUsed;i<spritePool.length;i++)spritePool[i].visible=false;
-    for(const group of bulkGroups)if(group)for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
+    for(const group of bulkGroups.values())for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
     align();drawReference();app.render();
     state.drawn=state.records.length;state.details=detailed;state.bulk=bulk;
     state.records.length=0;
@@ -375,7 +381,7 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups=[];spritePool=[];restoredTextures.clear();state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();state.ready=false;
   }
   return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
