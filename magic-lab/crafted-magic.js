@@ -260,7 +260,9 @@
  }
  function draw(scene,g,time){
   const active=[...(scene.craftedShots||[])];if(scene.craftedAura)active.push(scene.craftedAura);
-  for(const st of active){
+  const pixi=scene.pixiSpellRenderer?.active?scene.pixiSpellRenderer:null;
+  for(let castIndex=0;castIndex<active.length;castIndex++){
+  const st=active[castIndex];
   const cfg=st.recipe.settings,colors=palettes[cfg.palette];
   const vfx=scene.elementVfx||null;
   const light=.14+cfg.light/100*.84,alpha=.18+light*.63;
@@ -293,7 +295,11 @@
    const worldVy=st.delivery==='world'?a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
    if(st.focus?.focused)Presence.paintFocused(g,{x,y,r,time,seed:a.seed||i,
     angle:Math.atan2(worldVy,worldVx),element:a.element||0,color:col,profile:st.focus});
-   if(vfx){
+   if(pixi){
+    pixi.paint({x,y,r,element:a.element||0,color:col,alpha,time,
+      seed:a.seed||i,angle:Math.atan2(worldVy,worldVx),
+      texture:cfg.texture,palette:cfg.palette,progress:t,castIndex,agentIndex:i});
+   }else if(vfx){
     const vx=st.delivery==='world'?a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
     const vy=st.delivery==='world'?a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
     vfx.paint(g,{x,y,r,element:a.element||0,color:col,alpha,time,seed:a.seed||i,
@@ -347,6 +353,12 @@
    const fade=Math.pow(clamp(1-elapsed/FADE_MS,0,1),1.35);
    if(fade<=0)continue;
    for(const p of batch.pieces){
+    if(pixi){
+     pixi.paint({x:p.x,y:p.y,r:p.r,element:p.element||0,color:p.color,
+      alpha:p.opacity*fade,time,seed:p.seed||0,angle:p.angle,
+      castIndex:-1,agentIndex:p.seed||0,texture:p.texture,palette:p.palette});
+     continue;
+    }
     if(scene.elementVfx){
      scene.elementVfx.paint(g,{x:p.x,y:p.y,r:p.r,element:p.element||0,color:p.color,
       alpha:p.opacity*fade,time,seed:p.seed||0,texture:p.texture,palette:p.palette,
