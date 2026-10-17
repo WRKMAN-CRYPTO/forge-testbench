@@ -160,7 +160,7 @@ header .actions{display:flex;gap:6px}
 .skinChoiceStar{position:absolute;right:1px;top:1px;z-index:1;border:0;border-radius:5px;background:#172b3a;color:#8296aa;font:900 19px/1 monospace;padding:1px;min-width:24px;min-height:25px}
 .skinChoiceStar.is-keeper{color:#ffd77b;text-shadow:0 0 7px #eea63d}
 .skinChoice:focus-visible,.skinNav:focus-visible,.skinKeeperBtn:focus-visible,.skinChoiceStar:focus-visible{outline:2px solid #c9e9ff;outline-offset:2px}
-.skinFoot{display:flex;justify-content:space-between;gap:6px;color:#9fb8c8;font:bold 9px ui-monospace,monospace}
+.skinFoot{display:flex;justify-content:space-between;gap:6px;align-items:center;color:#9fb8c8;font:bold 9px ui-monospace,monospace}.skinFoot #skinRetry[hidden]{display:none!important}.skinFoot #skinRetry{padding:3px 6px;min-height:23px;font-size:9px}
 #skinsOpen{border-color:#bf9963;color:#ffe0a4;white-space:nowrap}
 @media (max-width:790px){.skinPanel{padding:8px;gap:4px}.skinGrid{gap:3px}.skinChoice{min-height:78px}.skinThumb{transform:scale(.80)}.skinControls{min-height:60px}.skinTop strong{font-size:11px}.skinTop small{font-size:9px}}
 @media (max-width:600px){.skinGrid{grid-template-columns:repeat(5,minmax(0,1fr))}.skinChoice{min-height:84px}}
@@ -892,7 +892,7 @@ if(window.WRKMAN_WANDRUNE_ART){
    <button type="button" id="skinKeeper" class="skinKeeperBtn" aria-pressed="false">☆ KEEPER</button>
   </div>
   <div class="skinGrid" id="skinGrid" aria-label="Twenty numbered wizard designs"></div>
-  <div class="skinFoot"><span id="skinCount">0 KEEPERS</span><span id="skinAssetState">Skin artwork loading…</span><span>Saved on this device</span></div>
+  <div class="skinFoot"><span id="skinCount">0 KEEPERS</span><span id="skinAssetState">Skin artwork loading…</span><button type="button" class="minibtn" id="skinRetry" hidden>RETRY ART</button><span>Saved on this device</span></div>
  </div>
 </div>
 <!-- 034: Crafted spells read the same 32x32 recipes as the standalone field lab. -->
@@ -1300,13 +1300,16 @@ class Lab extends Phaser.Scene{
   candidates.push({key:"wizardSkins012",maskKey:"wizardHueMasks012",
    atlas:"./skins/wizard-skins-20.webp?v=010",
    mask:"./skins/wizard-hue-masks-012.png?v=012",label:"LEGACY ATLAS"});
-  const announceSkin=message=>{if(status)status.textContent=message;};
+  const announceSkin=message=>{
+   if(status)status.textContent=message;
+   const retry=$("skinRetry");if(retry)retry.hidden=!message.includes("ART NOT LOADED");
+  };
   let attempts=0;
   const start=()=>{
    if(!this.sys.isActive())return;
    const item=candidates.shift();
    if(!item){
-    announceSkin("⚠ ART NOT LOADED · TAP SKINS TO RETRY");
+    announceSkin("⚠ ART NOT LOADED · RETRY BELOW");
     announce("LAB ONLINE • Character atlas unavailable; retry from wardrobe.");
     return;
    }
@@ -2687,6 +2690,15 @@ for(let n=1;n<=SKIN_COUNT;n++){
 }
 $("skinsOpen").addEventListener("click",openSkinOverlay);
 $("skinDone").addEventListener("click",closeSkinOverlay);
+$("skinRetry").addEventListener("click",()=>{
+ if(!scene||scene.load.isLoading())return;
+ $("skinAssetState").textContent="Retrying original wardrobe art…";
+ $("skinRetry").hidden=true;
+ try{scene.loadCosmetics();}catch(error){
+  $("skinAssetState").textContent="⚠ "+(error?.message||"Retry failed");
+  $("skinRetry").hidden=false;
+ }
+});
 $("skinPrev").addEventListener("click",()=>equipSkin(activeSkin-1));
 $("skinNext").addEventListener("click",()=>equipSkin(activeSkin+1));
 $("skinKeeper").addEventListener("click",()=>toggleSkinKeeper(activeSkin));
