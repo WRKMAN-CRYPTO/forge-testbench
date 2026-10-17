@@ -1,4 +1,4 @@
-/* WANDRUNE 081 / Presentation-only formation tests.
+/* WANDRUNE 082 / Trail-aligned presentation regression tests.
  * Run: node magic-lab/pixi-formation.tests.js
  * No network, browser, Phaser, Matter or real Pixi GPU required.
  */
@@ -17,10 +17,23 @@ function beam(count=200,width=24,castIndex=0){
    r:3.4,alpha:.72};
  });
 }
-const cone=beam(),snapshot=JSON.stringify(cone);
+// Synthetic reproduction of the screenshot: orange trail history sits
+// significantly above the current blue/ember agent heads. The renderer
+// must stay on the real orange line without inventing a vertical offset.
+const cone=beam().map(p=>({...p,trail:[
+ {x:p.x-40,y:p.y-125},
+ {x:p.x-28,y:p.y-121},
+ {x:p.x-16,y:p.y-117},
+ {x:p.x-5,y:p.y-112}
+]}));
+const snapshot=JSON.stringify(cone);
+const trailCoordinates=new Set(cone.flatMap(p=>p.trail.concat([{x:p.x,y:p.y}]))
+ .map(p=>p.x.toFixed(6)+":"+p.y.toFixed(6)));
 const forms=Formation.analyze(cone);
 ok(forms.length===1,"widening cone recognized from motion and geometry");
-ok(forms[0].segments.length>=7,"ribbon includes connected occupied regions");
+ok(forms[0].segments.length>=7,"coherent geometry detected");
+ok(forms[0].paths.length>10,"real head histories are forwarded for aligned glow");
+ok(forms[0].paths.every(path=>path[0].y<200),"historical traces begin above the agents");
 ok(forms[0].coherence>.8,"motion-direction coherence is measured");
 ok(JSON.stringify(cone)===snapshot,"analysis never mutates agent records");
 ok(Formation.analyze(beam(15)).length===0,"fewer than 24 points creates no artificial beam");
@@ -42,7 +55,7 @@ const split=beam().map(p=>({...p,x:p.x<340?p.x:p.x+800}));
 ok(Formation.analyze(split).length===0,"disconnected distant streams cannot be joined");
 // Minimal Pixi public-surface mock verifies toggles and fallback behavior.
 const ctx=new Proxy({}, {get(_t,k){return k==="createRadialGradient"?()=>({addColorStop(){}}):()=>{};}});
-let polygons=0,rendered=0,appInstance=null,particleRef=null;
+let strokes=[],rendered=0,appInstance=null,particleRef=null;
 class Container{
  constructor(){this.children=[];this.scale={set(){}};this.position={set(){}};}
  addChild(...a){this.children.push(...a);}
@@ -50,9 +63,11 @@ class Container{
  destroy(){}
 }
 class Graphics{
- clear(){this.fills=0;}
- moveTo(){return this;}lineTo(){return this;}closePath(){return this;}
- fill(){this.fills=(this.fills||0)+1;polygons++;return this;}
+ constructor(){this.vertices=[];}
+ clear(){this.vertices=[];return this;}
+ moveTo(x,y){this.vertices.push({x,y,move:true});return this;}
+ lineTo(x,y){this.vertices.push({x,y});return this;}
+ stroke(style){strokes.push({vertices:this.vertices.slice(),style});this.vertices=[];return this;}
 }
 class Sprite{constructor(t){this.texture=t;this.anchor={set(){}};this.position={set(){}};}}
 class Particle{constructor(data){Object.assign(this,data);if(!particleRef)particleRef=this;}}
@@ -81,7 +96,13 @@ const scene={player:{x:100,y:100},combat:{hp:100},
  ok(vfx.formations===0,"bright changes opacity without merging trajectories");
  vfx.setLook("formation");tick();
  ok(vfx.formations===1&&vfx.formationSegments>=7,"coherent stream gets shape glow");
- ok(polygons>0,"geometry is sent to Pixi Graphics");
+ ok(strokes.length>=2,"both glow bands are drawn with Pixi Graphics");
+ok(strokes.some(st=>st.vertices.some(v=>v.y<200)),"formation reaches existing historical trails");
+ok(strokes.every(st=>st.vertices.every(v=>
+ trailCoordinates.has(v.x.toFixed(6)+":"+v.y.toFixed(6)))),
+ "every glow vertex lies on a REAL supplied tail or head coordinate");
+ok(strokes.every(st=>st.vertices.filter(v=>v.move).length>5),
+ "glow contains independent traces, not one polyline linking agents");
  ok(vfx.drawn===200,"formation never reduces simulated visual-state count");
  ok(JSON.stringify(cone)===snapshot,"bridge does not change source records");
  ok(scene.player.x===100&&scene.combat.hp===100,"combat and player positions untouched");
@@ -90,5 +111,5 @@ const scene={player:{x:100,y:100},combat:{hp:100},
  vfx.disable();ok(!vfx.active,"Phaser fallback available");
  ok(await vfx.enable(),"Pixi can re-enable without new game state");
  vfx.destroy();ok(!vfx.active&&!vfx.ready,"bridge shuts down cleanly");
- console.log("Wandrune 081 formation: "+assertions+" assertions passed; "+rendered+" mock renders.");
+ console.log("Wandrune 082 aligned formation: "+assertions+" assertions passed; "+rendered+" mock renders.");
 })().catch(err=>{console.error(err);process.exitCode=1;});
