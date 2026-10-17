@@ -83,7 +83,8 @@
     for(const p of members){x+=p.x;y+=p.y;minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
     const count=members.length;
     groups.push({castIndex,count,x:x/count,y:y/count,minX,minY,maxX,maxY,
-      hull:hull(members),edges:group.edges,
+      // Renderer-only references to the already measured members; no writes.
+      members:members.slice(),hull:hull(members),edges:group.edges,
       // This is DEBUG geometry, not the final plasma perimeter.
       radius:maxRadius});
    }
