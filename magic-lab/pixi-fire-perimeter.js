@@ -27,8 +27,17 @@
   const minX=group.minX-padding,minY=group.minY-padding;
   const width=(group.maxX-group.minX)+2*padding,height=(group.maxY-group.minY)+2*padding;
   const maxSamples=clamp(Math.floor(opts.maxSamples||1100),400,3500);
-  const step=Math.max(4.0,width/104,height/78,Math.sqrt(width*height/maxSamples));
-  const nx=Math.max(3,Math.ceil(width/step)+1),ny=Math.max(3,Math.ceil(height/step)+1);
+  let step=Math.max(4.0,width/104,height/78,Math.sqrt(width*height/maxSamples));
+  let nx=Math.max(3,Math.ceil(width/step)+1),
+   ny=Math.max(3,Math.ceil(height/step)+1);
+  // The old ceil(+1) grid sizing could silently exceed maxSamples and
+  // drop the third 200-agent blob despite a 3-slot budget. Enforce the
+  // actual number of field samples, not just an area approximation.
+  for(let attempts=0;nx*ny>maxSamples&&attempts<24;attempts++){
+   step*=Math.max(1.045,Math.sqrt(nx*ny/maxSamples)*1.015);
+   nx=Math.max(3,Math.ceil(width/step)+1);
+   ny=Math.max(3,Math.ceil(height/step)+1);
+  }
   const dx=width/(nx-1),dy=height/(ny-1);
   // Max 2σ support is small relative to bucket size. Query a 5×5 grid
   // to keep every influence exact within our chosen 2.9σ cutoff.
