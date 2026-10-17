@@ -455,7 +455,7 @@ function renderResults(){
  ui.results.replaceChildren();
  if(!reports.length){ui.results.textContent='No measurements yet.';return;}
  for(let r of reports){let div=document.createElement('div');div.className='result '+(r.passed?'ok':'bad');
- let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' total / '+(r.submitted??r.count).toLocaleString()+' drawn · '+(r.strategy||'BASELINE').toUpperCase();
+ let a=document.createElement('span');a.textContent=r.count.toLocaleString()+' visual states · '+(r.strategy==='hybrid'?r.detailRatio+'% detail':(r.strategy||'BASELINE').toUpperCase());
  let b=document.createElement('strong');b.textContent=round(r.fps)+' FPS · '+round(r.p95)+' ms P95';
  div.append(a,b);ui.results.append(div);}
 }
@@ -466,7 +466,7 @@ async function ramp(){
  if(auto){if(!comparing)abortRamp();return;}
  if(busy||!app)return;
  auto=true;stopped=false;const ticket=++autoEpoch;reports=[];renderResults();ui.ramp.textContent='■ STOP RAMP';ui.ramp.classList.add('stop');ui.progress.textContent='0 / '+LEVELS.length;lastStable=null;firstWeak=null;let badStreak=0;
- const buttons=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#compare');
+ const buttons=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#compare,#blendCompare,#mixSlider');
  buttons.forEach(x=>x.disabled=true);
  try{
  for(let i=0;i<LEVELS.length&&auto&&ticket===autoEpoch;i++){
@@ -477,7 +477,7 @@ async function ramp(){
   await delay(650);if(!auto||ticket!==autoEpoch)break;clearSamples();
   await delay(2000);if(!auto||ticket!==autoEpoch)break;
   const m=sample(),pass=m.samples>=30&&m.fps>=50&&m.p95<=25;
-  reports.push({casts:LEVELS[i],count:LEVELS[i]*PER,element,quality,layout,look,strategy,zoom,approxVisible:visibleApprox,submitted,skipped,nearCount,midCount,farCount,passed:pass,
+  reports.push({casts:LEVELS[i],count:LEVELS[i]*PER,element,quality,layout,look,strategy,detailRatio,detailTotal,bulkTotal,zoom,approxVisible:visibleApprox,submitted,skipped,nearCount,midCount,farCount,passed:pass,
    fps:Number(m.fps.toFixed(2)),p95:Number(m.p95.toFixed(2)),cpu:Number(m.cpu.toFixed(2)),samples:m.samples});
   renderResults();
   if(pass){lastStable=LEVELS[i]*PER;badStreak=0;firstWeak=null;}
@@ -491,14 +491,14 @@ async function ramp(){
 }
 function trigger(){pulseAt=(performance.now()-sceneOrigin)/1000;let tint=TYPES[element].accent;ui.flash.style.background=tint;ui.flash.animate([{opacity:.3},{opacity:0}],{duration:470,easing:'ease-out'});}
 function report(){
- const data={app:'WRKMAN PixiJS 8 Intelligent Rendering Lab',version:'0.5',date:new Date().toISOString(),renderer:strategy==='particle'?'PixiJS 8.10.0 ParticleContainer':'PixiJS 8.10.0 Sprites',element,quality,layout,look,strategy,submitted,skipped,nearCount,midCount,farCount,comparisonResults:compareResults,camera:{x:camera.x,y:camera.y,zoom},approxVisible:visibleApprox,particleCount:objects.length,visualsPerCast:PER,levels:LEVELS,threshold:{minFps:50,maxP95ms:25,consecutiveFailures:2},results:reports,highestPassingParticles:lastStable,
- current:sample(),device:navigator.userAgent,viewport:[innerWidth,innerHeight],pixelRatio:devicePixelRatio,notes:'Frame cadence via rAF. JS + render call time does not equal GPU execution time. Same total sprite count; layout and zoom affect approximate visible counts. Short ~2-second stages; no Wandrune code used.'};
+ const data={app:'WRKMAN PixiJS 8 Hybrid VFX Lab',version:'0.6',date:new Date().toISOString(),renderer:strategy==='hybrid'?'PixiJS 8.10.0 Hybrid Sprites + ParticleContainers':strategy==='particle'?'PixiJS 8.10.0 ParticleContainer':'PixiJS 8.10.0 Sprites',element,quality,layout,look,strategy,detailRatio,detailTotal,bulkTotal,submitted,skipped,nearCount,midCount,farCount,comparisonResults:compareResults,camera:{x:camera.x,y:camera.y,zoom},approxVisible:visibleApprox,particleCount:objects.length,visualsPerCast:PER,levels:LEVELS,threshold:{minFps:50,maxP95ms:25,consecutiveFailures:2},results:reports,highestPassingParticles:lastStable,
+ current:sample(),device:navigator.userAgent,viewport:[innerWidth,innerHeight],pixelRatio:devicePixelRatio,notes:'Frame cadence via rAF; JS+render call time is not GPU timing. All 200 visual states per cast update in every ratio. Enhanced lightweight hybrid uses three different particle textures versus the single texture of the previous particle-only renderer. Short ~2-second benchmarks, visual changes and browser variation confound pure FPS comparisons. No Wandrune changes.'};
  const dataStr=JSON.stringify(data,null,2);
  if(navigator.clipboard&&navigator.clipboard.writeText){
  navigator.clipboard.writeText(dataStr).then(()=>setStatus('Benchmark copied. Paste the report into our conversation.')).catch(()=>download(dataStr));
  }else download(dataStr);
 }
-function download(s){let blob=new Blob([s],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='wrkman-pixi-vfx-005.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),800);setStatus('Benchmark report downloaded.');}
+function download(s){let blob=new Blob([s],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='wrkman-pixi-vfx-006.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),800);setStatus('Benchmark report downloaded.');}
 async function changeSetting(){
  if(busy||auto)return;await rebuild();
 }
@@ -536,7 +536,7 @@ $('sampleNow').addEventListener('click',()=>{
  if(auto||busy)return;
  const m=sample();
  if(m.samples<30){setStatus('Let the scene settle for at least 30 frames before capturing.');return;}
- reports.push({manual:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,strategy,submitted,skipped,nearCount,midCount,farCount,zoom,approxVisible:visibleApprox,
+ reports.push({manual:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,strategy,detailRatio,detailTotal,bulkTotal,submitted,skipped,nearCount,midCount,farCount,zoom,approxVisible:visibleApprox,
   passed:m.fps>=50&&m.p95<=25,fps:+m.fps.toFixed(2),p95:+m.p95.toFixed(2),cpu:+m.cpu.toFixed(2),samples:m.samples});
  renderResults();setStatus('Captured '+objects.length.toLocaleString()+' particles · '+look+' · '+layout+' · '+round(m.fps)+' FPS.');
 });
@@ -568,9 +568,17 @@ const STRATEGIES={
  baseline:'Every Sprite is animated and submitted, even when beyond the camera. Full appearance reference.',
  cull:'All particle states update, but outside-the-camera Sprites set renderable=false and are not drawn.',
  adaptive:'Offscreen Sprites are not drawn; near detail is full, mid draws 1/2, far draws 1/6. Each keeps its underlying animated state.',
- particle:'PixiJS 8 ParticleContainer batching. Every lightweight Particle is submitted; a shared texture and blend mode mean this is not pixel-identical to regular Sprites.'
+ particle:'Previous single-texture ParticleContainer, for comparison with the old flat-looking version.',
+ hybrid:'A selectable percentage of rich detailed Sprites plus three fast ParticleContainer ember/crystal/arc layers. All 200 visual states per cast remain.'
 };
+function setMixLabel(){
+ $('mixText').textContent=detailRatio+'% / '+(100-detailRatio)+'%';
+ $('ratioBar').style.width=detailRatio+'%';
+ $('detailInfo').textContent=detailRatio+'% detailed Sprites ('+Math.round(PER*detailRatio/100)+' per cast), '+(100-detailRatio)+'% lightweight Particles. Every visual state still updates.';
+}
 function activateStrategy(){
+ setMixLabel();
+ $('hybridPanel').classList.toggle('dim',strategy!=='hybrid');
  for(const b of document.querySelectorAll('[data-strategy]'))b.setAttribute('aria-pressed',String(b.dataset.strategy===strategy));
  $('strategyNote').textContent=STRATEGIES[strategy];
  clearSamples();
@@ -592,7 +600,7 @@ $('compare').addEventListener('click',async()=>{
  if(auto||busy||!app||comparing)return;
  const initial=strategy,ticket=++comparisonEpoch,modes=['baseline','cull','adaptive','particle'];
  comparing=true;auto=true;compareResults=[];
- const controls=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#ramp,#compare');
+ const controls=document.querySelectorAll('[data-el],[data-q],[data-layout],[data-look],[data-strategy],#load,#reset,#cameraZoom,#recenter,#sampleNow,#ramp,#compare,#blendCompare,#mixSlider');
  controls.forEach(c=>c.disabled=true);
  $('compareStop').disabled=false;$('progress').textContent='0 / 4';
  let endedEarly=false;
@@ -610,7 +618,7 @@ $('compare').addEventListener('click',async()=>{
    await delay(2200);
    if(!comparing||ticket!==comparisonEpoch){endedEarly=true;break;}
    let m=sample(),okPerf=m.samples>=30&&m.fps>=50&&m.p95<=25;
-   const row={comparison:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,strategy,
+   const row={comparison:true,casts:LEVELS[level],count:objects.length,element,quality,layout,look,strategy,detailRatio,detailTotal,bulkTotal,
     zoom,approxVisible:visibleApprox,submitted,skipped,nearCount,midCount,farCount,
     passed:okPerf,fps:+m.fps.toFixed(2),p95:+m.p95.toFixed(2),cpu:+m.cpu.toFixed(2),samples:m.samples};
    compareResults.push(row);reports.push(row);renderResults();
