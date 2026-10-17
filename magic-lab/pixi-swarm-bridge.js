@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="085-fire-cohesion-pass-a",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="085-fire-cohesion-pass-b",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -78,6 +78,7 @@
   if(!stage)throw Error("Wandrune stage not found");
   const FORMATION=win.WRKMAN_PIXI_FORMATIONS||null;
   const FIRE_CLUSTERS=win.WRKMAN_FIRE_CLUSTERS||null;
+  const FIRE_PERIMETER=win.WRKMAN_FIRE_PERIMETER||null;
   const allowedLooks=["original","bright","formation"];
   const requested=allowedLooks.includes(opts.look)?opts.look:"formation";
   const initialLook=requested==="formation"&&!FORMATION?.analyze?"bright":requested;
@@ -87,10 +88,13 @@
    details:0,bulk:0,frame:0,look:initialLook,art:selectedArt,materialDrawn:0,artFallback:0,ambientDrawn:0,formations:0,formationSegments:0,canvasOffsetX:0,canvasOffsetY:0,
    fireDebug:!!opts.fireDebug&&!!FIRE_CLUSTERS?.findClusters,
    fireCandidates:0,fireGroups:0,fireLargest:0,fireSingles:0,fireEdges:0,
-   fireVisibleGroups:0,fireNeighborChecks:0};
+   fireVisibleGroups:0,fireNeighborChecks:0,
+   fireShell:opts.fireShell!==false&&!!FIRE_CLUSTERS?.findClusters&&!!FIRE_PERIMETER?.buildPerimeters,
+   fireShellGroups:0,fireShellPaths:0,fireShellVertices:0,fireShellSamples:0,
+   fireShellWork:0,fireShellSkipped:0,fireShellMs:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
    registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=new Map(),spritePool=[],
-   restoredTextures=new Map(),accentGraphics=null,fireDebugGraphics=null,disposed=false,heroUsed=0;
+   restoredTextures=new Map(),accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
    if(typeof opts.status==="function")try{opts.status(msg);}catch(_){}
@@ -180,6 +184,74 @@
    announce("FIRE CLUSTERS · "+(state.fireDebug?"DEBUG ON":"OFF"));
    return state.fireDebug;
   }
+  function setFireShell(enabled){
+   state.fireShell=!!enabled&&!!FIRE_PERIMETER?.buildPerimeters&&!!FIRE_CLUSTERS?.findClusters;
+   if(!state.fireShell){
+    fireShellGraphics?.clear();
+    state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;
+    state.fireShellSamples=state.fireShellWork=state.fireShellSkipped=0;
+    state.fireShellMs=0;
+   }
+   announce("FIRE SHELL · "+(state.fireShell?"ON":"OFF"));
+   return state.fireShell;
+  }
+  function paintFireShells(found){
+   if(!fireShellGraphics)return;
+   fireShellGraphics.clear();
+   if(!state.fireShell||!found||!FIRE_PERIMETER?.buildPerimeters)return;
+   const before=typeof performance!=="undefined"?performance.now():0;
+   try{
+    const results=FIRE_PERIMETER.buildPerimeters(found.groups,{
+     maxGroups:4,sampleBudget:8000});
+    state.fireShellGroups=results.groups;
+    state.fireShellPaths=results.paths;
+    state.fireShellVertices=results.vertices;
+    state.fireShellSamples=results.samples;
+    state.fireShellWork=results.work;
+    state.fireShellSkipped=results.skipped;
+    for(const cl of results.shells){
+     const factor=cl.count>=4?1:.65;
+     // Boundary ONLY in Pass B: no opaque fill and no bright interior.
+     // Three feathered stroked bands suggest hot plasma around the
+     // exact merged influence of neighboring agents.
+     for(const path of cl.paths){
+      const points=path.points;
+      if(points.length<3)continue;
+      for(const band of [
+       {width:15,color:0xff5015,alpha:.045*factor},
+       {width:7,color:0xff8d2d,alpha:.095*factor},
+       {width:2.4,color:0xffc16b,alpha:.16*factor}
+      ]){
+       const g=fireShellGraphics;
+       g.moveTo(points[0].x,points[0].y);
+       for(let i=1;i<points.length;i++)g.lineTo(points[i].x,points[i].y);
+       if(path.closed)g.closePath();
+       g.stroke({width:band.width,color:band.color,alpha:band.alpha,
+        cap:"round",join:"round"});
+      }
+     }
+    }
+    state.fireShellMs=before?Math.round((performance.now()-before)*10)/10:0;
+   }catch(error){
+    console.warn("Nonfatal fire perimeter failure",error);
+    setFireShell(false);
+   }
+  }
+  function paintFireEffects(){
+   if(!state.fireDebug&&!state.fireShell)return;
+   let found;
+   try{
+    // One clustering operation supplies BOTH the validated Pass A debug
+    // and the new Pass B surface. Do not double-process 200 agents.
+    found=FIRE_CLUSTERS.findClusters(state.records,{
+     bounds:fireViewport(),radius:26,margin:36});
+   }catch(error){
+    console.warn("Nonfatal fire group failure",error);
+    setFireShell(false);setFireDebug(false);return;
+   }
+   paintFireShells(found);
+   paintFireDebug(found);
+  }
   function fireViewport(){
    const cam=scene.cameras?.main;
    if(!cam?.getWorldPoint)return null;
@@ -188,17 +260,11 @@
    return {minX:Math.min(a.x,b.x,c.x,d.x),maxX:Math.max(a.x,b.x,c.x,d.x),
     minY:Math.min(a.y,b.y,c.y,d.y),maxY:Math.max(a.y,b.y,c.y,d.y)};
   }
-  function paintFireDebug(){
+  function paintFireDebug(found){
    const g=fireDebugGraphics;if(!g)return;
    g.clear();
    if(!state.fireDebug||!FIRE_CLUSTERS?.findClusters)return;
-   let found;
-   try{
-    found=FIRE_CLUSTERS.findClusters(state.records,{bounds:fireViewport(),radius:26,margin:36});
-   }catch(error){
-    console.warn("Nonfatal fire clustering diagnostic:",error);
-    setFireDebug(false);return;
-   }
+   if(!found)return;
    state.fireCandidates=found.candidates;state.fireGroups=found.activeClusters;
    state.fireLargest=found.largest;state.fireSingles=found.singles;
    state.fireEdges=found.links;state.fireNeighborChecks=found.checks;
@@ -355,8 +421,8 @@
     world=new P.Container();detailsLayer=new P.Container();
     shapeLayer=new P.Container();shapeLayer.blendMode="add";shapeGraphics=new P.Graphics();
     shapeLayer.addChild(shapeGraphics);
-    accentGraphics=new P.Graphics();fireDebugGraphics=new P.Graphics();
-    app.stage.addChild(world);world.addChild(shapeLayer,detailsLayer,accentGraphics,fireDebugGraphics);
+    accentGraphics=new P.Graphics();fireDebugGraphics=new P.Graphics();fireShellGraphics=new P.Graphics();fireShellGraphics.blendMode="add";
+    app.stage.addChild(world);world.addChild(shapeLayer,fireShellGraphics,detailsLayer,accentGraphics,fireDebugGraphics);
     if(opts.alignDebug){
      registrationGraphics=new P.Graphics();
      world.addChild(registrationGraphics);
@@ -378,7 +444,7 @@
   function disable(reason){
    state.active=false;state.records.length=0;
    if(app?.canvas)app.canvas.style.display="none";
-   shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
+   shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
    announce("PHASER SWARM · SAFE FALLBACK");
   }
@@ -442,7 +508,7 @@
     }
     // Never edits trajectory, collision, position or count: this is a
     // purely visual geometric interpretation of already-computed records.
-    paintFormations();paintAccents();paintFireDebug();
+    paintFormations();paintAccents();paintFireEffects();
     state.materialDrawn=materialDrawn;state.artFallback=artFallback;
     for(let i=heroUsed;i<spritePool.length;i++)spritePool[i].visible=false;
     for(const group of bulkGroups.values())for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
@@ -454,9 +520,9 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,createBridge});
 });
