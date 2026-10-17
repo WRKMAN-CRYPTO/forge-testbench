@@ -202,7 +202,7 @@
    const before=typeof performance!=="undefined"?performance.now():0;
    try{
     const results=FIRE_PERIMETER.buildPerimeters(found.groups,{
-     maxGroups:4,sampleBudget:8000});
+     maxGroups:3,sampleBudget:3500});
     state.fireShellGroups=results.groups;
     state.fireShellPaths=results.paths;
     state.fireShellVertices=results.vertices;
