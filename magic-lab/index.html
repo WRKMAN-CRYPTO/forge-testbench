@@ -1221,7 +1221,7 @@ class Lab extends Phaser.Scene{
     fireShell:new URLSearchParams(window.location.search).get("fireShell")!=="0",
     fireBody:new URLSearchParams(window.location.search).get("fireBody")!=="0",
     fireHot:new URLSearchParams(window.location.search).get("fireHot")!=="0",
-    fireStable:new URLSearchParams(window.location.search).get("fireStable")!=="0",
+    fireStable:new URLSearchParams(window.location.search).get("fireStable")==="1",
     status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY"))return;
      const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
