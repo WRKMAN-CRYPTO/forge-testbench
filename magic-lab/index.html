@@ -841,6 +841,7 @@ if(window.WRKMAN_WANDRUNE_ART){
      <div class="pill">STONE <b id="pillars">3</b></div>
      <div class="pill">WILDLIFE <b id="wildlifeCount">0</b></div>
      <div class="pill">LAB <b id="labState">BOOT</b></div>
+     <div class="pill">PIXICORE <b id="pixiFlowStatus">OFF</b></div>
      <div class="pill">DATA <b id="profileMode">SAVED</b></div>
      <div class="pill">MODE <b>SOLO / LOCAL</b></div>
     </div>
@@ -1747,6 +1748,11 @@ class Lab extends Phaser.Scene{
     if(Crafted)Crafted.draw(this,this.craftedDraw,this.time.now);
     this.elementVfx?.extras(this.time.now);
     this.pixiSpellRenderer?.end();
+    if((this.pixiStatusTick=(this.pixiStatusTick||0)+1)%12===0){
+     const p=this.pixiSpellRenderer;
+     $("pixiFlowStatus").textContent=p?.active?
+      (p.look.toUpperCase()+" · "+p.formations+" SHAPES / "+p.formationSegments+" LINKS"):"PHASER";
+    }
    }catch(vfxError){
     // Optional graphics must NEVER take the game or agent simulation down.
     console.warn("Elemental visuals fell back to original draw",vfxError);
