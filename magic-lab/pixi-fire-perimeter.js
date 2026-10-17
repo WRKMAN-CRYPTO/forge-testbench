@@ -11,6 +11,10 @@
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
  const VERSION="085-fire-perimeter-pass-b";
+ // 512-point exponential falloff lookup for the visual-only density pass.
+ // Indexing uses 128 steps per exponent unit, <0.4% local weight error.
+ const GAUSS=new Float32Array(512);
+ for(let i=0;i<GAUSS.length;i++)GAUSS[i]=Math.exp(-i/128);
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
  const nodeKey=(x,y,edge)=>edge===0?"h:"+x+":"+y:
   edge===1?"v:"+(x+1)+":"+y:
@@ -54,7 +58,7 @@
     for(let i=i0;i<=i1;i++){
      const ex=minX+i*dx-a.x,d2=ex*ex+ey2;
      if(d2>a.cutoff)continue;
-     values[row+i]+=a.weight*Math.exp(-d2*a.inv);
+     values[row+i]+=a.weight*GAUSS[Math.min(511,(d2*a.inv*128)|0)];
      work++;
     }
    }
