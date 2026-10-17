@@ -26,7 +26,7 @@
   const padding=38;
   const minX=group.minX-padding,minY=group.minY-padding;
   const width=(group.maxX-group.minX)+2*padding,height=(group.maxY-group.minY)+2*padding;
-  const maxSamples=clamp(Math.floor(opts.maxSamples||1900),400,3500);
+  const maxSamples=clamp(Math.floor(opts.maxSamples||1100),400,3500);
   const step=Math.max(4.0,width/104,height/78,Math.sqrt(width*height/maxSamples));
   const nx=Math.max(3,Math.ceil(width/step)+1),ny=Math.max(3,Math.ceil(height/step)+1);
   const dx=width/(nx-1),dy=height/(ny-1);
@@ -154,15 +154,15 @@
    bounds:{minX,minY,maxX:minX+width,maxY:minY+height}};
  }
  function buildPerimeters(groups,opts={}){
-  const maxGroups=clamp(Math.floor(opts.maxGroups??5),0,12);
-  const budget=clamp(Math.floor(opts.sampleBudget??9000),0,24000);
+  const maxGroups=clamp(Math.floor(opts.maxGroups??4),0,12);
+  const budget=clamp(Math.floor(opts.sampleBudget??4500),0,24000);
   const chosen=[],statistics={groups:0,paths:0,vertices:0,samples:0,work:0,
    skipped:0,budget,version:VERSION};
   for(const group of groups||[]){
    if(!group||group.count<2)continue;
    if(chosen.length>=maxGroups||statistics.samples+400>budget){statistics.skipped++;continue;}
    const remaining=budget-statistics.samples;
-   const shell=buildOne(group,{maxSamples:Math.min(1900,remaining),threshold:opts.threshold});
+   const shell=buildOne(group,{maxSamples:Math.min(1100,remaining),threshold:opts.threshold});
    if(!shell||!shell.paths.length)continue;
    if(statistics.samples+shell.samples>budget){statistics.skipped++;continue;}
    statistics.samples+=shell.samples;statistics.work+=shell.work;
