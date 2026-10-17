@@ -63,6 +63,8 @@ const bridge=Bridge.createBridge({cameras:{main:camera}},
  bridge.begin();
  bridge.paint({x:235,y:348,r:3,alpha:.8,color:0xff6600,element:1,angle:.2,agentIndex:4,castIndex:0});
  bridge.end();
+ // DOM offset measurement is sampled every twelfth rendered frame.
+ for(let i=0;i<11;i++){bridge.begin();bridge.end();}
  near(bridge.canvasOffsetX,0,"Overlay CSS x equals Phaser canvas CSS x");
  near(bridge.canvasOffsetY,0,"Overlay CSS y equals Phaser canvas CSS y");
  const root=app.stage.children[0];
