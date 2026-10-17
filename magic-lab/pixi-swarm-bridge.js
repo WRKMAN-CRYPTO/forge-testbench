@@ -191,7 +191,7 @@
     if(disposed){app.destroy(true);return false;}
     app.stop();
     world=new P.Container();detailsLayer=new P.Container();
-    shapeLayer=new P.Container();shapeGraphics=new P.Graphics();
+    shapeLayer=new P.Container();shapeLayer.blendMode="add";shapeGraphics=new P.Graphics();
     shapeLayer.addChild(shapeGraphics);
     app.stage.addChild(world);world.addChild(shapeLayer,detailsLayer);
     textureSet=ELEMENTS.map((_,e)=>[0,1,2].map(v=>makeTexture(win,P,e,v)));
