@@ -9,9 +9,8 @@
  if(root)root.WRKMAN_FIRE_STABILITY=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="085-stable-fire-masses";
- const DEFAULTS={maxSlots:3,fadeMs:180,minHoldMs:230,
-  challengerRatio:1.33,challengeMs:170,missingMs:450,
+ const VERSION="085-nonblocking-fire-masses";
+ const DEFAULTS={maxSlots:3,fadeMs:180,missingMs:450,
   heatHoldMs:110,heatFadeMs:190};
  const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
  function makeTracker(config={}){
@@ -84,56 +83,50 @@
    // Mark missed components but KEEP their last geometry for a short fade.
    for(const t of tracks.values())if(t.seenAt!==now)t.group=null;
    const current=[...tracks.values()].filter(t=>t.group);
-   const sizeSort=(a,b)=>b.count-a.count||a.castIndex-b.castIndex||a.id-b.id;
-   current.sort(sizeSort);
-   function occupied(){
-    return [...tracks.values()].filter(t=>t.selected);
-   }
-   // Reclaim slots only when the incumbent is fully faded. A departed
-   // mass cannot hand its visual slot to another mass in a single frame.
-   for(const t of occupied()){
-    if((!t.group||t.retiring)&&t.alpha<=.001){
-     t.selected=false;t.retiring=false;t.challengerId=0;
+   // A small occupancy bonus helps equal-size blobs keep their look, but
+   // no old mass can BLOCK a bigger newcomer. Expiring images live in a
+   // separate cheap fade queue, not in the THREE expensive field slots.
+   current.sort((a,b)=>{
+    const as=a.count*(a.selected?1.10:1);
+    const bs=b.count*(b.selected?1.10:1);
+    return bs-as||b.count-a.count||a.castIndex-b.castIndex||a.id-b.id;
+   });
+   const selected=new Set(current.slice(0,cfg.maxSlots).map(t=>t.id));
+   const lastSelected=[...tracks.values()].filter(t=>t.selected);
+   const incoming=current.slice(0,cfg.maxSlots).filter(t=>!t.selected).length;
+   if(lastSelected.length===cfg.maxSlots)swaps+=incoming;
+   for(const t of tracks.values()){
+    const chosen=selected.has(t.id);
+    if(chosen){
+     // An entirely new eligible mass should not spend 180ms invisible.
+     // Smoothing is for departures and heat thresholds, not starving
+     // the arrival of visible mass.
+     if(!t.selected)t.alpha=Math.max(t.alpha,.82);
+     t.selected=true;t.retiring=false;
+     t.selectedAt=now;
+     t.alpha=clamp(t.alpha+dt/Math.max(60,cfg.fadeMs*.45),0,1);
+    }else{
+     if(t.selected)t.retiring=true;
+     t.selected=false;
+     t.alpha=clamp(t.alpha-dt/cfg.fadeMs,0,1);
+     if(t.alpha<=.001)t.retiring=false;
     }
    }
-   let held=occupied();
-   for(const t of current){
-    if(held.length>=cfg.maxSlots)break;
-    if(t.selected||t.retiring)continue;
-    t.selected=true;t.retiring=false;t.selectedAt=now;
-    held.push(t);
-   }
-   // A challenger must be substantially larger for a sustained interval.
-   // First fade the old mass; do not exceed maxSlots during replacement.
-   const challengers=current.filter(t=>!t.selected&&!t.retiring);
-   const challenger=challengers[0];
-   if(challenger&&held.length>=cfg.maxSlots){
-    const incumbent=held.filter(t=>t.group&&!t.retiring)
-     .sort((a,b)=>a.count-b.count||a.id-b.id)[0];
-    if(incumbent&&now-incumbent.selectedAt>=cfg.minHoldMs&&
-       challenger.count>=incumbent.count*cfg.challengerRatio){
-     if(incumbent.challengerId!==challenger.id){
-      incumbent.challengerId=challenger.id;incumbent.challengeAt=now;
-     }else if(now-incumbent.challengeAt>=cfg.challengeMs){
-      incumbent.retiring=true;swaps++;
-     }
-    }else if(incumbent){incumbent.challengerId=0;}
-   }else for(const t of held)t.challengerId=0;
-   for(const t of tracks.values()){
-    const target=t.selected&&t.group&&!t.retiring?1:0;
-    const delta=dt/cfg.fadeMs;
-    t.alpha=clamp(t.alpha+(target?delta:-delta),0,1);
-   }
-   // Clean abandoned tracking history, even for no-longer-visible casts.
+   const active=current.filter(t=>t.selected);
+   // No field work for fading afterimages. Bound cached ghosts separately
+   // to three cheap graphics draws; they never occupy a field-sampling slot.
+   const ghosts=[...tracks.values()].filter(t=>!t.selected&&t.retiring&&
+      t.alpha>.001&&t.cache).sort((a,b)=>b.alpha-a.alpha).slice(0,cfg.maxSlots);
    for(const [id,t] of tracks){
-    if(!t.selected&&now-t.seenAt>cfg.missingMs)tracks.delete(id);
+    if(!t.selected&&!t.retiring&&now-t.seenAt>cfg.missingMs)
+     tracks.delete(id);
    }
-   held=occupied().sort((a,b)=>a.selectedAt-b.selectedAt||a.id-b.id);
-   return {now,dt,slots:held.map(t=>({id:t.id,group:t.group,
-     castIndex:t.castIndex,count:t.count,opacity:t.alpha,
-     retiring:t.retiring,ghost:!t.group})),
-    groups:current.length,selected:held.length,ghosts:held.filter(t=>!t.group).length,
-    fading:held.filter(t=>t.retiring||!t.group||t.alpha<.999).length,
+   const visible=active.concat(ghosts);
+   return {now,dt,slots:visible.map(t=>({id:t.id,
+     group:t.selected?t.group:null,castIndex:t.castIndex,count:t.count,
+     opacity:t.alpha,retiring:t.retiring,ghost:!t.selected})),
+    groups:current.length,selected:active.length,ghosts:ghosts.length,
+    fading:visible.filter(t=>t.retiring||t.alpha<.999).length,
     swaps,tracked:tracks.size};
   }
   function apply(result,selection){
