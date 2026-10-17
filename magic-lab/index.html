@@ -807,6 +807,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <button class="minibtn" id="copy" type="button">COPY BUILD</button>
     <button class="minibtn" id="reset" type="button">RESET ARENA</button>
     <button class="minibtn" id="pixiRendererMode" type="button" title="Switch crafted swarm visuals without changing physics or saves">RENDER: PHASER</button>
+    <button class="minibtn" id="pixiLookMode" type="button" title="Cycle between original particle opacity, restored brightness, and geometry-aware formation glow">VFX: FORMATION</button>
    </div>
    <div class="craftPanel" role="group" aria-label="Crafted spell linking">
     <div class="menuCaption">CRAFTED FIELD / SPELL LINK</div>
@@ -985,7 +986,8 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./element-material-registry.js?v=069"></script>
 <script src="./element-vfx.js?v=069"></script>
 <script src="./crafted-magic.js?v=080p"></script>
-<script src="./pixi-swarm-bridge.js?v=080p"></script>
+<script src="./pixi-formation.js?v=081"></script>
+<script src="./pixi-swarm-bridge.js?v=081"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1189,9 +1191,12 @@ class Lab extends Phaser.Scene{
   try{
    this.pixiSpellRenderer=PixiSwarm?PixiSwarm.createBridge(this,{
     width:W,height:H,stage:$("stage"),
-    status:message=>{const b=$("pixiRendererMode");if(b)b.textContent=message;}
+    look:new URLSearchParams(window.location.search).get("vfx")||"formation",
+    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE"))return;
+     const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
    if(this.pixiSpellRenderer){
+    $("pixiLookMode").textContent="VFX: "+this.pixiSpellRenderer.look.toUpperCase();
     this.events.once("shutdown",()=>this.pixiSpellRenderer?.destroy());
     if(PixiSwarm.wantPixi(window.location.search)){
      this.pixiSpellRenderer.enable().catch(error=>console.warn("Pixi visuals not available",error));
@@ -2862,6 +2867,14 @@ $("pixiRendererMode").addEventListener("click",()=>{
   $("pixiRendererMode").textContent="PIXI8 · LOADING";
   adapter.enable().catch(e=>console.warn("Pixi swap failed",e));
  }
+});
+// Original → Bright → Formation A/B; presentation only. No recipe state saved.
+$("pixiLookMode").addEventListener("click",()=>{
+ const adapter=scene?.pixiSpellRenderer;
+ if(!adapter){$("pixiLookMode").textContent="VFX: UNAVAILABLE";return;}
+ const styles=["original","bright","formation"];
+ const next=styles[(styles.indexOf(adapter.look)+1)%styles.length];
+ $("pixiLookMode").textContent="VFX: "+adapter.setLook(next).toUpperCase();
 });
 // Capture canvas touches directly so Phaser's pointer management cannot
 // eat the second thumb while the first is held on the external joystick.
