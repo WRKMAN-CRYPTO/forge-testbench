@@ -44,7 +44,9 @@
  ];
  function makeTexture(win,P,kind,variant){
   const canvas=win.document.createElement("canvas");canvas.width=canvas.height=128;
-  const g=canvas.getContext("2d"),[r,v,b]=ELEMENTS[kind].rgb;
+  // White luminance texture can be tinted to the *authored* recipe RGB.
+  // A preset-color texture multiplied by the recipe tint would darken custom spells.
+  const g=canvas.getContext("2d"),[r,v,b]=[255,255,255];
   const glow=g.createRadialGradient(64,64,1,64,64,59);
   glow.addColorStop(0,"rgba("+r+","+v+","+b+",.95)");
   glow.addColorStop(.16,"rgba("+r+","+v+","+b+",.60)");
@@ -53,7 +55,7 @@
   g.fillStyle=glow;g.fillRect(0,0,128,128);
   g.save();g.translate(64,64);
   g.shadowColor="rgb("+r+","+v+","+b+")";g.shadowBlur=13;
-  g.fillStyle=kind===1?"#fff2b5":kind===3?"#e7ffff":kind===4?"#f5ffff":"#e5eeff";
+  g.fillStyle="#ffffff";
   if(variant===0){
    if(kind===1){g.beginPath();g.moveTo(0,-27);g.bezierCurveTo(16,-5,10,4,8,17);g.quadraticCurveTo(-2,26,-12,8);g.quadraticCurveTo(-10,-3,0,-27);g.fill();}
    else if(kind===3){g.beginPath();g.moveTo(0,-27);g.lineTo(8,-6);g.lineTo(0,28);g.lineTo(-9,-7);g.closePath();g.fill();}
@@ -63,7 +65,7 @@
    g.rotate(.6);g.beginPath();g.ellipse(0,0,kind===3?4:3,kind===1?22:26,0,0,Math.PI*2);g.fill();
   }else{
    g.beginPath();g.arc(0,0,kind===3?6:3.7,0,Math.PI*2);g.fill();
-   if(kind===3){g.strokeStyle="#d9ffff";g.lineWidth=1.3;g.beginPath();g.moveTo(-12,0);g.lineTo(12,0);g.moveTo(0,-12);g.lineTo(0,12);g.stroke();}
+   if(kind===3){g.strokeStyle="#ffffff";g.lineWidth=1.3;g.beginPath();g.moveTo(-12,0);g.lineTo(12,0);g.moveTo(0,-12);g.lineTo(0,12);g.stroke();}
   }
   g.restore();
   return P.Texture.from(canvas);
@@ -187,6 +189,7 @@
      const radius=clamp(Number(r.r),.6,80);
      const size=radius*(hero?6.0:4.3);
      const alpha=clamp(r.alpha??.65)*(hero?.86:.62);
+     const visualTint=typeof r.color==="number"&&Number.isFinite(r.color)?(r.color&0xffffff):0xffffff;
      if(hero){
       const sprite=allocateHero();
       sprite.texture=textureSet[elem][variant];
@@ -195,14 +198,14 @@
       sprite.width=size;sprite.height=size*1.55;
       sprite.alpha=alpha;sprite.visible=true;
       // Texture contains its own elemental glow, with bright hero accents.
-      sprite.tint=typeof r.color==="number"?r.color:0xffffff;
+      sprite.tint=visualTint;
       detailed++;
      }else{
       const particle=takeParticle(elem,variant);
       particle.x=r.x;particle.y=r.y;particle.rotation=r.angle||0;
       particle.scaleX=size/128;particle.scaleY=size*1.5/128;
       particle.alpha=alpha;
-      if(typeof r.color==="number")particle.tint=r.color;
+      particle.tint=visualTint;
       bulk++;
      }
     }
