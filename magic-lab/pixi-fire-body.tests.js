@@ -102,7 +102,7 @@ const scene={player:{x:1,y:2},combat:{hp:100},
  cameras:{main:{getWorldPoint(x,y){return{x,y};}}}};
 (async()=>{
  const bridge=Bridge.createBridge(scene,
-  {window:win,stage,width:960,height:600,fireBody:true,fireShell:true,
+  {window:win,stage,width:960,height:600,fireBody:true,fireShell:true,fireHot:false,
    look:"bright",art:"soft"});
  ok(await bridge.enable(),"Pixi scene still initializes");
  function frame(records=cone){
