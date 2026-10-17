@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="080-pixi8-stage1",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="081-pixi8-formations",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -76,11 +76,57 @@
   const W=Number(opts.width)||960,H=Number(opts.height)||600;
   const stage=opts.stage||win.document.getElementById("stage");
   if(!stage)throw Error("Wandrune stage not found");
-  const state={active:false,ready:false,loading:false,error:null,records:[],drawn:0,details:0,bulk:0,frame:0};
-  let P=null,app=null,world=null,detailsLayer=null,textureSet=[],bulkGroups=[],spritePool=[],disposed=false,heroUsed=0;
+  const FORMATION=win.WRKMAN_PIXI_FORMATIONS||null;
+  const allowedLooks=["original","bright","formation"];
+  const requested=allowedLooks.includes(opts.look)?opts.look:"formation";
+  const initialLook=requested==="formation"&&!FORMATION?.analyze?"bright":requested;
+  const state={active:false,ready:false,loading:false,error:null,records:[],drawn:0,
+   details:0,bulk:0,frame:0,look:initialLook,formations:0,formationSegments:0};
+  let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,textureSet=[],bulkGroups=[],spritePool=[],disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
    if(typeof opts.status==="function")try{opts.status(msg);}catch(_){}
+  }
+  function setLook(next){
+   if(!allowedLooks.includes(next))return state.look;
+   if(next==="formation"&&!FORMATION?.analyze){
+    announce("FORMATION UNAVAILABLE · BRIGHT ONLY");
+    next="bright";
+   }
+   state.look=next;
+   if(next!=="formation"){shapeGraphics?.clear();state.formations=0;state.formationSegments=0;}
+   announce("PIXI LOOK · "+next.toUpperCase());
+   return state.look;
+  }
+  function drawQuad(g,a,b,nx,ny,scale,color,alpha){
+   const aw=a.width*scale,bw=b.width*scale;
+   g.moveTo(a.x+nx*aw,a.y+ny*aw)
+    .lineTo(b.x+nx*bw,b.y+ny*bw)
+    .lineTo(b.x-nx*bw,b.y-ny*bw)
+    .lineTo(a.x-nx*aw,a.y-ny*aw)
+    .closePath().fill({color,alpha});
+  }
+  function paintFormations(){
+   if(!shapeGraphics)return;
+   shapeGraphics.clear();
+   state.formations=0;state.formationSegments=0;
+   if(state.look!=="formation"||!FORMATION?.analyze)return;
+   const inferred=FORMATION.analyze(state.records,{maxFormations:10});
+   for(const f of inferred){
+    state.formations++;
+    state.formationSegments+=f.segments.length;
+    const nx=-f.axis.y,ny=f.axis.x,color=f.color;
+    const r=(color>>>16)&255,gr=(color>>>8)&255,blue=color&255;
+    const hot=(Math.round(r+(255-r)*.58)<<16)|
+     (Math.round(gr+(255-gr)*.58)<<8)|Math.round(blue+(255-blue)*.58);
+    for(const segment of f.segments){
+     // Three independent light bands, behind the individual particles.
+     // Per-bin width is inferred from local occupied space.
+     drawQuad(shapeGraphics,segment.a,segment.b,nx,ny,2.25,color,.035);
+     drawQuad(shapeGraphics,segment.a,segment.b,nx,ny,1.15,color,.085);
+     drawQuad(shapeGraphics,segment.a,segment.b,nx,ny,.47,hot,.12);
+    }
+   }
   }
   function getGroup(element,variant){
    const i=element*3+variant;
@@ -145,7 +191,9 @@
     if(disposed){app.destroy(true);return false;}
     app.stop();
     world=new P.Container();detailsLayer=new P.Container();
-    app.stage.addChild(world);world.addChild(detailsLayer);
+    shapeLayer=new P.Container();shapeGraphics=new P.Graphics();
+    shapeLayer.addChild(shapeGraphics);
+    app.stage.addChild(world);world.addChild(shapeLayer,detailsLayer);
     textureSet=ELEMENTS.map((_,e)=>[0,1,2].map(v=>makeTexture(win,P,e,v)));
     const cv=app.canvas;cv.classList.add("wandrune-pixi-canvas");
     Object.assign(cv.style,{position:"absolute",pointerEvents:"none",zIndex:"2",display:"block",maxWidth:"none",maxHeight:"none"});
@@ -163,6 +211,7 @@
   function disable(reason){
    state.active=false;state.records.length=0;
    if(app?.canvas)app.canvas.style.display="none";
+   shapeGraphics?.clear();state.formations=0;state.formationSegments=0;
    if(reason)state.error=String(reason);
    announce("PHASER SWARM · SAFE FALLBACK");
   }
@@ -188,7 +237,10 @@
      const variant=(Math.floor(index/3)+elem)%3;
      const radius=clamp(Number(r.r),.6,80);
      const size=radius*(hero?6.0:4.3);
-     const alpha=clamp(r.alpha??.65)*(hero?.86:.62);
+     // Original demonstrates the translucency problem for an honest A/B.
+     // Bright and Formation restore the opacity missing from lightweight embers.
+     const alpha=clamp(clamp(r.alpha??.65)*
+      (state.look==="original"?(hero?.86:.62):(hero?1.12:1.22)));
      const visualTint=typeof r.color==="number"&&Number.isFinite(r.color)?(r.color&0xffffff):0xffffff;
      if(hero){
       const sprite=allocateHero();
@@ -209,6 +261,9 @@
       bulk++;
      }
     }
+    // Never edits trajectory, collision, position or count: this is a
+    // purely visual geometric interpretation of already-computed records.
+    paintFormations();
     for(let i=heroUsed;i<spritePool.length;i++)spritePool[i].visible=false;
     for(const group of bulkGroups)if(group)for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
     align();app.render();
@@ -219,9 +274,9 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;bulkGroups=[];spritePool=[];state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;bulkGroups=[];spritePool=[];state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,createBridge});
 });
