@@ -166,9 +166,15 @@
   // One already-computed density grid supplies the hotter nested isovalues.
   // 2.7 requires meaningful local cooperation; 4.8 is intentionally rare.
   // No white-hot line is invented for a sparse pair or ordinary ember.
-  const hotBands=opts.hot?[
-   {level:2.7,kind:"hot",paths:trace(2.7)},
-   {level:4.8,kind:"peak",paths:trace(4.8)}
+  // Cheap maximum-density scan lets diffuse sprays skip unnecessary
+  // contour passes entirely; the full density field is already present.
+  let maxDensity=0;
+  if(opts.hot)for(let i=0;i<values.length;i++)
+   if(values[i]>maxDensity)maxDensity=values[i];
+  const canHeat=!!opts.hot&&agents.length>=4;
+  const hotBands=canHeat?[
+   {level:2.7,kind:"hot",paths:maxDensity>=2.7?trace(2.7):[]},
+   {level:4.8,kind:"peak",paths:maxDensity>=4.8?trace(4.8):[]}
   ]:[];
   return {count:agents.length,paths,bands,hotBands,samples:nx*ny,work,
    bounds:{minX,minY,maxX:minX+width,maxY:minY+height}};
@@ -183,7 +189,7 @@
    if(chosen.length>=maxGroups||statistics.samples+400>budget){statistics.skipped++;continue;}
    const remaining=budget-statistics.samples;
    const shell=buildOne(group,{maxSamples:Math.min(1100,remaining),
-    threshold:opts.threshold,body:!!opts.body,hot:!!opts.hot});
+    threshold:opts.threshold,body:!!opts.body,hot:!!opts.hot&&group.count>=4});
    if(!shell||!shell.paths.length)continue;
    if(statistics.samples+shell.samples>budget){statistics.skipped++;continue;}
    statistics.samples+=shell.samples;statistics.work+=shell.work;
