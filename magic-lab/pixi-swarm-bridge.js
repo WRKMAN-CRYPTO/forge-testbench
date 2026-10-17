@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="081-pixi8-formations",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="082-pixi8-trail-aligned",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -98,34 +98,37 @@
    announce("PIXI LOOK · "+next.toUpperCase());
    return state.look;
   }
-  function drawQuad(g,a,b,nx,ny,scale,color,alpha){
-   const aw=a.width*scale,bw=b.width*scale;
-   g.moveTo(a.x+nx*aw,a.y+ny*aw)
-    .lineTo(b.x+nx*bw,b.y+ny*bw)
-    .lineTo(b.x-nx*bw,b.y-ny*bw)
-    .lineTo(a.x-nx*aw,a.y-ny*aw)
-    .closePath().fill({color,alpha});
+  function tracePaths(g,paths,width,color,alpha){
+   // All vertices are the original Phaser-trail world positions.
+   // Explicit moveTo starts each separate trail; no cross-agent bridges.
+   for(const path of paths){
+    if(!path||path.length<2)continue;
+    g.moveTo(path[0].x,path[0].y);
+    for(let i=1;i<path.length;i++)g.lineTo(path[i].x,path[i].y);
+   }
+   g.stroke({width,color,alpha,cap:"round",join:"round"});
   }
   function paintFormations(){
    if(!shapeGraphics)return;
    shapeGraphics.clear();
    state.formations=0;state.formationSegments=0;
    if(state.look!=="formation"||!FORMATION?.analyze)return;
-   const inferred=FORMATION.analyze(state.records,{maxFormations:10});
+   const inferred=FORMATION.analyze(state.records,{maxFormations:10,maxPaths:64});
    for(const f of inferred){
+    // A coherent shape without history should stay unaugmented. Its history
+    // must arrive from the actual spell draw path, never a guessed centerline.
+    if(!f.paths?.length)continue;
     state.formations++;
-    state.formationSegments+=f.segments.length;
-    const nx=-f.axis.y,ny=f.axis.x,color=f.color;
+    state.formationSegments+=f.paths.reduce((n,path)=>n+Math.max(0,path.length-1),0);
+    const color=f.color;
     const r=(color>>>16)&255,gr=(color>>>8)&255,blue=color&255;
-    const hot=(Math.round(r+(255-r)*.58)<<16)|
-     (Math.round(gr+(255-gr)*.58)<<8)|Math.round(blue+(255-blue)*.58);
-    for(const segment of f.segments){
-     // Three independent light bands, behind the individual particles.
-     // Per-bin width is inferred from local occupied space.
-     drawQuad(shapeGraphics,segment.a,segment.b,nx,ny,2.25,color,.035);
-     drawQuad(shapeGraphics,segment.a,segment.b,nx,ny,1.15,color,.085);
-     drawQuad(shapeGraphics,segment.a,segment.b,nx,ny,.47,hot,.12);
-    }
+    const hot=(Math.round(r+(255-r)*.55)<<16)|
+     (Math.round(gr+(255-gr)*.55)<<8)|Math.round(blue+(255-blue)*.55);
+    // Wide ambient band + narrow luminous core, both anchored to the same
+    // historic line segments that the Phaser draw pass shows in orange.
+    const width=Math.min(15,Math.max(3,Number(f.meanRadius||3)*2));
+    tracePaths(shapeGraphics,f.paths,width,color,.06);
+    tracePaths(shapeGraphics,f.paths,Math.max(1.1,width*.35),hot,.12);
    }
   }
   function getGroup(element,variant){
