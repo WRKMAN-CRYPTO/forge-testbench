@@ -10,7 +10,7 @@
  if(root)root.WRKMAN_FIRE_PERIMETER=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="085-fire-perimeter-pass-b";
+ const VERSION="085-fire-cohesion-pass-c";
  // 512-point exponential falloff lookup for the visual-only density pass.
  // Indexing uses 128 steps per exponent unit, <0.4% local weight error.
  const GAUSS=new Float32Array(512);
@@ -22,7 +22,7 @@
  function buildOne(group,opts={}){
   const members=group?.members;
   if(!members||members.length<2)return null;
-  const threshold=clamp(Number(opts.threshold)||.52,.28,.95);
+  const threshold=clamp(Number.isFinite(opts.threshold)?opts.threshold:.52,.28,.95);
   const padding=38;
   const minX=group.minX-padding,minY=group.minY-padding;
   const width=(group.maxX-group.minX)+2*padding,height=(group.maxY-group.minY)+2*padding;
@@ -63,112 +63,127 @@
     }
    }
   }
-  // Each marching-square edge has one stable grid-edge ID. Contour
-  // assembly joins ONLY matching edge IDs, never distant agent heads.
-  const points=new Map(),segments=[];
-  function intersect(i,j,edge,v){
-   const key=nodeKey(i,j,edge);
-   if(points.has(key))return key;
-   const corner=[[i,j],[i+1,j],[i+1,j+1],[i,j+1]];
-   const a=edge,b=(edge+1)%4;
-   const va=v[a],vb=v[b];
-   const t=clamp((threshold-va)/(vb-va||1e-9),0,1);
-   const x=minX+(corner[a][0]+(corner[b][0]-corner[a][0])*t)*dx;
-   const y=minY+(corner[a][1]+(corner[b][1]-corner[a][1])*t)*dy;
-   points.set(key,{x,y});
-   return key;
-  }
-  for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){
-   const index=j*nx+i,v=[
-    values[index],values[index+1],values[index+nx+1],values[index+nx]];
-   const cuts=[];
-   for(let e=0;e<4;e++){
-    const next=(e+1)%4;
-    if((v[e]>=threshold)!==(v[next]>=threshold))
-     cuts.push(intersect(i,j,e,v));
+  // Reuse one density grid for outer contour and all nested plasma levels.
+  // This matters on iPhone: recomputing the Gaussian field twice costs
+  // substantially more than tracing a second isovalue over existing cells.
+  function trace(level){
+   const points=new Map(),segments=[];
+   function intersect(i,j,edge,v){
+    const key=nodeKey(i,j,edge);
+    if(points.has(key))return key;
+    const corner=[[i,j],[i+1,j],[i+1,j+1],[i,j+1]];
+    const a=edge,b=(edge+1)%4;
+    const va=v[a],vb=v[b],t=clamp((level-va)/(vb-va||1e-9),0,1);
+    points.set(key,{x:minX+(corner[a][0]+(corner[b][0]-corner[a][0])*t)*dx,
+     y:minY+(corner[a][1]+(corner[b][1]-corner[a][1])*t)*dy});
+    return key;
    }
-   if(cuts.length===2)segments.push([cuts[0],cuts[1]]);
-   else if(cuts.length===4){
-    // Ambiguous saddle: choose separation from the bilinear cell center.
-    // Either case gives two independent paths with no X-shaped crossings.
-    const center=(v[0]+v[1]+v[2]+v[3])/4;
-    if(center>=threshold){
-     segments.push([cuts[0],cuts[1]],[cuts[2],cuts[3]]);
-    }else{
-     segments.push([cuts[0],cuts[3]],[cuts[1],cuts[2]]);
+   for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){
+    const index=j*nx+i,v=[
+     values[index],values[index+1],values[index+nx+1],values[index+nx]];
+    const cuts=[];
+    for(let e=0;e<4;e++)if((v[e]>=level)!==(v[(e+1)%4]>=level))
+     cuts.push(intersect(i,j,e,v));
+    if(cuts.length===2)segments.push([cuts[0],cuts[1]]);
+    else if(cuts.length===4){
+     const center=(v[0]+v[1]+v[2]+v[3])/4;
+     if(center>=level)segments.push([cuts[0],cuts[1]],[cuts[2],cuts[3]]);
+     else segments.push([cuts[0],cuts[3]],[cuts[1],cuts[2]]);
     }
    }
-  }
-  if(!segments.length)return {count:agents.length,paths:[],samples:nx*ny,work};
-  const adjacent=new Map();
-  for(let i=0;i<segments.length;i++){
-   for(const key of segments[i]){
+   const adjacent=new Map();
+   for(let i=0;i<segments.length;i++)for(const key of segments[i]){
     if(!adjacent.has(key))adjacent.set(key,[]);
     adjacent.get(key).push(i);
    }
-  }
-  const used=new Uint8Array(segments.length),loops=[];
-  function walk(start){
-   let current=start,previous=-1;
-   const keys=[current],limit=segments.length+2;
-   for(let k=0;k<limit;k++){
-    const choices=adjacent.get(current)||[];
-    const next=choices.find(e=>!used[e]&&e!==previous);
-    if(next===undefined)break;
-    used[next]=1;
-    const pair=segments[next];
-    current=pair[0]===current?pair[1]:pair[0];
-    keys.push(current);previous=next;
-    if(current===start)break;
+   const used=new Uint8Array(segments.length),loops=[];
+   function walk(start){
+    let at=start,prev=-1;
+    const keys=[at];
+    for(let step=0;step<segments.length+2;step++){
+     const next=(adjacent.get(at)||[]).find(e=>!used[e]&&e!==prev);
+     if(next===undefined)break;
+     used[next]=1;at=segments[next][0]===at?segments[next][1]:segments[next][0];
+     keys.push(at);prev=next;
+     if(at===start)break;
+    }
+    return keys;
    }
-   return keys;
-  }
-  // Open contour fragments first; then the closed loops.
-  for(const [key,edges] of adjacent)if(edges.length===1&&edges.some(e=>!used[e])){
-   const p=walk(key);if(p.length>2)loops.push(p);
-  }
-  for(let i=0;i<segments.length;i++)if(!used[i]){
-   const p=walk(segments[i][0]);if(p.length>2)loops.push(p);
-  }
-  const result=[];
-  for(const keys of loops){
-   const closed=keys[0]===keys[keys.length-1];
-   let path=keys.map(key=>points.get(key)).filter(Boolean);
-   if(path.length<4)continue;
-   const stride=Math.max(1,Math.ceil(path.length/190));
-   if(stride>1)path=path.filter((_,i)=>i%stride===0);
-   if(closed&&path.length>=3){
-    const first=path[0],last=path[path.length-1];
-    if(first.x!==last.x||first.y!==last.y)path.push(first);
+   for(const [key,edges] of adjacent)if(edges.length===1&&edges.some(e=>!used[e])){
+    const p=walk(key);if(p.length>2)loops.push(p);
    }
-   let length=0;
-   for(let k=1;k<path.length;k++)
-    length+=Math.hypot(path[k].x-path[k-1].x,path[k].y-path[k-1].y);
-   if(length<10)continue;
-   result.push({points:path,closed,length});
+   for(let i=0;i<segments.length;i++)if(!used[i]){
+    const p=walk(segments[i][0]);if(p.length>2)loops.push(p);
+   }
+   const result=[];
+   for(const keys of loops){
+    const closed=keys[0]===keys[keys.length-1];
+    let path=keys.map(key=>points.get(key)).filter(Boolean);
+    if(path.length<4)continue;
+    const stride=Math.max(1,Math.ceil(path.length/190));
+    if(stride>1)path=path.filter((_,i)=>i%stride===0);
+    if(closed&&path.length>=3){
+     const first=path[0],last=path[path.length-1];
+     if(first.x!==last.x||first.y!==last.y)path.push(first);
+    }
+    let length=0,area=0;
+    for(let k=1;k<path.length;k++){
+     length+=Math.hypot(path[k].x-path[k-1].x,path[k].y-path[k-1].y);
+     area+=path[k-1].x*path[k].y-path[k].x*path[k-1].y;
+    }
+    if(length<10)continue;
+    result.push({points:path,closed,length,area:Math.abs(area/2),parent:-1,depth:0});
+   }
+   result.sort((a,b)=>b.area-a.area);
+   // Distinguish contour islands from holes by geometric nesting. A ring
+   // must remain a ring when its body is filled, not become an orange disc.
+   const inside=(q,poly)=>{
+    let yes=false;
+    for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+     const a=poly[i],b=poly[j];
+     if(((a.y>q.y)!==(b.y>q.y))&&
+        (q.x<(b.x-a.x)*(q.y-a.y)/(b.y-a.y)+a.x))yes=!yes;
+    }
+    return yes;
+   };
+   for(let i=0;i<result.length;i++){
+    const p=result[i];
+    if(!p.closed)continue;
+    for(let j=i-1;j>=0;j--){
+     const q=result[j];
+     if(q.closed&&inside(p.points[0],q.points)){
+      p.parent=j;p.depth=q.depth+1;break;
+     }
+    }
+   }
+   return result.slice(0,16);
   }
-  // Small islands and holes can be legitimate. Do not bridge them.
-  // Prefer long visible shells if a cluster is unusually fragmented.
-  result.sort((a,b)=>b.length-a.length);
-  return {count:agents.length,paths:result.slice(0,16),samples:nx*ny,work,
+  const paths=trace(threshold);
+  const bands=opts.body?[
+   {level:threshold,kind:"body",paths},
+   {level:1.6,kind:"dense",paths:trace(1.6)}
+  ]:[];
+  return {count:agents.length,paths,bands,samples:nx*ny,work,
    bounds:{minX,minY,maxX:minX+width,maxY:minY+height}};
  }
  function buildPerimeters(groups,opts={}){
   const maxGroups=clamp(Math.floor(opts.maxGroups??4),0,12);
   const budget=clamp(Math.floor(opts.sampleBudget??4500),0,24000);
   const chosen=[],statistics={groups:0,paths:0,vertices:0,samples:0,work:0,
-   skipped:0,budget,version:VERSION};
+   skipped:0,bodyPaths:0,budget,version:VERSION};
   for(const group of groups||[]){
    if(!group||group.count<2)continue;
    if(chosen.length>=maxGroups||statistics.samples+400>budget){statistics.skipped++;continue;}
    const remaining=budget-statistics.samples;
-   const shell=buildOne(group,{maxSamples:Math.min(1100,remaining),threshold:opts.threshold});
+   const shell=buildOne(group,{maxSamples:Math.min(1100,remaining),
+    threshold:opts.threshold,body:!!opts.body});
    if(!shell||!shell.paths.length)continue;
    if(statistics.samples+shell.samples>budget){statistics.skipped++;continue;}
    statistics.samples+=shell.samples;statistics.work+=shell.work;
    statistics.groups++;statistics.paths+=shell.paths.length;
    for(const path of shell.paths)statistics.vertices+=path.points.length;
-   chosen.push({castIndex:group.castIndex,count:group.count,paths:shell.paths});
+   for(const band of shell.bands)statistics.bodyPaths+=band.paths.length;
+   chosen.push({castIndex:group.castIndex,count:group.count,paths:shell.paths,bands:shell.bands});
   }
   return {...statistics,shells:chosen};
  }
