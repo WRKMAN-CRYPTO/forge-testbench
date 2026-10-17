@@ -808,6 +808,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <button class="minibtn" id="reset" type="button">RESET ARENA</button>
     <button class="minibtn" id="pixiRendererMode" type="button" title="Switch crafted swarm visuals without changing physics or saves">RENDER: PHASER</button>
     <button class="minibtn" id="pixiLookMode" type="button" title="Cycle between original particle opacity, restored brightness, and geometry-aware formation glow">VFX: FORMATION</button>
+    <button class="minibtn" id="pixiArtMode" type="button" title="Compare soft migration textures with authentic faceted Wandrune material artwork and sparse elemental accents">ART: FORGE</button>
    </div>
    <div class="craftPanel" role="group" aria-label="Crafted spell linking">
     <div class="menuCaption">CRAFTED FIELD / SPELL LINK</div>
@@ -989,7 +990,7 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./element-vfx.js?v=069"></script>
 <script src="./crafted-magic.js?v=082trail"></script>
 <script src="./pixi-formation.js?v=082trail"></script>
-<script src="./pixi-swarm-bridge.js?v=083camera"></script>
+<script src="./pixi-swarm-bridge.js?v=084style"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1199,6 +1200,7 @@ class Lab extends Phaser.Scene{
    this.pixiSpellRenderer=PixiSwarm?PixiSwarm.createBridge(this,{
     width:W,height:H,stage:$("stage"),alignDebug:this.pixiAlignDiagnostic,
     look:new URLSearchParams(window.location.search).get("vfx")||"formation",
+    art:new URLSearchParams(window.location.search).get("art")||"forge",
     status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE"))return;
      const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
@@ -1223,6 +1225,7 @@ class Lab extends Phaser.Scene{
     };
     this.events.on(Phaser.Scenes.Events.RENDER,renderPixiFrame);
     $("pixiLookMode").textContent="VFX: "+this.pixiSpellRenderer.look.toUpperCase();
+    $("pixiArtMode").textContent="ART: "+this.pixiSpellRenderer.art.toUpperCase();
     this.events.once("shutdown",()=>{
      this.events.off(Phaser.Scenes.Events.RENDER,renderPixiFrame);
      this.pixiSpellRenderer?.destroy();
@@ -1789,7 +1792,7 @@ class Lab extends Phaser.Scene{
     if((this.pixiStatusTick=(this.pixiStatusTick||0)+1)%12===0){
      const p=this.pixiSpellRenderer;
      $("pixiFlowStatus").textContent=p?.active?
-      (p.look.toUpperCase()+" · "+p.formations+" SHAPES / "+p.formationSegments+" LINKS"):"PHASER";
+      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS"):"PHASER";
     }
    }catch(vfxError){
     // Optional graphics must NEVER take the game or agent simulation down.
@@ -2919,6 +2922,15 @@ $("pixiLookMode").addEventListener("click",()=>{
  const styles=["original","bright","formation"];
  const next=styles[(styles.indexOf(adapter.look)+1)%styles.length];
  $("pixiLookMode").textContent="VFX: "+adapter.setLook(next).toUpperCase();
+});
+// Compare current soft sprites against the original Wandrune material atlas,
+ // and optionally the restrained added highlights. Visual-only settings.
+$("pixiArtMode").addEventListener("click",()=>{
+ const adapter=scene?.pixiSpellRenderer;
+ if(!adapter){$("pixiArtMode").textContent="ART: UNAVAILABLE";return;}
+ const choices=["soft","forge","forge-hot"];
+ const next=choices[(choices.indexOf(adapter.art)+1)%choices.length];
+ $("pixiArtMode").textContent="ART: "+adapter.setArt(next).toUpperCase();
 });
 // Capture canvas touches directly so Phaser's pointer management cannot
 // eat the second thumb while the first is held on the external joystick.
