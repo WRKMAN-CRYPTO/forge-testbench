@@ -1,0 +1,105 @@
+/* WANDRUNE 085 / COHESION STABILITY REGRESSION
+ * node magic-lab/pixi-fire-stability.tests.js
+ * Deterministic clocks; no browser, network or physics.
+ */
+"use strict";
+const assert=require("node:assert/strict");
+const Stability=require("./pixi-fire-stability.js");
+const Clusters=require("./pixi-fire-clusters.js");
+const Perimeter=require("./pixi-fire-perimeter.js");
+let assertions=0;
+const ok=(v,m)=>{assert.ok(v,m);assertions++;};
+const eq=(a,b,m)=>{assert.equal(a,b,m);assertions++;};
+function mass(label,count,castIndex=0){
+ const x=label*95;
+ return {castIndex,count,x,y:155,minX:x-12,maxX:x+12,minY:140,maxY:170,
+  members:Array.from({length:count},(_,i)=>({agentIndex:label*1000+i,x:x+(i%5),y:150+(i%3),r:3,alpha:.85}))};
+}
+function rankRivals(t){
+ return [mass(1,70),mass(2,60),mass(3,50),mass(4,(Math.round(t/20)%2)?53:48)];
+}
+const track=Stability.makeTracker();
+let initial=null;
+for(let t=0;t<=900;t+=20){
+ const state=track.step(rankRivals(t),t);
+ if(!initial)initial=state.slots.map(x=>x.id);
+ eq(state.slots.length,3,"three enhanced slots maximum");
+ eq(state.swaps,0,"small cluster size oscillations never trigger visual replacement");
+ eq(state.slots.map(x=>x.id).join(","),initial.join(","),
+  "same three blob IDs remain visually selected");
+}
+ok(initial.length===3,"initial slots filled");
+const preempt=Stability.makeTracker();
+let first=preempt.step([mass(1,70),mass(2,60),mass(3,50),mass(4,20)],0);
+const selectedBefore=first.slots.map(x=>x.id);
+let sawRetiring=false,passed=false;
+for(let t=20;t<=1200;t+=20){
+ const next=preempt.step([mass(1,70),mass(2,60),mass(3,50),mass(4,84)],t);
+ ok(next.slots.length<=3,"challenger NEVER causes fourth simultaneous enhanced mass");
+ if(next.slots.some(x=>x.retiring))sawRetiring=true;
+ if(next.slots.some(x=>x.id!==selectedBefore[0]&&x.id!==selectedBefore[1]&&x.id!==selectedBefore[2]))passed=true;
+}
+ok(sawRetiring,"much larger challenger triggers delayed fade-out");
+ok(passed,"sustained larger challenger eventually gains a freed slot");
+eq(preempt.diagnostics().swaps,1,"replacement occurs once, not repeated thrashing");
+const vanished=Stability.makeTracker();
+let before=null;
+for(let t=0;t<=200;t+=20)before=vanished.step([mass(1,80)],t);
+const priorAlpha=before.slots[0].opacity;
+let falling=[];
+for(let t=220;t<=480;t+=20){
+ const state=vanished.step([],t);
+ ok(state.slots.length<=1,"vanished blob uses only its old slot while fading");
+ if(state.slots.length)falling.push(state.slots[0].opacity);
+}
+ok(priorAlpha>.9,"mass becomes fully visible before disappearing");
+ok(falling.length>=4,"old mass survives multiple fade frames");
+ok(falling[0]<priorAlpha&&falling[1]<falling[0],"disappearance fades, not snaps");
+eq(vanished.step([],500).slots.length,0,"vanished mass eventually releases its slot");
+const casts=Stability.makeTracker();
+const clA=mass(1,30,1),clB={...mass(1,30,2),x:clA.x,y:clA.y};
+const stateA=casts.step([clA,clB],0);
+eq(stateA.slots.length,2,"two casts can overlap visually without merging");
+const idPairs=stateA.slots.map(s=>({cast:s.castIndex,id:s.id}));
+const stateB=casts.step([clB,clA],20);
+for(const p of idPairs)ok(stateB.slots.some(s=>s.castIndex===p.cast&&s.id===p.id),
+ "cross-cast tracking preserves each independent visual identity");
+const heat=Stability.makeTracker({heatHoldMs:110,heatFadeMs:180});
+function source(trackId,hasHot){
+ const contour={points:[{x:1,y:1},{x:10,y:1},{x:8,y:8},{x:1,y:1}],
+  closed:true,depth:0,parent:-1,area:25};
+ return {trackId,count:100,castIndex:0,paths:[contour],bands:[],
+  hotBands:hasHot?[{kind:"hot",paths:[contour]},{kind:"peak",paths:[]}]:[]};
+}
+let hotId,holdAlpha=0,quietAlpha=0;
+for(let t=0;t<=200;t+=20){
+ const s=heat.step([mass(1,100)],t);
+ hotId=s.slots[0].id;
+ const res=heat.apply({shells:[source(hotId,true)]},s);
+ ok(res.shells.length===1,"stable visible shell exists");
+}
+let sticky=heat.step([mass(1,100)],220);
+let held=heat.apply({shells:[source(hotId,false)]},sticky);
+ok(held.heldHot>=1,"hot contour memory survives one below-threshold frame");
+holdAlpha=held.shells[0].hotBands[0].opacity;
+for(let t=240;t<=480;t+=20){
+ const s=heat.step([mass(1,100)],t);
+ held=heat.apply({shells:[source(hotId,false)]},s);
+ if(t===440)quietAlpha=held.shells[0].hotBands[0]?.opacity||0;
+}
+ok(holdAlpha>.5,"a brief dip preserves substantial hot opacity");
+ok(quietAlpha<holdAlpha,"sustained absence fades the hot contour");
+ok(held.shells[0].hotBands.length===0,"old hot contour eventually disappears");
+const dynamic=Stability.makeTracker();
+const intact=mass(5,150);
+const original=JSON.stringify(intact);
+const ss=dynamic.step([intact],0);
+const dummy=source(ss.slots[0].id,true);
+dynamic.apply({shells:[dummy]},ss);
+eq(JSON.stringify(intact),original,"persistent visual memory never edits agent records");
+const old=Perimeter.buildPerimeters(Clusters.findClusters([
+ {x:100,y:100,r:3,alpha:.9,element:1,agentIndex:0,castIndex:0},
+ {x:112,y:100,r:3,alpha:.9,element:1,agentIndex:1,castIndex:0}
+]).groups,{body:true,hot:true});
+eq(old.groups,1,"original fire detector and field solver remain operational");
+console.log("Fire 085 stability: "+assertions+" assertions passed.");
