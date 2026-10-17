@@ -892,7 +892,7 @@ if(window.WRKMAN_WANDRUNE_ART){
    <button type="button" id="skinKeeper" class="skinKeeperBtn" aria-pressed="false">☆ KEEPER</button>
   </div>
   <div class="skinGrid" id="skinGrid" aria-label="Twenty numbered wizard designs"></div>
-  <div class="skinFoot"><span id="skinCount">0 KEEPERS</span><span>Saved on this device</span></div>
+  <div class="skinFoot"><span id="skinCount">0 KEEPERS</span><span id="skinAssetState">Skin artwork loading…</span><span>Saved on this device</span></div>
  </div>
 </div>
 <!-- 034: Crafted spells read the same 32x32 recipes as the standalone field lab. -->
@@ -1000,6 +1000,7 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./spell-forge.js?v=079"></script>
 <script src="./music.js?v=054"></script>
 <script src="./title-screen.js?v=055"></script>
+<script src="./skins/wizard-skin-backup-085.js?v=085fix"></script>
 <script>
 (()=>{
 "use strict";
@@ -1049,7 +1050,9 @@ const skinKey="wrkman-arcane-lab010-skin";
 const SKIN_COUNT=20,SKIN_W=56,SKIN_H=68;
 // Rendering assets never block the Matter world, input, or enemies.
 let activeAtlasKey="wizardSkins013",activeMaskKey="wizardHueMasks013";
-let activeAtlasURL="./skins/wizard-skins-20-013.webp?v=013";
+// Use a bundled copy of the ORIGINAL image assets, not a replacement skin.
+const skinBackup=window.WRKMAN_WIZARD_SKIN_BACKUP||null;
+let activeAtlasURL=skinBackup?.atlas||"./skins/wizard-skins-20-013.webp?v=013";
 let skinArtReady=false;
 const storedSkin=Number(gameStorage.getItem(skinKey+"-selected"));
 let activeSkin=Number.isInteger(storedSkin)&&storedSkin>=1&&storedSkin<=20?storedSkin:1;
@@ -1283,56 +1286,67 @@ class Lab extends Phaser.Scene{
   }
  }
  loadCosmetics(){
-  const startLoad=(atlasKey,maskKey,atlasURL,maskURL,fallback)=>{
-   const finish=()=>{
-    if(this.textures.exists(atlasKey)){
-     activeAtlasKey=atlasKey;
-     activeAtlasURL=atlasURL;
-     activeMaskKey=maskKey;
-     skinArtReady=true;
-     if(this.playerSkinSprite)this.playerSkinSprite.destroy();
-     this.playerSkinSprite=this.add.sprite(this.player.x,this.player.y-12,activeAtlasKey,activeSkin-1)
-       .setScale(1.16).setDepth(6);
-     this.setSkin(activeSkin);
-     refreshSkinUI();
-     refreshHueUI();
-     if(!this.textures.exists(maskKey)){
-      // A missing new dye mask shouldn't close the Hue Forge either.
-      // Last working mask is usable with the art, although 03's new face
-      // will have its older trim coverage until the 013 mask is available.
-      this.load.once("complete",()=>{
-       if(this.textures.exists("wizardHueMasks012")){
-        activeMaskKey="wizardHueMasks012";
-        this.setSkin(activeSkin);
-        refreshSkinUI();refreshHueUI();
-        announce("LAB ONLINE • Using previous dye masks. New 03 mask may need a reload.");
-       }else{
-        announce("LAB ONLINE • Dye assets unavailable; fighting and movement are unaffected.");
-       }
-      });
-      this.load.image("wizardHueMasks012","./skins/wizard-hue-masks-012.png?v=012");
-      this.load.start();
-     }
-     return;
-    }
-    if(fallback){
-     // Previously working atlas, still optional. No failed image can stall play.
-     startLoad("wizardSkins012","wizardHueMasks012",
-      "./skins/wizard-skins-20.webp?v=010",
-      "./skins/wizard-hue-masks-012.png?v=012",false);
-    }else{
-     announce("LAB ONLINE • Character art unavailable; using classic wizard.");
+  // Phaser's classic vector fallback is only a safety net, not the desired
+  // default. Do not change selected-skin or Hue Forge storage.
+  const status=$("skinAssetState");
+  const candidates=[];
+  if(skinBackup?.atlas){
+   candidates.push({key:"wizardSkins085Local",maskKey:"wizardHueMasks085Local",
+    atlas:skinBackup.atlas,mask:skinBackup.mask,label:"BUNDLED ORIGINAL"});
+  }
+  candidates.push({key:"wizardSkins013",maskKey:"wizardHueMasks013",
+   atlas:"./skins/wizard-skins-20-013.webp?v=013",
+   mask:"./skins/wizard-hue-masks-013.png?v=013",label:"WEBP 013"});
+  candidates.push({key:"wizardSkins012",maskKey:"wizardHueMasks012",
+   atlas:"./skins/wizard-skins-20.webp?v=010",
+   mask:"./skins/wizard-hue-masks-012.png?v=012",label:"LEGACY ATLAS"});
+  const announceSkin=message=>{if(status)status.textContent=message;};
+  let attempts=0;
+  const start=()=>{
+   if(!this.sys.isActive())return;
+   const item=candidates.shift();
+   if(!item){
+    announceSkin("⚠ ART NOT LOADED · TAP SKINS TO RETRY");
+    announce("LAB ONLINE • Character atlas unavailable; retry from wardrobe.");
+    return;
+   }
+   attempts++;
+   announceSkin("Loading "+item.label+" ("+attempts+")…");
+   if(this.textures.exists(item.key)){finish(item);return;}
+   let settled=false;
+   const cleanup=()=>{this.load.off("loaderror",error);};
+   const finishAttempt=()=>{
+    if(settled)return;settled=true;cleanup();
+    if(this.textures.exists(item.key))finish(item);
+    else start();
+   };
+   const error=file=>{
+    if(file?.key===item.key){
+     announceSkin(item.label+" failed, trying backup…");
     }
    };
-   if(this.textures.exists(atlasKey)){finish();return;}
-   this.load.once("complete",finish);
-   this.load.spritesheet(atlasKey,atlasURL,{frameWidth:SKIN_W,frameHeight:SKIN_H});
-   this.load.image(maskKey,maskURL);
-   this.load.start();
+   this.load.on("loaderror",error);
+   this.load.once("complete",finishAttempt);
+   this.load.spritesheet(item.key,item.atlas,{frameWidth:SKIN_W,frameHeight:SKIN_H});
+   if(item.mask)this.load.image(item.maskKey,item.mask);
+   if(!this.load.isLoading())this.load.start();
   };
-  startLoad("wizardSkins013","wizardHueMasks013",
-   "./skins/wizard-skins-20-013.webp?v=013",
-   "./skins/wizard-hue-masks-013.png?v=013",true);
+  const finish=item=>{
+   activeAtlasKey=item.key;
+   activeAtlasURL=item.atlas;
+   activeMaskKey=item.maskKey;
+   skinArtReady=true;
+   if(this.playerSkinSprite)this.playerSkinSprite.destroy();
+   this.playerSkinSprite=this.add.sprite(this.player.x,this.player.y-12,activeAtlasKey,activeSkin-1)
+    .setScale(1.16).setDepth(6);
+   this.setSkin(activeSkin);
+   announceSkin("✓ "+item.label+" · SKIN "+skinLabel(activeSkin));
+   refreshSkinUI();
+   refreshHueUI();
+   if(!this.textures.exists(activeMaskKey))
+    announceSkin("✓ WIZARD RESTORED · DYE MASK UNAVAILABLE");
+  };
+  start();
  }
  setSkin(id){
   if(!this.playerSkinSprite||!skinArtReady)return;
@@ -2642,6 +2656,11 @@ function toggleSkinKeeper(n){
 }
 function openSkinOverlay(){
  skinOverlay.hidden=false;
+ // The playable game should not silently remain on the vector fallback.
+ // Retrying is safe and does not touch selected skin, dyes or spell saves.
+ if(!skinArtReady&&scene&&!scene.load.isLoading()){
+  try{scene.loadCosmetics();}catch(_){}
+ }
  // Browsing skins must not let enemies attack the player unseen.
  scene?.scene.pause();
  neutralStick();
