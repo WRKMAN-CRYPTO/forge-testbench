@@ -78,7 +78,9 @@ export class LiveNoteConductor {
    // One stalled network request must never flush a rapid pile of
    // historical drum hits into the speakers.
    if(when < now+0.035){this.late++;continue;}
-   if(when > now+4){this.invalid++;continue;}
+   // Complete vocal phrases may schedule a later note more than four
+   // seconds ahead when the network jitter cushion is included.
+   if(when > now+6){this.invalid++;continue;}
    play(event,when);
    this.scheduled++;
    played++;
