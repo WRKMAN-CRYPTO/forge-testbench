@@ -13,6 +13,10 @@ export class VoiceJournal {
     this.experiments=number(saved?.experiments);
     this.responses=number(saved?.responses);
     this.motifRepeats=number(saved?.motifRepeats);
+    this.heldNotes=number(saved?.heldNotes);
+    this.longestNoteSeconds=Number.isFinite(saved?.longestNoteSeconds)?
+      Math.max(0,Math.min(10,saved.longestNoteSeconds)):0;
+    this.firstHeldNote=saved?.firstHeldNote||null;
     this.sharedPhrases=number(saved?.sharedPhrases);
     this.firstSharedPhrase=saved?.firstSharedPhrase||null;
     this.partnerReplies={Pip:number(saved?.partnerReplies?.Pip),Riff:number(saved?.partnerReplies?.Riff)};
@@ -37,6 +41,19 @@ export class VoiceJournal {
     const pitches=Array.isArray(event?.pitches)?event.pitches.filter(n=>Number.isFinite(n)&&n>0).slice(0,8):[];
     if(!pitches.length)return;
     const vowel=vowels.has(event.vowel)?event.vowel:'m';
+    const durations=Array.isArray(event?.durations)?
+      pitches.map((_,i)=>Number.isFinite(event.durations[i])?
+        Math.max(0,Math.min(10,event.durations[i])):0):pitches.map(()=>0);
+    for(let i=0;i<durations.length;i++){
+      const duration=durations[i];
+      if(duration>this.longestNoteSeconds)this.longestNoteSeconds=duration;
+      if(duration>=.95){
+        this.heldNotes++;
+        if(!this.firstHeldNote)this.firstHeldNote={
+          bar,pitch:pitches[i],seconds:Math.round(duration*100)/100
+        };
+      }
+    }
     const kind=event.kind==='motif'?'motif':event.kind==='phrase'?'phrase':'hum';
     const response=event.response==='Riff'||event.response==='Pip'?event.response:null;
     const repeated=!!event.repeated;
@@ -52,7 +69,7 @@ export class VoiceJournal {
     }
     if(repeated)this.motifRepeats++;
     this.learnedVowels[vowel]=(this.learnedVowels[vowel]||0)+pitches.length;
-    const item={bar,vowel,kind,response,repeated,ensemble:!!event.ensemble,pitches:pitches.map(n=>Math.round(n*10)/10)};
+    const item={bar,vowel,kind,response,repeated,ensemble:!!event.ensemble,pitches:pitches.map(n=>Math.round(n*10)/10),durations:durations.map(n=>Math.round(n*100)/100)};
     if(vowel!=='m'&&!this.firstVowel)this.firstVowel={bar,vowel,pitch:item.pitches[0]};
     if(pitches.length>1&&!this.firstPhrase)this.firstPhrase={bar,pitches:[...item.pitches]};
     if(kind==='motif'&&!this.firstMotif)this.firstMotif={bar,pitches:[...item.pitches]};
@@ -74,7 +91,9 @@ export class VoiceJournal {
   }
   snapshot(){return {
     attempts:this.attempts,notes:this.notes,phrases:this.phrases,experiments:this.experiments,
-    responses:this.responses,motifRepeats:this.motifRepeats,sharedPhrases:this.sharedPhrases,
+    responses:this.responses,motifRepeats:this.motifRepeats,heldNotes:this.heldNotes,
+    longestNoteSeconds:this.longestNoteSeconds,firstHeldNote:this.firstHeldNote?{...this.firstHeldNote}:null,
+    sharedPhrases:this.sharedPhrases,
     firstSharedPhrase:this.firstSharedPhrase?{...this.firstSharedPhrase}:null,
     partnerReplies:{...this.partnerReplies},
     firstPartnerReply:Object.fromEntries(['Pip','Riff'].map(n=>[n,this.firstPartnerReply[n]?{...this.firstPartnerReply[n]}:null])),
@@ -87,7 +106,9 @@ export class VoiceJournal {
   };}
   report(){return {
     notes:this.notes,attempts:this.attempts,phrases:this.phrases,experiments:this.experiments,
-    responses:this.responses,motifRepeats:this.motifRepeats,sharedPhrases:this.sharedPhrases,
+    responses:this.responses,motifRepeats:this.motifRepeats,heldNotes:this.heldNotes,
+    longestNoteSeconds:this.longestNoteSeconds,firstHeldNote:this.firstHeldNote,
+    sharedPhrases:this.sharedPhrases,
     firstSharedPhrase:this.firstSharedPhrase,partnerReplies:{...this.partnerReplies},
     firstPartnerReply:{...this.firstPartnerReply},recentReplies:this.recentReplies.slice(0,5),
     vowels:{...this.learnedVowels},
