@@ -9,7 +9,7 @@
  if(root)root.WRKMAN_FIRE_MOTION=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="088b-direction-lock",PI=Math.PI;
+ const VERSION="088c-forward-axis-flip",PI=Math.PI;
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,Number.isFinite(n)?n:a));
  const wrap=x=>Math.atan2(Math.sin(x),Math.cos(x));
  function interpolateAngle(start,target,weight){
@@ -18,6 +18,12 @@
  function smoothstep(a,b,v){
   const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);
  }
+ // 088c: iPhone recordings confirmed the visual flame is authored with its
+ // visible tail opposite the assumed forward axis. Apply a PRESENTATION-ONLY
+ // 180-degree correction consistently to both trail and motion headings.
+ // Do not invert physical velocity, history vectors, or the idle animation.
+ const FLAME_AXIS_OFFSET=-PI/2;
+ const travelRotation=(dx,dy)=>Math.atan2(dy,dx)+FLAME_AXIS_OFFSET;
  // Last meaningful world-space trail segment is preferred over noisy
  // frame-to-frame displacement. The source already passes trail coordinates
  // from physics; here they are READ ONLY. Ignore the most recent point if it
@@ -29,7 +35,7 @@
    const p=trail[i];
    if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
    const dx=r.x-p.x,dy=r.y-p.y,dist=Math.hypot(dx,dy);
-   if(dist>=1.1&&dist<=90)return {dx,dy,dist,angle:Math.atan2(dy,dx)+PI/2};
+   if(dist>=1.1&&dist<=90)return {dx,dy,dist,angle:travelRotation(dx,dy)};
   }
   return null;
  }
@@ -109,8 +115,8 @@
     // During reversals, a three-frame-old path can be stale. Use current
     // displacement when its vector clearly disagrees with the recent trail.
     if(measuredValid&&(dx*path.dx+dy*path.dy)/(dist*path.dist)<.35)
-     heading=Math.atan2(dy,dx)+PI/2;
-   }else if(measuredValid)heading=Math.atan2(dy,dx)+PI/2;
+     heading=travelRotation(dx,dy);
+   }else if(measuredValid)heading=travelRotation(dx,dy);
    // Most important correction: speed LOCKS orientation, not just a gentle
    // nudge from idle. Even a mid-speed moving agent must visibly face travel.
    // Density damps *stretch* and body deformation, not heading accuracy.
@@ -131,5 +137,5 @@
   function reset(){tracks.clear();frame=0;}
   return {beginFrame,sample,reset,get size(){return tracks.size;}};
  }
- return Object.freeze({VERSION,interpolateAngle,smoothstep,trailHeading,countNearbyFire,makeTracker});
+ return Object.freeze({VERSION,FLAME_AXIS_OFFSET,travelRotation,interpolateAngle,smoothstep,trailHeading,countNearbyFire,makeTracker});
 });
