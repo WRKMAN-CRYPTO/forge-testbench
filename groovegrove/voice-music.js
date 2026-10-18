@@ -20,7 +20,7 @@ const nearestRoot=p=>{
 };
 const readable=v=>VOICES.includes(v)?v:'m';
 export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
-                                audio,journal,onNote}){
+                                audio,journal,onNote,playing=null}){
   if(singer.stage!=='humming'||library.busy('Murmur')||
      bar-singer.lastAttemptBar<2){
     singer.rests++;return false;
@@ -35,7 +35,7 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   const pipNearby=!!(drums&&bar-drums.bar<=3&&
     space.canHear('Murmur','Pip',drums.kind)>.1);
   const present=musician.ensembleIntent==='joining'&&!space.traveling('Murmur')&&
-    (riffNearby||pipNearby);
+    ((riffNearby&&(playing?.Riff??true))||(pipNearby&&(playing?.Pip??true)));
   // An invitation changes willingness, never guarantees a performance.
   // Away from the group, Murmur still enjoys solitary experimentation.
   const bookIdeas=['vowelShapes','breathPhrasing','melodicContours']
