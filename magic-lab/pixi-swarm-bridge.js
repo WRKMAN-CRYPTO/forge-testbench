@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="090-flowing-fire",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="091-water-lab",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -91,6 +91,7 @@
   const FIRE_MOTION=win.WRKMAN_FIRE_MOTION||null;
   const FIRE_GROUP_FLAMES=win.WRKMAN_FIRE_GROUP_FLAMES||null;
   const FIRE_GROUP_FLOW=win.WRKMAN_FIRE_GROUP_FLOW||null;
+  const WATER_VFX=win.WRKMAN_WATER_VFX||null;
   const fireMotionTracker=FIRE_MOTION?.makeTracker?FIRE_MOTION.makeTracker():null;
   const fireTracker=FIRE_STABILITY?.makeTracker?FIRE_STABILITY.makeTracker({
    maxSlots:3,fadeMs:180,heatHoldMs:110,heatFadeMs:190}):null;
@@ -122,11 +123,14 @@
    fireGroupStyle:opts.fireGroupFlames===false||opts.fireGroupStyle==="off"?"off":
     opts.fireGroupStyle==="spikes"?"spikes":FIRE_GROUP_FLOW?.createFlows?"flow":"spikes",
    fireGroupTongues:0,fireGroupTongueGroups:0,
+   waterDrops:opts.waterDrops!==false&&!!WATER_VFX?.makeDropTexture,
+   waterStreams:opts.waterStreams!==false&&!!WATER_VFX?.collectStreams,
+   waterDropsDrawn:0,waterStreamsDrawn:0,
    fireStableSlots:0,fireStableGhosts:0,fireStableFading:0,
    fireStableSwaps:0,fireStableHeldHot:0,fireStableCached:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
    registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=new Map(),spritePool=[],
-   restoredTextures=new Map(),flameTextures=[],fireGroupGraphics=null,accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,fireBodyGraphics=null,fireHotGraphics=null,disposed=false,heroUsed=0;
+   restoredTextures=new Map(),flameTextures=[],waterTextures=[],waterGraphics=null,fireGroupGraphics=null,accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,fireBodyGraphics=null,fireHotGraphics=null,disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
    if(typeof opts.status==="function")try{opts.status(msg);}catch(_){}
@@ -215,6 +219,17 @@
    }
    announce("FIRE CLUSTERS · "+(state.fireDebug?"DEBUG ON":"OFF"));
    return state.fireDebug;
+  }
+  function setWaterDrops(enabled){
+   state.waterDrops=!!enabled&&waterTextures.length===3&&waterTextures.every(Boolean);
+   announce("WATER DROPS · "+(state.waterDrops?"ON":"OFF"));
+   return state.waterDrops;
+  }
+  function setWaterStreams(enabled){
+   state.waterStreams=!!enabled&&!!WATER_VFX?.collectStreams;
+   if(!state.waterStreams){waterGraphics?.clear();state.waterStreamsDrawn=0;}
+   announce("WATER STREAMS · "+(state.waterStreams?"ON":"OFF"));
+   return state.waterStreams;
   }
   function setFireGroupStyle(mode){
    let next=["flow","spikes","off"].includes(mode)?mode:"off";
@@ -472,6 +487,17 @@
     setFireShell(false);setFireBody(false);setFireHot(false);setFireGroupFlames(false);
    }
   }
+  function paintWaterStreams(){
+   waterGraphics?.clear();state.waterStreamsDrawn=0;
+   if(!state.waterStreams||!waterGraphics||!WATER_VFX?.collectStreams)return;
+   try{
+    const streams=WATER_VFX.collectStreams(state.records,{maxStreams:64});
+    state.waterStreamsDrawn=WATER_VFX.drawStreams(waterGraphics,streams);
+   }catch(error){
+    console.warn("Optional water streams unavailable",error);
+    setWaterStreams(false);
+   }
+  }
   function paintFireEffects(){
    if(!state.fireDebug&&!state.fireShell&&!state.fireBody&&!state.fireHot&&!state.fireGroupFlames)return;
    let found;
@@ -661,7 +687,8 @@
     fireHotGraphics=new P.Graphics();fireHotGraphics.blendMode="add";
     fireShellGraphics=new P.Graphics();fireShellGraphics.blendMode="add";
     fireGroupGraphics=new P.Graphics();fireGroupGraphics.blendMode="normal";
-    app.stage.addChild(world);world.addChild(shapeLayer,fireBodyGraphics,fireHotGraphics,fireShellGraphics,fireGroupGraphics,detailsLayer,accentGraphics,fireDebugGraphics);
+    waterGraphics=new P.Graphics();waterGraphics.blendMode="normal";
+    app.stage.addChild(world);world.addChild(shapeLayer,fireBodyGraphics,fireHotGraphics,fireShellGraphics,fireGroupGraphics,waterGraphics,detailsLayer,accentGraphics,fireDebugGraphics);
     if(opts.alignDebug){
      registrationGraphics=new P.Graphics();
      world.addChild(registrationGraphics);
@@ -678,6 +705,14 @@
      }catch(error){console.warn("Optional fire appearance unavailable",error);flameTextures=[];}
     }
     state.fireFlames=state.fireFlames&&flameTextures.length===3&&flameTextures.every(Boolean);
+    if(WATER_VFX?.makeDropTexture){
+     try{
+      const source=scene.textures?.get?.("wandrune-mat069-water")?.getSourceImage?.();
+      if(source?.width>0&&source?.height>0)
+       waterTextures=[0,1,2].map(v=>WATER_VFX.makeDropTexture(win,P,source,v));
+     }catch(error){console.warn("Water droplet art unavailable",error);waterTextures=[];}
+    }
+    state.waterDrops=state.waterDrops&&waterTextures.length===3&&waterTextures.every(Boolean);
     const cv=app.canvas;cv.classList.add("wandrune-pixi-canvas");
     Object.assign(cv.style,{position:"absolute",pointerEvents:"none",zIndex:"2",display:"block",maxWidth:"none",maxHeight:"none"});
     stage.appendChild(cv);
@@ -700,8 +735,9 @@
    state.fireMotionAligned=state.fireMotionDense=0;
    fireMotionTracker?.reset();
    state.fireGroupTongues=state.fireGroupTongueGroups=0;
+   state.waterDropsDrawn=state.waterStreamsDrawn=0;
    if(app?.canvas)app.canvas.style.display="none";
-   shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();fireHotGraphics?.clear();fireGroupGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireHotFills=state.fireHotGlows=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
+   shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();fireHotGraphics?.clear();fireGroupGraphics?.clear();waterGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireHotFills=state.fireHotGlows=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
    announce("PHASER SWARM · SAFE FALLBACK");
   }
@@ -721,7 +757,7 @@
     state.frame++;heroUsed=0;
     for(const group of bulkGroups.values())group.used=0;
     let detailed=0,bulk=0,materialDrawn=0,artFallback=0,emberBoosted=0,flamesDrawn=0;
-    let motionAligned=0,motionDense=0;
+    let motionAligned=0,motionDense=0,waterDropsDrawn=0;
     const neighborCounts=state.fireMotion&&state.fireFlames?
      FIRE_MOTION.countNearbyFire(state.records):null;
     if(neighborCounts)fireMotionTracker.beginFrame();
@@ -753,29 +789,32 @@
       height:idlePose.height*moving.stretch,
       rotation:moving.rotation
      }:idlePose;
+     const water=elem===2&&useMaterial&&state.waterDrops&&!!waterTextures[variant];
+     const waterPose=water?WATER_VFX.dropPose(r,size):null;
+     if(water)waterDropsDrawn++;
      if(flame)flamesDrawn++;
      if(moving?.aligned)motionAligned++;
      if(flame&&neighborhood>=5)motionDense++;
      if(hero){
       const sprite=allocateHero();
-      sprite.texture=flame?flameTextures[variant]:(texture||textureSet[elem][variant]);
+      sprite.texture=water?waterTextures[variant]:(flame?flameTextures[variant]:(texture||textureSet[elem][variant]));
       sprite.position.set(r.x,r.y);
-      sprite.rotation=flame?pose.rotation:(useMaterial?(elem===3?Math.sin(r.seed||0)*.1:elem===1?Math.sin((r.time||0)*.0008+(r.seed||0))*.12:0):(r.angle||0));
-      sprite.width=flame?pose.width:size;
-      sprite.height=flame?pose.height:size*(useMaterial?1:1.55);
+      sprite.rotation=water?waterPose.rotation:(flame?pose.rotation:(useMaterial?(elem===3?Math.sin(r.seed||0)*.1:elem===1?Math.sin((r.time||0)*.0008+(r.seed||0))*.12:0):(r.angle||0)));
+      sprite.width=water?waterPose.width:(flame?pose.width:size);
+      sprite.height=water?waterPose.height:(flame?pose.height:size*(useMaterial?1:1.55));
       sprite.alpha=alpha;sprite.visible=true;
       // Texture contains its own elemental glow, with bright hero accents.
       sprite.tint=visualTint;
       detailed++;
      }else{
-      const selectedTexture=flame?flameTextures[variant]:(texture||textureSet[elem][variant]);
-      const sourceKey=flame?"flame087:"+variant:(useMaterial?"material:"+materialKey(r,elem):"soft:"+elem+":"+variant);
+      const selectedTexture=water?waterTextures[variant]:(flame?flameTextures[variant]:(texture||textureSet[elem][variant]));
+      const sourceKey=water?"water091:"+variant:(flame?"flame087:"+variant:(useMaterial?"material:"+materialKey(r,elem):"soft:"+elem+":"+variant));
       const particle=takeParticle(selectedTexture,sourceKey);
       particle.x=r.x;particle.y=r.y;
-      particle.rotation=flame?pose.rotation:(useMaterial?(elem===3?Math.sin(r.seed||0)*.1:0):(r.angle||0));
-      const sourceSide=flame?FIRE_FLAME.SIDE:(useMaterial?48:128);
-      particle.scaleX=(flame?pose.width:size)/sourceSide;
-      particle.scaleY=(flame?pose.height:size*(useMaterial?1:1.5))/sourceSide;
+      particle.rotation=water?waterPose.rotation:(flame?pose.rotation:(useMaterial?(elem===3?Math.sin(r.seed||0)*.1:0):(r.angle||0)));
+      const sourceSide=water?WATER_VFX.SIDE:(flame?FIRE_FLAME.SIDE:(useMaterial?48:128));
+      particle.scaleX=(water?waterPose.width:(flame?pose.width:size))/sourceSide;
+      particle.scaleY=(water?waterPose.height:(flame?pose.height:size*(useMaterial?1:1.5)))/sourceSide;
       particle.alpha=alpha;
       particle.tint=visualTint;
       bulk++;
@@ -783,10 +822,11 @@
     }
     // Never edits trajectory, collision, position or count: this is a
     // purely visual geometric interpretation of already-computed records.
-    paintFormations();paintAccents();paintFireEffects();
+    paintFormations();paintAccents();paintWaterStreams();paintFireEffects();
     state.materialDrawn=materialDrawn;state.artFallback=artFallback;
     state.fireEmberBoosted=emberBoosted;state.fireFlamesDrawn=flamesDrawn;
     state.fireMotionAligned=motionAligned;state.fireMotionDense=motionDense;
+    state.waterDropsDrawn=waterDropsDrawn;
     for(let i=heroUsed;i<spritePool.length;i++)spritePool[i].visible=false;
     for(const group of bulkGroups.values())for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
     align();drawReference();app.render();
@@ -797,9 +837,9 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;fireGroupGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();flameTextures=[];state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;fireGroupGraphics=null;waterGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();flameTextures=[];waterTextures=[];state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setFireMotion,setFireGroupFlames,setFireGroupStyle,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setFireMotion,setFireGroupFlames,setFireGroupStyle,setWaterDrops,setWaterStreams,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,fireEmberFootprint,createBridge});
 });
