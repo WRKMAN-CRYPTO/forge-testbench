@@ -121,6 +121,7 @@ async function init(){
    beat:nextBeat,bar:world.bar,
    practice:{Pip:pip.observations,Riff:riff.observations},
    experiments:{Pip:pip.experiments,Riff:riff.experiments},
+   sustained:{Riff:world.riffHeldChords||0,Murmur:world.voiceJournal?.heldNotes||0,longestVocalSeconds:Math.round((world.voiceJournal?.longestNoteSeconds||0)*100)/100},
    voice:{stage:world.vocalist.stage,notes:world.vocalist.notes,phrases:world.voiceJournal?.phrases||0,shared:world.voiceJournal?.sharedPhrases||0,partnerReplies:world.voiceJournal?.partnerReplies||{Pip:0,Riff:0},books:world.library.known.Murmur?.length||0},
    sinceLastBeatMs:Date.now()-lastAdvanceAt,checkpointAt:lastWrite
   }));
