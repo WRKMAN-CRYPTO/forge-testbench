@@ -22,7 +22,8 @@ class Application{
  constructor(){this.stage=new Container();this.canvas={style:{},classList:{add(){}}};this.renders=0;}
  async init(){}stop(){}render(){this.renders++;}destroy(){this.destroyed=true;}
 }
-const PIXI={Application,Sprite,Particle,ParticleContainer,Container,Texture:{from:()=>({})}};
+class Graphics{clear(){return this;}moveTo(){return this;}lineTo(){return this;}stroke(){return this;}circle(){return this;}fill(){return this;}}
+const PIXI={Application,Sprite,Particle,ParticleContainer,Container,Graphics,Texture:{from:()=>({})}};
 const windowMock={PIXI,devicePixelRatio:3,document:{createElement:()=>({getContext:()=>context})}};
 const stage={appendChild(canvas){this.overlay=canvas;},querySelector(){return{getBoundingClientRect:rect};},getBoundingClientRect:rect};
 const scene={player:{x:10,y:20},combat:{hp:100},cameras:{main:{getWorldPoint(x,y){return{x:x/.8+11,y:y/.8+42};}}}};
