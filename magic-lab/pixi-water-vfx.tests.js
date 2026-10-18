@@ -5,6 +5,10 @@
 const assert=require("node:assert/strict");
 const Water=require("./pixi-water-vfx.js");
 const Bridge=require("./pixi-swarm-bridge.js");
+let checks=0;
+function ok(x,m){assert.ok(x,m);checks++}
+function eq(x,y,m){assert.equal(x,y,m);checks++}
+function near(x,y,err,m){ok(Math.abs(x-y)<err,m)}
 const movingRecord=(x,y,t,i=0,seed=1)=>({
  element:2,x,y,time:t,castIndex:0,agentIndex:i,seed,alpha:.82,angle:0,r:3
 });
@@ -44,10 +48,6 @@ eq(teleport.sample(movingRecord(20,0,32,0,777)).influence,0,
  "Reused agent index with new seed resets history");
 teleport.reset();eq(teleport.size,0,"Motion history can be cleared on toggle");
 
-let checks=0;
-function ok(x,m){assert.ok(x,m);checks++}
-function eq(x,y,m){assert.equal(x,y,m);checks++}
-function near(x,y,err,m){ok(Math.abs(x-y)<err,m)}
 const record=(element,i,t=400)=>({
  x:90+i*2,y:220+i*.37,r:2.8,alpha:.58,element,
  castIndex:i<100?0:1,agentIndex:i,seed:i*.19,
