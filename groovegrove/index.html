@@ -16,9 +16,9 @@
   No LLM, network inference, external sound files, or predetermined band-forming script.
 */
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
-import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js';
+import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261018-pass004';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
-import { Grove } from './grove-core.js';
+import { Grove } from './grove-core.js?v=20261018-pass004';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
 import { LiveNoteConductor } from './live-note-conductor.js?v=20261018-voice';
 
@@ -374,28 +374,41 @@ function scheduleViewportSize(){
 function makeLibraryNook(world){
   const x=landscape?W-243:(W-190)/2;
   const y=landscape?123:155;
-  const w=190,unitH=111,gap=12,h=unitH*2+gap;
-  ui.shelfBounds={x,y,w,h,unitH,gap};
+  const w=190,unitH=111,gap=landscape?12:10,secondH=landscape?111:61,h=unitH+gap+secondH;
+  ui.shelfBounds={x,y,w,h,unitH,gap,secondH};
   const g=new Graphics();world.addChild(g);
   for(let section=0;section<2;section++){
     const sy=y+section*(unitH+gap);
     // Separate physical cabinets. Existing copy slots 0..5 never move.
-    rect(g,x-7,sy-9,w+14,unitH+30,13,0x051c1c,.47);
-    rect(g,x,sy,w,unitH,7,section?0x55513a:0x4b362b);
-    rect(g,x+5,sy+5,w-10,unitH-10,4,section?0x7c7450:0x786043);
-    rect(g,x+12,sy+23,w-24,32,4,0x172b28);
-    rect(g,x+12,sy+64,w-24,32,4,0x172b28);
-    for(let col=1;col<3;col++){
-      const cx=x+12+col*55;
-      line(g,cx,sy+23,cx,sy+96,0xa5875c,2,.63);
+    const cabinetH=section===0?unitH:secondH;
+    rect(g,x-7,sy-9,w+14,cabinetH+30,13,0x051c1c,.47);
+    rect(g,x,sy,w,cabinetH,7,section?0x55513a:0x4b362b);
+    rect(g,x+5,sy+5,w-10,cabinetH-10,4,section?0x7c7450:0x786043);
+    if(section===1 && !landscape){
+      // A slim second cabinet leaves room for the musicians' inspect HUD.
+      rect(g,x+12,sy+15,w-24,20,4,0x172b28);
+      rect(g,x+12,sy+37,w-24,20,4,0x172b28);
+      for(let col=1;col<3;col++){
+        const cx=x+12+col*55;
+        line(g,cx,sy+15,cx,sy+57,0xa5875c,2,.63);
+      }
+      line(g,x+10,sy+36,x+w-10,sy+36,0xd6ad74,3,.8);
+      line(g,x+10,sy+59,x+w-10,sy+59,0xd6ad74,3,.8);
+    }else{
+      rect(g,x+12,sy+23,w-24,32,4,0x172b28);
+      rect(g,x+12,sy+64,w-24,32,4,0x172b28);
+      for(let col=1;col<3;col++){
+        const cx=x+12+col*55;
+        line(g,cx,sy+23,cx,sy+96,0xa5875c,2,.63);
+      }
+      line(g,x+10,sy+58,x+w-10,sy+58,0xd6ad74,5,.8);
+      line(g,x+10,sy+100,x+w-10,sy+100,0xd6ad74,5,.8);
     }
-    line(g,x+10,sy+58,x+w-10,sy+58,0xd6ad74,5,.8);
-    line(g,x+10,sy+100,x+w-10,sy+100,0xd6ad74,5,.8);
   }
   textAt(world,'THE LIBRARY',x+w/2,y-26,13,PALETTE.gold,'bold',2,.5);
   ui.shelfCounter=textAt(world,'LIBRARY  0 / 12',x+8,y+8,9,PALETTE.cream,'bold',.6);
-  textAt(world,'SHELF II  ·  NEW IDEAS',x+8,y+unitH+gap+8,9,PALETTE.cream,'bold',.6);
-  ui.shelfStatus=textAt(world,'Tap shelf to deliver books',x+w/2,y+h+12,landscape?10:9,PALETTE.muted,'normal',0,.5);
+  textAt(world,'SHELF II  ·  NEW IDEAS',x+8,y+unitH+gap+(landscape?8:3),landscape?9:7,PALETTE.cream,'bold',.6);
+  ui.shelfStatus=textAt(world,'Tap shelf to deliver books',x+w/2,y+h+(landscape?12:5),landscape?10:9,PALETTE.muted,'normal',0,.5);
   ui.shelfStatus.style.wordWrap=true;
   ui.shelfStatus.style.wordWrapWidth=landscape?270:220;
   ui.shelfStatus.style.align='center';
@@ -489,11 +502,15 @@ function renderPhysicalBooks(){
     const def=LIBRARY_CATALOG[book.type];
     if(book.state==='shelf'){
       const px=x+17+(book.slot%3)*55;
-      const py=y+31+Math.floor((book.slot%6)/3)*41+Math.floor(book.slot/6)*(ui.shelfBounds.unitH+ui.shelfBounds.gap);
-      rect(g,px,py,43,25,3,def.color);
-      rect(g,px+4,py+3,7,19,2,0x21443b,.62);
-      line(g,px+16,py+8,px+37,py+8,0x123b30,2,.55);
-      line(g,px+16,py+15,px+32,py+15,0x123b30,2,.36);
+      const second=book.slot>=6,small=second&&!landscape;
+      const py=second
+        ?y+ui.shelfBounds.unitH+ui.shelfBounds.gap+(small?17:31)+Math.floor((book.slot-6)/3)*(small?22:41)
+        :y+31+Math.floor(book.slot/3)*41;
+      const bh=small?18:25;
+      rect(g,px,py,43,bh,3,def.color);
+      rect(g,px+4,py+3,7,bh-6,2,0x21443b,.62);
+      line(g,px+16,py+(small?6:8),px+37,py+(small?6:8),0x123b30,2,.55);
+      line(g,px+16,py+(small?12:15),px+32,py+(small?12:15),0x123b30,2,.36);
       continue;
     }
     const agent=book.owner==='Pip'?ui.pip:ui.riff;
@@ -712,7 +729,7 @@ function refreshText(){
     const book=grove.library.copyById(task.copyId);
     return name+' '+task.stage+' '+(book?LIBRARY_CATALOG[book.type].title:'');
   }).filter(Boolean);
-  if(ui.shelfStatus)ui.shelfStatus.text=reading.join(' · ')||(grove.library.books.length?'Tap shelves for book delivery':'Empty shelves · tap to donate books');
+  if(ui.shelfStatus)ui.shelfStatus.text=reading.length?(reading.length+' reading · tap for books'):(grove.library.books.length?'Tap shelves for book delivery':'Empty shelves · tap to donate books');
 }
 function renderMeter(){
   if(!ui.meter)return;
