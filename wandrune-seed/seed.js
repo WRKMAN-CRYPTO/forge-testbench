@@ -1,7 +1,7 @@
 /* Wandrune: Seed A0. Fresh canvas-only experiment. No production imports. */
 (()=>{'use strict';
 const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d',{alpha:false});
-const TAU=Math.PI*2,agents=[],keys=new Set(),pointer={x:0,y:0,down:false},player={x:0,y:0},camera={x:0,y:0};
+canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('selectstart',e=>e.preventDefault());canvas.addEventListener('dragstart',e=>e.preventDefault());document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});document.addEventListener('gesturechange',e=>e.preventDefault(),{passive:false});document.addEventListener('gestureend',e=>e.preventDefault(),{passive:false});const TAU=Math.PI*2,agents=[],keys=new Set(),pointer={x:0,y:0,down:false},player={x:0,y:0},camera={x:0,y:0};
 let W=0,H=0,dpr=1,last=0,acc=0,mode='world',selection=0,brush=1,editing=false;const stick={id:null,x:0,y:0},aim={id:null,x:0,y:0};let touchMode=matchMedia('(pointer:coarse)').matches;const move={x:0,y:0};
 const names=['Magic','Return'],map=new Uint8Array(1024);
 for(let y=4;y<28;y++)map[y*32+16]=1;
