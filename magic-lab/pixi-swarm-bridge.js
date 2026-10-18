@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="089-group-flame-surface",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="090-flowing-fire",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -90,6 +90,7 @@
   const FIRE_FLAME=win.WRKMAN_FIRE_FLAME||null;
   const FIRE_MOTION=win.WRKMAN_FIRE_MOTION||null;
   const FIRE_GROUP_FLAMES=win.WRKMAN_FIRE_GROUP_FLAMES||null;
+  const FIRE_GROUP_FLOW=win.WRKMAN_FIRE_GROUP_FLOW||null;
   const fireMotionTracker=FIRE_MOTION?.makeTracker?FIRE_MOTION.makeTracker():null;
   const fireTracker=FIRE_STABILITY?.makeTracker?FIRE_STABILITY.makeTracker({
    maxSlots:3,fadeMs:180,heatHoldMs:110,heatFadeMs:190}):null;
@@ -116,7 +117,10 @@
    fireFlamesDrawn:0,
    fireMotion:opts.fireMotion!==false&&!!fireMotionTracker,
    fireMotionAligned:0,fireMotionDense:0,
-   fireGroupFlames:opts.fireGroupFlames!==false&&!!FIRE_GROUP_FLAMES?.createTongues&&!!FIRE_PERIMETER?.buildPerimeters,
+   fireGroupFlames:opts.fireGroupFlames!==false&&
+    !!(FIRE_GROUP_FLOW?.createFlows||FIRE_GROUP_FLAMES?.createTongues)&&!!FIRE_PERIMETER?.buildPerimeters,
+   fireGroupStyle:opts.fireGroupFlames===false||opts.fireGroupStyle==="off"?"off":
+    opts.fireGroupStyle==="spikes"?"spikes":FIRE_GROUP_FLOW?.createFlows?"flow":"spikes",
    fireGroupTongues:0,fireGroupTongueGroups:0,
    fireStableSlots:0,fireStableGhosts:0,fireStableFading:0,
    fireStableSwaps:0,fireStableHeldHot:0,fireStableCached:0};
@@ -212,10 +216,19 @@
    announce("FIRE CLUSTERS · "+(state.fireDebug?"DEBUG ON":"OFF"));
    return state.fireDebug;
   }
-  function setFireGroupFlames(enabled){
-   state.fireGroupFlames=!!enabled&&!!FIRE_GROUP_FLAMES?.createTongues&&!!FIRE_PERIMETER?.buildPerimeters;
+  function setFireGroupStyle(mode){
+   let next=["flow","spikes","off"].includes(mode)?mode:"off";
+   if(next==="flow"&&!FIRE_GROUP_FLOW?.createFlows)next=FIRE_GROUP_FLAMES?.createTongues?"spikes":"off";
+   if(next==="spikes"&&!FIRE_GROUP_FLAMES?.createTongues)next=FIRE_GROUP_FLOW?.createFlows?"flow":"off";
+   state.fireGroupStyle=next;
+   state.fireGroupFlames=next!=="off"&&!!FIRE_PERIMETER?.buildPerimeters;
    if(!state.fireGroupFlames){fireGroupGraphics?.clear();state.fireGroupTongues=state.fireGroupTongueGroups=0;}
-   announce("GROUP FLAMES · "+(state.fireGroupFlames?"ON":"OFF"));
+   announce("GROUP FIRE · "+next.toUpperCase());
+   return next;
+  }
+  function setFireGroupFlames(enabled){
+   if(!enabled)setFireGroupStyle("off");
+   else setFireGroupStyle(FIRE_GROUP_FLOW?.createFlows?"flow":"spikes");
    return state.fireGroupFlames;
   }
   function setFireMotion(enabled){
@@ -363,20 +376,28 @@
     }
    }
   }
-  function drawFireGroupFlames(results){
+  function drawFireGroupFlames(results,groups){
    fireGroupGraphics?.clear();
    state.fireGroupTongues=state.fireGroupTongueGroups=0;
-   if(!state.fireGroupFlames||!fireGroupGraphics||!FIRE_GROUP_FLAMES?.createTongues)return;
+   if(!state.fireGroupFlames||!fireGroupGraphics)return;
    try{
-    // Scene time keeps tongue animation speed constant at 30 or 60 FPS.
+    // Scene clock rather than a frame counter; same timing on iPhone 30/60 FPS.
     const sceneTime=Number(state.records[0]?.time);
     const presentationTime=Number.isFinite(sceneTime)?sceneTime:state.frame*16.667;
-    const flame=FIRE_GROUP_FLAMES.createTongues(results.shells,presentationTime,{maxTotal:30,maxPerShell:10});
-    state.fireGroupTongues=FIRE_GROUP_FLAMES.drawTongues(fireGroupGraphics,flame.tongues);
-    state.fireGroupTongueGroups=flame.groups;
+    if(state.fireGroupStyle==="flow"&&FIRE_GROUP_FLOW?.createFlows){
+     const fire=FIRE_GROUP_FLOW.createFlows(results.shells,groups,presentationTime,
+      {maxTotal:12,maxPerGroup:4});
+     state.fireGroupTongues=FIRE_GROUP_FLOW.drawFlows(fireGroupGraphics,fire.ribbons);
+     state.fireGroupTongueGroups=fire.groups;
+    }else if(state.fireGroupStyle==="spikes"&&FIRE_GROUP_FLAMES?.createTongues){
+     const flame=FIRE_GROUP_FLAMES.createTongues(results.shells,presentationTime,
+      {maxTotal:30,maxPerShell:10});
+     state.fireGroupTongues=FIRE_GROUP_FLAMES.drawTongues(fireGroupGraphics,flame.tongues);
+     state.fireGroupTongueGroups=flame.groups;
+    }
    }catch(error){
-    console.warn("Optional group flame appearance unavailable",error);
-    setFireGroupFlames(false);
+    console.warn("Optional group fire appearance unavailable",error);
+    setFireGroupStyle("off");
    }
   }
   function paintFireShells(found){
@@ -414,11 +435,12 @@
     state.firePeakPaths=results.peakPaths;
     drawFireBody(results);
     drawFireHot(results);
-    drawFireGroupFlames(results);
+    drawFireGroupFlames(results,groups);
     if(state.fireShell)for(const cl of results.shells){
      const factor=cl.count>=4?1:.65;
      // Only soften the glowing capsule boundary in the new appearance.
-     const rimStrength=state.fireGroupFlames&&cl.count>=8?.45:1;
+     const rimStrength=state.fireGroupFlames&&cl.count>=8?
+      (state.fireGroupStyle==="flow"?.15:.45):1;
      // Boundary ONLY in Pass B: no opaque fill and no bright interior.
      // Three feathered stroked bands suggest hot plasma around the
      // exact merged influence of neighboring agents.
@@ -777,7 +799,7 @@
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
    app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;fireGroupGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();flameTextures=[];state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setFireMotion,setFireGroupFlames,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setFireMotion,setFireGroupFlames,setFireGroupStyle,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,fireEmberFootprint,createBridge});
 });
