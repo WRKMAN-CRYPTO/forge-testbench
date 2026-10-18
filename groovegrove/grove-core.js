@@ -1,9 +1,9 @@
 /* GrooveGrove shared simulation. Same classes in server + client. */
 import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261018-voice';
 import {ListeningJournal} from './listening-journal.js';
-import {GroveWorld} from './grove-world.js?v=20261018-voice';
-import {VoiceJournal} from './voice-journal.js?v=20261018-voice';
-import {tryVocalPhrase} from './voice-music.js?v=20261018-voice';
+import {GroveWorld} from './grove-world.js?v=20261018-ensemble';
+import {VoiceJournal} from './voice-journal.js?v=20261018-ensemble';
+import {tryVocalPhrase} from './voice-music.js?v=20261018-ensemble';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const rand=(a,b)=>a+(b-a)*Math.random();
@@ -99,10 +99,14 @@ export class Grove {
       }
       if(singer.stage==='humming')singer.curiosity=clamp(singer.curiosity+.0003,0,1);
     }
-    if(beat===0)tryVocalPhrase({
-      singer,library:this.library,space:this.space,bar,time:t,beatDur,
-      audio,journal:this.voiceJournal,onNote:this.onNote
-    });
+    if(beat===0){
+      const vocal=tryVocalPhrase({
+        singer,library:this.library,space:this.space,bar,time:t,beatDur,
+        audio,journal:this.voiceJournal,onNote:this.onNote
+      });
+      if(vocal?.ensemble&&this.voiceJournal.sharedPhrases===1)
+        this.push('Murmur chooses to sing with the others for the first time.');
+    }
     // A practice room can hold two soloists without making them a duo.
     // They exchange turns every two bars. Only a mutual choice creates joint music.
     const pipActive=(!solo || bar%4<2 || this.library.busy('Riff')) &&
@@ -239,6 +243,33 @@ export class Grove {
         if(this.sessionMeasurements.length>1000)this.sessionMeasurements.shift();
       }
     }
+    // Each instrumentalist may answer a real Murmur phrase independently.
+    // Nothing is counted until an actual instrument note is scheduled.
+    if(beat===3){
+      const riffHeard=this.space.people.Riff.lastHeardVoice;
+      const pipHeard=this.space.people.Pip.lastHeardVoice;
+      const riffCanAnswer=riffHeard?.bar===bar &&
+        this.space.canHear('Riff','Murmur','voice')>.08 &&
+        !this.space.traveling('Riff')&&!this.library.busy('Riff') &&
+        this.space.destination('Riff')!=='pond';
+      const pipCanAnswer=pipHeard?.bar===bar &&
+        this.space.canHear('Pip','Murmur','voice')>.08 &&
+        !this.space.traveling('Pip')&&!this.library.busy('Pip') &&
+        this.space.destination('Pip')!=='pond';
+      if(riffCanAnswer && Math.random()<(this.library.has('Riff','partnerListening')?.56:.46)){
+        const pitch=pitches[(bar+1)%pitches.length]*2;
+        play.guitar(pitch,guitarOnset+beatDur*.48,.22,.27,true);
+        this.voiceJournal.partnerReply({bar,partner:'Riff',kind:'guitar',pitch});
+        if(this.voiceJournal.partnerReplies.Riff===1)
+          this.push('Riff answers a melody he actually heard from Murmur.');
+      }
+      if(pipCanAnswer && Math.random()<(this.library.has('Pip','callResponse')?.46:.31)){
+        play.snare(drumOnset+beatDur*.62,.2,true);
+        this.voiceJournal.partnerReply({bar,partner:'Pip',kind:'snare',pitch:null});
+        if(this.voiceJournal.partnerReplies.Pip===1)
+          this.push('Pip answers Murmur with a small rhythmic accent.');
+      }
+    }
     if(this.onNote){
       if(pipActive)this.onNote({agent:'Pip',time:drumOnset,beat,delta:drumOffset-riffOffset});
       if(riffActive)this.onNote({agent:'Riff',time:guitarOnset,beat,delta:riffOffset});
@@ -268,7 +299,7 @@ export class Grove {
     if(this.mode==='solo')this.considerNewActivity(before);
     else if(this.mode==='lesson'){
       const together=this.space.distance('Pip','Riff')<260 &&
-        !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.anyBusy();
+        !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.busy('Pip')&&!this.library.busy('Riff');
       if(!together){
         // Leaving is allowed: no credits for a lesson nobody heard.
         this.mode='solo';this.modeBars=0;
@@ -285,7 +316,7 @@ export class Grove {
       }
     }else if(this.mode==='jam'){
       const together=this.space.distance('Pip','Riff')<260 &&
-        !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.anyBusy();
+        !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.busy('Pip')&&!this.library.busy('Riff');
       if(!together){
         this.mode='solo';this.modeBars=0;
         this.push('The jam falls quiet as the musicians move apart.');
@@ -306,7 +337,7 @@ export class Grove {
     if(this.onCheckpoint)this.onCheckpoint(this.snapshot());
   }
   considerNewActivity(measuredError){
-    if(this.modeBars<3 || this.library.anyBusy() || this.space.traveling('Pip') ||
+    if(this.modeBars<3 || this.library.busy('Pip')||this.library.busy('Riff') || this.space.traveling('Pip') ||
        this.space.traveling('Riff') || this.space.distance('Pip','Riff')>245)return;
     // Riff recognizes a timing problem from HEARD onset differences, then chooses whether to help.
     const needsHelp=measuredError!=null && measuredError>40;
