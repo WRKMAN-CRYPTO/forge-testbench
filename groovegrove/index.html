@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0c2021">
+  <title>GrooveGrove · Pass 001</title>
+</head>
+<body>
+<script type="module">
+/*
+  GROOVEGROVE  /  PASS 001
+  One visible PixiJS canvas. No DOM interface. All sound is synthesized locally.
+  Musical onset listening is via timestamped note events, NOT microphone recognition.
+  Agent intentions are independently selected by simple, inspectable decision policies.
+  No LLM, network inference, external sound files, or predetermined band-forming script.
+*/
+import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
+
+document.documentElement.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;background:#081b1d';
+document.body.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;touch-action:none';
+
+const PALETTE = {
+  ink:0x0a2022, navy:0x0d292a, grove:0x123830, green:0x1e5142,
+  mint:0x90dfc1, cyan:0x7dd4c5, gold:0xffd18a, orange:0xea986f,
+  lilac:0xbfa5e8, cream:0xfff5d9, muted:0x9ab4ad, panel:0x10302f,
+  dark:0x06181b, bark:0x5d4037, soil:0x183c36
+};
+const BPM=98;
+const beatDur=60/BPM;
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const rand=(a,b)=>a+(b-a)*Math.random();
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+const rms=a=>a.length?Math.sqrt(avg(a.map(x=>x*x))):null;
+const fmt=v=>v==null?'collecting...':Math.round(v)+' ms';
+function seeded(n){let x=n>>>0; return ()=>{x=(1664525*x+1013904223)>>>0;return x/4294967296;};}
+function txt(content,size=18,color=PALETTE.cream,weight='normal',letterSpacing=0){
+  return new Text({text:content,style:{fontFamily:'Trebuchet MS, Avenir Next, Arial, sans-serif',fontSize:size,fill:color,fontWeight:weight,letterSpacing,breakWords:true}});
+}
+function textAt(parent,content,x,y,size=18,color=PALETTE.cream,weight='normal',spacing=0,anchorX=0){
+  const t=txt(content,size,color,weight,spacing);t.position.set(x,y);t.anchor.x=anchorX;parent.addChild(t);return t;
+}
+function rect(g,x,y,w,h,r,color,alpha=1){g.roundRect(x,y,w,h,r).fill({color,alpha});return g;}
+function line(g,x1,y1,x2,y2,color,width=3,alpha=1){g.moveTo(x1,y1).lineTo(x2,y2).stroke({color,width,alpha,cap:'round'});return g;}
+function circle(g,x,y,r,color,alpha=1){g.circle(x,y,r).fill({color,alpha});return g;}
+function ellipse(g,x,y,rx,ry,color,alpha=1){g.ellipse(x,y,rx,ry).fill({color,alpha});return g;}
+
+// A persistent, single-record world memory. IndexedDB preferred, localStorage fallback.
+const STORAGE_KEY='groovegrove.pass001.memory';
+let database=null;
+async function openMemory(){
+  if(!('indexedDB' in window))return;
+  try{
+    database=await new Promise((resolve,reject)=>{
+      const req=indexedDB.open('GrooveGroveMemory',1);
+      req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('world'))req.result.createObjectStore('world');};
+      req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+    });
+  }catch(e){database=null;}
+}
+async function loadMemory(){
+  if(database){
+    try{return await new Promise((resolve,reject)=>{
+      const tx=database.transaction('world','readonly');const req=tx.objectStore('world').get('pass001');
+      req.onsuccess=()=>resolve(req.result??null);req.onerror=()=>reject(req.error);
+    });}catch(e){}
+  }
+  try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch(e){return null;}
+}
+function saveMemory(value){
+  const snap=JSON.parse(JSON.stringify(value));
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(snap));}catch(e){}
+  if(database){try{database.transaction('world','readwrite').objectStore('world').put(snap,'pass001');}catch(e){}}
+}
+
+// Sound synthesis and accurate, ahead-of-time Web Audio scheduling.
+class SoundEngine {
+  constructor(){this.context=null;this.master=null;this.noise=null;this.timer=null;this.beat=0;this.nextTime=0;}
+  async start(onBeat){
+    if(!this.context){
+      const Ctx=window.AudioContext||window.webkitAudioContext;
+      if(!Ctx)throw new Error('Web Audio is not supported on this device.');
+      this.context=new Ctx();
+      this.master=this.context.createGain();this.master.gain.value=0.58;
+      const limiter=this.context.createDynamicsCompressor();
+      limiter.threshold.value=-12;limiter.knee.value=15;limiter.ratio.value=3.5;
+      this.master.connect(limiter);limiter.connect(this.context.destination);
+      const len=Math.round(this.context.sampleRate*.3);
+      this.noise=this.context.createBuffer(1,len,this.context.sampleRate);
+      const data=this.noise.getChannelData(0);
+      for(let i=0;i<len;i++)data[i]=Math.random()*2-1;
+    }
+    await this.context.resume();
+    if(this.timer)return;
+    this.onBeat=onBeat;
+    this.nextTime=this.context.currentTime+.12;
+    this.timer=setInterval(()=>this.schedule(),23);
+    this.schedule();
+  }
+  schedule(){
+    const ctx=this.context;
+    if(!ctx || ctx.state!=='running')return;
+    let steps=0;
+    while(this.nextTime<ctx.currentTime+.18 && steps++<32){
+      this.onBeat(this.beat,this.nextTime);
+      this.beat++;this.nextTime+=beatDur;
+    }
+    // After tab suspension, resume from now rather than queueing an old hour's beats.
+    if(this.nextTime<ctx.currentTime-.15)this.nextTime=ctx.currentTime+.08;
+  }
+  tone(freq,time,duration,level,shape='triangle',pan=0){
+    const ctx=this.context;if(!ctx)return;
+    const t=Math.max(ctx.currentTime+.002,time);
+    const osc=ctx.createOscillator(),gain=ctx.createGain(),low=ctx.createBiquadFilter();
+    osc.type=shape;osc.frequency.setValueAtTime(freq,t);
+    low.type='lowpass';low.frequency.setValueAtTime(shape==='sine'?4000:2400,t);
+    low.frequency.exponentialRampToValueAtTime(500,t+duration);
+    gain.gain.setValueAtTime(.0001,t);
+    gain.gain.exponentialRampToValueAtTime(Math.max(.0002,level),t+.009);
+    gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
+    osc.connect(low);low.connect(gain);
+    if(ctx.createStereoPanner){const p=ctx.createStereoPanner();p.pan.value=pan;gain.connect(p);p.connect(this.master);}else gain.connect(this.master);
+    osc.start(t);osc.stop(t+duration+.02);
+  }
+  noiseHit(time,duration,level,highpass=1200,pan=-.25){
+    const ctx=this.context,src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),env=ctx.createGain();
+    const t=Math.max(ctx.currentTime+.002,time);
+    src.buffer=this.noise;filter.type='highpass';filter.frequency.value=highpass;
+    env.gain.setValueAtTime(Math.max(.001,level),t);
+    env.gain.exponentialRampToValueAtTime(.0001,t+duration);
+    src.connect(filter);filter.connect(env);
+    if(ctx.createStereoPanner){const p=ctx.createStereoPanner();p.pan.value=pan;env.connect(p);p.connect(this.master);}else env.connect(this.master);
+    src.start(t);src.stop(t+duration+.005);
+  }
+  kick(t,volume=1){
+    const ctx=this.context,osc=ctx.createOscillator(),gain=ctx.createGain();
+    t=Math.max(ctx.currentTime+.002,t);osc.type='sine';
+    osc.frequency.setValueAtTime(160,t);osc.frequency.exponentialRampToValueAtTime(48,t+.17);
+    gain.gain.setValueAtTime(.001,t);gain.gain.exponentialRampToValueAtTime(.65*volume,t+.008);
+    gain.gain.exponentialRampToValueAtTime(.001,t+.28);
+    osc.connect(gain);gain.connect(this.master);osc.start(t);osc.stop(t+.3);
+  }
+  snare(t,volume=1){this.noiseHit(t,.16,.23*volume,900,-.35);this.tone(185,t,.12,.13*volume,'triangle',-.35);}
+  hat(t,volume=1){this.noiseHit(t,.045,.055*volume,5400,-.25);}
+  guitar(freq,t,volume=1,duration=.34){
+    this.tone(freq,t,duration,.12*volume,'triangle',.34);
+    this.tone(freq*2,t+.003,Math.min(duration,.24),.025*volume,'sine',.35);
+  }
+}
+
+// Agent communication is through a shared note-event bus and structured intentions.
+// This pass does not pretend to use speech recognition or a language model.
+class MusicalAgent {
+  constructor(name,role,initial){
+    this.name=name;this.role=role;
+    this.biasMs=initial.biasMs;this.jitterMs=initial.jitterMs;
+    this.curiosity=role==='drummer'?.83:.74;
+    this.generosity=role==='guitarist'?.89:.65;
+    this.currentGoal='practicing';this.observations=[];
+    this.ownOnsets=[];this.experiences=[];
+  }
+  rhythmOffset(){
+    // Gaussian-ish but clamped. Skill determines audible deviations, not a fake UI score.
+    const z=(Math.random()+Math.random()+Math.random()+Math.random()-2)*1.73;
+    return clamp(this.biasMs+this.jitterMs*z,-155,155);
+  }
+  observe(event){this.observations.push(event);if(this.observations.length>128)this.observations.shift();}
+  remember(description){this.experiences.unshift(description);if(this.experiences.length>8)this.experiences.length=8;}
+}
+class Grove {
+  constructor(saved=null){
+    this.pip=new MusicalAgent('Pip','drummer',{biasMs:clamp(saved?.pipBias??78,-100,150),jitterMs:clamp(saved?.pipJitter??34,7,75)});
+    this.riff=new MusicalAgent('Riff','guitarist',{biasMs:0,jitterMs:7});
+    this.familiarity=clamp(saved?.familiarity??0,0,99);
+    this.lessons=saved?.lessons??0;this.jams=saved?.jams??0;
+    this.mode='solo';this.modeBars=0;this.bar=0;this.beat=0;
+    this.logs=[];this.lastRiffOnsets=new Map();this.lastPipOnsets=new Map();
+    this.relativeErrors=[];this.barErrors=[];this.priorErrors=[];this.sessionMeasurements=[];
+    this.pipPlayed=0;this.riffPlayed=0;this.lastLearning=null;
+    this.highlight='Two musicians, one little clearing.';
+    this.onSound=null;this.onNote=null;
+    this.push('The grove is quiet. Two musicians are finding their sound.');
+    if(saved){this.push('Their memories survived the last visit.');}
+  }
+  push(message){this.logs.unshift({message,bar:this.bar});this.logs=this.logs.slice(0,12);this.highlight=message;}
+  exchange(from,to,message){
+    this.push(from.name+' → '+to.name+': '+message);
+    if(this.onTalk)this.onTalk(from.name,message);
+  }
+  baseline(){return rms(this.relativeErrors.slice(-16));}
+  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams};}
+  onBeatEvent(index,t,audio){
+    const beat=index%4,bar=Math.floor(index/4);
+    if(beat===0 && index>0)this.finishBar();
+    this.beat=beat;this.bar=bar;
+    const solo=this.mode==='solo';
+    // A practice room can hold two soloists without making them a duo.
+    // They exchange turns every two bars. Only a mutual choice creates joint music.
+    const pipActive=!solo || bar%4<2;
+    const riffActive=!solo || bar%4>=2;
+    const riffOffset=this.riff.rhythmOffset();
+    const guitarOnset=t+riffOffset/1000;
+    const pitches=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[146.83,185,220]][Math.floor(bar/2)%4];
+    const onLesson=this.mode==='lesson';
+    const onJam=this.mode==='jam';
+    const dynamic=onJam?.9:onLesson?.69:.51;
+    if(riffActive){
+      if(beat===0||beat===2){
+        pitches.forEach((p,i)=>audio.guitar(p,guitarOnset+i*.026,dynamic*(i===0?1:.72),.42));
+      }else audio.guitar(pitches[(beat+bar)%3]*2,guitarOnset,dynamic*.72,.23);
+      this.riffPlayed++;
+      this.pip.observe({type:'heard-guitar',bar,beat,time:guitarOnset});
+      this.riff.ownOnsets.push({bar,beat,time:guitarOnset});
+    }
+    const drumOffset=this.pip.rhythmOffset();
+    const drumOnset=t+drumOffset/1000;
+    if(pipActive){
+      if(beat===0||beat===2)audio.kick(drumOnset,beat===0?.9:.68);
+      else audio.snare(drumOnset,.7);
+      audio.hat(drumOnset+.017,.6);
+      audio.hat(drumOnset+beatDur*.5+.017,.32);
+      if(onJam && beat===3 && this.pip.curiosity>.7 && bar%4===0)audio.snare(drumOnset+beatDur*.74,.28);
+      this.pipPlayed++;
+      this.riff.observe({type:'heard-drum',bar,beat,time:drumOnset});
+      this.pip.ownOnsets.push({bar,beat,time:drumOnset});
+      // The partner's reliable reference pulse exists even while the guitar is silent.
+      // Difference is measured from actual synthesized drum onsets, not a cosmetic score.
+      const delta=(drumOnset-guitarOnset)*1000;
+      this.relativeErrors.push(delta);this.barErrors.push(delta);
+      this.sessionMeasurements.push({bar,beat,errorMs:delta,mode:this.mode});
+      if(this.relativeErrors.length>96)this.relativeErrors.shift();
+      if(this.sessionMeasurements.length>1000)this.sessionMeasurements.shift();
+    }
+    if(this.onNote){
+      if(pipActive)this.onNote({agent:'Pip',time:drumOnset,beat,delta:drumOffset-riffOffset});
+      if(riffActive)this.onNote({agent:'Riff',time:guitarOnset,beat,delta:riffOffset});
+    }
+  }
+  finishBar(){
+    const last4=this.barErrors;
+    this.barErrors=[];
+    const before=rms(last4)??this.baseline();
+    if(last4.length){
+      const correction=avg(last4);
+      const oldBias=this.pip.biasMs,oldJitter=this.pip.jitterMs;
+      // The partner's live reference yields a stronger correction than solo rehearsal.
+      const gain=this.mode==='lesson'?.59:(this.mode==='jam'?.16:.035);
+      this.pip.biasMs=clamp(this.pip.biasMs-clamp(correction*gain,-48,48),-105,145);
+      this.pip.jitterMs=clamp(this.pip.jitterMs*(this.mode==='lesson'?.927:(this.mode==='jam'?.987:.997)),7,75);
+      this.lastLearning={bar:this.bar,observedErrorMs:before,correctionMs:oldBias-this.pip.biasMs,precisionChangeMs:oldJitter-this.pip.jitterMs,mode:this.mode};
+    }
+    this.modeBars++;
+    if(this.mode==='solo')this.considerNewActivity(before);
+    else if(this.mode==='lesson'){
+      const clearProgress=this.modeBars>=3 && (before<36||this.modeBars>=7);
+      if(clearProgress){
+        this.lessons++;this.familiarity++;
+        this.pip.remember('Riff demonstrated a steady pulse.');
+        this.riff.remember('Pip worked through a timing lesson.');
+        this.exchange(this.pip,this.riff,before<36?'I can feel the beat settling!':'I want to try that in a song.');
+        this.mode='solo';this.modeBars=0;
+        this.pip.currentGoal='trying new patterns';this.riff.currentGoal='looking for a new idea';
+      }
+    }else if(this.mode==='jam'){
+      if(this.modeBars>=6 && Math.random()<.46){
+        this.jams++;this.familiarity++;
+        this.exchange(this.riff,this.pip,'That groove was worth remembering.');
+        this.pip.remember('Shared a jam with Riff; familiar grooves feel easier.');
+        this.riff.remember('Pip adds playful offbeat accents.');
+        this.mode='solo';this.modeBars=0;
+        this.pip.currentGoal='practicing';this.riff.currentGoal='experimenting';
+      }
+    }
+    if(this.bar%4===0)saveMemory(this.snapshot());
+  }
+  considerNewActivity(measuredError){
+    if(this.modeBars<3)return;
+    // Riff recognizes a timing problem from HEARD onset differences, then chooses whether to help.
+    const needsHelp=measuredError!=null && measuredError>40;
+    const teachUtility=(needsHelp?.65:0)+this.riff.generosity*.26+rand(-.1,.1);
+    const jamUtility=.26+this.familiarity*.08+(measuredError!=null&&measuredError<56?.24:0)+this.pip.curiosity*.16+rand(-.1,.1);
+    const soloUtility=.46+rand(-.08,.16);
+    const candidate=teachUtility>jamUtility&&teachUtility>soloUtility?'lesson':jamUtility>soloUtility?'jam':'solo';
+    if(candidate==='lesson' && needsHelp){
+      this.exchange(this.riff,this.pip,'Your notes drift a little. Want to follow my pulse?');
+      const pipWillingness=.55+clamp(measuredError/150,0,.34)+(this.familiarity*.025);
+      if(Math.random()<pipWillingness){
+        this.exchange(this.pip,this.riff,'Play it steady. I’ll listen.');
+        this.mode='lesson';this.modeBars=0;
+        this.pip.currentGoal='listening and correcting timing';
+        this.riff.currentGoal='demonstrating the pulse';
+      }else this.push('Pip chooses to keep experimenting alone.');
+    }else if(candidate==='jam'){
+      this.exchange(this.pip,this.riff,'Want to see what these rhythms do together?');
+      const riffWillingness=.49+this.riff.curiosity*.24+this.familiarity*.025;
+      if(Math.random()<riffWillingness){
+        this.exchange(this.riff,this.pip,'Let’s find out.');
+        this.mode='jam';this.modeBars=0;
+        this.pip.currentGoal='improvising with Riff';
+        this.riff.currentGoal='responding to Pip’s rhythm';
+      }else this.push('Riff listens, then returns to practicing chords.');
+    }else if(this.modeBars>6 && Math.random()<.3){
+      this.pip.currentGoal='independent rhythm practice';
+      this.riff.currentGoal='exploring chord shapes';
+      this.push('For now, each musician follows their own curiosity.');
+    }
+  }
+}
+
+const app=new Application();
+await app.init({resizeTo:window,background:PALETTE.ink,antialias:true,preference:'webgl',resolution:Math.min(window.devicePixelRatio||1,2),autoDensity:true});
+document.body.appendChild(app.canvas);
+app.canvas.setAttribute('aria-label','GrooveGrove musical agents prototype. Tap the canvas to start sound.');
+app.canvas.style.display='block';
+const root=new Container();app.stage.addChild(root);
+let sound=new SoundEngine(),grove=null;
+let started=false,startError='',selected='Pip';
+let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1;
+let floatingNotes=[],talkBubble=null,ambient=[],now=0,visualBeat=-1;
+let noteFlash={Pip:0,Riff:0};
+let redrawAccum=0;
+const noteMarks=[];
+
+function makeBackground(world){
+  const g=new Graphics();world.addChild(g);
+  rect(g,0,0,W,H,0,PALETTE.ink);
+  const r=seeded(42017);
+  for(let k=0;k<10;k++)ellipse(g,W*.52,H*.49,Math.max(W,H)*(.68-k*.051),Math.max(W,H)*(.58-k*.042),k%2?0x102d2d:0x0f2b2b,.17);
+  for(let i=0;i<145;i++){
+    const x=r()*W,y=r()*H,radius=2+r()*8;
+    if(Math.abs(x-W*.5)<W*.29 && Math.abs(y-H*.43)<H*.24)continue;
+    ellipse(g,x,y,radius*.53,radius*1.3,i%3===0?0x355b40:0x1c493c,.3+r()*.23);
+  }
+  for(let i=0;i<54;i++){
+    const x=r()*W,y=r()*H;
+    circle(g,x,y,.5+r()*1.6, i%4===0?PALETTE.gold:PALETTE.mint,.2+r()*.22);
+  }
+  const padX=W*.5,padY=landscape?H*.46:H*.405;
+  ui.padX=padX;ui.padY=padY;
+  const radX=landscape?Math.min(W*.30,405):198;
+  const radY=landscape?222:242;
+  for(let k=0;k<5;k++)ellipse(g,padX,padY+16,radX+24-k*6,radY+24-k*6,k%2?0x295244:0x20473b,.27);
+  ellipse(g,padX,padY+13,radX,radY,0x21473d,1);
+  ellipse(g,padX,padY+20,radX-15,radY-17,0x2a5646,.44);
+  ellipse(g,padX,padY+radY-5,radX*.77,36,0x081e20,.35);
+  // Loose spiraling lines imply a wood-and-moss performance clearing.
+  for(let a=0;a<17;a++){
+    const ang=(a/17)*Math.PI*2;
+    const x=padX+Math.cos(ang)*(radX-10),y=padY+Math.sin(ang)*(radY-9);
+    ellipse(g,x,y,13+r()*12,8+r()*7,a%3?0x407356:0x628c62,.26);
+  }
+  // Houseplants, shells, acoustic ornaments. Nothing is an HTML element.
+  for(let i=0;i<28;i++){
+    const a=r()*6.28,rx=radX*(.77+r()*.22),ry=radY*(.75+r()*.2);
+    const x=padX+Math.cos(a)*rx,y=padY+Math.sin(a)*ry;
+    circle(g,x,y,2+r()*2.5,0xa5a36e,.25);
+  }
+  // Hanging garden lanterns.
+  const lx=padX-radX*.69,ly=padY-radY*.64;
+  const rx=padX+radX*.72,ry=padY-radY*.60;
+  [[lx,ly],[rx,ry]].forEach(([x,y],idx)=>{
+    line(g,x,y-45,x,y-7,0x779479,2,.5);
+    circle(g,x,y,37,0xf2c779,.045);circle(g,x,y,23,0xf2c779,.09);
+    rect(g,x-8,y-11,16,22,5,0x72583a);
+    rect(g,x-5,y-8,10,16,4,0xffdc9f,.78);
+  });
+  // Small pond to reset the experiment with a long-press gesture.
+  const px=landscape?padX+radX*.6:W*.81;
+  const py=landscape?padY+radY*.69:padY+radY*.70;
+  ui.pond={x:px,y:py,r:26};
+  ellipse(g,px,py,32,19,0x0b3439,.85);
+  ellipse(g,px,py-3,26,13,0x367c79,.7);
+  ellipse(g,px-6,py-5,10,2,0xb1e7c5,.28);
+  // Keep handles to animated fireflies; one Pixi graphics object per mote.
+  ambient=[];
+  for(let i=0;i<18;i++){
+    const p=new Graphics();circle(p,0,0,1.5+r()*2,i%4?PALETTE.gold:PALETTE.mint,.8);
+    p.x=r()*W;p.y=r()*H;p.alpha=.05;world.addChild(p);
+    ambient.push({sprite:p,x:p.x,y:p.y,phase:r()*6.28,speed:.35+r()*.8});
+  }
+}
+function makeDrummer(parent,x,y,s){
+  const c=new Container();c.position.set(x,y);c.scale.set(s);parent.addChild(c);
+  const shadow=new Graphics();ellipse(shadow,0,122,108,24,0x051f20,.38);c.addChild(shadow);
+  const legs=new Graphics();line(legs,-24,48,-37,95,0x1d3438,15);line(legs,25,48,43,96,0x1d3438,15);
+  ellipse(legs,-43,100,25,11,0x244b49);ellipse(legs,50,99,25,11,0x244b49);c.addChild(legs);
+  const body=new Graphics();ellipse(body,0,24,55,64,0x52aa9b);ellipse(body,-15,2,27,33,0x9ae6bf,.19);
+  rect(body,-56,-81,111,104,45,0x60c1ac);
+  ellipse(body,0,-26,45,37,0x72cab3,.48);
+  ellipse(body,-22,-40,7,9,PALETTE.dark);ellipse(body,23,-40,7,9,PALETTE.dark);
+  circle(body,-19,-43,2.5,0xfbf8d8);circle(body,26,-43,2.5,0xfbf8d8);
+  line(body,-12,-17,12,-17,0x26534d,3.2);
+  // Headphones
+  body.arc(0,-49,51,3.3,6.1).stroke({color:0x294e50,width:9});
+  rect(body,-56,-55,11,33,5,0x365b60);rect(body,47,-55,11,33,5,0x365b60);
+  c.addChild(body);
+  const sticks=new Graphics();c.addChild(sticks);
+  const drums=new Graphics();
+  ellipse(drums,-57,84,47,21,0x9f665c);ellipse(drums,56,84,47,21,0x9f665c);
+  ellipse(drums,-57,79,43,13,0xd89f85);ellipse(drums,56,79,43,13,0xd89f85);
+  rect(drums,-45,94,90,35,10,0x8b554c);
+  ellipse(drums,0,95,49,22,0xd89175);ellipse(drums,0,92,43,14,0xebc9a5);
+  ellipse(drums,0,94,14,7,0xe8a97c,.43);
+  line(drums,-57,105,-64,125,0xf7bb8e,3);line(drums,59,107,66,126,0xf7bb8e,3);
+  c.addChild(drums);
+  const label=textAt(c,'PIP',0,145,22,PALETTE.mint,'bold',3,.5);
+  return {group:c,sticks,face:body,label};
+}
+function makeGuitarist(parent,x,y,s){
+  const c=new Container();c.position.set(x,y);c.scale.set(s);parent.addChild(c);
+  const g=new Graphics();ellipse(g,0,122,105,24,0x041d1e,.39);
+  line(g,-18,50,-30,99,0x3b3752,17);line(g,20,54,38,96,0x3b3752,17);
+  ellipse(g,-35,102,25,11,0x2c3447);ellipse(g,43,102,25,11,0x2c3447);
+  ellipse(g,0,16,50,65,0x7d6ca1);
+  rect(g,-56,-85,111,111,45,0xa58ecb);
+  ellipse(g,-22,-35,7,9,PALETTE.dark);ellipse(g,21,-35,7,9,PALETTE.dark);
+  circle(g,-20,-38,2.5,0xfff2d2);circle(g,23,-38,2.5,0xfff2d2);
+  g.moveTo(-10,-12).quadraticCurveTo(0,-3,11,-12).stroke({color:0x443f59,width:3});
+  // Slightly slanted beret.
+  ellipse(g,2,-88,62,17,0x44475e);ellipse(g,0,-101,32,13,0x535670);
+  c.addChild(g);
+  const guitar=new Graphics();
+  guitar.rotation=-.24;guitar.position.set(15,39);
+  ellipse(guitar,-23,25,45,43,0xd77b61);
+  ellipse(guitar,3,-3,34,32,0xe9a16f);
+  rect(guitar,2,-99,18,104,6,0xd7a96c);
+  rect(guitar,1,-110,21,23,4,0xc58c57);
+  circle(guitar,0,9,14,0x3a3447);
+  for(let i=0;i<4;i++)line(guitar,8+i*2.5,-105,-12+i*4,56,0xffe6bd,.85,.78);
+  rect(guitar,-19,44,32,9,2,0x584654);
+  c.addChild(guitar);
+  const arm=new Graphics();c.addChild(arm);
+  const label=textAt(c,'RIFF',0,145,22,PALETTE.lilac,'bold',3,.5);
+  return {group:c,arm,guitar,label};
+}
+function buildCanvas(){
+  // Rebuild graphics, never the agent state, on resize/orientation change.
+  for(const child of root.removeChildren())child.destroy({children:true});
+  ui={};floatingNotes=[];talkBubble=null;
+  const winW=app.screen.width,winH=app.screen.height;
+  landscape=winW>winH*1.18;
+  scale=landscape?Math.min(winW/1170,winH/755):winW/430;
+  root.scale.set(scale);W=winW/scale;H=winH/scale;
+  const world=new Container();root.addChild(world);
+  makeBackground(world);
+  const left=landscape?56:28;
+  const title=textAt(world,'GROOVEGROVE',left,landscape?22:42,landscape?35:29,PALETTE.cream,'bold',3.4);
+  textAt(world,'TWO MINDS  ·  ONE GROOVE',left,landscape?66:83,landscape?12:11,PALETTE.mint,'bold',2.4);
+  textAt(world,'PASS 001    /    THE FIRST JAM',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
+  const cy=ui.padY;
+  const actorOffset=landscape?Math.min(W*.19,235):116;
+  const actorScale=landscape?1.02:.71;
+  ui.pipPos={x:W*.5-actorOffset,y:cy+10};
+  ui.riffPos={x:W*.5+actorOffset,y:cy+10};
+  ui.pip=makeDrummer(world,ui.pipPos.x,ui.pipPos.y,actorScale);
+  ui.riff=makeGuitarist(world,ui.riffPos.x,ui.riffPos.y,actorScale);
+  ui.pip.group.eventMode='static';ui.pip.group.hitArea=new Rectangle(-115,-125,230,285);
+  ui.riff.group.eventMode='static';ui.riff.group.hitArea=new Rectangle(-115,-125,230,285);
+  ui.pip.group.cursor='pointer';ui.riff.group.cursor='pointer';
+  ui.pip.group.on('pointertap',()=>{selected='Pip';refreshText();});
+  ui.riff.group.on('pointertap',()=>{selected='Riff';refreshText();});
+  ui.fx=new Graphics();world.addChild(ui.fx);
+  ui.bubbleLayer=new Container();world.addChild(ui.bubbleLayer);
+  ui.bubbleShape=new Graphics();ui.bubbleLayer.addChild(ui.bubbleShape);
+  ui.bubbleText=textAt(ui.bubbleLayer,'',0,0,landscape?13:12,PALETTE.cream);
+  ui.bubbleLayer.visible=false;
+  const border=new Graphics();world.addChild(border);
+  const panelY=landscape?H-197:H-284;
+  ui.panelY=panelY;
+  const panelW=landscape?Math.min(W-96,1100):W-32;
+  const panelX=(W-panelW)*.5;
+  ui.panelX=panelX;ui.panelW=panelW;
+  rect(border,panelX,panelY,panelW,landscape?174:263,22,0x091f23,.96);
+  rect(border,panelX+3,panelY+3,panelW-6,landscape?168:257,20,0x123432,.91);
+  if(landscape){
+    line(border,panelX+panelW*.47,panelY+21,panelX+panelW*.47,panelY+154,0x41645b,1,.42);
+    line(border,panelX+panelW*.74,panelY+21,panelX+panelW*.74,panelY+154,0x41645b,1,.42);
+  }else{
+    line(border,panelX+15,panelY+91,panelX+panelW-15,panelY+91,0x41645b,1,.42);
+    line(border,panelX+15,panelY+167,panelX+panelW-15,panelY+167,0x41645b,1,.42);
+  }
+  ui.modeLabel=textAt(world,'TWO SOLO PRACTICES',landscape?panelX+20:W*.5,panelY+15,landscape?14:13,PALETTE.gold,'bold',2,landscape?0:.5);
+  ui.statusLine=textAt(world,'Tap the clearing to begin listening',landscape?panelX+20:W*.5,panelY+(landscape?47:43),landscape?16:13,PALETTE.cream,'normal',0,landscape?0:.5);
+  ui.statusLine.style.wordWrap=true;ui.statusLine.style.wordWrapWidth=landscape?panelW*.43:panelW-35;
+  ui.listenLabel=textAt(world,'LIVE TIMING   /   PIP TO RIFF',landscape?panelX+20:panelX+18,panelY+(landscape?86:110),12,PALETTE.muted,'bold',1);
+  ui.meter=new Graphics();world.addChild(ui.meter);
+  if(landscape){
+    const statX=panelX+panelW*.49;
+    textAt(world,'MUSICIANS',statX,panelY+15,12,PALETTE.muted,'bold',1.5);
+    ui.pipMetric=textAt(world,'PIP   collecting...',statX,panelY+49,17,PALETTE.mint,'bold');
+    ui.riffMetric=textAt(world,'RIFF   steady guide',statX,panelY+78,15,PALETTE.lilac);
+    ui.memoryMetric=textAt(world,'MEMORIES   0 shared sessions',statX,panelY+120,12,PALETTE.muted);
+    const feedX=panelX+panelW*.77;
+    textAt(world,'LISTENING LOG',feedX,panelY+15,12,PALETTE.muted,'bold',1.6);
+    ui.log=[textAt(world,'',feedX,panelY+45,14,PALETTE.cream),textAt(world,'',feedX,panelY+83,14,PALETTE.muted),textAt(world,'',feedX,panelY+121,13,PALETTE.muted)];
+    ui.log.forEach(t=>{t.style.wordWrap=true;t.style.wordWrapWidth=panelW*.21;});
+  }else{
+    ui.pipMetric=textAt(world,'PIP   collecting...',panelX+18,panelY+179,15,PALETTE.mint,'bold');
+    ui.riffMetric=textAt(world,'RIFF   steady guide',panelX+18,panelY+202,13,PALETTE.lilac);
+    ui.memoryMetric=textAt(world,'0 shared sessions',panelX+18,panelY+226,12,PALETTE.muted);
+    textAt(world,'LISTENING LOG',panelX+18,panelY+247,10,PALETTE.muted,'bold',1.2);
+    ui.log=[textAt(world,'',panelX+134,panelY+246,12,PALETTE.cream)];
+    ui.log[0].style.wordWrap=true;ui.log[0].style.wordWrapWidth=panelW-154;
+  }
+  const badgeX=landscape?W*.5:W*.5,badgeY=landscape?panelY-44:panelY-51;
+  ui.badge=new Graphics();rect(ui.badge,badgeX-124,badgeY-13,248,36,18,0x102d2d,.92);
+  world.addChild(ui.badge);
+  ui.badgeText=textAt(world,'TAP ANYWHERE TO START',badgeX,badgeY-4,12,PALETTE.gold,'bold',1.7,.5);
+  ui.inspect=textAt(world,'',landscape?W*.5:W*.5,landscape?panelY-84:panelY-93,landscape?13:12,PALETTE.cream,'normal',0,.5);
+  refreshText();
+}
+function refreshText(){
+  if(!ui.modeLabel)return;
+  const mode=grove?.mode||'solo';
+  ui.modeLabel.text=mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES';
+  ui.statusLine.text=startError?startError:!started?'Tap the clearing to hear their first notes':grove.highlight;
+  if(grove){
+    const error=grove.baseline();
+    ui.pipMetric.text='PIP   '+(error==null?'collecting timing...':fmt(error)+' RMS drift');
+    ui.riffMetric.text='RIFF   guitar pulse · ~7 ms spread';
+    ui.memoryMetric.text=grove.familiarity+' shared sessions  ·  '+grove.lessons+' lessons  ·  '+grove.jams+' jams';
+    if(landscape){
+      const rows=grove.logs.slice(0,3);
+      ui.log.forEach((t,i)=>{t.text=rows[i]?.message||'';});
+    }else ui.log[0].text=grove.logs[0]?.message||'';
+    const who=selected==='Pip'?grove.pip:grove.riff;
+    ui.inspect.text=who.name.toUpperCase()+' · '+who.currentGoal+'  |  tap either musician to inspect';
+  }else ui.inspect.text='Tap a musician to follow their decisions';
+  ui.badgeText.text=!started?'TAP ANYWHERE TO START':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
+  ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
+}
+function renderMeter(){
+  if(!ui.meter)return;
+  const g=ui.meter;g.clear();
+  const x=ui.panelX+19,y=ui.panelY+(landscape?124:145);
+  const width=landscape?ui.panelW*.42:ui.panelW-40;
+  line(g,x,y,x+width,y,0x7b9b8a,1,.55);
+  const ticks=[-100,-50,0,50,100];
+  ticks.forEach(ms=>{
+    const tx=x+(ms+100)/200*width;
+    line(g,tx,y-6,tx,y+7,ms===0?PALETTE.gold:0x628780,ms===0?2:1,.6);
+  });
+  const errors=(grove?.relativeErrors||[]).slice(-14);
+  errors.forEach((value,i)=>{
+    const tx=x+(clamp(value,-100,100)+100)/200*width;
+    circle(g,tx,y-15-(i%3)*5,3.3,PALETTE.mint,.2+i/errors.length*.77);
+  });
+}
+
+function emitVisualNote(e){
+  const p=e.agent==='Pip'?ui.pipPos:ui.riffPos;
+  if(!p)return;
+  const tone=e.agent==='Pip'?PALETTE.mint:PALETTE.lilac;
+  floatingNotes.push({x:p.x+rand(-20,18),y:p.y-110+(landscape?0:25),vx:rand(-.38,.38),born:performance.now(),color:tone,size:rand(6,10)});
+  if(floatingNotes.length>24)floatingNotes.shift();
+  noteFlash[e.agent]=performance.now();
+}
+function showSpeech(from,message){
+  talkBubble={from,message,born:performance.now()};
+}
+function renderEffects(time){
+  if(!ui.fx)return;
+  const fx=ui.fx;fx.clear();
+  const pulse=(grove?.beat||0);
+  const elapsed=(time-(noteFlash.Pip||0))/1000;
+  const elapsedR=(time-(noteFlash.Riff||0))/1000;
+  [ ['Pip',elapsed,PALETTE.mint],['Riff',elapsedR,PALETTE.lilac] ].forEach(([name,dt,color])=>{
+    if(dt<.38 && dt>=0){
+      const p=name==='Pip'?ui.pipPos:ui.riffPos;
+      fx.circle(p.x,p.y+54,38+dt*170).stroke({color,width:3,alpha:(1-dt/.38)*.45});
+    }
+  });
+  floatingNotes=floatingNotes.filter(n=>time-n.born<1200);
+  floatingNotes.forEach(n=>{
+    const age=(time-n.born)/1000;
+    const x=n.x+n.vx*age*36,y=n.y-age*45;
+    const fade=(1-age/1.2);
+    circle(fx,x,y,n.size*.47,n.color,fade*.83);
+    line(fx,x+n.size*.3,y-7,x+n.size*.3,y,n.color,2,fade);
+  });
+  for(const a of ambient){
+    const t=time/1000*a.speed+a.phase;
+    a.sprite.position.set(a.x+Math.cos(t)*9,a.y+Math.sin(t*.77)*13);
+    a.sprite.alpha=.12+.45*(Math.sin(t*1.8)**2);
+  }
+  // Simple real-time drumstick motion and guitar strum animation.
+  const motionP=clamp(1-elapsedP(elapsed)/.24,0,1),motionR=clamp(1-elapsedP(elapsedR)/.3,0,1);
+  if(ui.pip?.sticks){
+    const d=ui.pip.sticks;d.clear();
+    line(d,-67,13,-28+(motionP*8),65-motionP*38,0xf9d28e,5);
+    line(d,68,12,22-(motionP*8),64-motionP*40,0xf9d28e,5);
+    circle(d,-67,13,6,PALETTE.mint);circle(d,68,12,6,PALETTE.mint);
+    ui.pip.group.y=ui.pipPos.y+Math.sin(time/380)*1.5;
+  }
+  if(ui.riff?.arm){
+    const a=ui.riff.arm;a.clear();
+    line(a,-35,11,20,35+motionR*19,0xa68dcd,15);
+    circle(a,20,35+motionR*19,8,0xe0c7e0);
+    ui.riff.group.y=ui.riffPos.y+Math.sin(time/470+2)*2;
+  }
+  ui.bubbleLayer.visible=!!(talkBubble && time-talkBubble.born<4300);
+  if(ui.bubbleLayer.visible){
+    const age=(time-talkBubble.born)/1000;
+    const pos=talkBubble.from==='Pip'?ui.pipPos:ui.riffPos;
+    const boxW=landscape?230:182;
+    const boxY=pos.y-(landscape?195:151);
+    const x=clamp(pos.x-boxW/2,12,W-boxW-12);
+    if(ui.lastBubble!==talkBubble){
+      const b=ui.bubbleShape;b.clear();
+      rect(b,x,boxY,boxW,landscape?74:78,13,0x082527,.93);
+      b.roundRect(x,boxY,boxW,landscape?74:78,13).stroke({color:talkBubble.from==='Pip'?PALETTE.mint:PALETTE.lilac,width:1,alpha:.5});
+      const text=ui.bubbleText;text.text=talkBubble.message;text.position.set(x+11,boxY+11);
+      text.style.wordWrap=true;text.style.wordWrapWidth=boxW-22;
+      ui.lastBubble=talkBubble;
+    }
+    ui.bubbleLayer.alpha=Math.min(1,(4.3-age)*3);
+  }
+}
+function elapsedP(x){return Math.max(0,x);}
+function onScheduledBeat(beat,time){
+  grove.onBeatEvent(beat,time,sound);
+  if(beat%4===0)refreshText();
+}
+async function startAudio(){
+  if(started)return;
+  started=true;
+  try{
+    await sound.start(onScheduledBeat);
+    grove.push('Pip and Riff begin playing. Neither has been told to form a band.');
+    refreshText();
+  }catch(err){
+    started=false;startError='Audio could not start: '+(err?.message||'unknown problem');refreshText();
+  }
+}
+let pressTimer=null,pressStart=null;
+app.canvas.addEventListener('pointerdown',(ev)=>{
+  startAudio();
+  // Press-and-hold the painted pond, not a DOM control, to begin a fresh study.
+  const bounds=app.canvas.getBoundingClientRect();
+  const lx=(ev.clientX-bounds.left)/scale,ly=(ev.clientY-bounds.top)/scale;
+  const d=Math.hypot(lx-ui.pond.x,ly-ui.pond.y);
+  if(d<40){
+    pressStart=performance.now();
+    clearTimeout(pressTimer);
+    pressTimer=setTimeout(()=>{
+      if(!grove)return;
+      grove=new Grove(null);
+      grove.onNote=emitVisualNote;grove.onTalk=showSpeech;
+      saveMemory(grove.snapshot());
+      grove.push('A fresh study begins. The pond remembers nothing.');
+      refreshText();
+    },1800);
+  }
+});
+['pointerup','pointercancel','pointerleave'].forEach(name=>app.canvas.addEventListener(name,()=>{clearTimeout(pressTimer);pressTimer=null;}));
+window.addEventListener('pagehide',()=>{if(grove)saveMemory(grove.snapshot());});
+window.addEventListener('resize',()=>{buildCanvas();});
+const saved=await (async()=>{await openMemory();return loadMemory();})();
+grove=new Grove(saved);
+grove.onNote=emitVisualNote;
+grove.onTalk=showSpeech;
+buildCanvas();
+app.ticker.add(()=>{
+  const t=performance.now();
+  renderEffects(t);
+  redrawAccum+=app.ticker.deltaMS;
+  if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
+});
+// Inspectable test hooks; not part of the rendered interface.
+window.GrooveGroveDebug={get state(){return grove.snapshot();},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},restart(){grove=new Grove();grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
+</script>
+</body>
+</html>
