@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="087-living-flame-silhouette",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="088-motion-aligned-flames",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -88,6 +88,8 @@
   const FIRE_PERIMETER=win.WRKMAN_FIRE_PERIMETER||null;
   const FIRE_STABILITY=win.WRKMAN_FIRE_STABILITY||null;
   const FIRE_FLAME=win.WRKMAN_FIRE_FLAME||null;
+  const FIRE_MOTION=win.WRKMAN_FIRE_MOTION||null;
+  const fireMotionTracker=FIRE_MOTION?.makeTracker?FIRE_MOTION.makeTracker():null;
   const fireTracker=FIRE_STABILITY?.makeTracker?FIRE_STABILITY.makeTracker({
    maxSlots:3,fadeMs:180,heatHoldMs:110,heatFadeMs:190}):null;
   const allowedLooks=["original","bright","formation"];
@@ -111,6 +113,8 @@
    fireEmbers:opts.fireEmbers!==false,fireEmberBoosted:0,
    fireFlames:opts.fireFlames!==false&&!!FIRE_FLAME?.makeFlameTexture,
    fireFlamesDrawn:0,
+   fireMotion:opts.fireMotion!==false&&!!fireMotionTracker,
+   fireMotionAligned:0,fireMotionDense:0,
    fireStableSlots:0,fireStableGhosts:0,fireStableFading:0,
    fireStableSwaps:0,fireStableHeldHot:0,fireStableCached:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
@@ -204,6 +208,13 @@
    }
    announce("FIRE CLUSTERS · "+(state.fireDebug?"DEBUG ON":"OFF"));
    return state.fireDebug;
+  }
+  function setFireMotion(enabled){
+   state.fireMotion=!!enabled&&!!fireMotionTracker;
+   fireMotionTracker?.reset();
+   state.fireMotionAligned=state.fireMotionDense=0;
+   announce("FIRE MOTION · "+(state.fireMotion?"ON":"OFF"));
+   return state.fireMotion;
   }
   function setFireFlames(enabled){
    state.fireFlames=!!enabled&&flameTextures.length===3&&flameTextures.every(Boolean);
@@ -635,6 +646,8 @@
    state.fireStableSlots=state.fireStableGhosts=state.fireStableFading=0;
    state.fireStableSwaps=state.fireStableHeldHot=state.fireStableCached=0;
    state.fireEmberBoosted=0;state.fireFlamesDrawn=0;
+   state.fireMotionAligned=state.fireMotionDense=0;
+   fireMotionTracker?.reset();
    if(app?.canvas)app.canvas.style.display="none";
    shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();fireHotGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireHotFills=state.fireHotGlows=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
@@ -656,6 +669,10 @@
     state.frame++;heroUsed=0;
     for(const group of bulkGroups.values())group.used=0;
     let detailed=0,bulk=0,materialDrawn=0,artFallback=0,emberBoosted=0,flamesDrawn=0;
+    let motionAligned=0,motionDense=0;
+    const neighborCounts=state.fireMotion&&state.fireFlames?
+     FIRE_MOTION.countNearbyFire(state.records):null;
+    if(neighborCounts)fireMotionTracker.beginFrame();
     for(const r of state.records){
      const elem=classify(r),index=Math.max(0,Number(r.agentIndex)||0);
      const hero=(index%10===0)||(r.r>9&&index%4===0);
@@ -675,8 +692,18 @@
      const visualTint=useMaterial?0xffffff:
       typeof r.color==="number"&&Number.isFinite(r.color)?(r.color&0xffffff):0xffffff;
      const flame=elem===1&&useMaterial&&state.fireFlames&&!!flameTextures[variant];
-     const pose=flame?FIRE_FLAME.flamePose(r,size):null;
+     const idlePose=flame?FIRE_FLAME.flamePose(r,size):null;
+     const neighborhood=flame&&neighborCounts?(neighborCounts.get(r)||0):0;
+     const moving=flame&&neighborCounts?
+      fireMotionTracker.sample(r,neighborhood,idlePose.rotation):null;
+     const pose=flame&&moving?{
+      width:idlePose.width*moving.width,
+      height:idlePose.height*moving.stretch,
+      rotation:moving.rotation
+     }:idlePose;
      if(flame)flamesDrawn++;
+     if(moving?.aligned)motionAligned++;
+     if(flame&&neighborhood>=5)motionDense++;
      if(hero){
       const sprite=allocateHero();
       sprite.texture=flame?flameTextures[variant]:(texture||textureSet[elem][variant]);
@@ -707,6 +734,7 @@
     paintFormations();paintAccents();paintFireEffects();
     state.materialDrawn=materialDrawn;state.artFallback=artFallback;
     state.fireEmberBoosted=emberBoosted;state.fireFlamesDrawn=flamesDrawn;
+    state.fireMotionAligned=motionAligned;state.fireMotionDense=motionDense;
     for(let i=heroUsed;i<spritePool.length;i++)spritePool[i].visible=false;
     for(const group of bulkGroups.values())for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
     align();drawReference();app.render();
@@ -719,7 +747,7 @@
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
    app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();flameTextures=[];state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setFireMotion,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,fireEmberFootprint,createBridge});
 });
