@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#080f1b">
-<title>W//OS : Seed 01</title>
+<title>W//OS : Seed 02</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;background:#07101b;overflow:hidden;width:100%;height:100%;overscroll-behavior:none}canvas{display:block;width:100vw;height:100dvh;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent} 
 </style>
@@ -14,23 +14,23 @@
 <body><canvas id="display" aria-label="W OS interactive virtual desktop"></canvas>
 <script>
 (()=>{'use strict';
-// W//OS SEED 01: A single-canvas OS shell with a persistent native WIMG file.
+// W//OS SEED 02: persistent WIMG + WNOTE, with the native single-canvas W//Keys keyboard.
 // Each subsystem is ONE W address and owns its legal transitions. No flag piles.
 const W=Object.freeze({
  system:Object.freeze({OFF:'SYSTEM.W0',BOOT:'SYSTEM.W1',READY:'SYSTEM.W2',SHUT:'SYSTEM.W3'}),
- shell:Object.freeze({HOME:'SHELL.W0',FILES:'SHELL.W1',STUDIO:'SHELL.W2',EDIT:'SHELL.W3',INSPECT:'SHELL.W4'}),
+ shell:Object.freeze({HOME:'SHELL.W0',FILES:'SHELL.W1',STUDIO:'SHELL.W2',EDIT:'SHELL.W3',INSPECT:'SHELL.W4',NOTEPAD:'SHELL.W5',NOTE_EDIT:'SHELL.W6'}),
  document:Object.freeze({UNBOUND:'DOCUMENT.W0',CLEAN:'DOCUMENT.W1',DIRTY:'DOCUMENT.W2',SAVING:'DOCUMENT.W3',ERROR:'DOCUMENT.W4'})
 });
 const LAW={
  system:{'SYSTEM.W0':['SYSTEM.W1'],'SYSTEM.W1':['SYSTEM.W2','SYSTEM.W0'],'SYSTEM.W2':['SYSTEM.W3'],'SYSTEM.W3':['SYSTEM.W0']},
- shell:{'SHELL.W0':['SHELL.W1','SHELL.W2','SHELL.W4'],'SHELL.W1':['SHELL.W0','SHELL.W2','SHELL.W3','SHELL.W4'],'SHELL.W2':['SHELL.W0','SHELL.W1','SHELL.W3','SHELL.W4'],'SHELL.W3':['SHELL.W0','SHELL.W1','SHELL.W2','SHELL.W4'],'SHELL.W4':['SHELL.W0','SHELL.W1','SHELL.W2','SHELL.W3']},
+ shell:Object.fromEntries(Object.values(W.shell).map(from=>[from,Object.values(W.shell).filter(to=>to!==from)])),
  document:{'DOCUMENT.W0':['DOCUMENT.W1'],'DOCUMENT.W1':['DOCUMENT.W0','DOCUMENT.W2'],'DOCUMENT.W2':['DOCUMENT.W3','DOCUMENT.W0'],'DOCUMENT.W3':['DOCUMENT.W1','DOCUMENT.W2','DOCUMENT.W4'],'DOCUMENT.W4':['DOCUMENT.W2','DOCUMENT.W3','DOCUMENT.W0']}
 };
 const canvas=document.getElementById('display'),g=canvas.getContext('2d',{alpha:false});
 const C={bg:'#080f1b',panel:'#111c2b',panel2:'#152439',stroke:'#253b53',dim:'#7e91a7',white:'#ecf6ff',mint:'#71efd4',blue:'#66b7fb',gold:'#f4c77d',red:'#ef839b'};
 const PALETTE=['#142033','#233951','#f2f5ec','#84dae7','#4e9ed4','#41627b','#c99fea','#f6b7a8','#f49a66','#ffdc83','#86d5a1','#536f4f'];
 let vw=0,vh=0,dpr=1,safeT=24,safeB=16,hit=[],drawing=null,paintRect=null,frame=false;
-let os={W:{system:W.system.OFF,shell:W.shell.HOME,document:W.document.UNBOUND},files:[],active:null,selected:null,brush:3,tool:'pencil',undo:[],toast:'',toastUntil:0,bootAt:0,loading:'',backFromInspect:W.shell.HOME,log:[],storage:'IndexedDB',error:'',pending:null};
+let os={W:{system:W.system.OFF,shell:W.shell.HOME,document:W.document.UNBOUND},files:[],active:null,selected:null,brush:3,tool:'pencil',undo:[],toast:'',toastUntil:0,bootAt:0,loading:'',backFromInspect:W.shell.HOME,log:[],storage:'IndexedDB',error:'',pending:null,filePage:0,note:{cursor:0,bodyCursor:0,scroll:0,page:'abc',shift:false,rename:false,title:'',titleCursor:0}};
 const stamp=()=>new Date().toISOString();
 function track(a,to,reason){const from=os.W[a];if(from===to)return true;if(!(LAW[a][from]||[]).includes(to)){console.warn('W law blocked',a,from,to);return false;}os.W[a]=to;os.log.unshift({at:new Date().toLocaleTimeString(),a,from,to,reason});os.log.length=Math.min(16,os.log.length);invalidate();return true;}
 function shell(to){return track('shell',to,'navigation');}
@@ -54,25 +54,53 @@ function header(){rect(0,0,vw,vh,C.bg); // coarse background grid
  line(0,safeT+1,vw,safeT+1,C.stroke);
 }
 function bottom(){const y=vh-safeB-61;line(0,y-13,vw,y-13,C.stroke);const x=14,gap=8,w=(vw-28-2*gap)/3;btn('⌂  DESKTOP',x,y,w,45,()=>nav(W.shell.HOME),'secondary',11);btn('▤  FILES',x+w+gap,y,w,45,()=>nav(W.shell.FILES),'secondary',11);btn('⏻  POWER',x+2*(w+gap),y,w,45,shutdown,'subtle',11);}
-function toastDraw(){if(Date.now()<os.toastUntil){const w=Math.min(vw-34,320),y=vh-safeB-134;rect((vw-w)/2,y,w,42,'#1b3742',12,C.mint);text(os.toast,vw/2,y+21,12,C.white,650,'center');}}
+function toastDraw(){if(Date.now()<os.toastUntil){const w=Math.min(vw-34,320),y=os.W.shell===W.shell.NOTE_EDIT?noteLayout().keyTop-57:vh-safeB-134;rect((vw-w)/2,y,w,42,'#1b3742',12,C.mint);text(os.toast,vw/2,y+21,12,C.white,650,'center');}}
 function motif(x,y,s){g.save();g.translate(x,y);g.scale(s,s);g.lineJoin='round';g.strokeStyle=C.mint;g.lineWidth=8;g.beginPath();g.moveTo(-29,-20);g.lineTo(-18,22);g.lineTo(-2,-2);g.lineTo(14,22);g.lineTo(29,-20);g.stroke();g.restore();}
-function drawBoot(){rect(0,0,vw,vh,'#070d18');const cx=vw/2,cy=vh/2;rect(cx-70,cy-135,140,140,'#102035',30,'#294b60');motif(cx,cy-65,1.3);text('W//OS',cx,cy+46,29,C.white,850,'center');text('SEED 01  •  NATIVE FILES',cx,cy+76,11,C.dim,650,'center',true);
+function drawBoot(){rect(0,0,vw,vh,'#070d18');const cx=vw/2,cy=vh/2;rect(cx-70,cy-135,140,140,'#102035',30,'#294b60');motif(cx,cy-65,1.3);text('W//OS',cx,cy+46,29,C.white,850,'center');text('SEED 02  •  NATIVE FILES',cx,cy+76,11,C.dim,650,'center',true);
  const f=Math.min(1,(performance.now()-os.bootAt)/1450);rect(cx-95,cy+111,190,4,'#26384d',2);rect(cx-95,cy+111,190*f,4,C.mint,2);text(os.loading||'INITIALIZING',cx,cy+137,10,C.dim,580,'center',true);text('PERSISTENCE IS THE FIRST LAW',cx,vh-safeB-48,10,C.dim,630,'center',true);
  if(f<1)setTimeout(invalidate,45);
 }
 function drawOff(){rect(0,0,vw,vh,'#060b14');const cx=vw/2,cy=vh/2;rect(cx-68,cy-120,136,136,'#0d1928',30,C.stroke);motif(cx,cy-52,1.2);text('W//OS IS OFF',cx,cy+49,22,C.white,800,'center');text('The virtual disk remains intact.',cx,cy+80,13,C.dim,400,'center');btn('⏻   BOOT SYSTEM',cx-110,cy+124,220,54,boot,'primary',14);text('Or close this page, then reopen it.',cx,vh-safeB-55,11,C.dim,500,'center');}
 function tile(x,y,w,h,title,sub,icon,fn){rect(x,y,w,h,C.panel,16,C.stroke);rect(x+15,y+17,54,54,'#1a3848',13);text(icon,x+42,y+44,27,C.mint,730,'center');text(title,x+15,y+90,18,C.white,750);text(sub,x+15,y+116,12,C.dim,450);hotspot(x,y,w,h,fn);}
-function drawHome(){pageTitle('Your little machine.','One canvas. Real files. W-controlled programs.');const w=(vw-52)/2,y=safeT+144,h=Math.min(173,(vh-safeT-safeB-300)/2+85);tile(20,y,w,h,'Files','Virtual WDrive','▤',()=>nav(W.shell.FILES));tile(32+w,y,w,h,'Pixel Studio','Draw + save WIMG','◈',()=>nav(W.shell.STUDIO));
- const infy=y+h+25;rect(20,infy,vw-40,Math.max(126,Math.min(193,vh-infy-safeB-107)),C.panel,14,C.stroke);label('SYSTEM REPORT',37,infy+24,C.mint);text('SYSTEM.W2   /   READY',37,infy+52,14,C.white,750,'left',true);text(`${os.files.length} file${os.files.length!==1?'s':''} on WDrive`,37,infy+82,15,C.white,570);text('Storage: '+os.storage,37,infy+106,12,C.dim);const ly=Math.max(infy+125,Math.min(infy+148,vh-safeB-150));btn('W ADDRESS INSPECTOR  →',36,ly,vw-72,36,()=>{os.backFromInspect=os.W.shell;nav(W.shell.INSPECT);},'secondary',11);
+function drawHome(){pageTitle('Your little machine.','One canvas. Real files. W-controlled programs.');
+ const w=(vw-52)/2,y=safeT+137,h=Math.max(118,Math.min(146,(vh-safeT-safeB-300)/2));
+ tile(20,y,w,h,'Files','WDrive documents','▤',()=>nav(W.shell.FILES));
+ tile(32+w,y,w,h,'Pixel Studio','Draw WIMG','◈',()=>nav(W.shell.STUDIO));
+ const y2=y+h+12;
+ tile(20,y2,w,h,'Notepad','Write WNOTE','✎',()=>nav(W.shell.NOTEPAD));
+ tile(32+w,y2,w,h,'W Inspector','State + transitions','⌘',()=>{os.backFromInspect=os.W.shell;nav(W.shell.INSPECT);});
+ const infy=y2+h+13, infh=Math.max(71,vh-safeB-106-infy);
+ rect(20,infy,vw-40,infh,C.panel,14,C.stroke);
+ label('SYSTEM REPORT',37,infy+19,C.mint);
+ text('SYSTEM.W2   /   READY',37,infy+40,12,C.white,750,'left',true);
+ text(`${os.files.length} file${os.files.length!==1?'s':''}  •  ${os.storage}`,37,infy+62,11,C.dim,550);
  bottom();}
 function thumb(doc,x,y,s){const p=doc.pixels||[];const n=doc.width||24;rect(x-1,y-1,s+2,s+2,'#26384f',5);g.save();g.beginPath();g.rect(x,y,s,s);g.clip();const sz=s/n;for(let iy=0;iy<n;iy++)for(let ix=0;ix<n;ix++){g.fillStyle=PALETTE[p[iy*n+ix]||0];g.fillRect(x+ix*sz,y+iy*sz,sz+.25,sz+.25);}g.restore();}
 function dateFmt(s){try{return new Date(s).toLocaleDateString([],{month:'short',day:'numeric'})+' · '+new Date(s).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}catch(_){return 'Just now';}}
-function drawFiles(){backButton(()=>nav(W.shell.HOME));pageTitle('Files','WDrive  /  documents');const sy=safeT+140;btn('+  NEW .WIMG',20,sy,vw-40,43,createFile,'primary',13);
- const start=sy+66,avail=vh-safeB-105-start,rowh=86; if(!os.files.length){text('This disk is empty.',vw/2,start+58,19,C.white,700,'center');text('Create your first native WIMG file.',vw/2,start+88,12,C.dim,500,'center');}
- os.files.slice(0,Math.floor(avail/rowh)).forEach((f,i)=>{const y=start+i*rowh;rect(20,y,vw-40,77,os.selected===f.id?'#1b3044':C.panel,12,os.selected===f.id?C.blue:C.stroke);thumb(f,32,y+11,54);text(f.name,98,y+22,Math.min(15,15*370/vw),C.white,730);text(`WIMG • rev ${f.rev} • ${f.width} × ${f.height}`,98,y+44,11,C.mint,650);text(dateFmt(f.updatedAt),98,y+61,10,C.dim,440);text('›',vw-38,y+38,26,C.dim,500,'center');hotspot(20,y,vw-40,77,()=>{os.selected=f.id;notify('Double-tap the file to open.');},()=>openFile(f.id));});
- if(os.files.length>Math.floor(avail/rowh))text(`${os.files.length} files • showing first ${Math.floor(avail/rowh)}`,vw/2,vh-safeB-111,10,C.dim,400,'center');
+function drawFiles(){backButton(()=>nav(W.shell.HOME));pageTitle('Files','WDrive  /  documents');
+ const sy=safeT+140, gap=8, bw=(vw-48)/2;
+ btn('+  NEW IMAGE',20,sy,bw,43,createFile,'primary',12);
+ btn('+  NEW NOTE',28+bw,sy,bw,43,createNote,'secondary',12);
+ const start=sy+60,avail=vh-safeB-128-start,rowh=82,perPage=Math.max(1,Math.floor(avail/rowh));
+ const count=os.files.length, pages=Math.max(1,Math.ceil(count/perPage));os.filePage=Math.max(0,Math.min(os.filePage,pages-1));
+ if(!count){text('This disk is empty.',vw/2,start+62,18,C.white,700,'center');text('Create your first WIMG or WNOTE file.',vw/2,start+91,11,C.dim,500,'center');}
+ os.files.slice(os.filePage*perPage,(os.filePage+1)*perPage).forEach((f,i)=>{
+  const y=start+i*rowh,isNote=f.type==='text/x-wnote';rect(20,y,vw-40,74,os.selected===f.id?'#1b3044':C.panel,12,os.selected===f.id?C.blue:C.stroke);
+  if(isNote){rect(32,y+10,54,54,'#1c3645',8);text('✎',59,y+29,24,C.mint,700,'center');text('≡ ≡',59,y+49,11,C.blue,700,'center');}
+  else thumb(f,32,y+10,54);
+  const fontSize=Math.min(14,Math.max(11,vw/27));text(f.name,98,y+20,fontSize,C.white,730);
+  text(isNote?`WNOTE • rev ${f.rev} • ${(f.body||'').length} chars`:`WIMG • rev ${f.rev} • ${f.width} × ${f.height}`,98,y+42,10,C.mint,650);
+  text(dateFmt(f.updatedAt),98,y+58,10,C.dim,440);text('›',vw-37,y+36,25,C.dim,500,'center');
+  hotspot(20,y,vw-40,74,()=>{os.selected=f.id;notify('Double-tap to open.');},()=>openFile(f.id));
+ });
+ if(pages>1){const py=vh-safeB-119;btn('‹ PREV',20,py,85,33,()=>{os.filePage=Math.max(0,os.filePage-1);invalidate();},'secondary',11);text(`PAGE ${os.filePage+1} / ${pages}`,vw/2,py+17,10,C.dim,700,'center',true);btn('NEXT ›',vw-105,py,85,33,()=>{os.filePage=Math.min(pages-1,os.filePage+1);invalidate();},'secondary',11);}
  bottom();}
 function drawStudio(){backButton(()=>nav(W.shell.HOME));pageTitle('Pixel Studio','Native WIMG editor');const y=safeT+147;rect(20,y,vw-40,162,C.panel,16,C.stroke);rect(vw/2-34,y+20,68,68,'#1e3d4b',16);text('◈',vw/2,y+54,42,C.mint,550,'center');text('MAKE SOMETHING THAT STAYS.',vw/2,y+110,13,C.white,710,'center');text('24 × 24 pixel documents',vw/2,y+135,12,C.dim,430,'center');btn('+  CREATE IMAGE',22,y+181,vw-44,54,createFile,'primary');btn('▤  OPEN FROM WDRIVE',22,y+246,vw-44,51,()=>nav(W.shell.FILES));text('Files can also launch Pixel Studio directly.',vw/2,y+330,11,C.dim,440,'center');bottom();}
+function drawNotepad(){backButton(()=>nav(W.shell.HOME));pageTitle('Notepad','Write native .wnote documents');const y=safeT+148;
+ rect(20,y,vw-40,154,C.panel,16,C.stroke);rect(vw/2-36,y+15,72,70,'#1e3d4b',16);text('✎',vw/2,y+49,40,C.mint,700,'center');
+ text('WORDS THAT STAY.',vw/2,y+104,14,C.white,720,'center');text('W//Keys • a canvas-native keyboard',vw/2,y+129,12,C.dim,440,'center');
+ btn('+  CREATE NOTE',22,y+173,vw-44,54,createNote,'primary');btn('▤  OPEN FROM WDRIVE',22,y+239,vw-44,51,()=>nav(W.shell.FILES));
+ text('WNOTE files launch Notepad on double-tap.',vw/2,y+321,11,C.dim,440,'center');bottom();}
 function contentGeometry(){const top=safeT+110,bottom=vh-safeB-98;const wide=vw>vh;const reserved=wide?115:198;let side=Math.max(96,Math.min(vw-36,bottom-top-reserved,500));if(wide)side=Math.max(110,Math.min((vw-40)*.56,bottom-top-14));return {x:(vw-side)/2,y:top+2,s:side,n:24};}
 function drawEditor(){const f=os.active;if(!f){nav(W.shell.FILES);return;}backButton(requestExit,'EXIT');text('PIXEL STUDIO',126,safeT+27,13,C.white,780);btn('SAVE',vw-92,safeT+8,73,40,saveActive,'primary',12);text(f.name,20,safeT+76,17,C.white,740);const ds=os.W.document;const sv=ds===W.document.DIRTY?'● UNSAVED':ds===W.document.SAVING?'◌ SAVING':ds===W.document.ERROR?'! ERROR':'✓ ON DISK';text(sv,vw-19,safeT+75,11,ds===W.document.DIRTY?C.gold:ds===W.document.ERROR?C.red:C.mint,650,'right',true);
  const b=contentGeometry();paintRect=b;
@@ -87,13 +115,97 @@ function drawEditor(){const f=os.active;if(!f){nav(W.shell.FILES);return;}backBu
  const actionsY=controlsY+sw+Math.max(10,Math.min(20,available*.09));const gap=9,bw=(vw-42-2*gap)/3;btn('✎  DRAW',20,actionsY,bw,41,()=>{os.tool='pencil';invalidate();},os.tool==='pencil'?'primary':'secondary',11);btn('▧  FILL',20+bw+gap,actionsY,bw,41,()=>{os.tool='fill';invalidate();},os.tool==='fill'?'primary':'secondary',11);btn('↶  UNDO',20+2*(bw+gap),actionsY,bw,41,undo, 'secondary',11);
  if(actionsY+65<vh-safeB-81){text(`${os.tool==='fill'?'Tap a region to fill':'Drag your finger to paint'}  •  ${f.width}×${f.height}`,vw/2,actionsY+61,11,C.dim,500,'center');}
  bottom();}
+// W//Keys is drawn in this same canvas. No native text inputs or keyboard overlays.
+function noteBodyRows(body,maxChars){const rows=[];let start=0;
+ for(const lineText of body.split('\n')){if(!lineText.length)rows.push({start,text:''});else for(let j=0;j<lineText.length;j+=maxChars)rows.push({start:start+j,text:lineText.slice(j,j+maxChars)});start+=lineText.length+1;}
+ return rows;
+}
+function noteLayout(){const keyH=Math.max(190,Math.min(270,vh*.36)),keyTop=vh-safeB-78-keyH,editTop=safeT+104,editBottom=keyTop-10;
+ const pitch=Math.max(8,Math.min(9.1, (vw-72)/29)),chars=Math.max(12,Math.floor((vw-70)/pitch)),rowH=21;
+ return {keyH,keyTop,editTop,editBottom,chars,rowH,visible:Math.max(1,Math.floor((editBottom-editTop-34)/rowH))};}
+function noteCursorRow(rows,cursor){let index=0,col=0;
+ for(let i=0;i<rows.length;i++){const r=rows[i],end=r.start+r.text.length;if(cursor>=r.start&&cursor<=end){index=i;col=cursor-r.start;if(cursor===end&&rows[i+1]?.start===cursor){index=i+1;col=0;}else if(cursor===end&&rows[i+1]?.start===cursor+1){index=i;col=r.text.length;} }}
+ return {index,col};}
+function syncNoteScroll(){if(!os.active||os.active.type!=='text/x-wnote')return;const n=os.note,l=noteLayout(),rows=noteBodyRows(os.active.body||'',l.chars);const cr=noteCursorRow(rows,n.cursor).index;
+ n.scroll=Math.max(0,Math.min(n.scroll,Math.max(0,rows.length-l.visible)));if(cr<n.scroll)n.scroll=cr;if(cr>=n.scroll+l.visible)n.scroll=cr-l.visible+1;
+}
+function noteKeyCell(t,x,y,w,h,fn,sty='base'){
+ const bg=sty==='action'?'#1d4050':sty==='hot'?'#27645e':sty==='space'?'#213748':'#172b40';
+ rect(x,y,w,h,bg,7,sty==='hot'?C.mint:'#304d64');text(t,x+w/2,y+h/2,sty==='base'?Math.min(16,w*.48):Math.min(12,w*.3+3),sty==='hot'?'#ddfff6':C.white,sty==='base'?600:710,'center');hotspot(x,y,w,h,fn);
+}
+function drawWKeys(l){const n=os.note,keyTop=l.keyTop,h=l.keyH;
+ rect(0,keyTop-6,vw,h+14,'#0d1b2a',13,C.stroke);
+ label('W//KEYS   /   '+(n.page==='abc'?(n.shift?'UPPERCASE':'QWERTY'):'SYMBOLS'),16,keyTop+11,C.mint);
+ text(n.rename?'EDITING FILE NAME':'PRIVATE CANVAS KEYBOARD',vw-16,keyTop+11,9,C.dim,620,'right',true);
+ const rows=n.page==='abc'?[['q','w','e','r','t','y','u','i','o','p'],['a','s','d','f','g','h','j','k','l'],['SHIFT','z','x','c','v','b','n','m','BACK']]:[['1','2','3','4','5','6','7','8','9','0'],['@','#','$','%','&','-','+','(',')'],['ABC','*','"',"'",':',';','!','?','BACK']];
+ const top=keyTop+25,gap=4,available=h-32,kh=Math.max(31,(available-gap*3)/4);
+ rows.forEach((keys,r)=>{const yy=top+r*(kh+gap),inset=r===1?13:5,baseW=(vw-inset*2-gap*(keys.length-1))/(keys.length+(r===2?.7:0));let x=inset;
+  const totalW=keys.reduce((acc,k)=>acc+baseW*((k==='SHIFT'||k==='BACK'||k==='ABC')?1.35:1),0)+gap*(keys.length-1);x=(vw-totalW)/2;
+  keys.forEach(key=>{const action=key==='SHIFT'||key==='BACK'||key==='ABC';const w=baseW*(action?1.35:1);const txt=key==='BACK'?'⌫':key==='SHIFT'?'⇧':key==='ABC'?'ABC':n.shift&&n.page==='abc'?key.toUpperCase():key;
+   noteKeyCell(txt,x,yy,w,kh,()=>noteInput(key),key==='SHIFT'&&n.shift?'hot':action?'action':'base');x+=w+gap;});});
+ const yy=top+3*(kh+gap),wide=(vw-10-gap*5),ratios=[1.15,.9,1,3.3,1.15,1.35],unit=(wide/ratios.reduce((a,b)=>a+b,0));let x=5;
+ const bottomKeys=[[n.page==='abc'?'123':'ABC','action'],['←','action'],['→','action'],['SPACE','space'],['.','base'],['↵','hot']];
+ bottomKeys.forEach(([key,style],i)=>{const w=unit*ratios[i];noteKeyCell(key,x,yy,w,kh,()=>noteInput(key),style);x+=w+gap;});
+}
+function drawNoteEditor(){const f=os.active;if(!f){nav(W.shell.FILES);return;}const n=os.note,l=noteLayout();
+ backButton(requestExit,'EXIT');text('NOTEPAD',122,safeT+27,13,C.white,780);
+ btn('SAVE',vw-91,safeT+8,72,40,saveActive,'primary',12);
+ const filename=n.rename?n.title+'.wnote':f.name;
+ text(filename.length>29?filename.slice(0,27)+'…':filename,20,safeT+75,16,C.white,740);
+ const ds=os.W.document,sv=ds===W.document.DIRTY?'● UNSAVED':ds===W.document.ERROR?'! ERROR':ds===W.document.SAVING?'◌ SAVING':'✓ ON DISK';
+ text(sv,vw-17,safeT+96,10,ds===W.document.DIRTY?C.gold:ds===W.document.ERROR?C.red:C.mint,650,'right',true);
+ btn(n.rename?'DONE':'✎ NAME',vw-114,safeT+64,95,25,()=>{if(n.rename){finishRename();}else{n.rename=true;n.title=f.name.replace(/\.wnote$/i,'');n.titleCursor=n.title.length;}invalidate();},'secondary',10);
+ const height=Math.max(12,l.editBottom-l.editTop);
+ rect(16,l.editTop,vw-32,height,C.panel,11,C.stroke);
+ const body=f.body||'',rows=noteBodyRows(body,l.chars),cursor=noteCursorRow(rows,n.cursor);
+ n.scroll=Math.max(0,Math.min(n.scroll,Math.max(0,rows.length-l.visible)));
+ const tx=28,ty=l.editTop+18;
+ g.save();g.beginPath();g.rect(21,l.editTop+5,vw-42,height-10);g.clip();
+ if(!body&&!n.rename)text('Start writing...',tx,ty+2,15,C.dim,450,'left',true);
+ const charW=(vw-70)/l.chars;
+ for(let i=n.scroll;i<Math.min(rows.length,n.scroll+l.visible+1);i++){
+  const y=ty+(i-n.scroll)*l.rowH; text(rows[i].text,tx,y,15,C.white,470,'left',true);
+ }
+ if(!n.rename&&os.W.document!==W.document.SAVING&&cursor.index>=n.scroll&&cursor.index<n.scroll+l.visible){const cx=tx+cursor.col*charW,cy=ty+(cursor.index-n.scroll)*l.rowH;line(cx,cy-9,cx,cy+9,C.mint,2);}
+ g.restore();
+ if(rows.length>l.visible){const scrollH=Math.max(12,(l.visible/rows.length)*(height-18)),scrollY=l.editTop+8+(n.scroll/Math.max(1,rows.length-l.visible))*(height-18-scrollH);rect(vw-23,scrollY,3,scrollH,C.mint,2);}
+ text(`${body.length} chars  •  ${rows.length} line${rows.length===1?'':'s'}`,26,l.keyTop-17,10,C.dim,450);
+ if(n.rename){rect(20,l.editTop+8,vw-40,48,'#244351',8,C.mint);text('NAME: '+n.title,30,l.editTop+31,14,C.white,650,'left',true);}
+ hotspot(20,l.editTop+1,vw-40,Math.max(10,l.editBottom-l.editTop-1),(x,y)=>positionNoteCursor(x,y,l,rows));
+ drawWKeys(l);bottom();}
+function positionNoteCursor(x,y,l,rows){if(os.note.rename)return;
+ const rowIndex=Math.max(0,Math.min(rows.length-1,Math.floor((y-(l.editTop+7))/l.rowH)+os.note.scroll));
+ const col=Math.max(0,Math.min(rows[rowIndex].text.length,Math.round((x-28)/((vw-70)/l.chars))));
+ os.note.cursor=rows[rowIndex].start+col;invalidate();}
+function finishRename(){const n=os.note,raw=n.title.trim().replace(/[\/\\:*?"<>|]/g,'').slice(0,36);
+ const name=(raw||os.active.name.replace(/\.wnote$/i,''))+'.wnote';
+ if(os.files.some(f=>f.id!==os.active.id&&f.name.toLowerCase()===name.toLowerCase())){notify('That filename already exists');return;}
+ if(os.active.name!==name){os.active.name=name;markDirty();}n.rename=false;invalidate();}
+function noteInput(key){if(os.W.system!==W.system.READY||os.W.shell!==W.shell.NOTE_EDIT||!os.active||os.pending||os.W.document===W.document.SAVING)return;
+ const n=os.note,rename=n.rename;
+ if(key==='123'){n.page='sym';n.shift=false;invalidate();return;}
+ if(key==='ABC'){n.page='abc';n.shift=false;invalidate();return;}
+ if(key==='SHIFT'){n.shift=!n.shift;invalidate();return;}
+ if(key==='↵'&&rename){finishRename();return;}
+ let field=rename?n.title:(os.active.body||''),idx=rename?n.titleCursor:n.cursor;
+ if(key==='←'){idx=Math.max(0,idx-1);}else if(key==='→'){idx=Math.min(field.length,idx+1);}
+ else if(key==='BACK'){if(idx>0){field=field.slice(0,idx-1)+field.slice(idx);idx--;}}
+ else {let ch=key==='SPACE'?' ':key==='↵'?'\n':key==='.'?'.':key;if(n.shift&&n.page==='abc')ch=ch.toUpperCase();if(n.shift)n.shift=false;
+  if(rename&&(/[\n\/\\:*?"<>|]/.test(ch)||field.length>=36)){invalidate();return;}
+  if(!rename&&field.length>=50000){notify('Note capacity is 50,000 characters');return;}
+  field=field.slice(0,idx)+ch+field.slice(idx);idx+=ch.length;
+ }
+ if(rename){n.title=field;n.titleCursor=idx;}else{if(field!==(os.active.body||'')){os.active.body=field;markDirty();}n.cursor=idx;syncNoteScroll();}
+ invalidate();}
 function drawInspect(){backButton(()=>nav(os.backFromInspect));pageTitle('W addresses','Transitions are checked against laws.');let y=safeT+142;for(const [k,v] of Object.entries(os.W)){rect(20,y,vw-40,62,C.panel,11,C.stroke);label(k.toUpperCase(),36,y+19,C.dim);text(v,36,y+41,15,C.mint,730,'left',true);y+=71;}label('RECENT LEGAL TRANSITIONS',26,y+14,C.dim);y+=36;for(const e of os.log.slice(0,Math.max(1,Math.floor((vh-safeB-122-y)/42)))){text(`${e.a.toUpperCase()}   ${e.from.split('.').pop()} → ${e.to.split('.').pop()}`,30,y,11,C.white,650,'left',true);text(e.at,30,y+17,10,C.dim,440);y+=41;}bottom();}
-function draw(){g.setTransform(dpr,0,0,dpr,0,0);hit=[];paintRect=null;if(os.W.system===W.system.OFF){drawOff();return;}if(os.W.system===W.system.BOOT||os.W.system===W.system.SHUT){drawBoot();return;}header();switch(os.W.shell){case W.shell.FILES:drawFiles();break;case W.shell.STUDIO:drawStudio();break;case W.shell.EDIT:drawEditor();break;case W.shell.INSPECT:drawInspect();break;default:drawHome();}toastDraw();}
-function nav(dest){if(os.W.system!==W.system.READY)return;if(os.W.shell===W.shell.EDIT&&dest!==W.shell.EDIT&&os.W.document===W.document.DIRTY){askExit(dest);return;}if(os.W.shell===W.shell.EDIT&&dest!==W.shell.EDIT)leaveEditor(dest);else shell(dest);}
-function leaveEditor(dest){if(os.W.document===W.document.DIRTY){askExit(dest);return;}os.active=null;os.undo=[];track('document',W.document.UNBOUND,'close editor');shell(dest);}
+function draw(){g.setTransform(dpr,0,0,dpr,0,0);hit=[];paintRect=null;if(os.W.system===W.system.OFF){drawOff();return;}if(os.W.system===W.system.BOOT||os.W.system===W.system.SHUT){drawBoot();return;}header();switch(os.W.shell){case W.shell.FILES:drawFiles();break;case W.shell.STUDIO:drawStudio();break;case W.shell.EDIT:drawEditor();break;case W.shell.NOTEPAD:drawNotepad();break;case W.shell.NOTE_EDIT:drawNoteEditor();break;case W.shell.INSPECT:drawInspect();break;default:drawHome();}toastDraw();}
+function nav(dest){if(os.W.system!==W.system.READY)return;if(os.W.shell===W.shell.NOTE_EDIT&&os.note.rename)finishRename();if(isEditing()&&dest!==os.W.shell){if(os.W.document===W.document.DIRTY||os.W.document===W.document.ERROR){askExit(dest);return;}leaveEditor(dest);}else shell(dest);}
+function isEditing(){return os.W.shell===W.shell.EDIT||os.W.shell===W.shell.NOTE_EDIT;}
+function leaveEditor(dest){if(os.W.document===W.document.DIRTY||os.W.document===W.document.ERROR){askExit(dest);return;}os.active=null;os.undo=[];os.note.rename=false;track('document',W.document.UNBOUND,'close editor');shell(dest);}
 function requestExit(){leaveEditor(W.shell.FILES);}
 function askExit(dest){os.pending=dest;invalidate();} // modal drawn at end by overlay wrapper below
-const baseDraw=draw;draw=function(){baseDraw();if(os.pending&&os.W.system===W.system.READY&&os.W.shell===W.shell.EDIT&&os.W.document===W.document.DIRTY){const cx=vw/2,y=Math.max(safeT+130,vh/2-110);rect(0,0,vw,vh,'rgba(3,10,17,.77)');hit=[];rect(22,y,vw-44,225,C.panel,16,C.gold);text('UNSAVED CHANGES',vw/2,y+41,18,C.white,770,'center');text('Leave without saving your pixels?',vw/2,y+78,13,C.dim,400,'center');btn(os.pending==='POWER_OFF'?'SAVE AND SHUT DOWN':'SAVE AND EXIT',37,y+109,vw-74,44,async()=>{const t=os.pending;os.pending=null;if(await saveActive()){leaveEditor(t==='POWER_OFF'?W.shell.HOME:(typeof t==='string'?t:W.shell.FILES));if(t==='POWER_OFF')shutdown();}},'primary',12);const gw=(vw-82)/2;btn('DISCARD',37,y+164,gw,38,()=>{const t=os.pending;os.pending=null;const destination=t==='POWER_OFF'?W.shell.HOME:(typeof t==='string'?t:W.shell.FILES);os.active=null;os.undo=[];track('document',W.document.UNBOUND,'discard');shell(destination);if(t==='POWER_OFF')shutdown();},'danger',12);btn('CANCEL',45+gw,y+164,gw,38,()=>{os.pending=null;invalidate();},'secondary',12);}}
+const baseDraw=draw;draw=function(){baseDraw();if(os.pending&&os.W.system===W.system.READY&&isEditing()&&(os.W.document===W.document.DIRTY||os.W.document===W.document.ERROR)){const cx=vw/2,y=Math.max(safeT+130,vh/2-110);rect(0,0,vw,vh,'rgba(3,10,17,.77)');hit=[];rect(22,y,vw-44,225,C.panel,16,C.gold);text('UNSAVED CHANGES',vw/2,y+41,18,C.white,770,'center');text(os.W.shell===W.shell.NOTE_EDIT?'Leave without saving your note?':'Leave without saving your pixels?',vw/2,y+78,13,C.dim,400,'center');btn(os.pending==='POWER_OFF'?'SAVE AND SHUT DOWN':'SAVE AND EXIT',37,y+109,vw-74,44,async()=>{const t=os.pending;if(os.W.shell===W.shell.NOTE_EDIT&&os.note.rename)finishRename();if(!os.pending)return;if(await saveActive()){os.pending=null;return completeExit(t);}},'primary',12);const gw=(vw-82)/2;btn('DISCARD',37,y+164,gw,38,()=>{const t=os.pending;os.pending=null;const destination=t==='POWER_OFF'?W.shell.HOME:(typeof t==='string'?t:W.shell.FILES);os.active=null;os.undo=[];track('document',W.document.UNBOUND,'discard');shell(destination);if(t==='POWER_OFF')shutdown();},'danger',12);btn('CANCEL',45+gw,y+164,gw,38,()=>{os.pending=null;invalidate();},'secondary',12);}}
+function completeExit(t){leaveEditor(t==='POWER_OFF'?W.shell.HOME:(typeof t==='string'?t:W.shell.FILES));if(t==='POWER_OFF')shutdown();}
 function uniqueName(){let i=1;while(os.files.some(f=>f.name===`Canvas ${String(i).padStart(2,'0')}.wimg`))i++;return `Canvas ${String(i).padStart(2,'0')}.wimg`;}
 function makePixels(){const p=Array(24*24).fill(0);for(let y=0;y<24;y++)for(let x=0;x<24;x++){
   if(y>=19)p[y*24+x]=1;else if(y>15&&((x*5+y*7)%17)<4)p[y*24+x]=5;
@@ -102,25 +214,30 @@ function makePixels(){const p=Array(24*24).fill(0);for(let y=0;y<24;y++)for(let 
  for(const [ax,ay,bx,by] of strokes){const steps=Math.max(Math.abs(ax-bx),Math.abs(ay-by));for(let j=0;j<=steps;j++){const x=Math.round(ax+(bx-ax)*j/steps),y=Math.round(ay+(by-ay)*j/steps);p[y*24+x]=3;p[y*24+x+1]=3;}}
  for(const [x,y] of [[3,3],[19,4],[12,3]]){p[y*24+x]=9;p[(y+1)*24+x]=9;p[y*24+x-1]=9;p[y*24+x+1]=9;}
  return p;}
-function cloneDoc(d){return {...d,pixels:d.pixels.slice()};}
+function cloneDoc(d){return {...d,...(Array.isArray(d.pixels)?{pixels:d.pixels.slice()}:{})};}
 function startEdit(doc){os.active=cloneDoc(doc);os.undo=[];if(os.W.document!==W.document.UNBOUND)track('document',W.document.UNBOUND,'reset document');track('document',W.document.CLEAN,'open WIMG');shell(W.shell.EDIT);invalidate();}
-function openFile(id){const f=os.files.find(d=>d.id===id);if(!f)return notify('File not found');if(f.type!=='image/x-wimg')return notify('No registered handler');os.selected=id;os.toastUntil=0;startEdit(f);}
+function startNoteEdit(doc){os.active=cloneDoc(doc);os.undo=[];os.note={cursor:(doc.body||'').length,bodyCursor:0,scroll:0,page:'abc',shift:false,rename:false,title:'',titleCursor:0};if(os.W.document!==W.document.UNBOUND)track('document',W.document.UNBOUND,'reset document');track('document',W.document.CLEAN,'open WNOTE');shell(W.shell.NOTE_EDIT);syncNoteScroll();invalidate();}
+function openFile(id){const f=os.files.find(d=>d.id===id);if(!f)return notify('File not found');os.selected=id;os.toastUntil=0;if(f.type==='image/x-wimg')startEdit(f);else if(f.type==='text/x-wnote')startNoteEdit(f);else notify('No registered handler');}
 async function createFile(){const at=stamp();const f={id:'wimg-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),type:'image/x-wimg',name:uniqueName(),width:24,height:24,rev:0,pixels:makePixels(),createdAt:at,updatedAt:at};try{await disk.put(f);os.files.push(cloneDoc(f));os.selected=f.id;startEdit(f);notify('Native WIMG created on WDrive');}catch(e){notify('Could not create file');console.error(e);}}
+function uniqueNoteName(){let i=1;while(os.files.some(f=>f.name===`Note ${String(i).padStart(2,'0')}.wnote`))i++;return `Note ${String(i).padStart(2,'0')}.wnote`;}
+async function createNote(){const at=stamp(),f={id:'wnote-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),type:'text/x-wnote',name:uniqueNoteName(),body:'',rev:0,createdAt:at,updatedAt:at};try{await disk.put(f);os.files.unshift(cloneDoc(f));os.filePage=0;os.selected=f.id;startNoteEdit(f);notify('WNOTE created on WDrive');}catch(e){console.error(e);notify('Could not create note');}}
 function markDirty(){if(os.W.document===W.document.CLEAN)track('document',W.document.DIRTY,'edit');}
 function addUndo(){if(!os.active)return;os.undo.push(os.active.pixels.slice());if(os.undo.length>30)os.undo.shift();}
 function setPx(x,y){const b=paintRect;if(!b||!os.active||os.pending)return;const a=Math.floor((x-b.x)/b.s*24),j=Math.floor((y-b.y)/b.s*24);if(a<0||j<0||a>=24||j>=24)return;const i=j*24+a,p=os.active.pixels;const val=os.brush;if(os.tool==='fill'){if(p[i]===val)return;addUndo();const old=p[i],q=[i];p[i]=val;while(q.length){const id=q.pop(),xx=id%24,yy=Math.floor(id/24);for(const n of [[xx-1,yy],[xx+1,yy],[xx,yy-1],[xx,yy+1]]){if(n[0]>=0&&n[0]<24&&n[1]>=0&&n[1]<24){const ix=n[1]*24+n[0];if(p[ix]===old){p[ix]=val;q.push(ix);}}}}markDirty();invalidate();return;}
  if(p[i]!==val){if(drawing&&!drawing.changed){addUndo();drawing.changed=true;}p[i]=val;markDirty();invalidate();}}
 function undo(){if(!os.active||!os.undo.length)return notify('Nothing to undo');os.active.pixels=os.undo.pop();markDirty();invalidate();}
-async function saveActive(){if(!os.active)return false;if(os.W.document===W.document.SAVING)return false;if(os.W.document===W.document.CLEAN){notify('Already saved to WDrive');return true;}if(os.W.document===W.document.ERROR)track('document',W.document.DIRTY,'retry');track('document',W.document.SAVING,'persist file');const doc=cloneDoc(os.active);doc.rev++;doc.updatedAt=stamp();try{await disk.put(doc);os.active=cloneDoc(doc);const i=os.files.findIndex(x=>x.id===doc.id);if(i>=0)os.files[i]=cloneDoc(doc);track('document',W.document.CLEAN,'write committed');notify(`Saved • revision ${doc.rev}`);return true;}catch(e){track('document',W.document.ERROR,'write failed');os.error=String(e);notify('Save failed • check storage');console.error(e);return false;}}
-async function shutdown(){if(os.W.system!==W.system.READY)return;if(os.W.document===W.document.DIRTY){askExit('POWER_OFF');return;}track('system',W.system.SHUT,'power off');os.loading='SHUTTING DOWN';os.active=null;os.undo=[];if(os.W.document!==W.document.UNBOUND)track('document',W.document.UNBOUND,'power off');if(os.W.shell!==W.shell.HOME)shell(W.shell.HOME);os.pending=null;setTimeout(()=>track('system',W.system.OFF,'power off complete'),420);}
-async function boot(){if(os.W.system!==W.system.OFF)return;track('system',W.system.BOOT,'power on');os.bootAt=performance.now();os.loading='MOUNTING WDRIVE';try{await disk.open();os.files=(await disk.all()).filter(x=>x?.type==='image/x-wimg'&&Array.isArray(x.pixels)).sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));os.selected=null;os.active=null;os.undo=[];os.pending=null;os.loading='REGISTERING WIMG HANDLER';const rest=Math.max(0,1150-(performance.now()-os.bootAt));setTimeout(()=>{if(os.W.system===W.system.BOOT){track('system',W.system.READY,'disk mounted');invalidate();}},rest);}catch(e){os.loading='STORAGE FAILED';os.error=String(e);console.error(e);setTimeout(()=>{track('system',W.system.OFF,'mount failed');notify('Storage initialization failed');},950);}invalidate();}
+async function saveActive(){if(!os.active)return false;if(os.W.document===W.document.SAVING)return false;if(os.W.shell===W.shell.NOTE_EDIT&&os.note.rename)finishRename();if(os.note.rename)return false;if(os.W.document===W.document.CLEAN){notify('Already saved to WDrive');return true;}if(os.W.document===W.document.ERROR)track('document',W.document.DIRTY,'retry');track('document',W.document.SAVING,'persist file');const doc=cloneDoc(os.active);doc.rev++;doc.updatedAt=stamp();try{await disk.put(doc);os.active=cloneDoc(doc);const i=os.files.findIndex(x=>x.id===doc.id);if(i>=0)os.files[i]=cloneDoc(doc);track('document',W.document.CLEAN,'write committed');notify(`Saved • revision ${doc.rev}`);return true;}catch(e){track('document',W.document.ERROR,'write failed');os.error=String(e);notify('Save failed • check storage');console.error(e);return false;}}
+async function shutdown(){if(os.W.system!==W.system.READY)return;if(os.W.shell===W.shell.NOTE_EDIT&&os.note.rename)finishRename();if(os.W.document===W.document.DIRTY||os.W.document===W.document.ERROR){askExit('POWER_OFF');return;}track('system',W.system.SHUT,'power off');os.loading='SHUTTING DOWN';os.active=null;os.undo=[];if(os.W.document!==W.document.UNBOUND)track('document',W.document.UNBOUND,'power off');if(os.W.shell!==W.shell.HOME)shell(W.shell.HOME);os.pending=null;setTimeout(()=>track('system',W.system.OFF,'power off complete'),420);}
+async function boot(){if(os.W.system!==W.system.OFF)return;track('system',W.system.BOOT,'power on');os.bootAt=performance.now();os.loading='MOUNTING WDRIVE';try{await disk.open();os.files=(await disk.all()).filter(x=>(x?.type==='image/x-wimg'&&Array.isArray(x.pixels))||(x?.type==='text/x-wnote'&&typeof x.body==='string')).sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));os.selected=null;os.active=null;os.undo=[];os.pending=null;os.loading='REGISTERING WIMG + WNOTE HANDLERS';const rest=Math.max(0,1150-(performance.now()-os.bootAt));setTimeout(()=>{if(os.W.system===W.system.BOOT){track('system',W.system.READY,'disk mounted');invalidate();}},rest);}catch(e){os.loading='STORAGE FAILED';os.error=String(e);console.error(e);setTimeout(()=>{track('system',W.system.OFF,'mount failed');notify('Storage initialization failed');},950);}invalidate();}
 const disk={db:null,mode:'idb',async open(){if(this.db)return;try{if(!indexedDB)throw new Error('No indexedDB');this.db=await new Promise((resolve,reject)=>{const r=indexedDB.open('WOS_WDRIVE_V1',1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('files'))r.result.createObjectStore('files',{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});os.storage='IndexedDB';}catch(e){this.mode='local';os.storage='Local storage fallback';let k='WOS_WDRIVE_V1_FILES';try{localStorage.setItem('_wos_probe','1');localStorage.removeItem('_wos_probe');}catch(err){throw new Error('Both IndexedDB and local storage unavailable');}}},async all(){if(this.mode==='local')return JSON.parse(localStorage.getItem('WOS_WDRIVE_V1_FILES')||'[]');return new Promise((resolve,reject)=>{let r=this.db.transaction('files','readonly').objectStore('files').getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});},async put(doc){if(this.mode==='local'){const fs=await this.all();const i=fs.findIndex(x=>x.id===doc.id);if(i<0)fs.push(doc);else fs[i]=doc;localStorage.setItem('WOS_WDRIVE_V1_FILES',JSON.stringify(fs));return;}return new Promise((resolve,reject)=>{const tx=this.db.transaction('files','readwrite');tx.objectStore('files').put(doc);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}};
 function pointerXY(e){const b=canvas.getBoundingClientRect();return [(e.clientX-b.left)*vw/b.width,(e.clientY-b.top)*vh/b.height];}
 let lastTap={at:0,key:''};
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();const [x,y]=pointerXY(e);if(os.W.shell===W.shell.EDIT&&os.W.system===W.system.READY&&!os.pending&&paintRect&&x>=paintRect.x&&x<=paintRect.x+paintRect.s&&y>=paintRect.y&&y<=paintRect.y+paintRect.s){drawing={pointer:e.pointerId,changed:false};canvas.setPointerCapture(e.pointerId);setPx(x,y);return;}const h=hit.slice().reverse().find(i=>x>=i.x&&x<=i.x+i.w&&y>=i.y&&y<=i.y+i.h);if(!h)return;if(h.kind==='paint')return;
- const key=[Math.round(h.x),Math.round(h.y),Math.round(h.w),Math.round(h.h)].join(':');const dbl=(lastTap.key===key&&performance.now()-lastTap.at<380);lastTap={key,at:performance.now()};if(dbl&&h.dbl){h.dbl();lastTap.at=0;}else if(h.tap)h.tap();});
+ const key=[Math.round(h.x),Math.round(h.y),Math.round(h.w),Math.round(h.h)].join(':');const dbl=(lastTap.key===key&&performance.now()-lastTap.at<380);lastTap={key,at:performance.now()};if(dbl&&h.dbl){h.dbl();lastTap.at=0;}else if(h.tap)h.tap(x,y);});
 canvas.addEventListener('pointermove',e=>{if(!drawing||drawing.pointer!==e.pointerId||os.tool!=='pencil')return;e.preventDefault();const [x,y]=pointerXY(e);setPx(x,y);});
 function stop(e){if(drawing?.pointer===e.pointerId)drawing=null;}canvas.addEventListener('pointerup',stop);canvas.addEventListener('pointercancel',stop);
+window.addEventListener('keydown',e=>{if(os.W.shell!==W.shell.NOTE_EDIT||os.W.system!==W.system.READY||os.pending)return;const cmd=e.metaKey||e.ctrlKey;if(cmd&&e.key.toLowerCase()==='s'){e.preventDefault();saveActive();return;}if(cmd)return;let k=e.key;if(k==='Backspace')k='BACK';else if(k==='Enter')k='↵';else if(k==='ArrowLeft')k='←';else if(k==='ArrowRight')k='→';else if(k===' ')k='SPACE';else if(k.length!==1)return;e.preventDefault();noteInput(k);});
+document.addEventListener('paste',e=>{if(os.W.shell!==W.shell.NOTE_EDIT||os.pending||!os.active)return;const txt=e.clipboardData?.getData('text/plain');if(!txt)return;e.preventDefault();for(const ch of txt.slice(0,50000)){if(ch==='\r')continue;noteInput(ch==='\n'?'↵':ch===' '?'SPACE':ch);}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)invalidate();});window.addEventListener('pageshow',()=>invalidate());
 resize();boot();setInterval(()=>{if(os.W.system===W.system.READY)invalidate();},30000);
 })();
