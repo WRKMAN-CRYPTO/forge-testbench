@@ -1,5 +1,5 @@
 /* GrooveGrove shared simulation. Same classes in server + client. */
-import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js';
+import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261018-pass004';
 import {ListeningJournal} from './listening-journal.js';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
