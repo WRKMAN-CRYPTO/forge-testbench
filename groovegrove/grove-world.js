@@ -29,6 +29,16 @@ const initial={
   Murmur:{x:754,y:659,place:'clearing'}
 };
 const SPEED={Pip:63,Riff:57,Murmur:46};
+const PLACE_OFFSETS={
+ Pip:{clearing:[-67,11],studio:[-67,23],library:[-54,20],pond:[-55,24]},
+ Riff:{clearing:[68,9],studio:[63,17],library:[54,20],pond:[50,12]},
+ Murmur:{clearing:[4,65],studio:[3,70],library:[0,76],pond:[3,64]}
+};
+const arrival=(name,node)=>{
+ const center=PLACES[node]||WAYPOINTS[node];
+ const [dx,dy]=PLACE_OFFSETS[name]?.[node]||[0,0];
+ return center?{x:center.x+dx,y:center.y+dy}:null;
+};
 const RANGES={kick:650,snare:530,hat:310,guitar:470,voice:255};
 const safePlace=p=>Object.hasOwn(PLACES,p)?p:'clearing';
 const road=(from,to)=>{
@@ -72,6 +82,11 @@ export class GroveWorld {
         lastChoice:valid(old.lastChoice)?old.lastChoice:-20,
         heard:Math.max(0,Math.floor(old.heard||0)),
         lastHeard:old.lastHeard&&NAMES.includes(old.lastHeard.from)?old.lastHeard:null,
+        lastHeardDrum:old.lastHeardDrum?.from==='Pip'?old.lastHeardDrum:null,
+        lastHeardVoice:old.lastHeardVoice?.from==='Murmur'?old.lastHeardVoice:null,
+        lastHeardGuitar:old.lastHeardGuitar?.from==='Riff'?old.lastHeardGuitar:null,
+        ensembleIntent:name==='Murmur'&&['solo','listening','joining'].includes(old.ensembleIntent)?old.ensembleIntent:'solo',
+        lastEnsembleChoice:valid(old.lastEnsembleChoice)?old.lastEnsembleChoice:-99,
         lastHeardGuitar:old.lastHeardGuitar?.from==='Riff' ? old.lastHeardGuitar : null,
         soundBar:valid(old.soundBar)?old.soundBar:-1,
         voluntaryRests:Math.max(0,Math.floor(old.voluntaryRests||0))
@@ -109,7 +124,7 @@ export class GroveWorld {
         if(p.destination!=='library')this.chooseDestination(name,'library','reading a borrowed book',grove.bar);
       }
       const next=p.route[0];if(!next)continue;
-      const to=PLACES[next]||WAYPOINTS[next];
+      const to=arrival(name,next);
       if(!to){p.route.shift();continue;}
       const dx=to.x-p.x,dy=to.y-p.y,d=Math.hypot(dx,dy);
       const step=SPEED[name]*beatSeconds;
@@ -145,6 +160,8 @@ export class GroveWorld {
       listener.lastHeard={from:source,kind,bar,strength:Math.round(intensity*100)/100,
         pitch:Number.isFinite(pitch)?pitch:null};
       if(source==='Riff'&&kind==='guitar')listener.lastHeardGuitar={...listener.lastHeard};
+      if(source==='Pip'&&(kind==='kick'||kind==='snare'))listener.lastHeardDrum={...listener.lastHeard};
+      if(source==='Murmur'&&kind==='voice')listener.lastHeardVoice={...listener.lastHeard};
       this.heard[name]++;
       if(this.recent.length>19)this.recent.shift();
       this.recent.push({listener:name,from:source,kind,bar});
@@ -156,6 +173,37 @@ export class GroveWorld {
       const p=this.people[name],curious=name==='Pip'?grove.pip?.curiosity:name==='Riff'?grove.riff?.curiosity:grove.vocalist?.curiosity;
       if(grove.library?.busy(name))continue;
       if(this.traveling(name) || bar-p.lastChoice<9)continue;
+      // Music becomes an invitation, never an obligation.
+      if(name==='Murmur'&&grove.vocalist?.stage==='humming'){
+        const fresh=[p.lastHeardGuitar,p.lastHeardDrum]
+          .filter(h=>h&&bar-h.bar<=4&&h.strength>.045);
+        const source=fresh.sort((a,b)=>b.bar-a.bar)[0];
+        const performer=source&&this.people[source.from];
+        const available=performer&&!this.traveling(source.from)&&
+          !grove.library?.busy(source.from)&&performer.destination!=='pond';
+        const invitation=available&&this.canHear('Murmur',source.from,source.kind)>.08;
+        if(invitation&&p.ensembleIntent!=='joining'&&Math.random()<.38+.3*(curious??.5)){
+          p.ensembleIntent='joining';p.lastEnsembleChoice=bar;
+          const location=performer.place,reason='trying a musical phrase with '+source.from;
+          if(p.destination!==location||!this.at(name,location,110))
+            this.chooseDestination(name,location,reason,bar);
+          else {p.purpose=reason;p.lastChoice=bar;}
+          grove.push('Murmur chooses to join '+source.from+' and listen for an opening.');
+          continue;
+        }
+        if(p.ensembleIntent==='joining'){
+          const silentFor=bar-Math.max(p.lastHeardGuitar?.bar??-99,p.lastHeardDrum?.bar??-99);
+          const wantsBreak=(bar-p.lastEnsembleChoice>=12&&Math.random()<.16)||
+            (silentFor>10&&bar-p.lastEnsembleChoice>=7);
+          if(wantsBreak){
+            p.ensembleIntent='listening';p.lastEnsembleChoice=bar;p.lastChoice=bar;
+            p.purpose='taking time to listen before singing again';
+            grove.push('Murmur chooses a listening break from the music.');
+            continue;
+          }
+          if(silentFor<=10)continue;
+        }
+      }
       // A destination is a personal choice, not a mandatory timetable.
       if(Math.random()>.23*(curious??.5))continue;
       const recentlyHeard=p.lastHeard && bar-p.lastHeard.bar<8?p.lastHeard:null;
@@ -178,6 +226,8 @@ export class GroveWorld {
         else if(Math.random()<.45){where='library';why='studying chord language';}
         else {where='clearing';why='listening for a possible jam';}
       }
+      if(name==='Murmur'&&p.ensembleIntent==='joining'&&where!==p.destination)
+        p.ensembleIntent='solo';
       if(where===p.destination){
         p.lastChoice=bar;p.voluntaryRests++;
       }else if(this.chooseDestination(name,where,why,bar)){
