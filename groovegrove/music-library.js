@@ -70,15 +70,17 @@ export class MusicLibrary{
     }
   }
   snapshot(){
-    return {books:this.books.map(b=>({...b})),known:{Pip:[...this.known.Pip],Riff:[...this.known.Riff]},activity:JSON.parse(JSON.stringify(this.activity)),nextCopy:this.nextCopy};
+    return {books:this.books.map(b=>({...b})),known:Object.fromEntries(AGENTS.map(name=>[name,[...this.known[name]]])),activity:JSON.parse(JSON.stringify(this.activity)),nextCopy:this.nextCopy};
   }
   donate(type){
     if(!LIBRARY_CATALOG[type])return {ok:false,reason:'Unknown book'};
     if(this.books.some(b=>b.type===type))return {ok:false,reason:'One copy already in the grove'};
     // First three original works belong to the original cabinet. New volumes
     // are delivered to Shelf II rather than taking its older sibling's spaces.
-    const shelfStart=BOOK_IDS.indexOf(type)<3?0:6;
-    const slot=Array.from({length:6},(_,i)=>shelfStart+i).find(i=>!this.books.some(b=>b.slot===i));
+    const index=BOOK_IDS.indexOf(type);
+    const shelfStart=index<3?0:index<8?6:12;
+    const shelfSize=shelfStart===12?3:6;
+    const slot=Array.from({length:shelfSize},(_,i)=>shelfStart+i).find(i=>!this.books.some(b=>b.slot===i));
     if(slot===undefined)return {ok:false,reason:'Every shelf slot is occupied'};
     const book={copyId:'book-'+this.nextCopy++,type,slot,state:'shelf',owner:null,progress:0};
     this.books.push(book);return {ok:true,book};
@@ -90,27 +92,37 @@ export class MusicLibrary{
   copyById(id){return this.books.find(book=>book.copyId===id);}
   borrow(name,book){
     if(!AGENTS.includes(name)||this.busy(name)||!book||book.state!=='shelf'||book.owner)return false;
-    if(this.has(name,LIBRARY_CATALOG[book.type].skill))return false;
+    const def=LIBRARY_CATALOG[book.type];
+    if(name==='Murmur'?def.reader!=='Murmur':def.reader==='Murmur')return false;
+    if(this.has(name,def.skill))return false;
     book.owner=name;book.state='carried';book.progress=0;
     this.activity[name]={copyId:book.copyId,stage:'carried',ticks:0};
     return true;
   }
   choose(name,grove){
     if(this.busy(name))return;
-    const candidates=this.books.filter(b=>b.state==='shelf'&&!this.has(name,LIBRARY_CATALOG[b.type].skill));
+    const candidates=this.books.filter(b=>{
+      const def=LIBRARY_CATALOG[b.type];
+      return b.state==='shelf' &&
+        (name==='Murmur'?def.reader==='Murmur':def.reader!=='Murmur') &&
+        !this.has(name,def.skill);
+    });
     if(!candidates.length)return;
     const scored=candidates.map(b=>{
       const def=LIBRARY_CATALOG[b.type];
       const relevant=def.reader===name?.32:def.reader===null?.17:-.16;
-      const interest=(name==='Pip'?grove.pip.curiosity:grove.riff.curiosity)*.32;
+      const interest=(name==='Pip'?grove.pip.curiosity:name==='Riff'?grove.riff.curiosity:grove.vocalist.curiosity)*.32;
       return {book:b,score:relevant+interest+Math.random()*.32};
     }).sort((a,b)=>b.score-a.score);
     // Choice is probabilistic. A book being on the shelf is not an order to read.
     if(scored[0].score<.57 || Math.random()>.42)return;
     if(this.borrow(name,scored[0].book)){
       const def=LIBRARY_CATALOG[scored[0].book.type];
-      const agent=name==='Pip'?grove.pip:grove.riff;
-      agent.currentGoal='reading '+def.title;
+      if(name==='Murmur')grove.space.people.Murmur.purpose='reading '+def.title;
+      else{
+        const agent=name==='Pip'?grove.pip:grove.riff;
+        agent.currentGoal='reading '+def.title;
+      }
       grove.push(name+' borrows '+def.title+'.');
     }
   }
@@ -133,14 +145,18 @@ export class MusicLibrary{
         if(book.progress>=def.readBars){
           if(!this.has(name,def.skill))this.known[name].push(def.skill);
           grove.push(name+' learned '+def.subtitle.toLowerCase()+' from '+def.title+'.');
-          const agent=name==='Pip'?grove.pip:grove.riff;
-          agent.remember('Read '+def.title+' and learned '+def.subtitle.toLowerCase()+'.');
+          if(name==='Murmur')grove.voiceJournal?.study({bar:grove.bar,title:def.title,skill:def.skill});
+          else{
+            const agent=name==='Pip'?grove.pip:grove.riff;
+            agent.remember('Read '+def.title+' and learned '+def.subtitle.toLowerCase()+'.');
+          }
           task.stage='returning';task.ticks=0;book.state='returning';
         }
       }else if(task.stage==='returning' && task.ticks>=1){
         book.state='shelf';book.owner=null;book.progress=0;
         this.activity[name]=null;
-        (name==='Pip'?grove.pip:grove.riff).currentGoal='exploring new musical ideas';
+        if(name==='Murmur')grove.space.people.Murmur.purpose='exploring a newly learned vocal idea';
+        else (name==='Pip'?grove.pip:grove.riff).currentGoal='exploring new musical ideas';
         grove.push(name+' returns '+def.title+'. The shelf is available again.');
       }
     }
