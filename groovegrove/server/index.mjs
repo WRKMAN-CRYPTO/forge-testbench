@@ -41,7 +41,7 @@ function packageState(includeEvents=false,since=0,includeWorld=true){
   events:list};
 }
 function capture(kind,args){
- const [a,b,c,d]=args;
+ const [a,b,c,d,expression]=args;
  const time=(kind==='guitar'||kind==='voice')?b:a;
  const source=kind==='voice'?'Murmur':kind==='guitar'?'Riff':'Pip';
  const position=world.space?.people[source]||null;
@@ -49,6 +49,15 @@ function capture(kind,args){
   bar:world.bar,beat:world.beat,x:position?Math.round(position.x):null,y:position?Math.round(position.y):null};
  if(kind==='guitar'||kind==='voice'){ev.freq=a;ev.volume=c;ev.duration=d;}
  else ev.volume=b;
+ if(kind==='voice'){
+  const v=['m','u','o','a','i'].includes(expression?.vowel)?expression.vowel:'m';
+  const safe=(n,f,min,max)=>Number.isFinite(n)?Math.min(max,Math.max(min,n)):f;
+  ev.expression={
+   vowel:v,glide:safe(expression?.glide,0,-2,2),
+   attack:safe(expression?.attack,.07,.02,.25),
+   release:safe(expression?.release,.08,.03,.3)
+  };
+ }
  events.push(ev);if(events.length>420)events.shift();
 }
 const sink={
@@ -112,6 +121,7 @@ async function init(){
    beat:nextBeat,bar:world.bar,
    practice:{Pip:pip.observations,Riff:riff.observations},
    experiments:{Pip:pip.experiments,Riff:riff.experiments},
+   voice:{stage:world.vocalist.stage,notes:world.vocalist.notes,phrases:world.voiceJournal?.phrases||0,books:world.library.known.Murmur?.length||0},
    sinceLastBeatMs:Date.now()-lastAdvanceAt,checkpointAt:lastWrite
   }));
  },30000);
