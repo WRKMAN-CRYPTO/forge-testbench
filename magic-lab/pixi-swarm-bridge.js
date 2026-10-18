@@ -368,7 +368,10 @@
    state.fireGroupTongues=state.fireGroupTongueGroups=0;
    if(!state.fireGroupFlames||!fireGroupGraphics||!FIRE_GROUP_FLAMES?.createTongues)return;
    try{
-    const flame=FIRE_GROUP_FLAMES.createTongues(results.shells,state.frame*16.667,{maxTotal:30,maxPerShell:10});
+    // Scene time keeps tongue animation speed constant at 30 or 60 FPS.
+    const sceneTime=Number(state.records[0]?.time);
+    const presentationTime=Number.isFinite(sceneTime)?sceneTime:state.frame*16.667;
+    const flame=FIRE_GROUP_FLAMES.createTongues(results.shells,presentationTime,{maxTotal:30,maxPerShell:10});
     state.fireGroupTongues=FIRE_GROUP_FLAMES.drawTongues(fireGroupGraphics,flame.tongues);
     state.fireGroupTongueGroups=flame.groups;
    }catch(error){
