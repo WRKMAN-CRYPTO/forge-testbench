@@ -85,6 +85,30 @@ const before=JSON.stringify(srcRecords);
  check(batches.every(x=>x.children.every(p=>p.texture.id===x.texture.id)),
   "Every batch has exactly one shared source");
 
+ // 086: default-on ember footprint is displayed, not simulated or alpha-clamped.
+ const ember=particles.find(p=>p.texture.id==="wandrune-mat069-fire");
+ const ice=particles.find(p=>p.texture.id==="wandrune-mat069-frost");
+ const base=2.8*3.2;
+ const boosted=ember.scaleX*48;
+ const baselineAlpha=ember.alpha;
+ const particleCount=particles.length;
+ check(bridge.fireEmbers&&bridge.fireEmberBoosted===80,"80 fire agents receive display support");
+ check(boosted>base+5,"Small fire visual has a materially larger footprint");
+ check(Math.abs(ice.scaleX*48-base)<1e-7,"Ice art is unchanged by the fire-only pass");
+ check(Bridge.fireEmberFootprint(.6,1,true,false,true)>12,"Tiny fire does not collapse into a dot");
+ check(Bridge.fireEmberFootprint(20,1,true,false,true)<65,"Large fire is nearly unchanged");
+ check(Bridge.fireEmberFootprint(2.8,1,false,false,true)===2.8*4.3,"Soft art baseline preserved");
+ check(bridge.setFireEmbers(false)===false,"Live A/B can disable ember sizing");
+ frame();
+ check(Math.abs(ember.scaleX*48-base)<1e-7,"Off restores the exact native footprint");
+ check(bridge.fireEmberBoosted===0,"Off removes the visual boost count");
+ check(ember.alpha===baselineAlpha,"Both settings preserve original alpha and fade");
+ check(particles.length===particleCount,"Toggle does not create any additional render particles");
+ check(bridge.setFireEmbers(true)===true,"Live A/B re-enables ember sizing");
+ frame();
+ check(Math.abs(ember.scaleX*48-boosted)<1e-7,"On restores the same smooth footprint");
+ check(bridge.drawn===200&&bridge.details+bridge.bulk===200,"Ember fidelity retains all 200 visuals");
+
  const materialAlpha=particles[0].alpha;
  bridge.setArt("soft");frame();
  check(bridge.materialDrawn===0,"Soft reference uses previous cloud textures");
