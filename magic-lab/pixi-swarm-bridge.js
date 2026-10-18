@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="088-motion-aligned-flames",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="089-group-flame-surface",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -89,6 +89,7 @@
   const FIRE_STABILITY=win.WRKMAN_FIRE_STABILITY||null;
   const FIRE_FLAME=win.WRKMAN_FIRE_FLAME||null;
   const FIRE_MOTION=win.WRKMAN_FIRE_MOTION||null;
+  const FIRE_GROUP_FLAMES=win.WRKMAN_FIRE_GROUP_FLAMES||null;
   const fireMotionTracker=FIRE_MOTION?.makeTracker?FIRE_MOTION.makeTracker():null;
   const fireTracker=FIRE_STABILITY?.makeTracker?FIRE_STABILITY.makeTracker({
    maxSlots:3,fadeMs:180,heatHoldMs:110,heatFadeMs:190}):null;
@@ -115,11 +116,13 @@
    fireFlamesDrawn:0,
    fireMotion:opts.fireMotion!==false&&!!fireMotionTracker,
    fireMotionAligned:0,fireMotionDense:0,
+   fireGroupFlames:opts.fireGroupFlames!==false&&!!FIRE_GROUP_FLAMES?.createTongues&&!!FIRE_PERIMETER?.buildPerimeters,
+   fireGroupTongues:0,fireGroupTongueGroups:0,
    fireStableSlots:0,fireStableGhosts:0,fireStableFading:0,
    fireStableSwaps:0,fireStableHeldHot:0,fireStableCached:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
    registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=new Map(),spritePool=[],
-   restoredTextures=new Map(),flameTextures=[],accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,fireBodyGraphics=null,fireHotGraphics=null,disposed=false,heroUsed=0;
+   restoredTextures=new Map(),flameTextures=[],fireGroupGraphics=null,accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,fireBodyGraphics=null,fireHotGraphics=null,disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
    if(typeof opts.status==="function")try{opts.status(msg);}catch(_){}
@@ -208,6 +211,12 @@
    }
    announce("FIRE CLUSTERS · "+(state.fireDebug?"DEBUG ON":"OFF"));
    return state.fireDebug;
+  }
+  function setFireGroupFlames(enabled){
+   state.fireGroupFlames=!!enabled&&!!FIRE_GROUP_FLAMES?.createTongues&&!!FIRE_PERIMETER?.buildPerimeters;
+   if(!state.fireGroupFlames){fireGroupGraphics?.clear();state.fireGroupTongues=state.fireGroupTongueGroups=0;}
+   announce("GROUP FLAMES · "+(state.fireGroupFlames?"ON":"OFF"));
+   return state.fireGroupFlames;
   }
   function setFireMotion(enabled){
    state.fireMotion=!!enabled&&!!fireMotionTracker;
@@ -354,10 +363,23 @@
     }
    }
   }
+  function drawFireGroupFlames(results){
+   fireGroupGraphics?.clear();
+   state.fireGroupTongues=state.fireGroupTongueGroups=0;
+   if(!state.fireGroupFlames||!fireGroupGraphics||!FIRE_GROUP_FLAMES?.createTongues)return;
+   try{
+    const flame=FIRE_GROUP_FLAMES.createTongues(results.shells,state.frame*16.667,{maxTotal:30,maxPerShell:10});
+    state.fireGroupTongues=FIRE_GROUP_FLAMES.drawTongues(fireGroupGraphics,flame.tongues);
+    state.fireGroupTongueGroups=flame.groups;
+   }catch(error){
+    console.warn("Optional group flame appearance unavailable",error);
+    setFireGroupFlames(false);
+   }
+  }
   function paintFireShells(found){
    if(!fireShellGraphics)return;
    fireShellGraphics.clear();
-   if((!state.fireShell&&!state.fireBody&&!state.fireHot)||!found||!FIRE_PERIMETER?.buildPerimeters)return;
+   if((!state.fireShell&&!state.fireBody&&!state.fireHot&&!state.fireGroupFlames)||!found||!FIRE_PERIMETER?.buildPerimeters)return;
    const before=typeof performance!=="undefined"?performance.now():0;
    try{
     let choice=null;
@@ -389,8 +411,11 @@
     state.firePeakPaths=results.peakPaths;
     drawFireBody(results);
     drawFireHot(results);
+    drawFireGroupFlames(results);
     if(state.fireShell)for(const cl of results.shells){
      const factor=cl.count>=4?1:.65;
+     // Only soften the glowing capsule boundary in the new appearance.
+     const rimStrength=state.fireGroupFlames&&cl.count>=8?.45:1;
      // Boundary ONLY in Pass B: no opaque fill and no bright interior.
      // Three feathered stroked bands suggest hot plasma around the
      // exact merged influence of neighboring agents.
@@ -412,18 +437,18 @@
        for(let i=1;i<points.length;i++)g.lineTo(points[i].x,points[i].y);
        if(path.closed)g.closePath();
        g.stroke({width:band.width,color:band.color,
-        alpha:band.alpha*(cl.opacity??1),cap:"round",join:"round"});
+        alpha:band.alpha*rimStrength*(cl.opacity??1),cap:"round",join:"round"});
       }
      }
     }
     state.fireShellMs=before?Math.round((performance.now()-before)*10)/10:0;
    }catch(error){
     console.warn("Nonfatal fire perimeter failure",error);
-    setFireShell(false);setFireBody(false);setFireHot(false);
+    setFireShell(false);setFireBody(false);setFireHot(false);setFireGroupFlames(false);
    }
   }
   function paintFireEffects(){
-   if(!state.fireDebug&&!state.fireShell&&!state.fireBody&&!state.fireHot)return;
+   if(!state.fireDebug&&!state.fireShell&&!state.fireBody&&!state.fireHot&&!state.fireGroupFlames)return;
    let found;
    try{
     // One clustering operation supplies BOTH the validated Pass A debug
@@ -432,7 +457,7 @@
      bounds:fireViewport(),radius:26,margin:36});
    }catch(error){
     console.warn("Nonfatal fire group failure",error);
-    setFireShell(false);setFireBody(false);setFireHot(false);setFireDebug(false);return;
+    setFireShell(false);setFireBody(false);setFireHot(false);setFireGroupFlames(false);setFireDebug(false);return;
    }
    paintFireShells(found);
    paintFireDebug(found);
@@ -610,7 +635,8 @@
     fireBodyGraphics=new P.Graphics();fireBodyGraphics.blendMode="normal";
     fireHotGraphics=new P.Graphics();fireHotGraphics.blendMode="add";
     fireShellGraphics=new P.Graphics();fireShellGraphics.blendMode="add";
-    app.stage.addChild(world);world.addChild(shapeLayer,fireBodyGraphics,fireHotGraphics,fireShellGraphics,detailsLayer,accentGraphics,fireDebugGraphics);
+    fireGroupGraphics=new P.Graphics();fireGroupGraphics.blendMode="normal";
+    app.stage.addChild(world);world.addChild(shapeLayer,fireBodyGraphics,fireHotGraphics,fireShellGraphics,fireGroupGraphics,detailsLayer,accentGraphics,fireDebugGraphics);
     if(opts.alignDebug){
      registrationGraphics=new P.Graphics();
      world.addChild(registrationGraphics);
@@ -648,8 +674,9 @@
    state.fireEmberBoosted=0;state.fireFlamesDrawn=0;
    state.fireMotionAligned=state.fireMotionDense=0;
    fireMotionTracker?.reset();
+   state.fireGroupTongues=state.fireGroupTongueGroups=0;
    if(app?.canvas)app.canvas.style.display="none";
-   shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();fireHotGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireHotFills=state.fireHotGlows=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
+   shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();fireHotGraphics?.clear();fireGroupGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireHotFills=state.fireHotGlows=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
    announce("PHASER SWARM · SAFE FALLBACK");
   }
@@ -745,9 +772,9 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();flameTextures=[];state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;fireGroupGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();flameTextures=[];state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setFireMotion,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setFireMotion,setFireGroupFlames,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,fireEmberFootprint,createBridge});
 });
