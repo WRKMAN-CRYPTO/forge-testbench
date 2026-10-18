@@ -47,6 +47,9 @@ export class Grove {
     this.logs=[];this.lastRiffOnsets=new Map();this.lastPipOnsets=new Map();
     this.relativeErrors=[];this.barErrors=[];this.priorErrors=[];this.sessionMeasurements=[];
     this.pipPlayed=0;this.riffPlayed=0;this.lastLearning=null;
+    // Actual scheduled long chords, not an XP badge. Kept across restarts.
+    this.riffHoldUntilBeat=Number.isFinite(saved?.riffHoldUntilBeat)?Math.max(0,Math.floor(saved.riffHoldUntilBeat)):0;
+    this.riffHeldChords=Math.max(0,Math.floor(saved?.riffHeldChords||0));
     this.library=new MusicLibrary(saved?.library);
     this.understanding=new ListeningJournal(saved?.understanding);
     this.voiceJournal=new VoiceJournal(saved?.voiceJournal);
@@ -72,7 +75,8 @@ export class Grove {
     if(this.onTalk)this.onTalk(from.name,message);
   }
   baseline(){return rms(this.relativeErrors.slice(-16));}
-  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),space:this.space.snapshot(),logs:this.logs.slice(0,12)};}
+  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},
+    riffHoldUntilBeat:this.riffHoldUntilBeat,riffHeldChords:this.riffHeldChords,vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),space:this.space.snapshot(),logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
@@ -163,20 +167,38 @@ export class Grove {
     if(riffActive){
       const feeling=riffChoice==='soft'?.7:1;
       const voicing=riffChoice==='voicing'?[pitches[1],pitches[2],pitches[0]*2]:pitches;
-      if(beat===0||beat===2){
-        voicing.forEach((p,i)=>play.guitar(p,guitarOnset+i*.026,dynamic*feeling*(i===0?1:.72),.42));
-      }else if(!(riffChoice==='breath' && beat===3) && !riffRest){
-        play.guitar(voicing[(beat+bar)%3]*2,guitarOnset,dynamic*.72*feeling,.23);
+      // Long harmonies are Riff's musical choice. He listens for a singer
+      // and sometimes leaves the chord ringing instead of re-strumming.
+      const alreadyHolding=this.riffHoldUntilBeat>index;
+      if(!alreadyHolding && (beat===0||beat===2)){
+        const voiceHeard=this.space.people.Riff.lastHeardVoice;
+        const singingNearby=!!(voiceHeard && bar-voiceHeard.bar<=2 &&
+          this.space.canHear('Riff','Murmur','voice')>.10);
+        const holdingChance=.19+
+          (this.library.has('Riff','openChords')?.13:0)+
+          (singingNearby?.18:0)+(onJam?.07:0);
+        const longChord=Math.random()<holdingChance;
+        const holdBeats=longChord?(beat===0?(Math.random()<.42?4:3):2):0;
+        const duration=longChord?holdBeats*beatDur-.06:.43;
+        if(longChord){
+          this.riffHoldUntilBeat=index+holdBeats;
+          this.riffHeldChords++;
+        }
+        voicing.forEach((p,i)=>play.guitar(
+          p,guitarOnset+i*.026,dynamic*feeling*(i===0?1:.72),duration
+        ));
+      }else if(!alreadyHolding && !(riffChoice==='breath' && beat===3) && !riffRest){
+        play.guitar(voicing[(beat+bar)%3]*2,guitarOnset,dynamic*.72*feeling,.29);
       }
       if(usesNewChords && beat===0)this.playedKnowledge.Riff++;
-      if(!riffRest && onJam && beat===3 && this.library.has('Riff','callResponse')){
+      if(!alreadyHolding && !riffRest && onJam && beat===3 && this.library.has('Riff','callResponse')){
         play.guitar(voicing[(bar+1)%3]*2,guitarOnset+beatDur*.47,dynamic*.42*feeling,.2,true);
         this.playedKnowledge.Riff++;
       }
-      if(!riffRest && riffChoice==='answer' && beat===3){
+      if(!alreadyHolding && !riffRest && riffChoice==='answer' && beat===3){
         play.guitar(voicing[bar%3]*2,guitarOnset+beatDur*.73,dynamic*.24,.16,true);
       }
-      if(this.library.has('Riff','walkingBass') && bar%2===1 && (beat===1 || beat===3)){
+      if(!alreadyHolding && this.library.has('Riff','walkingBass') && bar%2===1 && (beat===1 || beat===3)){
         // Gently lead the ear from this chord's root toward the following chord.
         const palette=usesNewChords?newChords:originalChords;
         const nextRoot=palette[(Math.floor((bar+1)/2))%4][0];
@@ -184,11 +206,11 @@ export class Grove {
         play.guitar(bassPitch,guitarOnset+beatDur*.33,dynamic*.29,.29,true);
         if(beat===3)this.playedKnowledge.Riff++;
       }
-      if(!riffRest && this.library.has('Riff','syncopation') && beat===1 && bar%3===0){
+      if(!alreadyHolding && !riffRest && this.library.has('Riff','syncopation') && beat===1 && bar%3===0){
         play.guitar(voicing[(bar+2)%3]*2,guitarOnset+beatDur*.57,dynamic*.32,.17,true);
         this.playedKnowledge.Riff++;
       }
-      if(!riffRest && this.library.has('Riff','partnerListening') && onJam && pipActive &&
+      if(!alreadyHolding && !riffRest && this.library.has('Riff','partnerListening') && onJam && pipActive &&
          beat===3 && bar%4===2){
         // An answer, not a compulsory band: only during a chosen shared jam.
         play.guitar(voicing[(bar+1)%3]*2,guitarOnset+beatDur*.72,dynamic*.25,.19,true);
