@@ -260,7 +260,7 @@ app.canvas.style.touchAction='none';
 const root=new Container();app.stage.addChild(root);
 let sound=new SoundEngine(),grove=null;
 let started=false,startError='',selected='Pip',soundNeedsRefresh=false,audioStartPending=false;
-let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false,journalOpen=false,journalName='Pip';
+let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false,deliveryCategory='instruments',journalOpen=false,journalName='Pip';
 let floatingNotes=[],talkBubble=null,ambient=[],now=0,visualBeat=-1;
 let noteFlash={Pip:0,Riff:0,Murmur:0};
 let redrawAccum=0;
@@ -516,7 +516,7 @@ function makeLibraryNook(world){
     }
   }
   textAt(world,'THE LIBRARY',x+w/2,y-26,13,PALETTE.gold,'bold',2,.5);
-  ui.shelfCounter=textAt(world,'LIBRARY  0 / 12',x+8,y+8,9,PALETTE.cream,'bold',.6);
+  ui.shelfCounter=textAt(world,'LIBRARY  0 / 15',x+8,y+8,9,PALETTE.cream,'bold',.6);
   textAt(world,'SHELF II  ·  NEW IDEAS',x+8,y+unitH+gap+(landscape?8:3),landscape?9:7,PALETTE.cream,'bold',.6);
   ui.shelfStatus=textAt(world,'Tap shelf to deliver books',x+w/2,y+h+(landscape?12:5),landscape?10:9,PALETTE.muted,'normal',0,.5);
   ui.shelfStatus.style.wordWrap=true;
@@ -525,8 +525,26 @@ function makeLibraryNook(world){
   const hit=new Graphics();rect(hit,x-8,y-8,w+16,h+25,7,0xffffff,.001);
   hit.eventMode='static';hit.cursor='pointer';
   hit.hitArea=new Rectangle(x-8,y-8,w+16,h+25);
-  hit.on('pointertap',()=>{deliveryOpen=!deliveryOpen;refreshText();});
+  hit.on('pointertap',()=>{deliveryCategory='instruments';deliveryOpen=!deliveryOpen;refreshText();});
   world.addChild(hit);
+  // Three dedicated volumes, attached to the library rather than shuffling
+  // existing copies out of either established cabinet.
+  const vx=x+w+15,vy=y+3,vw=157,vh=137;
+  ui.voiceShelfBounds={x:vx,y:vy,w:vw,h:vh};
+  const voiceWood=new Graphics();world.addChild(voiceWood);
+  rect(voiceWood,vx-6,vy-8,vw+12,vh+16,11,0x072425,.58);
+  rect(voiceWood,vx,vy,vw,vh,8,0x625346);
+  rect(voiceWood,vx+5,vy+5,vw-10,vh-10,5,0x88715b);
+  rect(voiceWood,vx+11,vy+39,vw-22,68,5,0x1b3736);
+  for(let i=1;i<3;i++)line(voiceWood,vx+10+i*46,vy+39,vx+10+i*46,vy+107,0xc4a57a,2,.62);
+  line(voiceWood,vx+9,vy+110,vx+vw-9,vy+110,0xe0b889,4,.82);
+  textAt(world,'VOICE COLLECTION',vx+vw/2,vy+12,12,0xf4d9b5,'bold',.5,.5);
+  textAt(world,'MURMUR’S BOOKS',vx+vw/2,vy+115,9,PALETTE.muted,'bold',.6,.5);
+  const voiceHit=new Graphics();rect(voiceHit,vx-6,vy-8,vw+12,vh+16,8,0xffffff,.001);
+  voiceHit.eventMode='static';voiceHit.cursor='pointer';
+  voiceHit.hitArea=new Rectangle(vx-6,vy-8,vw+12,vh+16);
+  voiceHit.on('pointertap',()=>{deliveryCategory='voice';deliveryOpen=!deliveryOpen;refreshText();});
+  world.addChild(voiceHit);
   // Keep musicians' existing reading positions, never shift into the HUD.
   ui.readPads=landscape?{
     Pip:{x:x-32,y:y+unitH+89},Riff:{x:x+125,y:y+unitH+89}
@@ -624,19 +642,20 @@ function renderPhysicalBooks(){
   for(const book of grove.library.books){
     const def=LIBRARY_CATALOG[book.type];
     if(book.state==='shelf'){
-      const px=x+17+(book.slot%3)*55;
-      const second=book.slot>=6,small=second&&!landscape;
-      const py=second
+      const voice=book.slot>=12;
+      const px=voice?ui.voiceShelfBounds.x+14+(book.slot-12)*46:x+17+(book.slot%3)*55;
+      const second=book.slot>=6&&!voice,small=second&&!landscape;
+      const py=voice?ui.voiceShelfBounds.y+55:second
         ?y+ui.shelfBounds.unitH+ui.shelfBounds.gap+(small?17:31)+Math.floor((book.slot-6)/3)*(small?22:41)
         :y+31+Math.floor(book.slot/3)*41;
-      const bh=small?18:25;
+      const bh=small?18:voice?39:25;
       rect(g,px,py,43,bh,3,def.color);
       rect(g,px+4,py+3,7,bh-6,2,0x21443b,.62);
       line(g,px+16,py+(small?6:8),px+37,py+(small?6:8),0x123b30,2,.55);
       line(g,px+16,py+(small?12:15),px+32,py+(small?12:15),0x123b30,2,.36);
       continue;
     }
-    const agent=book.owner==='Pip'?ui.pip:ui.riff;
+    const agent=book.owner==='Pip'?ui.pip:book.owner==='Riff'?ui.riff:ui.murmur;
     if(!agent?.group)continue;
     const bx=agent.group.x+20,by=agent.group.y+36;
     rect(g,bx-11,by-9,26,19,3,def.color);
@@ -880,7 +899,7 @@ function refreshText(){
   ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
   if(ui.audioLabel)ui.audioLabel.text=!started?'▶ AUDIO':soundNeedsRefresh?'↻ REPAIR':'↻ AUDIO';
   if(ui.audioWidget)ui.audioWidget.visible=!deliveryOpen && !journalOpen;
-  if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 12';
+  if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 15';
   for(const [name,button] of Object.entries(ui.cameraButtons||{})){
     const active=camera.mode==='follow'?camera.target===name:camera.mode==='place'&&camera.target===name;
     button.caption.alpha=active?1:.63;
