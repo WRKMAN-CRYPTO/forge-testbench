@@ -34,6 +34,7 @@ export class ListeningJournal{
   this.events=[];
   this.decisions={Pip:null,Riff:null};
   this.experiments={Pip:0,Riff:0};
+  this.totalBars={Pip:0,Riff:0};
   this.newFindings=[];
   if(saved&&typeof saved==='object'){
    for(const who of PEOPLE){
@@ -45,11 +46,16 @@ export class ListeningJournal{
     }));
     if(['quiet','open','busy','unknown'].includes(saved.texture?.[who]))this.texture[who]=saved.texture[who];
     this.latest[who]=this.memory[who].at(-1)||null;
-    this.experiments[who]=this.memory[who].filter(r=>r.variant!=='steady').length;
+    const recentExperiments=this.memory[who].filter(r=>r.variant!=='steady').length;
+    // Old worlds only saved the rolling 64-bar window. That is the minimum
+    // historical count we can honestly recover, not necessarily the lifetime count.
+    const safeCount=n=>Number.isSafeInteger(n)&&n>=0&&n<=Number.MAX_SAFE_INTEGER?n:null;
+    this.totalBars[who]=Math.max(this.memory[who].length,safeCount(saved.totalBars?.[who])||0);
+    this.experiments[who]=Math.max(recentExperiments,safeCount(saved.experiments?.[who])||0);
    }
   }
  }
- snapshot(){return {memory:{Pip:[...this.memory.Pip],Riff:[...this.memory.Riff]},texture:{...this.texture}};}
+ snapshot(){return {memory:{Pip:[...this.memory.Pip],Riff:[...this.memory.Riff]},texture:{...this.texture},totalBars:{...this.totalBars},experiments:{...this.experiments}};}
  canTry(who,skills){
   return Object.entries(VARIATIONS[who]).filter(([,v])=>!v.skill || skills?.[who]?.includes(v.skill)).map(([id])=>id);
  }
@@ -125,6 +131,7 @@ export class ListeningJournal{
    const record={who,variant,context:this.active.contexts[who],bar,cost,overlap,
      attackCount:attacks.length,driftMs,coverage,partnerAttacks:others.length};
    this.memory[who].push(record);
+   this.totalBars[who]++;
    if(this.memory[who].length>64)this.memory[who].shift();
    this.latest[who]=record;
    this.texture[who]=others.length===0?'quiet':others.length>=7?'busy':'open';
@@ -150,7 +157,7 @@ export class ListeningJournal{
    const batches=tested.filter(r=>r.variant===v);
    preference[v]={trials:batches.length,averageCost:batches.length?mean(batches.map(x=>x.cost)):null};
   }
-  return {name:who,observations:records.length,experiments:tested.length,
+  return {name:who,observations:this.totalBars[who],recentWindow:records.length,experiments:this.experiments[who],recentExperiments:tested.length,
    partnerTexture:this.texture[who],latest:this.latest[who],recent,preference};
  }
 }
