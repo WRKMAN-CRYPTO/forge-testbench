@@ -735,7 +735,7 @@ function makeJournalViewer(world){
   blocker.hitArea=new Rectangle(0,0,W,H);
   blocker.on('pointertap',()=>{journalOpen=false;refreshText();});
   const bw=Math.min(W-30,landscape?670:401);
-  const bh=landscape?358:497;
+  const bh=landscape?403:497;
   const bx=(W-bw)/2,by=Math.max(14,(H-bh)/2);
   const panel=new Graphics();overlay.addChild(panel);
   rect(panel,bx,by,bw,bh,17,0x123431,.99);
@@ -760,11 +760,11 @@ function makeJournalViewer(world){
   textAt(overlay,'RECENT MUSICAL EXPERIMENTS',bx+20,by+230,landscape?13:11,PALETTE.gold,'bold',1);
   ui.journalRows=[];
   for(let i=0;i<4;i++){
-    const field=textAt(overlay,'',bx+21,by+254+i*(landscape?18:25),landscape?12:11,PALETTE.cream);
+    const field=textAt(overlay,'',bx+21,by+254+i*(landscape?23:25),landscape?12:11,PALETTE.cream);
     field.style.wordWrap=true;field.style.wordWrapWidth=bw-44;
     ui.journalRows.push(field);
   }
-  const foot=textAt(overlay,'Overlap measures nearby attacks; it does not measure musical taste.',bx+20,by+bh-67,landscape?12:10,PALETTE.muted);
+  const foot=textAt(overlay,'Overlap measures nearby attacks; it does not measure musical taste.',bx+20,by+bh-58,landscape?12:10,PALETTE.muted);
   foot.style.wordWrap=true;foot.style.wordWrapWidth=bw-40;
   textAt(overlay,'Tap outside to return to the music',bx+bw/2,by+bh-25,landscape?12:10,PALETTE.gold,'normal',0,.5);
   overlay.visible=journalOpen;
@@ -1016,6 +1016,9 @@ let pressTimer=null,pressStart=null;
 app.canvas.addEventListener('pointerdown',(ev)=>{
   const bounds=app.canvas.getBoundingClientRect();
   const lx=(ev.clientX-bounds.left)/scale,ly=(ev.clientY-bounds.top)/scale;
+  // Modal layers own gestures. Never let a long-press through a journal or
+  // delivery overlay reset the pond and erase the musicians' memories.
+  if(journalOpen || deliveryOpen)return;
   // Audio repair executes synchronously from the same user gesture.
   const button=ui.audioRect;
   if(!deliveryOpen && button && lx>=button.x && lx<=button.x+button.w && ly>=button.y && ly<=button.y+button.h){
