@@ -1,0 +1,240 @@
+/* GrooveGrove shared simulation. Same classes in server + client. */
+import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js';
+import {ListeningJournal} from './listening-journal.js';
+const beatDur=60/98;
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const rand=(a,b)=>a+(b-a)*Math.random();
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+const rms=a=>a.length?Math.sqrt(avg(a.map(x=>x*x))):null;
+export class MusicalAgent {
+  constructor(name,role,initial){
+    this.name=name;this.role=role;
+    this.biasMs=initial.biasMs;this.jitterMs=initial.jitterMs;
+    this.curiosity=role==='drummer'?.83:.74;
+    this.generosity=role==='guitarist'?.89:.65;
+    this.currentGoal='practicing';this.observations=[];
+    this.ownOnsets=[];this.experiences=[];
+  }
+  rhythmOffset(){
+    // Gaussian-ish but clamped. Skill determines audible deviations, not a fake UI score.
+    const z=(Math.random()+Math.random()+Math.random()+Math.random()-2)*1.73;
+    return clamp(this.biasMs+this.jitterMs*z,-155,155);
+  }
+  observe(event){this.observations.push(event);if(this.observations.length>128)this.observations.shift();}
+  remember(description){this.experiences.unshift(description);if(this.experiences.length>8)this.experiences.length=8;}
+}
+export class Grove {
+  constructor(saved=null,onCheckpoint=null){
+    this.onCheckpoint=onCheckpoint;
+    this.pip=new MusicalAgent('Pip','drummer',{biasMs:clamp(saved?.pipBias??78,-100,150),jitterMs:clamp(saved?.pipJitter??34,7,75)});
+    this.riff=new MusicalAgent('Riff','guitarist',{biasMs:0,jitterMs:7});
+    this.familiarity=clamp(saved?.familiarity??0,0,99);
+    this.lessons=saved?.lessons??0;this.jams=saved?.jams??0;
+    this.mode=['solo','jam','lesson'].includes(saved?.mode)?saved.mode:'solo';this.modeBars=Number.isInteger(saved?.modeBars)?clamp(saved.modeBars,0,500):0;this.bar=Number.isInteger(saved?.bar)?Math.max(0,saved.bar):0;this.beat=Number.isInteger(saved?.beat)?clamp(saved.beat,0,3):0;
+    this.logs=[];this.lastRiffOnsets=new Map();this.lastPipOnsets=new Map();
+    this.relativeErrors=[];this.barErrors=[];this.priorErrors=[];this.sessionMeasurements=[];
+    this.pipPlayed=0;this.riffPlayed=0;this.lastLearning=null;
+    this.library=new MusicLibrary(saved?.library);
+    this.understanding=new ListeningJournal(saved?.understanding);
+    for(const name of ['Pip','Riff']){
+      const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
+      if(book)(name==='Pip'?this.pip:this.riff).currentGoal='finishing '+LIBRARY_CATALOG[book.type].title;
+    }
+    this.playedKnowledge={Pip:Math.max(0,saved?.playedKnowledge?.Pip||0),Riff:Math.max(0,saved?.playedKnowledge?.Riff||0)};
+    if(saved?.goals){
+      if(typeof saved.goals.Pip==='string')this.pip.currentGoal=saved.goals.Pip.slice(0,80);
+      if(typeof saved.goals.Riff==='string')this.riff.currentGoal=saved.goals.Riff.slice(0,80);
+    }
+    this.highlight='Two musicians, one little clearing.';
+    this.onSound=null;this.onNote=null;
+    this.push('The grove is quiet. Two musicians are finding their sound.');
+    if(saved?.logs?.length)this.logs=saved.logs.filter(x=>typeof x?.message==='string').slice(0,12);
+    else if(saved){this.push('Their memories survived the last visit.');}
+  }
+  push(message){this.logs.unshift({message,bar:this.bar});this.logs=this.logs.slice(0,12);this.highlight=message;}
+  exchange(from,to,message){
+    this.push(from.name+' → '+to.name+': '+message);
+    if(this.onTalk)this.onTalk(from.name,message);
+  }
+  baseline(){return rms(this.relativeErrors.slice(-16));}
+  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},logs:this.logs.slice(0,12)};}
+  onBeatEvent(index,t,audio){
+    const beat=index%4,bar=Math.floor(index/4);
+    if(beat===0 && index>0)this.finishBar();
+    this.beat=beat;this.bar=bar;
+    const solo=this.mode==='solo';
+    // A practice room can hold two soloists without making them a duo.
+    // They exchange turns every two bars. Only a mutual choice creates joint music.
+    const pipActive=(!solo || bar%4<2 || this.library.busy('Riff')) && !this.library.busy('Pip');
+    const riffActive=(!solo || bar%4>=2 || this.library.busy('Pip')) && !this.library.busy('Riff');
+    const riffOffset=this.riff.rhythmOffset();
+    const guitarOnset=t+riffOffset/1000;
+    const originalChords=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[146.83,185,220]];
+    const newChords=[[220,261.63,329.63],[146.83,174.61,220],[196,246.94,349.23],[174.61,261.63,349.23]];
+    const usesNewChords=this.library.has('Riff','openChords') && bar%4>=2;
+    const pitches=(usesNewChords?newChords:originalChords)[Math.floor(bar/2)%4];
+    const onLesson=this.mode==='lesson';
+    const onJam=this.mode==='jam';
+    const dynamic=onJam?.9:onLesson?.69:.51;
+    // Live onset bus: every heard note corresponds to an actual scheduled
+    // Web Audio event. Extra notes are marked so timing drift is not faked.
+    const drumOffset=this.pip.rhythmOffset();
+    const drumOnset=t+drumOffset/1000;
+    if(beat===0){
+      this.understanding.beginBar({bar,mode:this.mode,active:{Pip:pipActive,Riff:riffActive},skills:this.library.known});
+    }
+    const riffChoice=this.understanding.variation('Riff');
+    const pipChoice=this.understanding.variation('Pip');
+    const play={
+      guitar:(freq,at,volume,duration,extra=false)=>{
+        audio.guitar(freq,at,volume,duration);
+        this.understanding.hear({who:'Riff',kind:'guitar',time:at,bar,beat,velocity:volume,offsetMs:riffOffset,extra,pitch:freq});
+      },
+      kick:(at,volume,extra=false)=>{
+        audio.kick(at,volume);
+        this.understanding.hear({who:'Pip',kind:'kick',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
+      },
+      snare:(at,volume,extra=false)=>{
+        audio.snare(at,volume);
+        this.understanding.hear({who:'Pip',kind:'snare',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
+      },
+      hat:(at,volume,extra=false)=>{
+        audio.hat(at,volume);
+        this.understanding.hear({who:'Pip',kind:'hat',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
+      }
+    };
+    if(riffActive){
+      const feeling=riffChoice==='soft'?.7:1;
+      const voicing=riffChoice==='voicing'?[pitches[1],pitches[2],pitches[0]*2]:pitches;
+      if(beat===0||beat===2){
+        voicing.forEach((p,i)=>play.guitar(p,guitarOnset+i*.026,dynamic*feeling*(i===0?1:.72),.42));
+      }else if(!(riffChoice==='breath' && beat===3)){
+        play.guitar(voicing[(beat+bar)%3]*2,guitarOnset,dynamic*.72*feeling,.23);
+      }
+      if(usesNewChords && beat===0)this.playedKnowledge.Riff++;
+      if(onJam && beat===3 && this.library.has('Riff','callResponse')){
+        play.guitar(voicing[(bar+1)%3]*2,guitarOnset+beatDur*.47,dynamic*.42*feeling,.2,true);
+        this.playedKnowledge.Riff++;
+      }
+      if(riffChoice==='answer' && beat===3){
+        play.guitar(voicing[bar%3]*2,guitarOnset+beatDur*.73,dynamic*.24,.16,true);
+      }
+      this.riffPlayed++;
+      this.pip.observe({type:'heard-guitar',bar,beat,time:guitarOnset});
+      this.riff.ownOnsets.push({bar,beat,time:guitarOnset});
+    }
+    if(pipActive){
+      if(beat===0||beat===2)play.kick(drumOnset,beat===0?.9:.68);
+      else play.snare(drumOnset,.7);
+      play.hat(drumOnset+.017,.6);
+      if(!(pipChoice==='breath' && beat===3))play.hat(drumOnset+beatDur*.5+.017,.32);
+      if(onJam && beat===3 && this.pip.curiosity>.7 && bar%4===0)play.snare(drumOnset+beatDur*.74,.28,true);
+      // Book-learned motor vocabulary remains playable even without an experiment.
+      if(this.library.has('Pip','offbeatPulse') && beat===1 && bar%2===0){
+        play.kick(drumOnset+beatDur*.5,.32,true);play.snare(drumOnset+beatDur*.75,.18,true);
+        this.playedKnowledge.Pip++;
+      }
+      if(onJam && beat===3 && this.library.has('Pip','callResponse')){
+        play.snare(drumOnset+beatDur*.5,.31,true);this.playedKnowledge.Pip++;
+      }
+      // Mild optional variations: core four-beat pulse is never removed.
+      if(pipChoice==='ghost' && beat===2)play.snare(drumOnset+beatDur*.5,.17,true);
+      if(pipChoice==='offbeat' && beat===2)play.kick(drumOnset+beatDur*.53,.23,true);
+      this.pipPlayed++;
+      this.riff.observe({type:'heard-drum',bar,beat,time:drumOnset});
+      this.pip.ownOnsets.push({bar,beat,time:drumOnset});
+      // The partner's reliable reference pulse exists even while the guitar is silent.
+      // Difference is measured from actual synthesized drum onsets, not a cosmetic score.
+      const delta=(drumOnset-guitarOnset)*1000;
+      this.relativeErrors.push(delta);this.barErrors.push(delta);
+      this.sessionMeasurements.push({bar,beat,errorMs:delta,mode:this.mode});
+      if(this.relativeErrors.length>96)this.relativeErrors.shift();
+      if(this.sessionMeasurements.length>1000)this.sessionMeasurements.shift();
+    }
+    if(this.onNote){
+      if(pipActive)this.onNote({agent:'Pip',time:drumOnset,beat,delta:drumOffset-riffOffset});
+      if(riffActive)this.onNote({agent:'Riff',time:guitarOnset,beat,delta:riffOffset});
+    }
+  }
+  finishBar(){
+    const findings=this.understanding.finishBar(this.bar);
+    for(const f of findings){
+      // Event-based observations, not claims that the music is objectively good.
+      this.push(f.who+' tried '+f.label+' · '+Math.round(f.driftMs)+' ms attack drift, '+Math.round(f.overlap*100)+'% onset overlap.');
+    }
+    const last4=this.barErrors;
+    this.barErrors=[];
+    const before=rms(last4)??this.baseline();
+    if(last4.length){
+      const correction=avg(last4);
+      const oldBias=this.pip.biasMs,oldJitter=this.pip.jitterMs;
+      // The partner's live reference yields a stronger correction than solo rehearsal.
+      const gain=this.mode==='lesson'?.59:(this.mode==='jam'?.16:.035);
+      this.pip.biasMs=clamp(this.pip.biasMs-clamp(correction*gain,-48,48),-105,145);
+      // Reading supplies an exercise; only subsequent practice affects timing.
+      const pulseExercise=this.library.has('Pip','offbeatPulse') && this.mode==='solo' && !this.library.busy('Pip');
+      this.pip.jitterMs=clamp(this.pip.jitterMs*(this.mode==='lesson'?.927:(this.mode==='jam'?.987:(pulseExercise?.991:.997))),7,75);
+      this.lastLearning={bar:this.bar,observedErrorMs:before,correctionMs:oldBias-this.pip.biasMs,precisionChangeMs:oldJitter-this.pip.jitterMs,mode:this.mode};
+    }
+    this.modeBars++;
+    if(this.mode==='solo')this.considerNewActivity(before);
+    else if(this.mode==='lesson'){
+      const clearProgress=this.modeBars>=3 && (before<36||this.modeBars>=7);
+      if(clearProgress){
+        this.lessons++;this.familiarity++;
+        this.pip.remember('Riff demonstrated a steady pulse.');
+        this.riff.remember('Pip worked through a timing lesson.');
+        this.exchange(this.pip,this.riff,before<36?'I can feel the beat settling!':'I want to try that in a song.');
+        this.mode='solo';this.modeBars=0;
+        this.pip.currentGoal='trying new patterns';this.riff.currentGoal='looking for a new idea';
+      }
+    }else if(this.mode==='jam'){
+      if(this.modeBars>=6 && Math.random()<.46){
+        this.jams++;this.familiarity++;
+        this.exchange(this.riff,this.pip,'That groove was worth remembering.');
+        this.pip.remember('Shared a jam with Riff; familiar grooves feel easier.');
+        this.riff.remember('Pip adds playful offbeat accents.');
+        this.mode='solo';this.modeBars=0;
+        this.pip.currentGoal='practicing';this.riff.currentGoal='experimenting';
+      }
+    }
+    this.library.tick(this);
+    // Save every bar (about 2.45 s), including each reading page and return.
+    // The old four-bar cadence could preserve a 75% book checkpoint indefinitely
+    // when iOS interrupted the audio clock before the next checkpoint.
+    if(this.onCheckpoint)this.onCheckpoint(this.snapshot());
+  }
+  considerNewActivity(measuredError){
+    if(this.modeBars<3 || this.library.anyBusy())return;
+    // Riff recognizes a timing problem from HEARD onset differences, then chooses whether to help.
+    const needsHelp=measuredError!=null && measuredError>40;
+    const teachUtility=(needsHelp?.65:0)+this.riff.generosity*.26+rand(-.1,.1);
+    const jamUtility=.26+this.familiarity*.08+(measuredError!=null&&measuredError<56?.24:0)+this.pip.curiosity*.16+rand(-.1,.1);
+    const soloUtility=.46+rand(-.08,.16);
+    const candidate=teachUtility>jamUtility&&teachUtility>soloUtility?'lesson':jamUtility>soloUtility?'jam':'solo';
+    if(candidate==='lesson' && needsHelp){
+      this.exchange(this.riff,this.pip,'Your notes drift a little. Want to follow my pulse?');
+      const pipWillingness=.55+clamp(measuredError/150,0,.34)+(this.familiarity*.025);
+      if(Math.random()<pipWillingness){
+        this.exchange(this.pip,this.riff,'Play it steady. I’ll listen.');
+        this.mode='lesson';this.modeBars=0;
+        this.pip.currentGoal='listening and correcting timing';
+        this.riff.currentGoal='demonstrating the pulse';
+      }else this.push('Pip chooses to keep experimenting alone.');
+    }else if(candidate==='jam'){
+      this.exchange(this.pip,this.riff,'Want to see what these rhythms do together?');
+      const riffWillingness=.49+this.riff.curiosity*.24+this.familiarity*.025;
+      if(Math.random()<riffWillingness){
+        this.exchange(this.riff,this.pip,'Let’s find out.');
+        this.mode='jam';this.modeBars=0;
+        this.pip.currentGoal='improvising with Riff';
+        this.riff.currentGoal='responding to Pip’s rhythm';
+      }else this.push('Riff listens, then returns to practicing chords.');
+    }else if(this.modeBars>6 && Math.random()<.3){
+      this.pip.currentGoal='independent rhythm practice';
+      this.riff.currentGoal='exploring chord shapes';
+      this.push('For now, each musician follows their own curiosity.');
+    }
+  }
+}
+
