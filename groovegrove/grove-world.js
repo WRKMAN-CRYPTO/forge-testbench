@@ -17,7 +17,7 @@ const WAYPOINTS={
   'trail-clearing-library':{x:505,y:500},
   'trail-clearing-studio':{x:1005,y:485},
   'trail-clearing-pond':{x:940,y:750},
-  'trail-studio-pond':{x:1290,y:580}
+  'trail-pond-studio':{x:1290,y:580}
 };
 const between=(a,b)=>'trail-'+[a,b].sort().join('-');
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
