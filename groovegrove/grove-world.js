@@ -72,6 +72,7 @@ export class GroveWorld {
         lastChoice:valid(old.lastChoice)?old.lastChoice:-20,
         heard:Math.max(0,Math.floor(old.heard||0)),
         lastHeard:old.lastHeard&&NAMES.includes(old.lastHeard.from)?old.lastHeard:null,
+        lastHeardGuitar:old.lastHeardGuitar?.from==='Riff' ? old.lastHeardGuitar : null,
         soundBar:valid(old.soundBar)?old.soundBar:-1,
         voluntaryRests:Math.max(0,Math.floor(old.voluntaryRests||0))
       };
@@ -132,7 +133,7 @@ export class GroveWorld {
     const d=distance(a,b);
     return clamp((range-d)/range,0,1);
   }
-  sound(source,kind,bar,velocity=1){
+  sound(source,kind,bar,velocity=1,pitch=null){
     const p=this.people[source];if(!p)return;
     p.soundBar=bar;
     for(const name of NAMES){
@@ -141,7 +142,9 @@ export class GroveWorld {
       if(intensity<.05)continue;
       const listener=this.people[name];
       listener.heard++;
-      listener.lastHeard={from:source,kind,bar,strength:Math.round(intensity*100)/100};
+      listener.lastHeard={from:source,kind,bar,strength:Math.round(intensity*100)/100,
+        pitch:Number.isFinite(pitch)?pitch:null};
+      if(source==='Riff'&&kind==='guitar')listener.lastHeardGuitar={...listener.lastHeard};
       this.heard[name]++;
       if(this.recent.length>19)this.recent.shift();
       this.recent.push({listener:name,from:source,kind,bar});
