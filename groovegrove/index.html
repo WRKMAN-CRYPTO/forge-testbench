@@ -16,6 +16,7 @@
   No LLM, network inference, external sound files, or predetermined band-forming script.
 */
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
+import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js';
 
 document.documentElement.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;background:#081b1d';
 document.body.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;touch-action:none';
@@ -177,6 +178,8 @@ class Grove {
     this.logs=[];this.lastRiffOnsets=new Map();this.lastPipOnsets=new Map();
     this.relativeErrors=[];this.barErrors=[];this.priorErrors=[];this.sessionMeasurements=[];
     this.pipPlayed=0;this.riffPlayed=0;this.lastLearning=null;
+    this.library=new MusicLibrary(saved?.library);
+    this.playedKnowledge={Pip:0,Riff:0};
     this.highlight='Two musicians, one little clearing.';
     this.onSound=null;this.onNote=null;
     this.push('The grove is quiet. Two musicians are finding their sound.');
@@ -188,7 +191,7 @@ class Grove {
     if(this.onTalk)this.onTalk(from.name,message);
   }
   baseline(){return rms(this.relativeErrors.slice(-16));}
-  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams};}
+  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot()};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
@@ -196,11 +199,14 @@ class Grove {
     const solo=this.mode==='solo';
     // A practice room can hold two soloists without making them a duo.
     // They exchange turns every two bars. Only a mutual choice creates joint music.
-    const pipActive=!solo || bar%4<2;
-    const riffActive=!solo || bar%4>=2;
+    const pipActive=(!solo || bar%4<2) && !this.library.busy('Pip');
+    const riffActive=(!solo || bar%4>=2) && !this.library.busy('Riff');
     const riffOffset=this.riff.rhythmOffset();
     const guitarOnset=t+riffOffset/1000;
-    const pitches=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[146.83,185,220]][Math.floor(bar/2)%4];
+    const originalChords=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[146.83,185,220]];
+    const newChords=[[220,261.63,329.63],[146.83,174.61,220],[196,246.94,349.23],[174.61,261.63,349.23]];
+    const usesNewChords=this.library.has('Riff','openChords') && bar%4>=2;
+    const pitches=(usesNewChords?newChords:originalChords)[Math.floor(bar/2)%4];
     const onLesson=this.mode==='lesson';
     const onJam=this.mode==='jam';
     const dynamic=onJam?.9:onLesson?.69:.51;
@@ -208,6 +214,11 @@ class Grove {
       if(beat===0||beat===2){
         pitches.forEach((p,i)=>audio.guitar(p,guitarOnset+i*.026,dynamic*(i===0?1:.72),.42));
       }else audio.guitar(pitches[(beat+bar)%3]*2,guitarOnset,dynamic*.72,.23);
+      if(usesNewChords && beat===0)this.playedKnowledge.Riff++;
+      if(onJam && beat===3 && this.library.has('Riff','callResponse')){
+        audio.guitar(pitches[(bar+1)%3]*2,guitarOnset+beatDur*.47,dynamic*.42,.2);
+        this.playedKnowledge.Riff++;
+      }
       this.riffPlayed++;
       this.pip.observe({type:'heard-guitar',bar,beat,time:guitarOnset});
       this.riff.ownOnsets.push({bar,beat,time:guitarOnset});
@@ -220,6 +231,14 @@ class Grove {
       audio.hat(drumOnset+.017,.6);
       audio.hat(drumOnset+beatDur*.5+.017,.32);
       if(onJam && beat===3 && this.pip.curiosity>.7 && bar%4===0)audio.snare(drumOnset+beatDur*.74,.28);
+      // Readable pattern content: a displaced kick/snare pair, not a cosmetic skill point.
+      if(this.library.has('Pip','offbeatPulse') && beat===1 && bar%2===0){
+        audio.kick(drumOnset+beatDur*.5,.32);audio.snare(drumOnset+beatDur*.75,.18);
+        this.playedKnowledge.Pip++;
+      }
+      if(onJam && beat===3 && this.library.has('Pip','callResponse')){
+        audio.snare(drumOnset+beatDur*.5,.31);this.playedKnowledge.Pip++;
+      }
       this.pipPlayed++;
       this.riff.observe({type:'heard-drum',bar,beat,time:drumOnset});
       this.pip.ownOnsets.push({bar,beat,time:drumOnset});
@@ -246,7 +265,9 @@ class Grove {
       // The partner's live reference yields a stronger correction than solo rehearsal.
       const gain=this.mode==='lesson'?.59:(this.mode==='jam'?.16:.035);
       this.pip.biasMs=clamp(this.pip.biasMs-clamp(correction*gain,-48,48),-105,145);
-      this.pip.jitterMs=clamp(this.pip.jitterMs*(this.mode==='lesson'?.927:(this.mode==='jam'?.987:.997)),7,75);
+      // Reading supplies an exercise; only subsequent practice affects timing.
+      const pulseExercise=this.library.has('Pip','offbeatPulse') && this.mode==='solo' && !this.library.busy('Pip');
+      this.pip.jitterMs=clamp(this.pip.jitterMs*(this.mode==='lesson'?.927:(this.mode==='jam'?.987:(pulseExercise?.991:.997))),7,75);
       this.lastLearning={bar:this.bar,observedErrorMs:before,correctionMs:oldBias-this.pip.biasMs,precisionChangeMs:oldJitter-this.pip.jitterMs,mode:this.mode};
     }
     this.modeBars++;
@@ -271,10 +292,11 @@ class Grove {
         this.pip.currentGoal='practicing';this.riff.currentGoal='experimenting';
       }
     }
+    this.library.tick(this);
     if(this.bar%4===0)saveMemory(this.snapshot());
   }
   considerNewActivity(measuredError){
-    if(this.modeBars<3)return;
+    if(this.modeBars<3 || this.library.anyBusy())return;
     // Riff recognizes a timing problem from HEARD onset differences, then chooses whether to help.
     const needsHelp=measuredError!=null && measuredError>40;
     const teachUtility=(needsHelp?.65:0)+this.riff.generosity*.26+rand(-.1,.1);
@@ -322,7 +344,7 @@ app.canvas.style.touchAction='none';
 const root=new Container();app.stage.addChild(root);
 let sound=new SoundEngine(),grove=null;
 let started=false,startError='',selected='Pip';
-let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1;
+let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false;
 let floatingNotes=[],talkBubble=null,ambient=[],now=0,visualBeat=-1;
 let noteFlash={Pip:0,Riff:0};
 let redrawAccum=0;
@@ -477,6 +499,7 @@ function buildCanvas(){
   root.scale.set(scale);W=winW/scale;H=winH/scale;
   const world=new Container();root.addChild(world);
   makeBackground(world);
+  makeLibraryNook(world);
   const left=landscape?56:28;
   const title=textAt(world,'GROOVEGROVE',left,landscape?22:42,landscape?35:29,PALETTE.cream,'bold',3.4);
   textAt(world,'TWO MINDS  ·  ONE GROOVE',left,landscape?66:83,landscape?12:11,PALETTE.mint,'bold',2.4);
@@ -486,6 +509,7 @@ function buildCanvas(){
   const actorScale=landscape?1.02:.71;
   ui.pipPos={x:W*.5-actorOffset,y:cy+10};
   ui.riffPos={x:W*.5+actorOffset,y:cy+10};
+  ui.homePositions={Pip:{...ui.pipPos},Riff:{...ui.riffPos}};
   ui.pip=makeDrummer(world,ui.pipPos.x,ui.pipPos.y,actorScale);
   ui.riff=makeGuitarist(world,ui.riffPos.x,ui.riffPos.y,actorScale);
   ui.pip.group.eventMode='static';ui.pip.group.hitArea=new Rectangle(-115,-125,230,285);
@@ -541,6 +565,7 @@ function buildCanvas(){
   world.addChild(ui.badge);
   ui.badgeText=textAt(world,'TAP ANYWHERE TO START',badgeX,badgeY-4,12,PALETTE.gold,'bold',1.7,.5);
   ui.inspect=textAt(world,'',landscape?W*.5:W*.5,landscape?panelY-84:panelY-93,landscape?13:12,PALETTE.cream,'normal',0,.5);
+  makeDeliveryTray(world);
   refreshText();
 }
 function refreshText(){
@@ -562,6 +587,15 @@ function refreshText(){
   }else ui.inspect.text='Tap a musician to follow their decisions';
   ui.badgeText.text=!started?'TAP ANYWHERE TO START':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
   ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
+  if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 6';
+  if(ui.deliveryTray)ui.deliveryTray.visible=deliveryOpen;
+  const reading=['Pip','Riff'].map(name=>{
+    const task=grove.library.status(name);
+    if(!task)return null;
+    const book=grove.library.copyById(task.copyId);
+    return name+' '+task.stage+' '+(book?LIBRARY_CATALOG[book.type].title:'');
+  }).filter(Boolean);
+  if(ui.shelfStatus)ui.shelfStatus.text=reading.join(' · ')||(grove.library.books.length?'Tap shelf to deliver books':'Empty shelves · tap to deliver books');
 }
 function renderMeter(){
   if(!ui.meter)return;
@@ -612,6 +646,8 @@ function renderEffects(time){
     circle(fx,x,y,n.size*.47,n.color,fade*.83);
     line(fx,x+n.size*.3,y-7,x+n.size*.3,y,n.color,2,fade);
   });
+  renderPhysicalBooks();
+  moveReaders();
   for(const a of ambient){
     const t=time/1000*a.speed+a.phase;
     a.sprite.position.set(a.x+Math.cos(t)*9,a.y+Math.sin(t*.77)*13);
@@ -716,7 +752,7 @@ app.ticker.add(()=>{
   if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
 });
 // Inspectable test hooks; not part of the rendered interface.
-window.GrooveGroveDebug={get state(){return grove.snapshot();},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove();grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
+window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},,get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove();grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
 </script>
 </body>
 </html>
