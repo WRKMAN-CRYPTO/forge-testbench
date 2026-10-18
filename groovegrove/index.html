@@ -17,6 +17,7 @@
 */
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
 import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js';
+import { ListeningJournal, VARIATIONS } from './listening-journal.js';
 
 document.documentElement.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;background:#081b1d';
 document.body.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;touch-action:none';
@@ -214,6 +215,7 @@ class Grove {
     this.relativeErrors=[];this.barErrors=[];this.priorErrors=[];this.sessionMeasurements=[];
     this.pipPlayed=0;this.riffPlayed=0;this.lastLearning=null;
     this.library=new MusicLibrary(saved?.library);
+    this.understanding=new ListeningJournal(saved?.understanding);
     for(const name of ['Pip','Riff']){
       const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
       if(book)(name==='Pip'?this.pip:this.riff).currentGoal='finishing '+LIBRARY_CATALOG[book.type].title;
@@ -230,7 +232,7 @@ class Grove {
     if(this.onTalk)this.onTalk(from.name,message);
   }
   baseline(){return rms(this.relativeErrors.slice(-16));}
-  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot()};}
+  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot()};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
@@ -249,35 +251,70 @@ class Grove {
     const onLesson=this.mode==='lesson';
     const onJam=this.mode==='jam';
     const dynamic=onJam?.9:onLesson?.69:.51;
+    // Live onset bus: every heard note corresponds to an actual scheduled
+    // Web Audio event. Extra notes are marked so timing drift is not faked.
+    const drumOffset=this.pip.rhythmOffset();
+    const drumOnset=t+drumOffset/1000;
+    if(beat===0){
+      this.understanding.beginBar({bar,mode:this.mode,active:{Pip:pipActive,Riff:riffActive},skills:this.library.known});
+    }
+    const riffChoice=this.understanding.variation('Riff');
+    const pipChoice=this.understanding.variation('Pip');
+    const play={
+      guitar:(freq,at,volume,duration,extra=false)=>{
+        audio.guitar(freq,at,volume,duration);
+        this.understanding.hear({who:'Riff',kind:'guitar',time:at,bar,beat,velocity:volume,offsetMs:riffOffset,extra,pitch:freq});
+      },
+      kick:(at,volume,extra=false)=>{
+        audio.kick(at,volume);
+        this.understanding.hear({who:'Pip',kind:'kick',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
+      },
+      snare:(at,volume,extra=false)=>{
+        audio.snare(at,volume);
+        this.understanding.hear({who:'Pip',kind:'snare',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
+      },
+      hat:(at,volume,extra=false)=>{
+        audio.hat(at,volume);
+        this.understanding.hear({who:'Pip',kind:'hat',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
+      }
+    };
     if(riffActive){
+      const feeling=riffChoice==='soft'?.7:1;
+      const voicing=riffChoice==='voicing'?[pitches[1],pitches[2],pitches[0]*2]:pitches;
       if(beat===0||beat===2){
-        pitches.forEach((p,i)=>audio.guitar(p,guitarOnset+i*.026,dynamic*(i===0?1:.72),.42));
-      }else audio.guitar(pitches[(beat+bar)%3]*2,guitarOnset,dynamic*.72,.23);
+        voicing.forEach((p,i)=>play.guitar(p,guitarOnset+i*.026,dynamic*feeling*(i===0?1:.72),.42));
+      }else if(!(riffChoice==='breath' && beat===3)){
+        play.guitar(voicing[(beat+bar)%3]*2,guitarOnset,dynamic*.72*feeling,.23);
+      }
       if(usesNewChords && beat===0)this.playedKnowledge.Riff++;
       if(onJam && beat===3 && this.library.has('Riff','callResponse')){
-        audio.guitar(pitches[(bar+1)%3]*2,guitarOnset+beatDur*.47,dynamic*.42,.2);
+        play.guitar(voicing[(bar+1)%3]*2,guitarOnset+beatDur*.47,dynamic*.42*feeling,.2,true);
         this.playedKnowledge.Riff++;
+      }
+      if(riffChoice==='answer' && beat===3){
+        play.guitar(voicing[bar%3]*2,guitarOnset+beatDur*.73,dynamic*.24,.16,true);
       }
       this.riffPlayed++;
       this.pip.observe({type:'heard-guitar',bar,beat,time:guitarOnset});
       this.riff.ownOnsets.push({bar,beat,time:guitarOnset});
     }
-    const drumOffset=this.pip.rhythmOffset();
-    const drumOnset=t+drumOffset/1000;
     if(pipActive){
-      if(beat===0||beat===2)audio.kick(drumOnset,beat===0?.9:.68);
-      else audio.snare(drumOnset,.7);
-      audio.hat(drumOnset+.017,.6);
-      audio.hat(drumOnset+beatDur*.5+.017,.32);
-      if(onJam && beat===3 && this.pip.curiosity>.7 && bar%4===0)audio.snare(drumOnset+beatDur*.74,.28);
-      // Readable pattern content: a displaced kick/snare pair, not a cosmetic skill point.
+      if(beat===0||beat===2)play.kick(drumOnset,beat===0?.9:.68);
+      else play.snare(drumOnset,.7);
+      play.hat(drumOnset+.017,.6);
+      if(!(pipChoice==='breath' && beat===3))play.hat(drumOnset+beatDur*.5+.017,.32);
+      if(onJam && beat===3 && this.pip.curiosity>.7 && bar%4===0)play.snare(drumOnset+beatDur*.74,.28,true);
+      // Book-learned motor vocabulary remains playable even without an experiment.
       if(this.library.has('Pip','offbeatPulse') && beat===1 && bar%2===0){
-        audio.kick(drumOnset+beatDur*.5,.32);audio.snare(drumOnset+beatDur*.75,.18);
+        play.kick(drumOnset+beatDur*.5,.32,true);play.snare(drumOnset+beatDur*.75,.18,true);
         this.playedKnowledge.Pip++;
       }
       if(onJam && beat===3 && this.library.has('Pip','callResponse')){
-        audio.snare(drumOnset+beatDur*.5,.31);this.playedKnowledge.Pip++;
+        play.snare(drumOnset+beatDur*.5,.31,true);this.playedKnowledge.Pip++;
       }
+      // Mild optional variations: core four-beat pulse is never removed.
+      if(pipChoice==='ghost' && beat===2)play.snare(drumOnset+beatDur*.5,.17,true);
+      if(pipChoice==='offbeat' && beat===2)play.kick(drumOnset+beatDur*.53,.23,true);
       this.pipPlayed++;
       this.riff.observe({type:'heard-drum',bar,beat,time:drumOnset});
       this.pip.ownOnsets.push({bar,beat,time:drumOnset});
@@ -295,6 +332,11 @@ class Grove {
     }
   }
   finishBar(){
+    const findings=this.understanding.finishBar(this.bar);
+    for(const f of findings){
+      // Event-based observations, not claims that the music is objectively good.
+      this.push(f.who+' tried '+f.label+' · '+Math.round(f.driftMs)+' ms attack drift, '+Math.round(f.overlap*100)+'% onset overlap.');
+    }
     const last4=this.barErrors;
     this.barErrors=[];
     const before=rms(last4)??this.baseline();
