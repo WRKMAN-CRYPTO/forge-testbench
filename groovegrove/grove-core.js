@@ -1,6 +1,7 @@
 /* GrooveGrove shared simulation. Same classes in server + client. */
 import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261018-pass004';
 import {ListeningJournal} from './listening-journal.js';
+import {GroveWorld} from './grove-world.js?v=20261018-spatial';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const rand=(a,b)=>a+(b-a)*Math.random();
@@ -44,6 +45,7 @@ export class Grove {
     this.pipPlayed=0;this.riffPlayed=0;this.lastLearning=null;
     this.library=new MusicLibrary(saved?.library);
     this.understanding=new ListeningJournal(saved?.understanding);
+    this.space=new GroveWorld(saved?.space);
     for(const name of ['Pip','Riff']){
       const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
       if(book)(name==='Pip'?this.pip:this.riff).currentGoal='finishing '+LIBRARY_CATALOG[book.type].title;
@@ -65,16 +67,19 @@ export class Grove {
     if(this.onTalk)this.onTalk(from.name,message);
   }
   baseline(){return rms(this.relativeErrors.slice(-16));}
-  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},vocalist:{...this.vocalist},logs:this.logs.slice(0,12)};}
+  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},vocalist:{...this.vocalist},space:this.space.snapshot(),logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
     this.beat=beat;this.bar=bar;
+    this.space.advance(this,beatDur);
     const solo=this.mode==='solo';
     const singer=this.vocalist;
     // No random breakthrough countdown. Silence remains an independent choice.
     if(beat===0){
-      singer.listening++;
+      // An audible event in Murmur's surroundings is an actual listening opportunity.
+      const remembered=this.space.people.Murmur.lastHeard;
+      if(remembered && bar-remembered.bar<=1)singer.listening++;
       if(singer.stage==='silent' && Math.random()<.018*singer.curiosity &&
          singer.listening>12)singer.stage='exploring';
       if(singer.stage==='exploring' && Math.random()<.055*singer.curiosity &&
@@ -94,12 +99,20 @@ export class Grove {
       const pitches=[196,220,246.94,261.63,293.66];
       const pitch=pitches[Math.floor(Math.random()*pitches.length)];
       singer.lastPitch=pitch;singer.lastAttemptBar=bar;singer.notes++;
-      if(typeof audio.voice==='function')audio.voice(pitch,t+.13,.12+Math.random()*.07,.36+Math.random()*.45);
+      const strength=.12+Math.random()*.07;
+      const duration=.36+Math.random()*.45;
+      if(typeof audio.voice==='function')audio.voice(pitch,t+.13,strength,duration);
+      this.space.sound('Murmur','voice',bar,strength*4);
+      if(this.onNote)this.onNote({agent:'Murmur',time:t+.13,beat});
     }else if(beat===0)singer.rests++;
     // A practice room can hold two soloists without making them a duo.
     // They exchange turns every two bars. Only a mutual choice creates joint music.
-    const pipActive=(!solo || bar%4<2 || this.library.busy('Riff')) && !this.library.busy('Pip');
-    const riffActive=(!solo || bar%4>=2 || this.library.busy('Pip')) && !this.library.busy('Riff');
+    const pipActive=(!solo || bar%4<2 || this.library.busy('Riff')) &&
+      !this.library.busy('Pip') && !this.space.traveling('Pip') &&
+      this.space.destination('Pip')!=='pond';
+    const riffActive=(!solo || bar%4>=2 || this.library.busy('Pip')) &&
+      !this.library.busy('Riff') && !this.space.traveling('Riff') &&
+      this.space.destination('Riff')!=='pond';
     const riffOffset=this.riff.rhythmOffset();
     const guitarOnset=t+riffOffset/1000;
     const originalChords=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[146.83,185,220]];
@@ -107,7 +120,9 @@ export class Grove {
     const usesNewChords=this.library.has('Riff','openChords') && bar%4>=2;
     const pitches=(usesNewChords?newChords:originalChords)[Math.floor(bar/2)%4];
     const onLesson=this.mode==='lesson';
-    const onJam=this.mode==='jam';
+    const withinEarshot=this.space.distance('Pip','Riff')<260 &&
+      this.space.canHear('Pip','Riff','guitar')>.13;
+    const onJam=this.mode==='jam' && withinEarshot;
     const dynamic=onJam?.9:onLesson?.69:.51;
     const riffRest=this.library.has('Riff','deliberateSpace') && beat===3 && bar%4===1;
     const pipRest=this.library.has('Pip','deliberateSpace') && beat===3 && bar%4===1;
@@ -123,18 +138,22 @@ export class Grove {
     const play={
       guitar:(freq,at,volume,duration,extra=false)=>{
         audio.guitar(freq,at,volume,duration);
+        this.space.sound('Riff','guitar',bar,volume);
         this.understanding.hear({who:'Riff',kind:'guitar',time:at,bar,beat,velocity:volume,offsetMs:riffOffset,extra,pitch:freq});
       },
       kick:(at,volume,extra=false)=>{
         audio.kick(at,volume);
+        this.space.sound('Pip','kick',bar,volume);
         this.understanding.hear({who:'Pip',kind:'kick',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
       },
       snare:(at,volume,extra=false)=>{
         audio.snare(at,volume);
+        this.space.sound('Pip','snare',bar,volume);
         this.understanding.hear({who:'Pip',kind:'snare',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
       },
       hat:(at,volume,extra=false)=>{
         audio.hat(at,volume);
+        this.space.sound('Pip','hat',bar,volume);
         this.understanding.hear({who:'Pip',kind:'hat',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
       }
     };
@@ -173,7 +192,8 @@ export class Grove {
         this.playedKnowledge.Riff++;
       }
       this.riffPlayed++;
-      this.pip.observe({type:'heard-guitar',bar,beat,time:guitarOnset});
+      if(this.space.canHear('Pip','Riff','guitar')>.05)
+        this.pip.observe({type:'heard-guitar',bar,beat,time:guitarOnset});
       this.riff.ownOnsets.push({bar,beat,time:guitarOnset});
     }
     if(pipActive){
@@ -208,15 +228,18 @@ export class Grove {
         this.playedKnowledge.Pip++;
       }
       this.pipPlayed++;
-      this.riff.observe({type:'heard-drum',bar,beat,time:drumOnset});
+      if(this.space.canHear('Riff','Pip','kick')>.05)
+        this.riff.observe({type:'heard-drum',bar,beat,time:drumOnset});
       this.pip.ownOnsets.push({bar,beat,time:drumOnset});
       // The partner's reliable reference pulse exists even while the guitar is silent.
       // Difference is measured from actual synthesized drum onsets, not a cosmetic score.
-      const delta=(drumOnset-guitarOnset)*1000;
-      this.relativeErrors.push(delta);this.barErrors.push(delta);
-      this.sessionMeasurements.push({bar,beat,errorMs:delta,mode:this.mode});
-      if(this.relativeErrors.length>96)this.relativeErrors.shift();
-      if(this.sessionMeasurements.length>1000)this.sessionMeasurements.shift();
+      if(riffActive && this.space.canHear('Pip','Riff','guitar')>.12){
+        const delta=(drumOnset-guitarOnset)*1000;
+        this.relativeErrors.push(delta);this.barErrors.push(delta);
+        this.sessionMeasurements.push({bar,beat,errorMs:delta,mode:this.mode});
+        if(this.relativeErrors.length>96)this.relativeErrors.shift();
+        if(this.sessionMeasurements.length>1000)this.sessionMeasurements.shift();
+      }
     }
     if(this.onNote){
       if(pipActive)this.onNote({agent:'Pip',time:drumOnset,beat,delta:drumOffset-riffOffset});
@@ -266,13 +289,15 @@ export class Grove {
       }
     }
     this.library.tick(this);
+    this.space.decide(this);
     // Save every bar (about 2.45 s), including each reading page and return.
     // The old four-bar cadence could preserve a 75% book checkpoint indefinitely
     // when iOS interrupted the audio clock before the next checkpoint.
     if(this.onCheckpoint)this.onCheckpoint(this.snapshot());
   }
   considerNewActivity(measuredError){
-    if(this.modeBars<3 || this.library.anyBusy())return;
+    if(this.modeBars<3 || this.library.anyBusy() || this.space.traveling('Pip') ||
+       this.space.traveling('Riff') || this.space.distance('Pip','Riff')>245)return;
     // Riff recognizes a timing problem from HEARD onset differences, then chooses whether to help.
     const needsHelp=measuredError!=null && measuredError>40;
     const teachUtility=(needsHelp?.65:0)+this.riff.generosity*.26+rand(-.1,.1);
