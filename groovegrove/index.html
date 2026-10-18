@@ -308,10 +308,17 @@ class Grove {
 }
 
 const app=new Application();
-await app.init({resizeTo:window,background:PALETTE.ink,antialias:true,preference:'webgl',resolution:Math.min(window.devicePixelRatio||1,2),autoDensity:true});
+// The viewport is sized explicitly: Pixi's deferred resizeTo handler can race
+// with iOS Safari orientation events and leave the world using old dimensions.
+await app.init({width:Math.max(1,window.innerWidth),height:Math.max(1,window.innerHeight),background:PALETTE.ink,antialias:true,preference:'webgl',resolution:Math.min(window.devicePixelRatio||1,2),autoDensity:true});
 document.body.appendChild(app.canvas);
 app.canvas.setAttribute('aria-label','GrooveGrove musical agents prototype. Tap the canvas to start sound.');
 app.canvas.style.display='block';
+app.canvas.style.position='fixed';
+app.canvas.style.left='0';
+app.canvas.style.top='0';
+app.canvas.style.margin='0';
+app.canvas.style.touchAction='none';
 const root=new Container();app.stage.addChild(root);
 let sound=new SoundEngine(),grove=null;
 let started=false,startError='',selected='Pip';
@@ -432,6 +439,33 @@ function makeGuitarist(parent,x,y,s){
   const arm=new Graphics();c.addChild(arm);
   const label=textAt(c,'RIFF',0,145,22,PALETTE.lilac,'bold',3,.5);
   return {group:c,arm,guitar,label};
+}
+// One authority for both the WebGL drawing buffer and GrooveGrove's scene layout.
+// On iOS a rotation can update visualViewport and window sizes on different frames.
+let viewportWidth=0,viewportHeight=0,resizeFrame=0,settleTimer=0;
+function measuredViewport(){
+  const visual=window.visualViewport;
+  return {
+    width:Math.max(1,Math.round(visual?.width || window.innerWidth || document.documentElement.clientWidth || 1)),
+    height:Math.max(1,Math.round(visual?.height || window.innerHeight || document.documentElement.clientHeight || 1))
+  };
+}
+function applyViewportSize(force=false){
+  const {width,height}=measuredViewport();
+  if(!force && width===viewportWidth && height===viewportHeight)return;
+  viewportWidth=width;viewportHeight=height;
+  // Resize renderer FIRST, then rebuild all positions from app.screen.
+  app.renderer.resize(width,height);
+  app.canvas.style.width=width+'px';
+  app.canvas.style.height=height+'px';
+  buildCanvas();
+}
+function scheduleViewportSize(){
+  cancelAnimationFrame(resizeFrame);
+  // Two frames allow Safari's viewport geometry to settle after rotation.
+  resizeFrame=requestAnimationFrame(()=>{resizeFrame=requestAnimationFrame(()=>applyViewportSize());});
+  clearTimeout(settleTimer);
+  settleTimer=setTimeout(()=>applyViewportSize(),330);
 }
 function buildCanvas(){
   // Rebuild graphics, never the agent state, on resize/orientation change.
@@ -654,12 +688,19 @@ app.canvas.addEventListener('pointerdown',(ev)=>{
 });
 ['pointerup','pointercancel','pointerleave'].forEach(name=>app.canvas.addEventListener(name,()=>{clearTimeout(pressTimer);pressTimer=null;}));
 window.addEventListener('pagehide',()=>{if(grove)saveMemory(grove.snapshot());});
-window.addEventListener('resize',()=>{buildCanvas();});
+window.addEventListener('resize',scheduleViewportSize,{passive:true});
+window.visualViewport?.addEventListener('resize',scheduleViewportSize,{passive:true});
+window.addEventListener('orientationchange',()=>{
+  scheduleViewportSize();
+  setTimeout(scheduleViewportSize,170);
+  setTimeout(scheduleViewportSize,500);
+},{passive:true});
+window.addEventListener('pageshow',scheduleViewportSize,{passive:true});
 const saved=await (async()=>{await openMemory();return loadMemory();})();
 grove=new Grove(saved);
 grove.onNote=emitVisualNote;
 grove.onTalk=showSpeech;
-buildCanvas();
+applyViewportSize(true);
 app.ticker.add(()=>{
   const t=performance.now();
   renderEffects(t);
@@ -667,7 +708,7 @@ app.ticker.add(()=>{
   if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
 });
 // Inspectable test hooks; not part of the rendered interface.
-window.GrooveGroveDebug={get state(){return grove.snapshot();},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},restart(){grove=new Grove();grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
+window.GrooveGroveDebug={get state(){return grove.snapshot();},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove();grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
 </script>
 </body>
 </html>
