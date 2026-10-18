@@ -305,7 +305,7 @@ export class Grove {
     if(beat===3){
       const riffHeard=this.space.people.Riff.lastHeardVoice;
       const pipHeard=this.space.people.Pip.lastHeardVoice;
-      const riffCanAnswer=riffHeard?.bar===bar &&
+      const riffCanAnswer=riffHeard?.bar===bar && this.riffHoldUntilBeat<=index &&
         this.space.canHear('Riff','Murmur','voice')>.08 &&
         !this.space.traveling('Riff')&&!this.library.busy('Riff') &&
         this.space.destination('Riff')!=='pond';
