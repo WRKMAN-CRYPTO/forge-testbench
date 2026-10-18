@@ -48,7 +48,7 @@ function ellipse(g,x,y,rx,ry,color,alpha=1){g.ellipse(x,y,rx,ry).fill({color,alp
 
 // A persistent, single-record world memory. IndexedDB preferred, localStorage fallback.
 const STORAGE_KEY='groovegrove.pass001.memory';
-let database=null;
+let database=null,lastMemoryStamp=0;
 async function openMemory(){
   if(!('indexedDB' in window))return;
   try{
@@ -59,17 +59,26 @@ async function openMemory(){
     });
   }catch(e){database=null;}
 }
+// Phone calls can interrupt an IndexedDB write. Prefer whichever complete
+// checkpoint has the newest timestamp, including our synchronous local fallback.
 async function loadMemory(){
+  let local=null,idb=null;
+  try{local=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch(e){}
   if(database){
-    try{return await new Promise((resolve,reject)=>{
+    try{idb=await new Promise((resolve,reject)=>{
       const tx=database.transaction('world','readonly');const req=tx.objectStore('world').get('pass001');
       req.onsuccess=()=>resolve(req.result??null);req.onerror=()=>reject(req.error);
     });}catch(e){}
   }
-  try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch(e){return null;}
+  const age=value=>Number.isFinite(value?.savedAt)?value.savedAt:0;
+  const saved=local && (!idb || age(local)>age(idb))?local:idb||local;
+  lastMemoryStamp=Math.max(age(local),age(idb));
+  return saved;
 }
 function saveMemory(value){
   const snap=JSON.parse(JSON.stringify(value));
+  // Monotonic even when several actions happen within the same millisecond.
+  snap.savedAt=lastMemoryStamp=Math.max(Date.now(),lastMemoryStamp+1);
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(snap));}catch(e){}
   if(database){try{database.transaction('world','readwrite').objectStore('world').put(snap,'pass001');}catch(e){}}
 }
@@ -179,6 +188,10 @@ class Grove {
     this.relativeErrors=[];this.barErrors=[];this.priorErrors=[];this.sessionMeasurements=[];
     this.pipPlayed=0;this.riffPlayed=0;this.lastLearning=null;
     this.library=new MusicLibrary(saved?.library);
+    for(const name of ['Pip','Riff']){
+      const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
+      if(book)(name==='Pip'?this.pip:this.riff).currentGoal='finishing '+LIBRARY_CATALOG[book.type].title;
+    }
     this.playedKnowledge={Pip:0,Riff:0};
     this.highlight='Two musicians, one little clearing.';
     this.onSound=null;this.onNote=null;
@@ -293,7 +306,10 @@ class Grove {
       }
     }
     this.library.tick(this);
-    if(this.bar%4===0)saveMemory(this.snapshot());
+    // Save every bar (about 2.45 s), including each reading page and return.
+    // The old four-bar cadence could preserve a 75% book checkpoint indefinitely
+    // when iOS interrupted the audio clock before the next checkpoint.
+    saveMemory(this.snapshot());
   }
   considerNewActivity(measuredError){
     if(this.modeBars<3 || this.library.anyBusy())return;
@@ -703,7 +719,7 @@ function refreshText(){
   if(!ui.modeLabel)return;
   const mode=grove?.mode||'solo';
   ui.modeLabel.text=grove?.library.anyBusy()?'READING IN THE GROVE':mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES';
-  ui.statusLine.text=startError?startError:!started?'Tap the clearing to hear their first notes':grove.highlight;
+  ui.statusLine.text=startError?startError:!started?(grove?.library.anyBusy()?'Tap the clearing to continue the interrupted reading':'Tap the clearing to hear their first notes'):(sound.context && sound.context.state!=='running'?'Audio paused · tap the clearing to resume':grove.highlight);
   if(grove){
     const error=grove.baseline();
     ui.pipMetric.text='PIP   '+(error==null?'collecting timing...':fmt(error)+' RMS drift');
@@ -716,7 +732,7 @@ function refreshText(){
     const who=selected==='Pip'?grove.pip:grove.riff;
     ui.inspect.text=who.name.toUpperCase()+' · '+who.currentGoal+(grove.library.known[who.name].length?' · '+grove.library.known[who.name].length+' book skills':'')+'  |  tap either musician';
   }else ui.inspect.text='Tap a musician to follow their decisions';
-  ui.badgeText.text=!started?'TAP ANYWHERE TO START':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
+  ui.badgeText.text=!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(sound.context && sound.context.state!=='running'?'TAP TO RESUME AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE');
   ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
   if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 6';
   if(ui.deliveryTray)ui.deliveryTray.visible=deliveryOpen;
@@ -838,7 +854,7 @@ async function startAudio(){
   started=true;
   try{
     await sound.start(onScheduledBeat);
-    grove.push('Pip and Riff begin playing. Neither has been told to form a band.');
+    grove.push(grove.library.anyBusy()?'The music resumes. Interrupted reading continues.':'Pip and Riff begin playing. Neither has been told to form a band.');
     refreshText();
   }catch(err){
     started=false;startError='Audio could not start: '+(err?.message||'unknown problem');refreshText();
@@ -865,7 +881,23 @@ app.canvas.addEventListener('pointerdown',(ev)=>{
   }
 });
 ['pointerup','pointercancel','pointerleave'].forEach(name=>app.canvas.addEventListener(name,()=>{clearTimeout(pressTimer);pressTimer=null;}));
-window.addEventListener('pagehide',()=>{if(grove)saveMemory(grove.snapshot());});
+function checkpointAndRecover(){
+  if(grove)saveMemory(grove.snapshot());
+}
+function recoverAudioAfterInterruption(){
+  if(!document.hidden && started && sound.context && sound.context.state!=='running'){
+    startAudio().then(refreshText).catch(()=>refreshText());
+  }else refreshText();
+}
+window.addEventListener('pagehide',checkpointAndRecover);
+document.addEventListener('visibilitychange',()=>{
+  // Store the precise current book page before iOS suspends the tab.
+  if(document.hidden)checkpointAndRecover();
+  else recoverAudioAfterInterruption();
+});
+window.addEventListener('focus',recoverAudioAfterInterruption,{passive:true});
+window.addEventListener('pageshow',recoverAudioAfterInterruption,{passive:true});
+
 window.addEventListener('resize',scheduleViewportSize,{passive:true});
 window.visualViewport?.addEventListener('resize',scheduleViewportSize,{passive:true});
 window.addEventListener('orientationchange',()=>{
