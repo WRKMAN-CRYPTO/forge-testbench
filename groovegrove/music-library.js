@@ -72,7 +72,10 @@ export class MusicLibrary{
   donate(type){
     if(!LIBRARY_CATALOG[type])return {ok:false,reason:'Unknown book'};
     if(this.books.some(b=>b.type===type))return {ok:false,reason:'One copy already in the grove'};
-    const slot=Array.from({length:SHELF_CAPACITY},(_,i)=>i).find(i=>!this.books.some(b=>b.slot===i));
+    // First three original works belong to the original cabinet. New volumes
+    // are delivered to Shelf II rather than taking its older sibling's spaces.
+    const shelfStart=BOOK_IDS.indexOf(type)<3?0:6;
+    const slot=Array.from({length:6},(_,i)=>shelfStart+i).find(i=>!this.books.some(b=>b.slot===i));
     if(slot===undefined)return {ok:false,reason:'Every shelf slot is occupied'};
     const book={copyId:'book-'+this.nextCopy++,type,slot,state:'shelf',owner:null,progress:0};
     this.books.push(book);return {ok:true,book};
