@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#0c2021">
-  <title>GrooveGrove · Pass 001</title>
+  <title>GrooveGrove · Pass 002 · The Library</title>
 </head>
 <body>
 <script type="module">
 /*
-  GROOVEGROVE  /  PASS 001
+  GROOVEGROVE  /  PASS 002
   One visible PixiJS canvas. No DOM interface. All sound is synthesized locally.
   Musical onset listening is via timestamped note events, NOT microphone recognition.
   Agent intentions are independently selected by simple, inspectable decision policies.
@@ -546,7 +546,7 @@ function makeDeliveryTray(world){
   backing.roundRect(x,y,bw,bh,16).stroke({color:PALETTE.gold,width:2,alpha:.7});
   textAt(layer,'BOOK DELIVERY',x+20,y+17,wide?22:18,PALETTE.cream,'bold',1.6);
   textAt(layer,'Choose a cover to put one real copy on an empty shelf.',x+20,y+49,wide?14:11,PALETTE.mint);
-  const cols=wide?3:1;
+  ui.deliveryBookLabels={};
   BOOK_IDS.forEach((id,i)=>{
     const def=LIBRARY_CATALOG[id];
     const cx=wide?x+19+i*(bw-38)/3:x+20;
@@ -571,11 +571,8 @@ function makeDeliveryTray(world){
       if(outcome.ok)saveMemory(grove.snapshot());
       deliveryOpen=false;refreshText();
     });
-    const donated=grove.library.books.some(b=>b.type===id);
-    if(donated){
-      // The cover exists in the delivery case, but cannot generate duplicate stock.
-      textAt(layer,'ALREADY DELIVERED',cx+cw-10,cy+ch-18,wide?9:10,PALETTE.gold,'bold',0,1);
-    }
+    // Keep stock labels bound to actual copies, even after delivering while this view is open.
+    ui.deliveryBookLabels[id]=textAt(layer,'ALREADY DELIVERED',cx+cw-10,cy+ch-18,wide?9:10,PALETTE.gold,'bold',0,1);
   });
   textAt(layer,'Tap outside the case to return to the grove.',x+bw/2,y+bh-26,11,PALETTE.muted,'normal',0,.5);
   layer.visible=deliveryOpen;
@@ -636,7 +633,7 @@ function buildCanvas(){
   const left=landscape?56:28;
   const title=textAt(world,'GROOVEGROVE',left,landscape?22:42,landscape?35:29,PALETTE.cream,'bold',3.4);
   textAt(world,'TWO MINDS  ·  ONE GROOVE',left,landscape?66:83,landscape?12:11,PALETTE.mint,'bold',2.4);
-  textAt(world,'PASS 001    /    THE FIRST JAM',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
+  textAt(world,'PASS 002    /    THE LIBRARY',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
   const cy=ui.padY;
   const actorOffset=landscape?Math.min(W*.19,235):116;
   const actorScale=landscape?1.02:.71;
@@ -705,7 +702,7 @@ function buildCanvas(){
 function refreshText(){
   if(!ui.modeLabel)return;
   const mode=grove?.mode||'solo';
-  ui.modeLabel.text=mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES';
+  ui.modeLabel.text=grove?.library.anyBusy()?'READING IN THE GROVE':mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES';
   ui.statusLine.text=startError?startError:!started?'Tap the clearing to hear their first notes':grove.highlight;
   if(grove){
     const error=grove.baseline();
@@ -723,6 +720,9 @@ function refreshText(){
   ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
   if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 6';
   if(ui.deliveryTray)ui.deliveryTray.visible=deliveryOpen;
+  if(ui.deliveryBookLabels)for(const [id,label] of Object.entries(ui.deliveryBookLabels)){
+    label.visible=grove.library.books.some(b=>b.type===id);
+  }
   const reading=['Pip','Riff'].map(name=>{
     const task=grove.library.status(name);
     if(!task)return null;
