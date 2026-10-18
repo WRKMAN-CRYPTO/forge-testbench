@@ -810,6 +810,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <button class="minibtn" id="pixiLookMode" type="button" title="Cycle between original particle opacity, restored brightness, and geometry-aware formation glow">VFX: FORMATION</button>
     <button class="minibtn" id="pixiArtMode" type="button" title="Compare soft migration textures with authentic faceted Wandrune material artwork and sparse elemental accents">ART: FORGE</button>
     <button class="minibtn" id="pixiWaterDrops" type="button" title="091: translucent pearlescent water droplet silhouettes; compare against canonical original water material">WATER DROPS: ON</button>
+    <button class="minibtn" id="pixiWaterMotion" type="button" title="091b: speed-driven droplet stretch plus a brief tapered wake, without affecting spells or WATER STREAMS">WATER MOTION: ON</button>
     <button class="minibtn" id="pixiWaterStreams" type="button" title="091: translucent ribbons follow the true existing water-agent path, max 64 per frame">WATER STREAMS: ON</button>
     <button class="minibtn" id="pixiFireMotion" type="button" title="088c: moving-flame sprite axis flipped 180°, with the same trail lock and smoothing">MOTION: ON</button>
     <button class="minibtn" id="pixiFireFlames" type="button" title="087: independent cached flame silhouettes and subtle motion; compare with previous faceted fire particles">FLAMES: ON</button>
@@ -1013,8 +1014,8 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./pixi-fire-motion.js?v=088c-axis-flip"></script>
 <script src="./pixi-fire-group-flames.js?v=089"></script>
 <script src="./pixi-fire-group-flow.js?v=090"></script>
-<script src="./pixi-water-vfx.js?v=091"></script>
-<script src="./pixi-swarm-bridge.js?v=091-waterlab"></script>
+<script src="./pixi-water-vfx.js?v=091b-motion"></script>
+<script src="./pixi-swarm-bridge.js?v=091b-motion"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1240,7 +1241,8 @@ class Lab extends Phaser.Scene{
     fireGroupStyle:new URLSearchParams(window.location.search).get("fireGroupStyle")||"flow",
     waterDrops:new URLSearchParams(window.location.search).get("waterDrops")!=="0",
     waterStreams:new URLSearchParams(window.location.search).get("waterStreams")!=="0",
-    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY")||message.startsWith("FIRE EMBERS")||message.startsWith("FIRE FLAMES")||message.startsWith("FIRE MOTION")||message.startsWith("GROUP FLAMES")||message.startsWith("GROUP FIRE")||message.startsWith("WATER DROPS")||message.startsWith("WATER STREAMS"))return;
+    waterMotion:new URLSearchParams(window.location.search).get("waterMotion")!=="0",
+    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY")||message.startsWith("FIRE EMBERS")||message.startsWith("FIRE FLAMES")||message.startsWith("FIRE MOTION")||message.startsWith("GROUP FLAMES")||message.startsWith("GROUP FIRE")||message.startsWith("WATER DROPS")||message.startsWith("WATER STREAMS")||message.startsWith("WATER MOTION"))return;
      const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
    if(this.pixiSpellRenderer){
@@ -1269,6 +1271,7 @@ class Lab extends Phaser.Scene{
     $("pixiFireFlames").textContent="FLAMES: "+(this.pixiSpellRenderer.fireFlames?"ON":"OFF");
     $("pixiWaterDrops").textContent="WATER DROPS: "+(this.pixiSpellRenderer.waterDrops?"ON":"OFF");
     $("pixiWaterStreams").textContent="WATER STREAMS: "+(this.pixiSpellRenderer.waterStreams?"ON":"OFF");
+    $("pixiWaterMotion").textContent="WATER MOTION: "+(this.pixiSpellRenderer.waterMotion?"ON":"OFF");
     $("pixiFireMotion").textContent="MOTION: "+(this.pixiSpellRenderer.fireMotion?"ON":"OFF");
     $("pixiFireGroupFlames").textContent="GROUP FIRE: "+this.pixiSpellRenderer.fireGroupStyle.toUpperCase();
     $("pixiFireDebug").textContent="FIRE GROUPS: "+(this.pixiSpellRenderer.fireDebug?"ON":"OFF");
@@ -1856,7 +1859,7 @@ class Lab extends Phaser.Scene{
     if((this.pixiStatusTick=(this.pixiStatusTick||0)+1)%12===0){
      const p=this.pixiSpellRenderer;
      $("pixiFlowStatus").textContent=p?.active?
-      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS / "+(p.fireEmbers?p.fireEmberBoosted+" EMBERS":"EMBERS OFF")+" / "+(p.fireFlames?p.fireFlamesDrawn+" FLAMES":"FLAMES OFF")+" / "+(p.fireMotion?p.fireMotionAligned+" TRAILING":"MOTION OFF")+" / "+(p.fireGroupFlames?p.fireGroupTongues+" "+(p.fireGroupStyle==="flow"?"FLOW RIBBONS":"OLD SPIKES"):"GROUP FIRE OFF")+" / "+(p.waterDrops?p.waterDropsDrawn+" WATER DROPS":"DROPS OFF")+" / "+(p.waterStreams?p.waterStreamsDrawn+" STREAMS":"STREAMS OFF")):"PHASER";
+      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS / "+(p.fireEmbers?p.fireEmberBoosted+" EMBERS":"EMBERS OFF")+" / "+(p.fireFlames?p.fireFlamesDrawn+" FLAMES":"FLAMES OFF")+" / "+(p.fireMotion?p.fireMotionAligned+" TRAILING":"MOTION OFF")+" / "+(p.fireGroupFlames?p.fireGroupTongues+" "+(p.fireGroupStyle==="flow"?"FLOW RIBBONS":"OLD SPIKES"):"GROUP FIRE OFF")+" / "+(p.waterDrops?p.waterDropsDrawn+" WATER DROPS":"DROPS OFF")+" / "+(p.waterStreams?p.waterStreamsDrawn+" STREAMS":"STREAMS OFF")+" / "+(p.waterMotion?p.waterSmearsDrawn+" SMEARS":"SMEAR OFF")):"PHASER";
      $("fireClusterStatus").textContent=p?.active&&p.fireDebug?
       (p.fireGroups+" GROUPS / "+p.fireLargest+" MAX / "+p.fireSingles+" SOLO / "+p.fireEdges+" LINKS"):"OFF";
      $("fireShellStatus").textContent=p?.active&&(p.fireShell||p.fireBody)?
@@ -3020,6 +3023,13 @@ $("pixiArtMode").addEventListener("click",()=>{
  const choices=["soft","forge","forge-hot"];
  const next=choices[(choices.indexOf(adapter.art)+1)%choices.length];
  $("pixiArtMode").textContent="ART: "+adapter.setArt(next).toUpperCase();
+});
+// 091b WATER MOTION: speed-responsive stretch and a short trailing wake.
+$("pixiWaterMotion").addEventListener("click",()=>{
+ const adapter=scene?.pixiSpellRenderer;
+ if(!adapter){$("pixiWaterMotion").textContent="WATER MOTION: UNAVAILABLE";return;}
+ const enabled=adapter.setWaterMotion(!adapter.waterMotion);
+ $("pixiWaterMotion").textContent="WATER MOTION: "+(enabled?"ON":"OFF");
 });
 // 091 WATER LAB: independent appearance toggles. Original material remains in place when OFF.
 $("pixiWaterDrops").addEventListener("click",()=>{
