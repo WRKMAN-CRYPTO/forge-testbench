@@ -578,7 +578,7 @@ function moveReaders(){
   const viewTop=landscape?152:187;
   const viewBottom=(ui.panelY||H-284)-48;
   const focusY=(viewTop+viewBottom)*.5;
-  camera.x=clamp(camera.x,W*.36,WORLD_SIZE.width-W*.36);
+  camera.x=clamp(camera.x,W*.5,WORLD_SIZE.width-W*.5);
   camera.y=clamp(camera.y,focusY-20,WORLD_SIZE.height-(H-focusY)*.5);
   ui.scene.position.set(W*.5-camera.x,focusY-camera.y);
 }
