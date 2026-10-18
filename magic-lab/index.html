@@ -809,6 +809,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <button class="minibtn" id="pixiRendererMode" type="button" title="Switch crafted swarm visuals without changing physics or saves">RENDER: PHASER</button>
     <button class="minibtn" id="pixiLookMode" type="button" title="Cycle between original particle opacity, restored brightness, and geometry-aware formation glow">VFX: FORMATION</button>
     <button class="minibtn" id="pixiArtMode" type="button" title="Compare soft migration textures with authentic faceted Wandrune material artwork and sparse elemental accents">ART: FORGE</button>
+    <button class="minibtn" id="pixiFireMotion" type="button" title="088: read fire-agent frame movement for smoothed, directional tails; damp it within plasma masses">MOTION: ON</button>
     <button class="minibtn" id="pixiFireFlames" type="button" title="087: independent cached flame silhouettes and subtle motion; compare with previous faceted fire particles">FLAMES: ON</button>
     <button class="minibtn" id="pixiFireEmbers" type="button" title="086: restore small individual flames with the existing material artwork and no extra sprites">EMBERS: ON</button>
     <button class="minibtn" id="pixiFireDebug" type="button" title="Pass A: outline each nearby connected fire cluster, without adding damage, mass, glow or new physics">FIRE GROUPS: OFF</button>
@@ -1006,7 +1007,8 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./pixi-fire-perimeter.js?v=085fix2"></script>
 <script src="./pixi-fire-stability.js?v=085fix2"></script>
 <script src="./pixi-fire-flame.js?v=087"></script>
-<script src="./pixi-swarm-bridge.js?v=087flames"></script>
+<script src="./pixi-fire-motion.js?v=088"></script>
+<script src="./pixi-swarm-bridge.js?v=088motion"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1227,7 +1229,8 @@ class Lab extends Phaser.Scene{
     fireStable:new URLSearchParams(window.location.search).get("fireStable")!=="0",
     fireEmbers:new URLSearchParams(window.location.search).get("fireEmbers")!=="0",
     fireFlames:new URLSearchParams(window.location.search).get("fireFlames")!=="0",
-    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY")||message.startsWith("FIRE EMBERS")||message.startsWith("FIRE FLAMES"))return;
+    fireMotion:new URLSearchParams(window.location.search).get("fireMotion")!=="0",
+    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY")||message.startsWith("FIRE EMBERS")||message.startsWith("FIRE FLAMES")||message.startsWith("FIRE MOTION"))return;
      const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
    if(this.pixiSpellRenderer){
@@ -1254,6 +1257,7 @@ class Lab extends Phaser.Scene{
     $("pixiArtMode").textContent="ART: "+this.pixiSpellRenderer.art.toUpperCase();
     $("pixiFireEmbers").textContent="EMBERS: "+(this.pixiSpellRenderer.fireEmbers?"ON":"OFF");
     $("pixiFireFlames").textContent="FLAMES: "+(this.pixiSpellRenderer.fireFlames?"ON":"OFF");
+    $("pixiFireMotion").textContent="MOTION: "+(this.pixiSpellRenderer.fireMotion?"ON":"OFF");
     $("pixiFireDebug").textContent="FIRE GROUPS: "+(this.pixiSpellRenderer.fireDebug?"ON":"OFF");
     $("pixiFireShell").textContent="PLASMA EDGE: "+(this.pixiSpellRenderer.fireShell?"ON":"OFF");
     $("pixiFireBody").textContent="PLASMA BODY: "+(this.pixiSpellRenderer.fireBody?"ON":"OFF");
@@ -1839,7 +1843,7 @@ class Lab extends Phaser.Scene{
     if((this.pixiStatusTick=(this.pixiStatusTick||0)+1)%12===0){
      const p=this.pixiSpellRenderer;
      $("pixiFlowStatus").textContent=p?.active?
-      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS / "+(p.fireEmbers?p.fireEmberBoosted+" EMBERS":"EMBERS OFF")+" / "+(p.fireFlames?p.fireFlamesDrawn+" FLAMES":"FLAMES OFF")):"PHASER";
+      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS / "+(p.fireEmbers?p.fireEmberBoosted+" EMBERS":"EMBERS OFF")+" / "+(p.fireFlames?p.fireFlamesDrawn+" FLAMES":"FLAMES OFF")+" / "+(p.fireMotion?p.fireMotionAligned+" TRAILING":"MOTION OFF")):"PHASER";
      $("fireClusterStatus").textContent=p?.active&&p.fireDebug?
       (p.fireGroups+" GROUPS / "+p.fireLargest+" MAX / "+p.fireSingles+" SOLO / "+p.fireEdges+" LINKS"):"OFF";
      $("fireShellStatus").textContent=p?.active&&(p.fireShell||p.fireBody)?
@@ -3003,6 +3007,13 @@ $("pixiArtMode").addEventListener("click",()=>{
  const choices=["soft","forge","forge-hot"];
  const next=choices[(choices.indexOf(adapter.art)+1)%choices.length];
  $("pixiArtMode").textContent="ART: "+adapter.setArt(next).toUpperCase();
+});
+// Fire 088: turn the purely visual motion alignment off for immediate A/B.
+$("pixiFireMotion").addEventListener("click",()=>{
+ const adapter=scene?.pixiSpellRenderer;
+ if(!adapter){$("pixiFireMotion").textContent="MOTION: UNAVAILABLE";return;}
+ const enabled=adapter.setFireMotion(!adapter.fireMotion);
+ $("pixiFireMotion").textContent="MOTION: "+(enabled?"ON":"OFF");
 });
 // Fire 087: compare the independent flame silhouette with previous faceted particles.
 $("pixiFireFlames").addEventListener("click",()=>{
