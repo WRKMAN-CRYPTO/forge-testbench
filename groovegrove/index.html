@@ -667,6 +667,52 @@ function makeJournalViewer(world){
   textAt(overlay,'Tap outside to return to the music',bx+bw/2,by+bh-25,landscape?12:10,PALETTE.gold,'normal',0,.5);
   overlay.visible=journalOpen;
 }
+function makeVocalist(parent,x,y,s){
+  const c=new Container();c.position.set(x,y);c.scale.set(s);parent.addChild(c);
+  const g=new Graphics();c.addChild(g);
+  ellipse(g,0,113,69,18,0x081f21,.37);
+  line(g,-19,56,-32,99,0x626357,12);
+  line(g,17,56,27,99,0x626357,12);
+  ellipse(g,-32,101,24,10,0x615e52);
+  ellipse(g,28,101,24,10,0x615e52);
+  ellipse(g,0,23,46,64,0xa5b69a);
+  rect(g,-47,-45,94,104,40,0xb3c2a3);
+  ellipse(g,0,-62,46,49,0xe5c5a5);
+  circle(g,-15,-68,4,0x34504a);
+  circle(g,15,-68,4,0x34504a);
+  ellipse(g,0,-43,6,3,0x8c685c,.75);
+  g.moveTo(-36,-2).quadraticCurveTo(8,13,39,-14)
+    .stroke({color:0xf1cf96,width:11,cap:'round'});
+  ellipse(g,0,-111,51,19,0x6e8271,.9);
+  textAt(c,'MURMUR',0,138,19,0xf1d5ae,'bold',2,.5);
+  return {group:c,face:g};
+}
+function makeCameraControls(hud){
+  const options=[
+    ['PIP','Pip'],['RIFF','Riff'],['MURMUR','Murmur'],
+    ['LIBRARY','library'],['CLEARING','clearing']
+  ];
+  const x=landscape?W*.34:12,barW=landscape?Math.min(W*.48,570):W-24;
+  const width=(barW-4*5)/5;
+  const y=landscape?104:146;
+  ui.cameraBand={x,y,w:barW,h:34};ui.cameraButtons={};
+  for(const [i,[label,value]] of options.entries()){
+    const bx=x+i*(width+5),g=new Graphics();hud.addChild(g);
+    rect(g,bx,y,width,33,12,0x0d2c2d,.92);
+    g.roundRect(bx,y,width,33,12).stroke({color:0x5b907c,width:1,alpha:.52});
+    g.eventMode='static';g.cursor='pointer';g.hitArea=new Rectangle(bx,y,width,33);
+    g.on('pointertap',()=>{
+      if(['Pip','Riff','Murmur'].includes(value)){
+        selected=value;camera.mode='follow';camera.target=value;
+      }else{camera.mode='place';camera.target=value;}
+      refreshText();
+    });
+    const caption=textAt(hud,label,bx+width/2,y+10,landscape?12:10,PALETTE.cream,'bold',.6,.5);
+    ui.cameraButtons[value]={g,caption};
+  }
+  ui.cameraHint=textAt(hud,'SWIPE THE WOODLAND TO EXPLORE',x+barW/2,y+38,landscape?11:9,PALETTE.muted,'bold',.65,.5);
+}
+
 function buildCanvas(){
   // Rebuild graphics, never the agent state, on resize/orientation change.
   for(const child of root.removeChildren())child.destroy({children:true});
@@ -675,37 +721,35 @@ function buildCanvas(){
   landscape=winW>winH*1.18;
   scale=landscape?Math.min(winW/1170,winH/755):winW/430;
   root.scale.set(scale);W=winW/scale;H=winH/scale;
-  const world=new Container();root.addChild(world);
-  makeBackground(world);
-  makeLibraryNook(world);
+  const scene=new Container();root.addChild(scene);ui.scene=scene;
+  makeWorldLandscape(scene);
+  makeLibraryNook(scene);
+  const world=new Container();root.addChild(world);ui.hud=world;
   const left=landscape?56:28;
   const title=textAt(world,'GROOVEGROVE',left,landscape?22:42,landscape?35:29,PALETTE.cream,'bold',3.4);
   textAt(world,'THREE MINDS  ·  ONE GROOVE',left,landscape?66:83,landscape?12:11,PALETTE.mint,'bold',2.4);
-  textAt(world,'PASS 004    /    SECOND SHELF',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
-  const cy=ui.padY;
-  const actorOffset=landscape?Math.min(W*.19,235):116;
-  const actorScale=landscape?1.02:.71;
-  ui.pipPos={x:W*.5-actorOffset,y:cy+10};
-  ui.riffPos={x:W*.5+actorOffset,y:cy+10};
-  ui.homePositions={Pip:{...ui.pipPos},Riff:{...ui.riffPos}};
-  ui.pip=makeDrummer(world,ui.pipPos.x,ui.pipPos.y,actorScale);
-  ui.riff=makeGuitarist(world,ui.riffPos.x,ui.riffPos.y,actorScale);
-  // Murmur watches the other two before discovering any sound.
-  ui.vocalPos={x:W*.5,y:cy+132};
-  const singer=new Graphics();world.addChild(singer);
-  ellipse(singer,ui.vocalPos.x,ui.vocalPos.y+24,26,7,0x142e2c,.45);
-  circle(singer,ui.vocalPos.x,ui.vocalPos.y,20,0xe3c2a0);
-  circle(singer,ui.vocalPos.x-6,ui.vocalPos.y-3,2,0x29463f);
-  circle(singer,ui.vocalPos.x+6,ui.vocalPos.y-3,2,0x29463f);
-  textAt(world,'MURMUR',ui.vocalPos.x,ui.vocalPos.y+27,11,PALETTE.cream,'bold',0,.5);
-  ui.booksDrawing=new Graphics();world.addChild(ui.booksDrawing);
+  textAt(world,'PASS 005    /    LIVING WORLD',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
+  const pip=grove?.space?.people.Pip||{x:681,y:538};
+  const riff=grove?.space?.people.Riff||{x:798,y:530};
+  const singer=grove?.space?.people.Murmur||{x:754,y:659};
+  const actorScale=landscape?.91:.65;
+  ui.pipPos={x:pip.x,y:pip.y};
+  ui.riffPos={x:riff.x,y:riff.y};
+  ui.vocalPos={x:singer.x,y:singer.y};
+  ui.pip=makeDrummer(scene,ui.pipPos.x,ui.pipPos.y,actorScale);
+  ui.riff=makeGuitarist(scene,ui.riffPos.x,ui.riffPos.y,actorScale);
+  ui.murmur=makeVocalist(scene,ui.vocalPos.x,ui.vocalPos.y,actorScale*.91);
+  ui.booksDrawing=new Graphics();scene.addChild(ui.booksDrawing);
   ui.pip.group.eventMode='static';ui.pip.group.hitArea=new Rectangle(-115,-125,230,285);
   ui.riff.group.eventMode='static';ui.riff.group.hitArea=new Rectangle(-115,-125,230,285);
   ui.pip.group.cursor='pointer';ui.riff.group.cursor='pointer';
-  ui.pip.group.on('pointertap',()=>{selected='Pip';refreshText();});
-  ui.riff.group.on('pointertap',()=>{selected='Riff';refreshText();});
-  ui.fx=new Graphics();world.addChild(ui.fx);
-  ui.bubbleLayer=new Container();world.addChild(ui.bubbleLayer);
+  ui.pip.group.on('pointertap',()=>{selected='Pip';camera.mode='follow';camera.target='Pip';refreshText();});
+  ui.riff.group.on('pointertap',()=>{selected='Riff';camera.mode='follow';camera.target='Riff';refreshText();});
+  ui.murmur.group.eventMode='static';ui.murmur.group.hitArea=new Rectangle(-80,-125,160,260);
+  ui.murmur.group.cursor='pointer';
+  ui.murmur.group.on('pointertap',()=>{selected='Murmur';camera.mode='follow';camera.target='Murmur';refreshText();});
+  ui.fx=new Graphics();scene.addChild(ui.fx);
+  ui.bubbleLayer=new Container();scene.addChild(ui.bubbleLayer);
   ui.bubbleShape=new Graphics();ui.bubbleLayer.addChild(ui.bubbleShape);
   ui.bubbleText=textAt(ui.bubbleLayer,'',0,0,landscape?13:12,PALETTE.cream);
   ui.bubbleLayer.visible=false;
@@ -752,6 +796,7 @@ function buildCanvas(){
   world.addChild(ui.badge);
   ui.badgeText=textAt(world,'TAP ANYWHERE TO START',badgeX,badgeY-4,12,PALETTE.gold,'bold',1.7,.5);
   ui.inspect=textAt(world,'',landscape?W*.5:W*.5,landscape?panelY-84:panelY-93,landscape?13:12,PALETTE.cream,'normal',0,.5);
+  makeCameraControls(world);
   makeDeliveryTray(world);
   makeAudioControl(world);
   makeJournalViewer(world);
