@@ -86,26 +86,52 @@ function saveMemory(value){
 // Sound synthesis and accurate, ahead-of-time Web Audio scheduling.
 class SoundEngine {
   constructor(){this.context=null;this.master=null;this.noise=null;this.timer=null;this.beat=0;this.nextTime=0;}
-  async start(onBeat){
-    if(!this.context){
-      const Ctx=window.AudioContext||window.webkitAudioContext;
-      if(!Ctx)throw new Error('Web Audio is not supported on this device.');
-      this.context=new Ctx();
-      this.master=this.context.createGain();this.master.gain.value=0.58;
-      const limiter=this.context.createDynamicsCompressor();
-      limiter.threshold.value=-12;limiter.knee.value=15;limiter.ratio.value=3.5;
-      this.master.connect(limiter);limiter.connect(this.context.destination);
-      const len=Math.round(this.context.sampleRate*.3);
-      this.noise=this.context.createBuffer(1,len,this.context.sampleRate);
-      const data=this.noise.getChannelData(0);
-      for(let i=0;i<len;i++)data[i]=Math.random()*2-1;
-    }
-    await this.context.resume();
-    if(this.timer)return;
+  makeContext(){
+    // Never reset the musical beat when rebuilding the AUDIO graph.
+    if(this.timer){clearInterval(this.timer);this.timer=null;}
+    const old=this.context;
+    this.context=null;
+    // Closing can hang in WebKit after a phone call. Do not await it.
+    if(old && old.state!=='closed'){try{Promise.resolve(old.close()).catch(()=>{});}catch(e){}}
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx)throw new Error('Web Audio is not supported on this device.');
+    const ctx=new Ctx();
+    this.context=ctx;
+    this.master=ctx.createGain();this.master.gain.value=0.58;
+    const limiter=ctx.createDynamicsCompressor();
+    limiter.threshold.value=-12;limiter.knee.value=15;limiter.ratio.value=3.5;
+    this.master.connect(limiter);limiter.connect(ctx.destination);
+    const len=Math.round(ctx.sampleRate*.3);
+    this.noise=ctx.createBuffer(1,len,ctx.sampleRate);
+    const data=this.noise.getChannelData(0);
+    for(let i=0;i<len;i++)data[i]=Math.random()*2-1;
+  }
+  async start(onBeat,{fresh=false,chime=false}={}){
     this.onBeat=onBeat;
-    this.nextTime=this.context.currentTime+.12;
-    this.timer=setInterval(()=>this.schedule(),23);
-    this.schedule();
+    // WebKit may fall back to its ringer/ambient channel after an iOS call,
+    // silently muting a perfectly "running" AudioContext. Use media playback.
+    try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch(e){}
+    if(fresh || !this.context || this.context.state==='closed')this.makeContext();
+    const ctx=this.context;
+    // Called directly from the pointerdown handler; don't defer resume()
+    // past the user-activation window on iOS.
+    if(ctx.state!=='running'){
+      const attempt=ctx.resume();
+      const resumed=await Promise.race([
+        Promise.resolve(attempt).then(()=>true),
+        new Promise(resolve=>setTimeout(()=>resolve(false),1600))
+      ]);
+      if(!resumed && ctx.state!=='running')throw new Error('Audio is blocked by iOS. Tap AUDIO again.');
+    }
+    if(ctx!==this.context)return;
+    if(ctx.state!=='running')throw new Error('Audio is '+ctx.state+'. Tap AUDIO to reconnect.');
+    if(!this.timer){
+      this.nextTime=ctx.currentTime+.12;
+      this.timer=setInterval(()=>this.schedule(),23);
+      this.schedule();
+    }
+    // An audible soft confirmation note when the player explicitly repairs audio.
+    if(chime)this.tone(587.33,ctx.currentTime+.035,.17,.065,'sine',0);
   }
   schedule(){
     const ctx=this.context;
@@ -359,7 +385,7 @@ app.canvas.style.margin='0';
 app.canvas.style.touchAction='none';
 const root=new Container();app.stage.addChild(root);
 let sound=new SoundEngine(),grove=null;
-let started=false,startError='',selected='Pip';
+let started=false,startError='',selected='Pip',soundNeedsRefresh=false,audioStartPending=false;
 let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false;
 let floatingNotes=[],talkBubble=null,ambient=[],now=0,visualBeat=-1;
 let noteFlash={Pip:0,Riff:0};
@@ -635,6 +661,18 @@ function renderPhysicalBooks(){
     }
   }
 }
+// Native canvas touch target: lets the player repair a silent WebKit audio route
+// even when AudioContext.state incorrectly claims 'running'.
+function makeAudioControl(world){
+  const w=92,h=31,x=W-w-15,y=landscape?54:37;
+  ui.audioRect={x,y,w,h};
+  const widget=new Container();world.addChild(widget);
+  const g=new Graphics();widget.addChild(g);
+  rect(g,x,y,w,h,13,0x123b38,.94);
+  g.roundRect(x,y,w,h,13).stroke({color:PALETTE.mint,width:1,alpha:.55});
+  ui.audioLabel=textAt(widget,'↻ AUDIO',x+w/2,y+8,12,PALETTE.mint,'bold',.3,.5);
+  ui.audioWidget=widget;
+}
 function buildCanvas(){
   // Rebuild graphics, never the agent state, on resize/orientation change.
   for(const child of root.removeChildren())child.destroy({children:true});
@@ -713,13 +751,14 @@ function buildCanvas(){
   ui.badgeText=textAt(world,'TAP ANYWHERE TO START',badgeX,badgeY-4,12,PALETTE.gold,'bold',1.7,.5);
   ui.inspect=textAt(world,'',landscape?W*.5:W*.5,landscape?panelY-84:panelY-93,landscape?13:12,PALETTE.cream,'normal',0,.5);
   makeDeliveryTray(world);
+  makeAudioControl(world);
   refreshText();
 }
 function refreshText(){
   if(!ui.modeLabel)return;
   const mode=grove?.mode||'solo';
   ui.modeLabel.text=grove?.library.anyBusy()?'READING IN THE GROVE':mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES';
-  ui.statusLine.text=startError?startError:!started?(grove?.library.anyBusy()?'Tap the clearing to continue the interrupted reading':'Tap the clearing to hear their first notes'):(sound.context && sound.context.state!=='running'?'Audio paused · tap the clearing to resume':grove.highlight);
+  ui.statusLine.text=startError?startError:!started?(grove?.library.anyBusy()?'Tap the clearing to continue the interrupted reading':'Tap the clearing to hear their first notes'):soundNeedsRefresh?'Audio route may be muted · tap ↻ AUDIO to reconnect':(sound.context && sound.context.state!=='running'?'Audio paused · tap ↻ AUDIO to reconnect':grove.highlight);
   if(grove){
     const error=grove.baseline();
     ui.pipMetric.text='PIP   '+(error==null?'collecting timing...':fmt(error)+' RMS drift');
@@ -732,8 +771,10 @@ function refreshText(){
     const who=selected==='Pip'?grove.pip:grove.riff;
     ui.inspect.text=who.name.toUpperCase()+' · '+who.currentGoal+(grove.library.known[who.name].length?' · '+grove.library.known[who.name].length+' book skills':'')+'  |  tap either musician';
   }else ui.inspect.text='Tap a musician to follow their decisions';
-  ui.badgeText.text=!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(sound.context && sound.context.state!=='running'?'TAP TO RESUME AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE');
+  ui.badgeText.text=!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(soundNeedsRefresh || (sound.context && sound.context.state!=='running'))?'TAP TO RECONNECT AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
   ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
+  if(ui.audioLabel)ui.audioLabel.text=!started?'▶ AUDIO':soundNeedsRefresh?'↻ REPAIR':'↻ AUDIO';
+  if(ui.audioWidget)ui.audioWidget.visible=!deliveryOpen;
   if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 6';
   if(ui.deliveryTray)ui.deliveryTray.visible=deliveryOpen;
   if(ui.deliveryBookLabels)for(const [id,label] of Object.entries(ui.deliveryBookLabels)){
@@ -841,31 +882,36 @@ function onScheduledBeat(beat,time){
   grove.onBeatEvent(beat,time,sound);
   if(beat%4===0)refreshText();
 }
-async function startAudio(){
-  if(started){
-    // Safari may suspend or interrupt audio during an orientation transition.
-    // The next user touch can re-enable it without resetting the musicians.
-    if(sound.context && sound.context.state!=='running'){
-      try{await sound.context.resume();startError='';}
-      catch(err){startError='Tap again to resume audio';refreshText();}
-    }
-    return;
-  }
-  started=true;
+async function startAudio(force=false){
+  if(audioStartPending)return;
+  if(started && !force && !soundNeedsRefresh && sound.context?.state==='running')return;
+  audioStartPending=true;
+  const first=!started;
+  const repair=force || soundNeedsRefresh || (started && sound.context?.state==='closed');
   try{
-    await sound.start(onScheduledBeat);
-    grove.push(grove.library.anyBusy()?'The music resumes. Interrupted reading continues.':'Pip and Riff begin playing. Neither has been told to form a band.');
-    refreshText();
+    await sound.start(onScheduledBeat,{fresh:repair,chime:repair});
+    started=true;startError='';soundNeedsRefresh=false;
+    if(repair)grove.push('The audio engine was reconnected without resetting the musicians.');
+    else if(first)grove.push(grove.library.anyBusy()?'The music resumes. Interrupted reading continues.':'Pip and Riff begin playing. Neither has been told to form a band.');
   }catch(err){
-    started=false;startError='Audio could not start: '+(err?.message||'unknown problem');refreshText();
+    soundNeedsRefresh=true;
+    startError='Sound needs attention: '+(err?.message||'tap ↻ AUDIO to retry');
+  }finally{
+    audioStartPending=false;refreshText();
   }
 }
 let pressTimer=null,pressStart=null;
 app.canvas.addEventListener('pointerdown',(ev)=>{
-  startAudio();
-  // Press-and-hold the painted pond, not a DOM control, to begin a fresh study.
   const bounds=app.canvas.getBoundingClientRect();
   const lx=(ev.clientX-bounds.left)/scale,ly=(ev.clientY-bounds.top)/scale;
+  // Audio repair executes synchronously from the same user gesture.
+  const button=ui.audioRect;
+  if(!deliveryOpen && button && lx>=button.x && lx<=button.x+button.w && ly>=button.y && ly<=button.y+button.h){
+    startAudio(true);
+    return;
+  }
+  startAudio(soundNeedsRefresh);
+  // Press-and-hold the painted pond, not a DOM control, to begin a fresh study.
   const d=Math.hypot(lx-ui.pond.x,ly-ui.pond.y);
   if(d<40){
     pressStart=performance.now();
@@ -883,11 +929,19 @@ app.canvas.addEventListener('pointerdown',(ev)=>{
 ['pointerup','pointercancel','pointerleave'].forEach(name=>app.canvas.addEventListener(name,()=>{clearTimeout(pressTimer);pressTimer=null;}));
 function checkpointAndRecover(){
   if(grove)saveMemory(grove.snapshot());
+  // A WebKit AudioContext can remain 'running' but silent after a phone call.
+  if(started)soundNeedsRefresh=true;
 }
 function recoverAudioAfterInterruption(){
-  if(!document.hidden && started && sound.context && sound.context.state!=='running'){
-    startAudio().then(refreshText).catch(()=>refreshText());
-  }else refreshText();
+  if(!document.hidden && started && sound.context){
+    // Reassert playback routing even if WebKit does not report interruption.
+    try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch(e){}
+    if(sound.context.state!=='running'){
+      soundNeedsRefresh=true;
+      try{sound.context.resume().catch(()=>{});}catch(e){}
+    }
+  }
+  refreshText();
 }
 window.addEventListener('pagehide',checkpointAndRecover);
 document.addEventListener('visibilitychange',()=>{
@@ -918,7 +972,7 @@ app.ticker.add(()=>{
   if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
 });
 // Inspectable test hooks; not part of the rendered interface.
-window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove();grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
+window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove();grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
 </script>
 </body>
 </html>
