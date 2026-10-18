@@ -18,7 +18,7 @@
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
 import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261018-voice';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
-import { Grove } from './grove-core.js?v=20261018-sustain';
+import { Grove } from './grove-core.js?v=20261018-riff-lead';
 import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261018-ensemble';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
 import { LiveNoteConductor } from './live-note-conductor.js?v=20261018-sustain';
@@ -866,7 +866,7 @@ function buildCanvas(){
   const left=landscape?56:28;
   const title=textAt(world,'GROOVEGROVE',left,landscape?22:42,landscape?35:29,PALETTE.cream,'bold',3.4);
   textAt(world,'THREE MINDS  ·  ONE GROOVE',left,landscape?66:83,landscape?12:11,PALETTE.mint,'bold',2.4);
-  textAt(world,'PASS 008    /    SUSTAINED HARMONIES',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
+  textAt(world,'PASS 009    /    RIFF LEAD NOTES',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
   const pip=grove?.space?.people.Pip||{x:681,y:538};
   const riff=grove?.space?.people.Riff||{x:798,y:530};
   const singer=grove?.space?.people.Murmur||{x:754,y:659};
@@ -950,7 +950,7 @@ function refreshText(){
   if(grove){
     const error=grove.baseline();
     ui.pipMetric.text='PIP   '+(error==null?'collecting timing...':fmt(error)+' RMS drift');
-    ui.riffMetric.text='RIFF   '+(grove.riffHeldChords||0)+' sustained chords · melodic rhythm';
+    ui.riffMetric.text='RIFF  '+(grove.riffHeldChords||0)+' held chords  ·  '+(grove.riffHeldNotes||0)+' held notes';
     ui.memoryMetric.text=remoteLive?('BAR '+Math.max(grove.bar,Math.floor(serverLastBeat/4))+' · '+grove.familiarity+' shared · '+grove.jams+' jams'):(grove.familiarity+' shared sessions  ·  '+grove.lessons+' lessons  ·  '+grove.jams+' jams');
     if(landscape){
       const rows=grove.logs.slice(0,3);
@@ -970,7 +970,7 @@ function refreshText(){
       const who=selected==='Pip'?grove.pip:grove.riff;
       const purpose=((remoteLive&&liveLocations?.[selected])||grove.space?.people[selected])?.purpose;
       ui.inspect.text=who.name.toUpperCase()+' · '+(purpose||who.currentGoal)+
-        (selected==='Riff'?' · '+(grove.riffHeldChords||0)+' held chords':
+        (selected==='Riff'?' · '+(grove.riffHeldChords||0)+' chords · '+(grove.riffHeldNotes||0)+' held notes':
           grove.library.known[who.name].length?' · '+grove.library.known[who.name].length+' book skills':'');
     }
   }else ui.inspect.text='Tap a musician to follow their decisions';
