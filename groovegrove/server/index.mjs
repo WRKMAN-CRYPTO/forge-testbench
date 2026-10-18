@@ -38,15 +38,16 @@ function packageState(includeEvents=false,since=0,includeWorld=true){
 }
 function capture(kind,args){
  const [a,b,c,d]=args;
- const time=kind==='guitar'?b:a;
+ const time=(kind==='guitar'||kind==='voice')?b:a;
  const ev={seq:nextSeq++,kind,atMs:Math.round(time*1000),
   bar:world.bar,beat:world.beat};
- if(kind==='guitar'){ev.freq=a;ev.volume=c;ev.duration=d;}
+ if(kind==='guitar'||kind==='voice'){ev.freq=a;ev.volume=c;ev.duration=d;}
  else ev.volume=b;
  events.push(ev);if(events.length>420)events.shift();
 }
 const sink={
  guitar(...a){capture('guitar',a)},
+ voice(...a){capture('voice',a)},
  kick(...a){capture('kick',a)},
  snare(...a){capture('snare',a)},
  hat(...a){capture('hat',a)}
