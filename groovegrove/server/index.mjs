@@ -35,7 +35,7 @@ function packageState(includeEvents=false,since=0,includeWorld=true){
   uptimeSeconds:Math.floor((now-bootAt)/1000),
   locations:ready&&world.space?Object.fromEntries(['Pip','Riff','Murmur'].map(name=>{
    const p=world.space.people[name];
-   return [name,{x:p.x,y:p.y,place:p.place,destination:p.destination,purpose:p.purpose,traveling:p.route.length>0}];
+   return [name,{x:p.x,y:p.y,place:p.place,destination:p.destination,purpose:p.purpose,traveling:p.route.length>0,ensembleIntent:p.ensembleIntent||null}];
   })):null,
   world:ready&&includeWorld?snapshot():null,
   events:list};
@@ -121,7 +121,7 @@ async function init(){
    beat:nextBeat,bar:world.bar,
    practice:{Pip:pip.observations,Riff:riff.observations},
    experiments:{Pip:pip.experiments,Riff:riff.experiments},
-   voice:{stage:world.vocalist.stage,notes:world.vocalist.notes,phrases:world.voiceJournal?.phrases||0,books:world.library.known.Murmur?.length||0},
+   voice:{stage:world.vocalist.stage,notes:world.vocalist.notes,phrases:world.voiceJournal?.phrases||0,shared:world.voiceJournal?.sharedPhrases||0,partnerReplies:world.voiceJournal?.partnerReplies||{Pip:0,Riff:0},books:world.library.known.Murmur?.length||0},
    sinceLastBeatMs:Date.now()-lastAdvanceAt,checkpointAt:lastWrite
   }));
  },30000);
