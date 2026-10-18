@@ -1,4 +1,4 @@
-/* Run: node magic-lab/pixi-fire-motion.tests.js. Render-only Pass 088. */
+/* Run: node magic-lab/pixi-fire-motion.tests.js. Render-only Pass 088c. */
 "use strict";
 const assert=require("node:assert/strict");
 const M=require("./pixi-fire-motion.js");
@@ -15,10 +15,11 @@ function track(dx,dy,neighbors=0){
  return p;
 }
 const right=track(5,0),left=track(-5,0),up=track(0,-5),down=track(0,5);
-ok(Math.abs(diff(right.rotation,Math.PI/2))<.10,"Right tip points right; tail left");
-ok(Math.abs(diff(left.rotation,-Math.PI/2))<.10,"Left tip points left; tail right");
-ok(Math.abs(diff(up.rotation,0))<.10,"Up tip points up; tail down");
-ok(Math.abs(diff(down.rotation,Math.PI))<.10,"Down tip points down; tail up");
+ok(Math.abs(diff(M.travelRotation(1,0),-Math.PI/2))<1e-10,"088c direction basis rotated 180 degrees");
+ok(Math.abs(diff(right.rotation,-Math.PI/2))<.10,"Right tip points right; tail left");
+ok(Math.abs(diff(left.rotation,Math.PI/2))<.10,"Left tip points left; tail right");
+ok(Math.abs(diff(up.rotation,Math.PI))<.10,"Up tip points up; tail down");
+ok(Math.abs(diff(down.rotation,0))<.10,"Down tip points down; tail up");
 ok(right.stretch>1.3&&right.width<.93,"Fast agents stretch and narrow");
 ok(right.aligned&&left.aligned,"Strong moving flames aligned");
 const dense=track(5,0,8),slow=track(.015,0);
