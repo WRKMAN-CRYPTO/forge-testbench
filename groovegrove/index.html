@@ -809,6 +809,8 @@ function buildCanvas(){
   world.addChild(ui.badge);
   ui.badgeText=textAt(world,'TAP ANYWHERE TO START',badgeX,badgeY-4,12,PALETTE.gold,'bold',1.7,.5);
   ui.inspect=textAt(world,'',landscape?W*.5:W*.5,landscape?panelY-84:panelY-93,landscape?13:12,PALETTE.cream,'normal',0,.5);
+  ui.inspect.style.wordWrap=true;ui.inspect.style.wordWrapWidth=landscape?620:W-40;
+  ui.inspect.style.align='center';
   makeCameraControls(world);
   makeDeliveryTray(world);
   makeAudioControl(world);
@@ -831,7 +833,7 @@ function refreshText(){
     }else ui.log[0].text=grove.logs[0]?.message||'';
     if(selected==='Murmur'){
       const v=grove.vocalist;
-      ui.inspect.text='MURMUR · '+v.stage+' · '+v.notes+' hums · '+v.rests+' rests · tap to follow';
+      ui.inspect.text='MURMUR · '+v.stage+' · '+v.notes+' hums · '+v.rests+' rests'+(v.firstSound?' · first voice at bar '+v.firstSound.bar:'');
     }else{
       const who=selected==='Pip'?grove.pip:grove.riff;
       const purpose=((remoteLive&&liveLocations?.[selected])||grove.space?.people[selected])?.purpose;
