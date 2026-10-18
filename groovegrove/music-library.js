@@ -36,10 +36,10 @@ export class MusicLibrary{
     }
     const used=new Set(), slots=new Set();
     if(Array.isArray(saved.books)){
-      for(const raw of saved.books.slice(0,12)){
+      for(const raw of saved.books.slice(0,SHELF_CAPACITY)){
         if(!LIBRARY_CATALOG[raw?.type] || typeof raw?.copyId!=='string' || used.has(raw.copyId))continue;
         const slot=Number(raw.slot);
-        if(!Number.isInteger(slot)||slot<0||slot>5||slots.has(slot))continue;
+        if(!Number.isInteger(slot)||slot<0||slot>=SHELF_CAPACITY||slots.has(slot))continue;
         used.add(raw.copyId);slots.add(slot);
         const state=['shelf','carried','reading','returning'].includes(raw.state)?raw.state:'shelf';
         const owner=AGENTS.includes(raw.owner)?raw.owner:null;
