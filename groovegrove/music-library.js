@@ -6,9 +6,15 @@
 export const LIBRARY_CATALOG=Object.freeze({
   'pocket-pulse':Object.freeze({id:'pocket-pulse',title:'Pocket Pulse',subtitle:'A displaced backbeat',color:0x83dbb3,skill:'offbeatPulse',topic:'rhythm',reader:'Pip',readBars:3}),
   'open-sky-chords':Object.freeze({id:'open-sky-chords',title:'Open Sky Chords',subtitle:'Four new chord voicings',color:0xf4b786,skill:'openChords',topic:'harmony',reader:'Riff',readBars:4}),
-  'call-response':Object.freeze({id:'call-response',title:'Call & Response',subtitle:'Making musical space',color:0xc5afe7,skill:'callResponse',topic:'theory',reader:null,readBars:4})
+  'call-response':Object.freeze({id:'call-response',title:'Call & Response',subtitle:'Making musical space',color:0xc5afe7,skill:'callResponse',topic:'theory',reader:null,readBars:4}),
+  'ghost-note-handbook':Object.freeze({id:'ghost-note-handbook',title:'Ghost Note Handbook',subtitle:'Quiet drum accents',color:0x9fd7c8,skill:'ghostNotes',topic:'rhythm',reader:'Pip',readBars:5}),
+  'walking-bassline':Object.freeze({id:'walking-bassline',title:'The Walking Bassline',subtitle:'Connecting chord roots',color:0xe7bc7e,skill:'walkingBass',topic:'harmony',reader:'Riff',readBars:5}),
+  'art-of-silence':Object.freeze({id:'art-of-silence',title:'The Art of Silence',subtitle:'Leaving deliberate space',color:0xb4b7e9,skill:'deliberateSpace',topic:'theory',reader:null,readBars:4}),
+  'syncopation-station':Object.freeze({id:'syncopation-station',title:'Syncopation Station',subtitle:'Offbeat rhythmic phrasing',color:0xe8a0a0,skill:'syncopation',topic:'rhythm',reader:null,readBars:6}),
+  'listening-musician':Object.freeze({id:'listening-musician',title:'The Listening Musician',subtitle:'Answering a partner’s phrase',color:0xa8d9f0,skill:'partnerListening',topic:'theory',reader:null,readBars:6})
 });
 export const BOOK_IDS=Object.keys(LIBRARY_CATALOG);
+export const SHELF_CAPACITY=12;
 const AGENTS=['Pip','Riff'];
 const safeNumber=(value,fallback=0)=>Number.isFinite(value)?value:fallback;
 
@@ -66,7 +72,7 @@ export class MusicLibrary{
   donate(type){
     if(!LIBRARY_CATALOG[type])return {ok:false,reason:'Unknown book'};
     if(this.books.some(b=>b.type===type))return {ok:false,reason:'One copy already in the grove'};
-    const slot=Array.from({length:6},(_,i)=>i).find(i=>!this.books.some(b=>b.slot===i));
+    const slot=Array.from({length:SHELF_CAPACITY},(_,i)=>i).find(i=>!this.books.some(b=>b.slot===i));
     if(slot===undefined)return {ok:false,reason:'Every shelf slot is occupied'};
     const book={copyId:'book-'+this.nextCopy++,type,slot,state:'shelf',owner:null,progress:0};
     this.books.push(book);return {ok:true,book};
