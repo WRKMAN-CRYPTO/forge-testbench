@@ -104,7 +104,7 @@ export class GroveWorld {
     for(const name of NAMES){
       const p=this.people[name];
       // Borrowed books are real: readers must reach the library to study.
-      if(name!=='Murmur' && grove.library?.busy(name)){
+      if(grove.library?.busy(name)){
         if(p.destination!=='library')this.chooseDestination(name,'library','reading a borrowed book',grove.bar);
       }
       const next=p.route[0];if(!next)continue;
@@ -151,7 +151,7 @@ export class GroveWorld {
     const bar=grove.bar;
     for(const name of NAMES){
       const p=this.people[name],curious=name==='Pip'?grove.pip?.curiosity:name==='Riff'?grove.riff?.curiosity:grove.vocalist?.curiosity;
-      if(name!=='Murmur' && grove.library?.busy(name))continue;
+      if(grove.library?.busy(name))continue;
       if(this.traveling(name) || bar-p.lastChoice<9)continue;
       // A destination is a personal choice, not a mandatory timetable.
       if(Math.random()>.23*(curious??.5))continue;
