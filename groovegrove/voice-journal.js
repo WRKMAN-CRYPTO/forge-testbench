@@ -13,6 +13,14 @@ export class VoiceJournal {
     this.experiments=number(saved?.experiments);
     this.responses=number(saved?.responses);
     this.motifRepeats=number(saved?.motifRepeats);
+    this.sharedPhrases=number(saved?.sharedPhrases);
+    this.firstSharedPhrase=saved?.firstSharedPhrase||null;
+    this.partnerReplies={Pip:number(saved?.partnerReplies?.Pip),Riff:number(saved?.partnerReplies?.Riff)};
+    this.firstPartnerReply={
+      Pip:saved?.firstPartnerReply?.Pip||null,
+      Riff:saved?.firstPartnerReply?.Riff||null
+    };
+    this.recentReplies=Array.isArray(saved?.recentReplies)?saved.recentReplies.slice(0,12):[];
     this.learnedVowels={m:0,u:0,o:0,a:0,i:0};
     for(const vowel of vowels)this.learnedVowels[vowel]=number(saved?.learnedVowels?.[vowel]);
     this.firstVowel=saved?.firstVowel||null;
@@ -37,9 +45,14 @@ export class VoiceJournal {
     if(pitches.length>1)this.phrases++;
     if(vowel!=='m' || pitches.length>1 || kind==='motif')this.experiments++;
     if(response)this.responses++;
+    if(event.ensemble){
+      this.sharedPhrases++;
+      if(!this.firstSharedPhrase)
+        this.firstSharedPhrase={bar,with:response||'the nearby musicians',pitch:pitches[0]};
+    }
     if(repeated)this.motifRepeats++;
     this.learnedVowels[vowel]=(this.learnedVowels[vowel]||0)+pitches.length;
-    const item={bar,vowel,kind,response,repeated,pitches:pitches.map(n=>Math.round(n*10)/10)};
+    const item={bar,vowel,kind,response,repeated,ensemble:!!event.ensemble,pitches:pitches.map(n=>Math.round(n*10)/10)};
     if(vowel!=='m'&&!this.firstVowel)this.firstVowel={bar,vowel,pitch:item.pitches[0]};
     if(pitches.length>1&&!this.firstPhrase)this.firstPhrase={bar,pitches:[...item.pitches]};
     if(kind==='motif'&&!this.firstMotif)this.firstMotif={bar,pitches:[...item.pitches]};
@@ -47,13 +60,25 @@ export class VoiceJournal {
     this.recent.unshift(item);
     if(this.recent.length>28)this.recent.length=28;
   }
+  partnerReply({bar,partner,kind,pitch}){
+    if(!['Pip','Riff'].includes(partner))return;
+    this.partnerReplies[partner]++;
+    const reply={bar,partner,kind,pitch:Number.isFinite(pitch)?pitch:null};
+    if(!this.firstPartnerReply[partner])this.firstPartnerReply[partner]={...reply};
+    this.recentReplies.unshift(reply);
+    if(this.recentReplies.length>12)this.recentReplies.length=12;
+  }
   study({bar,title,skill}){
     this.studies.unshift({bar,title,skill});
     if(this.studies.length>12)this.studies.length=12;
   }
   snapshot(){return {
     attempts:this.attempts,notes:this.notes,phrases:this.phrases,experiments:this.experiments,
-    responses:this.responses,motifRepeats:this.motifRepeats,learnedVowels:{...this.learnedVowels},
+    responses:this.responses,motifRepeats:this.motifRepeats,sharedPhrases:this.sharedPhrases,
+    firstSharedPhrase:this.firstSharedPhrase?{...this.firstSharedPhrase}:null,
+    partnerReplies:{...this.partnerReplies},
+    firstPartnerReply:Object.fromEntries(['Pip','Riff'].map(n=>[n,this.firstPartnerReply[n]?{...this.firstPartnerReply[n]}:null])),
+    recentReplies:this.recentReplies.map(e=>({...e})),learnedVowels:{...this.learnedVowels},
     firstVowel:this.firstVowel?{...this.firstVowel}:null,
     firstPhrase:this.firstPhrase?{...this.firstPhrase,pitches:[...this.firstPhrase.pitches]}:null,
     firstMotif:this.firstMotif?{...this.firstMotif,pitches:[...this.firstMotif.pitches]}:null,
@@ -62,7 +87,10 @@ export class VoiceJournal {
   };}
   report(){return {
     notes:this.notes,attempts:this.attempts,phrases:this.phrases,experiments:this.experiments,
-    responses:this.responses,motifRepeats:this.motifRepeats,vowels:{...this.learnedVowels},
+    responses:this.responses,motifRepeats:this.motifRepeats,sharedPhrases:this.sharedPhrases,
+    firstSharedPhrase:this.firstSharedPhrase,partnerReplies:{...this.partnerReplies},
+    firstPartnerReply:{...this.firstPartnerReply},recentReplies:this.recentReplies.slice(0,5),
+    vowels:{...this.learnedVowels},
     firstVowel:this.firstVowel,firstPhrase:this.firstPhrase,firstMotif:this.firstMotif,
     firstResponse:this.firstResponse,studies:this.studies.slice(0,5),recent:this.recent.slice(0,5)
   };}
