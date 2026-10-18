@@ -27,13 +27,13 @@ function authorized(req){
 }
 const send=(res,code,obj)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...noCache});res.end(JSON.stringify(obj));};
 function snapshot(){return world?world.snapshot():null;}
-function packageState(includeEvents=false,since=0){
+function packageState(includeEvents=false,since=0,includeWorld=true){
  const now=Date.now();
  const list=includeEvents?events.filter(e=>e.seq>since).slice(-200):[];
  return {version:1,initialized:ready,serverNow:now,
   beat:nextBeat,seq:nextSeq-1,
   uptimeSeconds:Math.floor((now-bootAt)/1000),
-  world:ready?snapshot():null,
+  world:ready&&includeWorld?snapshot():null,
   events:list};
 }
 function capture(kind,args){
@@ -137,7 +137,11 @@ const app=createServer(async(req,res)=>{
   }
   if(req.method==='GET'&&(url.pathname==='/v1/state'||url.pathname==='/v1/poll')){
    const since=Math.max(0,Number(url.searchParams.get('since')||0)||0);
-   send(res,200,packageState(url.pathname==='/v1/poll',since));return;
+   const polling=url.pathname==='/v1/poll';
+   // Compact polls carry only newly scheduled notes. Old clients receive
+   // full snapshots unless they opt in to the small payload explicitly.
+   const fullWorld=!polling || url.searchParams.get('compact')!=='1' || url.searchParams.get('world')==='1';
+   send(res,200,packageState(polling,since,fullWorld));return;
   }
   if(req.method==='POST'&&url.pathname==='/v1/seed'){
    if(!authorized(req)){send(res,401,{error:'Pairing key required'});return;}
