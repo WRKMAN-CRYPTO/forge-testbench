@@ -790,8 +790,10 @@
      const useMaterial=!!texture;
      if(useMaterial)materialDrawn++;else if(state.art!=="soft")artFallback++;
      // Preserve native fire art and fade; small fragments remain legible.
-     const size=fireEmberFootprint(radius,elem,useMaterial,hero,state.fireEmbers);
-     if(elem===1&&useMaterial&&state.fireEmbers&&size>radius*3.2+.5)emberBoosted++;
+     // Drawn r was doubled by crafted-magic. Preserve a full 2× increase
+     // even for tiny fire, whose former Ember support includes a fixed 12px.
+     const size=2*fireEmberFootprint(radius*.5,elem,useMaterial,hero,state.fireEmbers);
+     if(elem===1&&useMaterial&&state.fireEmbers&&size>radius*3.2+1)emberBoosted++;
      // Phaser's material response uses nonlinear opacity, without an
      // artificial floor that would prevent a fading agent disappearing.
      const alpha=useMaterial?exposedAlpha(r.alpha??.65,elem):
