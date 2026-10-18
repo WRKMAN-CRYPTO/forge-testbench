@@ -100,13 +100,13 @@ class SoundEngine {
   schedule(){
     const ctx=this.context;
     if(!ctx || ctx.state!=='running')return;
+    // Skip old beats before scheduling after iOS audio interruptions.
+    if(this.nextTime<ctx.currentTime-.15)this.nextTime=ctx.currentTime+.08;
     let steps=0;
     while(this.nextTime<ctx.currentTime+.18 && steps++<32){
       this.onBeat(this.beat,this.nextTime);
       this.beat++;this.nextTime+=beatDur;
     }
-    // After tab suspension, resume from now rather than queueing an old hour's beats.
-    if(this.nextTime<ctx.currentTime-.15)this.nextTime=ctx.currentTime+.08;
   }
   tone(freq,time,duration,level,shape='triangle',pan=0){
     const ctx=this.context;if(!ctx)return;
@@ -656,7 +656,15 @@ function onScheduledBeat(beat,time){
   if(beat%4===0)refreshText();
 }
 async function startAudio(){
-  if(started)return;
+  if(started){
+    // Safari may suspend or interrupt audio during an orientation transition.
+    // The next user touch can re-enable it without resetting the musicians.
+    if(sound.context && sound.context.state!=='running'){
+      try{await sound.context.resume();startError='';}
+      catch(err){startError='Tap again to resume audio';refreshText();}
+    }
+    return;
+  }
   started=true;
   try{
     await sound.start(onScheduledBeat);
