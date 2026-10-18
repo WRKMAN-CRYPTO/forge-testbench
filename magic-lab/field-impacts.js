@@ -10,6 +10,9 @@
  'use strict';
  const CELL=96,KEY_ORIGIN=65536,KEY_SPAN=131072;
  const Runes=typeof globalThis==='object'?globalThis.WRKMAN_SWARM_RUNES:null;
+ const SIZE=typeof globalThis==='object'?globalThis.WRKMAN_AGENT_SIZING:null;
+ const doubledHitRadius=r=>SIZE?.hitRadius?SIZE.hitRadius(r):r*2;
+ const sizeSearchPad=hasRunes=>SIZE?.searchPadding?SIZE.searchPadding(hasRunes):(hasRunes?96:6);
  const Presence=typeof globalThis==='object'?globalThis.WRKMAN_SPELL_PRESENCE:null;
  const key=(x,y)=>(x+KEY_ORIGIN)*KEY_SPAN+(y+KEY_ORIGIN);
  // Relative movement catches both fast particles and moving targets.
@@ -50,7 +53,7 @@
   cast.impactFX=cast.impactFX.filter(f=>time-f.born<300);
   if(!Combat)return 0;
   const all=targets(scene,cast);
-  const maxPad=Runes&&cast.runeCount?48:3;
+  const maxPad=sizeSearchPad(!!(Runes&&cast.runeCount));
   if(!all.length)return 0;
   const grid=new Map();let gridMinX=Infinity,gridMinY=Infinity,gridMaxX=-Infinity,gridMaxY=-Infinity;
   for(const t of all){
@@ -94,7 +97,7 @@
      if(t.seen===stamp)continue;t.seen=stamp;
      if((a.phaseUntil||0)>time&&t.kind!=='enemy')continue;
      const hit=sweep(ax,ay,tx,ty,
-      t.from.x,t.from.y,t.to.x,t.to.y,t.r+(Runes?Runes.radius(a):3));
+      t.from.x,t.from.y,t.to.x,t.to.y,t.r+doubledHitRadius(Runes?Runes.radius(a):3));
      if(hit!==null&&hit<earliest){earliest=hit;first=t}
     }
    }
