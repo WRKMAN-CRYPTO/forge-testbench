@@ -68,21 +68,27 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
     ?riffNearby&&pipNearby?(Math.random()<.68?'Riff':'Pip'):riffNearby?'Riff':pipNearby?'Pip':null
     :riffNearby&&Math.random()<.36?'Riff':null;
   const root=response?nearestRoot(guitar.pitch):nearestRoot(singer.lastPitch);
-  const pitches=[];
+  const pitches=[],durations=[];
   const gap=phrased?(length>2?.55:.73):.44;
   const baseLength=length===1?.37+Math.random()*.42:phrased?.31+Math.random()*.16:.25;
   const firstAt=time+(present?(response==='Pip'?beatDur*.7:beatDur*.76):.13);
+  // A sustained vowel needs a deliberate breath and a real note-off.
+  // Murmur is free to keep phrases short, including after studying the book.
+  const willSustain=phrased&&Math.random()<(present?.58:.46);
+  const holdLength=willSustain?(.95+Math.random()*1.55):0;
   for(let i=0;i<length;i++){
     const pitch=clamp(root*semitone(steps[i]||0),155,660);
     pitches.push(pitch);
     const at=firstAt+i*gap;
-    const duration=i===length-1&&phrased?baseLength*1.38:baseLength;
+    const duration=willSustain&&i===length-1?holdLength:
+      i===length-1&&phrased?baseLength*1.38:baseLength;
+    durations.push(duration);
     const strength=(.115+Math.random()*.064)*(phrased?(i===0?.77:i===length-1?.86:1):1);
     const expression={
       vowel:vowel,
       glide:shaped?(Math.random()-.5)*1.45:0,
-      attack:phrased?.12:.075,
-      release:phrased?.16:.08
+      attack:willSustain&&i===length-1?.17:phrased?.12:.075,
+      release:willSustain&&i===length-1?.3:phrased?.16:.08
     };
     if(typeof audio.voice==='function')audio.voice(pitch,at,strength,duration,expression);
     space.sound('Murmur','voice',bar,strength*4,pitch);
@@ -93,9 +99,9 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   singer.notes+=pitches.length;
   if(!singer.firstSound)singer.firstSound={bar,heard:response||'the grove',pitch:pitches[0],attempt:singer.attempts};
   if(journal)journal.sound({
-    bar,pitches,vowel,
+    bar,pitches,durations,vowel,
     kind:useContour?'motif':length>1?'phrase':'hum',
     response,repeated,ensemble:present
   });
-  return {sang:true,ensemble:present,response,pitches,bar};
+  return {sang:true,ensemble:present,response,pitches,durations,bar};
 }
