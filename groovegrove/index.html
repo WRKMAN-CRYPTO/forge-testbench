@@ -1073,7 +1073,12 @@ function playLivingEvents(data,sentAtMs,receivedAtMs){
   liveConductor.receive(data,{
     context:sound.context,sentAtMs,receivedAtMs,
     play:(event,when)=>{
-      const v=event.volume;
+      // The person behind the camera hears nearby music more clearly.
+      // World hearing between musicians is independently decided on the server.
+      const d=Number.isFinite(event.x)&&Number.isFinite(event.y)
+        ?Math.hypot(event.x-camera.x,event.y-camera.y):0;
+      const gain=clamp(1-d/940,.035,1);
+      const v=event.volume*gain;
       if(event.kind==='guitar')sound.guitar(event.freq,when,v,Number(event.duration)||.3);
       else if(event.kind==='kick')sound.kick(when,v);
       else if(event.kind==='snare')sound.snare(when,v);
@@ -1086,7 +1091,7 @@ function playLivingEvents(data,sentAtMs,receivedAtMs){
       if(playedKeys.has(key))return;
       playedKeys.add(key);
       // Visible drum strikes and strums belong to the actual sound time.
-      pendingVisualNotes.push({name,at:when,beat:event.beat});
+      pendingVisualNotes.push({name,at:when,beat:event.beat,x:event.x,y:event.y});
       if(pendingVisualNotes.length>240)pendingVisualNotes.splice(0,pendingVisualNotes.length-240);
     }
   });
@@ -1100,7 +1105,7 @@ function flushLiveVisuals(){
     const note=pendingVisualNotes[i];
     if(note.at>now+.04){i++;continue;}
     pendingVisualNotes.splice(i,1);
-    if(note.at>=now-.18)emitVisualNote({agent:note.name,beat:note.beat});
+    if(note.at>=now-.18)emitVisualNote({agent:note.name,beat:note.beat,x:note.x,y:note.y});
   }
 }
 async function pollLivingServer(){
@@ -1118,6 +1123,7 @@ async function pollLivingServer(){
       lastRemoteWorldAt=0;
     }
     remoteSequence=data.seq;
+    if(data.locations)liveLocations=data.locations;
     serverLastBeat=data.beat||serverLastBeat;
     remoteOnline=true;serverMessage='';
     playLivingEvents(data,sendAt,receivedAt);
@@ -1164,36 +1170,30 @@ async function startAudio(force=false){
     audioStartPending=false;refreshText();
   }
 }
-let pressTimer=null,pressStart=null;
+// One-finger panning explores the continuous map. A deliberate camera control
+// returns to following a musician. No hidden long-press world reset.
 app.canvas.addEventListener('pointerdown',(ev)=>{
   const bounds=app.canvas.getBoundingClientRect();
   const lx=(ev.clientX-bounds.left)/scale,ly=(ev.clientY-bounds.top)/scale;
-  // Modal layers own gestures. Never let a long-press through a journal or
-  // delivery overlay reset the pond and erase the musicians' memories.
-  if(journalOpen || deliveryOpen)return;
-  // Audio repair executes synchronously from the same user gesture.
+  if(journalOpen||deliveryOpen)return;
   const button=ui.audioRect;
-  if(!deliveryOpen && button && lx>=button.x && lx<=button.x+button.w && ly>=button.y && ly<=button.y+button.h){
-    startAudio(true);
-    return;
-  }
+  if(button && lx>=button.x && lx<=button.x+button.w &&
+     ly>=button.y && ly<=button.y+button.h){startAudio(true);return;}
   startAudio(soundNeedsRefresh);
-  // Press-and-hold the painted pond, not a DOM control, to begin a fresh study.
-  const d=Math.hypot(lx-ui.pond.x,ly-ui.pond.y);
-  if(d<40){
-    pressStart=performance.now();
-    clearTimeout(pressTimer);
-    pressTimer=setTimeout(()=>{
-      if(!grove)return;
-      grove=new Grove(null,saveMemory);
-      grove.onNote=emitVisualNote;grove.onTalk=showSpeech;
-      saveMemory(grove.snapshot());
-      grove.push('A fresh study begins. The pond remembers nothing.');
-      refreshText();
-    },1800);
+  if(ly>(ui.cameraBand?.y||145)+48 && ly<(ui.panelY||H-280)-48){
+    camera.drag={pointerId:ev.pointerId,x:lx,y:ly,startX:camera.x,startY:camera.y,moved:false};
   }
 });
-['pointerup','pointercancel','pointerleave'].forEach(name=>app.canvas.addEventListener(name,()=>{clearTimeout(pressTimer);pressTimer=null;}));
+app.canvas.addEventListener('pointermove',(ev)=>{
+  const d=camera.drag;if(!d||d.pointerId!==ev.pointerId)return;
+  const bounds=app.canvas.getBoundingClientRect();
+  const x=(ev.clientX-bounds.left)/scale,y=(ev.clientY-bounds.top)/scale;
+  if(Math.hypot(x-d.x,y-d.y)>9)d.moved=true;
+  if(d.moved){camera.mode='free';camera.x=d.startX-(x-d.x);camera.y=d.startY-(y-d.y);}
+});
+['pointerup','pointercancel','pointerleave'].forEach(type=>app.canvas.addEventListener(type,()=>{
+  camera.drag=null;
+}));
 function checkpointAndRecover(){
   if(grove)saveMemory(grove.snapshot());
   // A WebKit AudioContext can remain 'running' but silent after a phone call.
@@ -1242,7 +1242,7 @@ app.ticker.add(()=>{
   if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
 });
 // Inspectable test hooks; not part of the rendered interface.
-window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get journal(){return grove.understanding.snapshot();},get server(){return {connected:remoteLive,online:remoteOnline,message:serverMessage,beat:serverLastBeat,sequence:remoteSequence,returnReport,url:serverBase,audioBuffer:liveConductor.stats};},journalReport(name){return grove.understanding.report(name==='Riff'?'Riff':'Pip');},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get audioError(){return startError;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove(null,saveMemory);grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
+window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get journal(){return grove.understanding.snapshot();},get server(){return {connected:remoteLive,online:remoteOnline,message:serverMessage,beat:serverLastBeat,sequence:remoteSequence,returnReport,url:serverBase,audioBuffer:liveConductor.stats};},journalReport(name){return grove.understanding.report(name==='Riff'?'Riff':'Pip');},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get audioError(){return startError;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},get camera(){return {...camera,drag:null};},get locations(){return liveLocations||grove.space?.snapshot()?.people;},restart(){grove=new Grove(null,saveMemory);grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
 </script>
 </body>
 </html>
