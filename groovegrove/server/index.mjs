@@ -33,14 +33,20 @@ function packageState(includeEvents=false,since=0,includeWorld=true){
  return {version:1,initialized:ready,serverNow:now,
   beat:nextBeat,seq:nextSeq-1,
   uptimeSeconds:Math.floor((now-bootAt)/1000),
+  locations:ready&&world.space?Object.fromEntries(['Pip','Riff','Murmur'].map(name=>{
+   const p=world.space.people[name];
+   return [name,{x:p.x,y:p.y,place:p.place,destination:p.destination,purpose:p.purpose,traveling:p.route.length>0}];
+  })):null,
   world:ready&&includeWorld?snapshot():null,
   events:list};
 }
 function capture(kind,args){
  const [a,b,c,d]=args;
  const time=(kind==='guitar'||kind==='voice')?b:a;
+ const source=kind==='voice'?'Murmur':kind==='guitar'?'Riff':'Pip';
+ const position=world.space?.people[source]||null;
  const ev={seq:nextSeq++,kind,atMs:Math.round(time*1000),
-  bar:world.bar,beat:world.beat};
+  bar:world.bar,beat:world.beat,x:position?Math.round(position.x):null,y:position?Math.round(position.y):null};
  if(kind==='guitar'||kind==='voice'){ev.freq=a;ev.volume=c;ev.duration=d;}
  else ev.volume=b;
  events.push(ev);if(events.length>420)events.shift();
