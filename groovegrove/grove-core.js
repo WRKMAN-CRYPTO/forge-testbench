@@ -1,5 +1,5 @@
 /* GrooveGrove shared simulation. Same classes in server + client. */
-import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261018-pass004';
+import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261018-voice';
 import {ListeningJournal} from './listening-journal.js';
 import {GroveWorld} from './grove-world.js?v=20261018-voice';
 import {VoiceJournal} from './voice-journal.js?v=20261018-voice';
