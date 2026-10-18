@@ -27,10 +27,21 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   }
   // A sound heard through real proximity may inspire a response, but
   // listening or wandering in silence remains equally legitimate.
-  const guitar=space.people.Murmur.lastHeardGuitar;
-  const riffNearby=guitar&&bar-guitar.bar<=3&&space.canHear('Murmur','Riff','guitar')>.14;
-  const inspired=!!riffNearby;
-  const desire=clamp(.17*singer.curiosity+(inspired?.05:0),0,.32);
+  const musician=space.people.Murmur;
+  const guitar=musician.lastHeardGuitar;
+  const drums=musician.lastHeardDrum;
+  const riffNearby=!!(guitar&&bar-guitar.bar<=3&&
+    space.canHear('Murmur','Riff','guitar')>.12);
+  const pipNearby=!!(drums&&bar-drums.bar<=3&&
+    space.canHear('Murmur','Pip',drums.kind)>.1);
+  const present=musician.ensembleIntent==='joining'&&!space.traveling('Murmur')&&
+    (riffNearby||pipNearby);
+  // An invitation changes willingness, never guarantees a performance.
+  // Away from the group, Murmur still enjoys solitary experimentation.
+  const bookIdeas=['vowelShapes','breathPhrasing','melodicContours']
+    .reduce((sum,skill)=>sum+(library.has('Murmur',skill)?1:0),0);
+  const desire=clamp(.19*singer.curiosity+.012*bookIdeas+
+    (present?.28:riffNearby||pipNearby?.045:0),0,.62);
   if(Math.random()>=desire){singer.rests++;return false;}
   const shaped=library.has('Murmur','vowelShapes');
   const phrased=library.has('Murmur','breathPhrasing');
@@ -51,12 +62,16 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   }else if(length>1){
     steps=length===2?[0,select([-2,2,3])]:[0,select([-2,2]),select([-3,0,3])];
   }
-  const response=riffNearby && Math.random()<.62?'Riff':null;
+  // An answer requires a note Murmur really heard. Drums inspire rhythm;
+  // guitar notes supply harmonic pitch reference.
+  const response=present&&Math.random()<.83
+    ?riffNearby&&pipNearby?(Math.random()<.68?'Riff':'Pip'):riffNearby?'Riff':pipNearby?'Pip':null
+    :riffNearby&&Math.random()<.36?'Riff':null;
   const root=response?nearestRoot(guitar.pitch):nearestRoot(singer.lastPitch);
   const pitches=[];
   const gap=phrased?(length>2?.55:.73):.44;
   const baseLength=length===1?.37+Math.random()*.42:phrased?.31+Math.random()*.16:.25;
-  const firstAt=time+.13;
+  const firstAt=time+(present?(response==='Pip'?beatDur*.7:beatDur*.76):.13);
   for(let i=0;i<length;i++){
     const pitch=clamp(root*semitone(steps[i]||0),155,660);
     pitches.push(pitch);
@@ -80,7 +95,7 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   if(journal)journal.sound({
     bar,pitches,vowel,
     kind:useContour?'motif':length>1?'phrase':'hum',
-    response,repeated
+    response,repeated,ensemble:present
   });
-  return true;
+  return {sang:true,ensemble:present,response,pitches,bar};
 }
