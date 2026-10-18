@@ -56,6 +56,11 @@
       <section id="toolsPane" class="mode-pane tools-pane" aria-label="Project tools" aria-hidden="true">
         <div class="panel-head chrome"><strong>PROJECT TOOLS</strong><span>LOCAL PROJECT</span></div>
         <div class="tools-content">
+          <label class="import-file-button touch-target">
+            <span>↑ IMPORT HTML FILE</span>
+            <input id="importHtmlFile" type="file" accept=".html,.htm,text/html" aria-label="Import HTML file from this device">
+          </label>
+          <p class="hint">Open a .html or .htm file from Files. Imports replace the current project and preserve complete HTML pages, including inline scripts and styles. Download or copy anything you want to keep first.</p>
           <button id="resetProject" class="danger-soft touch-target" type="button">RESET STARTER PROJECT</button>
           <p>Source autosaves on this device. Run executes the current HTML, CSS, and JavaScript inside an isolated preview.</p>
           <p class="hint">Tap HTML, CSS, or JS above to return to code.</p>
