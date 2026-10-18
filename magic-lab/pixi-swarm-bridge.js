@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="091-water-lab",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="091b-water-motion-smear",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -92,6 +92,7 @@
   const FIRE_GROUP_FLAMES=win.WRKMAN_FIRE_GROUP_FLAMES||null;
   const FIRE_GROUP_FLOW=win.WRKMAN_FIRE_GROUP_FLOW||null;
   const WATER_VFX=win.WRKMAN_WATER_VFX||null;
+  const waterMotionTracker=WATER_VFX?.makeMotionTracker?WATER_VFX.makeMotionTracker():null;
   const fireMotionTracker=FIRE_MOTION?.makeTracker?FIRE_MOTION.makeTracker():null;
   const fireTracker=FIRE_STABILITY?.makeTracker?FIRE_STABILITY.makeTracker({
    maxSlots:3,fadeMs:180,heatHoldMs:110,heatFadeMs:190}):null;
@@ -126,6 +127,8 @@
    waterDrops:opts.waterDrops!==false&&!!WATER_VFX?.makeDropTexture,
    waterStreams:opts.waterStreams!==false&&!!WATER_VFX?.collectStreams,
    waterDropsDrawn:0,waterStreamsDrawn:0,
+   waterMotion:opts.waterMotion!==false&&!!waterMotionTracker,
+   waterSmearsDrawn:0,
    fireStableSlots:0,fireStableGhosts:0,fireStableFading:0,
    fireStableSwaps:0,fireStableHeldHot:0,fireStableCached:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
@@ -220,6 +223,14 @@
    announce("FIRE CLUSTERS · "+(state.fireDebug?"DEBUG ON":"OFF"));
    return state.fireDebug;
   }
+  function setWaterMotion(enabled){
+   state.waterMotion=!!enabled&&!!waterMotionTracker;
+   waterMotionTracker?.reset();
+   state.waterSmearsDrawn=0;
+   if(!state.waterMotion&&!state.waterStreams)waterGraphics?.clear();
+   announce("WATER MOTION · "+(state.waterMotion?"ON":"OFF"));
+   return state.waterMotion;
+  }
   function setWaterDrops(enabled){
    state.waterDrops=!!enabled&&waterTextures.length===3&&waterTextures.every(Boolean);
    announce("WATER DROPS · "+(state.waterDrops?"ON":"OFF"));
@@ -227,7 +238,7 @@
   }
   function setWaterStreams(enabled){
    state.waterStreams=!!enabled&&!!WATER_VFX?.collectStreams;
-   if(!state.waterStreams){waterGraphics?.clear();state.waterStreamsDrawn=0;}
+   if(!state.waterStreams){if(!state.waterMotion)waterGraphics?.clear();state.waterStreamsDrawn=0;}
    announce("WATER STREAMS · "+(state.waterStreams?"ON":"OFF"));
    return state.waterStreams;
   }
@@ -487,15 +498,21 @@
     setFireShell(false);setFireBody(false);setFireHot(false);setFireGroupFlames(false);
    }
   }
-  function paintWaterStreams(){
-   waterGraphics?.clear();state.waterStreamsDrawn=0;
-   if(!state.waterStreams||!waterGraphics||!WATER_VFX?.collectStreams)return;
-   try{
-    const streams=WATER_VFX.collectStreams(state.records,{maxStreams:64});
-    state.waterStreamsDrawn=WATER_VFX.drawStreams(waterGraphics,streams);
-   }catch(error){
-    console.warn("Optional water streams unavailable",error);
-    setWaterStreams(false);
+  function paintWaterStreams(motionSamples){
+   waterGraphics?.clear();
+   state.waterStreamsDrawn=state.waterSmearsDrawn=0;
+   if(!waterGraphics)return;
+   if(state.waterStreams&&WATER_VFX?.collectStreams){
+    try{
+     const streams=WATER_VFX.collectStreams(state.records,{maxStreams:64});
+     state.waterStreamsDrawn=WATER_VFX.drawStreams(waterGraphics,streams);
+    }catch(error){console.warn("Optional water streams unavailable",error);setWaterStreams(false);}
+   }
+   if(state.waterMotion&&WATER_VFX?.collectSmears){
+    try{
+     const smears=WATER_VFX.collectSmears(motionSamples,{maxSmears:72});
+     state.waterSmearsDrawn=WATER_VFX.drawSmears(waterGraphics,smears);
+    }catch(error){console.warn("Optional water motion unavailable",error);setWaterMotion(false);}
    }
   }
   function paintFireEffects(){
@@ -735,7 +752,8 @@
    state.fireMotionAligned=state.fireMotionDense=0;
    fireMotionTracker?.reset();
    state.fireGroupTongues=state.fireGroupTongueGroups=0;
-   state.waterDropsDrawn=state.waterStreamsDrawn=0;
+   state.waterDropsDrawn=state.waterStreamsDrawn=state.waterSmearsDrawn=0;
+   waterMotionTracker?.reset();
    if(app?.canvas)app.canvas.style.display="none";
    shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();fireHotGraphics?.clear();fireGroupGraphics?.clear();waterGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireHotFills=state.fireHotGlows=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
@@ -758,6 +776,8 @@
     for(const group of bulkGroups.values())group.used=0;
     let detailed=0,bulk=0,materialDrawn=0,artFallback=0,emberBoosted=0,flamesDrawn=0;
     let motionAligned=0,motionDense=0,waterDropsDrawn=0;
+    const waterSamples=[];
+    if(state.waterMotion&&waterMotionTracker)waterMotionTracker.beginFrame();
     const neighborCounts=state.fireMotion&&state.fireFlames?
      FIRE_MOTION.countNearbyFire(state.records):null;
     if(neighborCounts)fireMotionTracker.beginFrame();
@@ -790,7 +810,10 @@
       rotation:moving.rotation
      }:idlePose;
      const water=elem===2&&useMaterial&&state.waterDrops&&!!waterTextures[variant];
-     const waterPose=water?WATER_VFX.dropPose(r,size):null;
+     const waterMotion=elem===2&&state.waterMotion&&waterMotionTracker?
+      waterMotionTracker.sample(r):null;
+     if(waterMotion&&r.alpha>.035)waterSamples.push({record:r,motion:waterMotion});
+     const waterPose=water?WATER_VFX.dropPose(r,size,waterMotion):null;
      if(water)waterDropsDrawn++;
      if(flame)flamesDrawn++;
      if(moving?.aligned)motionAligned++;
@@ -822,7 +845,7 @@
     }
     // Never edits trajectory, collision, position or count: this is a
     // purely visual geometric interpretation of already-computed records.
-    paintFormations();paintAccents();paintWaterStreams();paintFireEffects();
+    paintFormations();paintAccents();paintWaterStreams(waterSamples);paintFireEffects();
     state.materialDrawn=materialDrawn;state.artFallback=artFallback;
     state.fireEmberBoosted=emberBoosted;state.fireFlamesDrawn=flamesDrawn;
     state.fireMotionAligned=motionAligned;state.fireMotionDense=motionDense;
@@ -839,7 +862,7 @@
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
    app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;fireGroupGraphics=null;waterGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();flameTextures=[];waterTextures=[];state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setFireMotion,setFireGroupFlames,setFireGroupStyle,setWaterDrops,setWaterStreams,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setFireMotion,setFireGroupFlames,setFireGroupStyle,setWaterDrops,setWaterStreams,setWaterMotion,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,fireEmberFootprint,createBridge});
 });
