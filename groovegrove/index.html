@@ -638,7 +638,7 @@ function refreshText(){
   if(!ui.modeLabel)return;
   const mode=grove?.mode||'solo';
   ui.modeLabel.text=remoteLive?(remoteOnline?'LIVE · THE GROVE IS HOME':'SERVER RECONNECTING'):(grove?.library.anyBusy()?'READING IN THE GROVE':mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES');
-  ui.statusLine.text=startError?startError:!started?(grove?.library.anyBusy()?'Tap the clearing to continue the interrupted reading':'Tap the clearing to hear their first notes'):soundNeedsRefresh?'Audio route may be muted · tap ↻ AUDIO to reconnect':(sound.context && sound.context.state!=='running'?'Audio paused · tap ↻ AUDIO to reconnect':grove.highlight);
+  ui.statusLine.text=serverMessage&&!remoteLive?serverMessage:startError?startError:!started?(grove?.library.anyBusy()?'Tap the clearing to continue the interrupted reading':'Tap the clearing to hear their first notes'):soundNeedsRefresh?'Audio route may be muted · tap ↻ AUDIO to reconnect':(sound.context && sound.context.state!=='running'?'Audio paused · tap ↻ AUDIO to reconnect':grove.highlight);
   if(grove){
     const error=grove.baseline();
     ui.pipMetric.text='PIP   '+(error==null?'collecting timing...':fmt(error)+' RMS drift');
@@ -817,8 +817,18 @@ async function attachLivingServer(){
   try{
     let status=await serverRequest('/v1/state');
     if(!status.initialized && serverKey){
-      // One-time transfer only. The book collection and both journals on this
-      // iPhone become the seed of the server's permanent world.
+      // Browser profiles do not share localStorage. Never accidentally seed a
+      // blank Grove from an in-app browser rather than the player's original.
+      const known=(grove.library.known.Pip?.length||0)+(grove.library.known.Riff?.length||0);
+      const heard=(grove.understanding.report('Pip').observations||0)+(grove.understanding.report('Riff').observations||0);
+      if(!grove.library.books.length || (!known && !heard && !grove.familiarity)){
+        serverMessage='PAIRING PAUSED · Open your private link in the SAME browser where Pip and Riff learned their books.';
+        grove.push('Memory transfer needs the original browser with their library and journals.');
+        refreshText();
+        return;
+      }
+      // One-time transfer only. Actual books and music journals become the
+      // server's authoritative world. No factory reset or replacement.
       await serverRequest('/v1/seed',{method:'POST',body:{world:grove.snapshot()},privateAction:true});
       status=await serverRequest('/v1/state');
     }
