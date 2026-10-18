@@ -269,7 +269,14 @@ export class Grove {
     this.modeBars++;
     if(this.mode==='solo')this.considerNewActivity(before);
     else if(this.mode==='lesson'){
-      const clearProgress=this.modeBars>=3 && (before<36||this.modeBars>=7);
+      const together=this.space.distance('Pip','Riff')<260 &&
+        !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.anyBusy();
+      if(!together){
+        // Leaving is allowed: no credits for a lesson nobody heard.
+        this.mode='solo';this.modeBars=0;
+        this.push('The lesson pauses. Each musician follows their own direction.');
+      }
+      const clearProgress=together&&this.modeBars>=3 && (before<36||this.modeBars>=7);
       if(clearProgress){
         this.lessons++;this.familiarity++;
         this.pip.remember('Riff demonstrated a steady pulse.');
@@ -279,7 +286,12 @@ export class Grove {
         this.pip.currentGoal='trying new patterns';this.riff.currentGoal='looking for a new idea';
       }
     }else if(this.mode==='jam'){
-      if(this.modeBars>=6 && Math.random()<.46){
+      const together=this.space.distance('Pip','Riff')<260 &&
+        !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.anyBusy();
+      if(!together){
+        this.mode='solo';this.modeBars=0;
+        this.push('The jam falls quiet as the musicians move apart.');
+      }else if(this.modeBars>=6 && Math.random()<.46){
         this.jams++;this.familiarity++;
         this.exchange(this.riff,this.pip,'That groove was worth remembering.');
         this.pip.remember('Shared a jam with Riff; familiar grooves feel easier.');
