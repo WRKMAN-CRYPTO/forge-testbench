@@ -11,24 +11,27 @@ export const LIBRARY_CATALOG=Object.freeze({
   'walking-bassline':Object.freeze({id:'walking-bassline',title:'The Walking Bassline',subtitle:'Connecting chord roots',color:0xe7bc7e,skill:'walkingBass',topic:'harmony',reader:'Riff',readBars:5}),
   'art-of-silence':Object.freeze({id:'art-of-silence',title:'The Art of Silence',subtitle:'Leaving deliberate space',color:0xb4b7e9,skill:'deliberateSpace',topic:'theory',reader:null,readBars:4}),
   'syncopation-station':Object.freeze({id:'syncopation-station',title:'Syncopation Station',subtitle:'Offbeat rhythmic phrasing',color:0xe8a0a0,skill:'syncopation',topic:'rhythm',reader:null,readBars:6}),
-  'listening-musician':Object.freeze({id:'listening-musician',title:'The Listening Musician',subtitle:'Answering a partner’s phrase',color:0xa8d9f0,skill:'partnerListening',topic:'theory',reader:null,readBars:6})
+  'listening-musician':Object.freeze({id:'listening-musician',title:'The Listening Musician',subtitle:'Answering a partner’s phrase',color:0xa8d9f0,skill:'partnerListening',topic:'theory',reader:null,readBars:6}),
+  'shape-of-sound':Object.freeze({id:'shape-of-sound',title:'The Shape of Sound',subtitle:'Vowels and resonance',color:0xe4b7d7,skill:'vowelShapes',topic:'voice',reader:'Murmur',readBars:5}),
+  'breath-between-notes':Object.freeze({id:'breath-between-notes',title:'The Breath Between Notes',subtitle:'Breathing and phrasing',color:0xb2d9e1,skill:'breathPhrasing',topic:'voice',reader:'Murmur',readBars:5}),
+  'melodies-without-words':Object.freeze({id:'melodies-without-words',title:'Melodies Without Words',subtitle:'Motifs and melodic contours',color:0xeecda0,skill:'melodicContours',topic:'voice',reader:'Murmur',readBars:7})
 });
 export const BOOK_IDS=Object.keys(LIBRARY_CATALOG);
-export const SHELF_CAPACITY=12;
-const AGENTS=['Pip','Riff'];
+export const SHELF_CAPACITY=15;
+const AGENTS=['Pip','Riff','Murmur'];
 const safeNumber=(value,fallback=0)=>Number.isFinite(value)?value:fallback;
 
 export class MusicLibrary{
   constructor(saved=null){
     this.books=[];
-    this.known={Pip:[],Riff:[]};
-    this.activity={Pip:null,Riff:null};
+    this.known={Pip:[],Riff:[],Murmur:[]};
+    this.activity={Pip:null,Riff:null,Murmur:null};
     this.history=[];
     this.nextCopy=1;
     if(saved && typeof saved==='object')this.restore(saved);
   }
   restore(saved){
-    this.known={Pip:[],Riff:[]};
+    this.known={Pip:[],Riff:[],Murmur:[]};
     for(const name of AGENTS){
       if(Array.isArray(saved.known?.[name])){
         this.known[name]=[...new Set(saved.known[name].filter(s=>BOOK_IDS.some(id=>LIBRARY_CATALOG[id].skill===s)))];
