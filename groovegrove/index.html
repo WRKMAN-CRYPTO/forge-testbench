@@ -560,51 +560,70 @@ function makeLibraryNook(world){
 function makeDeliveryTray(world){
   const layer=new Container();world.addChild(layer);
   ui.deliveryTray=layer;
-  const dimmer=new Graphics();rect(dimmer,0,0,W,H,0,0x041518,.81);
+  const dimmer=new Graphics();rect(dimmer,0,0,W,H,0,0x041518,.83);
   dimmer.eventMode='static';dimmer.hitArea=new Rectangle(0,0,W,H);
   dimmer.on('pointertap',()=>{deliveryOpen=false;refreshText();});
   layer.addChild(dimmer);
-  const wide=landscape;
-  const bw=wide?Math.min(W-90,720):Math.min(W-24,402);
-  const bh=wide?522:580;
-  const x=(W-bw)/2,y=Math.max(18,(H-bh)/2);
+  const wide=landscape,bw=wide?Math.min(W-90,720):Math.min(W-24,402);
+  const bh=wide?580:605;
+  const x=(W-bw)/2,y=Math.max(14,(H-bh)/2);
   const backing=new Graphics();layer.addChild(backing);
   rect(backing,x,y,bw,bh,16,0x10302d);
-  backing.roundRect(x,y,bw,bh,16).stroke({color:PALETTE.gold,width:2,alpha:.7});
-  textAt(layer,'BOOK DELIVERY',x+19,y+15,wide?21:18,PALETTE.cream,'bold',1.3);
-  textAt(layer,'Eight books · two shelves · one copy of each',x+19,y+49,wide?13:11,PALETTE.mint);
-  ui.deliveryBookLabels={};
-  const cols=2,gap=12,margin=18,cw=(bw-margin*2-gap)/cols;
-  const rowH=wide?102:112,ch=wide?94:102,top=wide?83:88;
-  BOOK_IDS.forEach((id,i)=>{
-    const def=LIBRARY_CATALOG[id];
-    const col=i%cols,row=Math.floor(i/cols);
-    const cx=x+margin+col*(cw+gap),cy=y+top+row*rowH;
-    const cover=new Graphics();layer.addChild(cover);
-    rect(cover,cx,cy,cw,ch,9,0x21443b);
-    cover.roundRect(cx,cy,cw,ch,9).stroke({color:0x54705f,width:1,alpha:.75});
-    rect(cover,cx+9,cy+10,29,ch-20,4,def.color,.94);
-    line(cover,cx+16,cy+15,cx+16,cy+ch-16,0x193e37,2,.6);
-    circle(cover,cx+23,cy+ch*.5,6,0x163632,.75);
-    const tx=cx+46,tw=cw-55;
-    textAt(layer,i<3?'SHELF I':'SHELF II',cx+cw-8,cy+6,8,PALETTE.gold,'bold',.45,1);
-    const title=textAt(layer,def.title,tx,cy+20,wide?14:12,PALETTE.cream,'bold');
-    title.style.wordWrap=true;title.style.wordWrapWidth=tw;
-    const subtitle=textAt(layer,def.subtitle,tx,cy+64,wide?11:10,PALETTE.muted);
-    subtitle.style.wordWrap=true;subtitle.style.wordWrapWidth=tw;
-    cover.eventMode='static';cover.cursor='pointer';cover.hitArea=new Rectangle(cx,cy,cw,ch);
-    cover.on('pointertap',()=>{
-      if(remoteLive)deliverRemoteBook(id);
-      else{
-        const outcome=grove.library.donate(id);
-        grove.push(outcome.ok?'A copy of '+def.title+' arrives on the shelf.':outcome.reason);
-        if(outcome.ok)saveMemory(grove.snapshot());
-      }
-      deliveryOpen=false;refreshText();
+  backing.roundRect(x,y,bw,bh,16).stroke({color:PALETTE.gold,width:2,alpha:.72});
+  textAt(layer,'BOOK DELIVERY',x+18,y+15,wide?22:19,PALETTE.cream,'bold',1.5);
+  textAt(layer,'Every book is a physical copy. Reading is always a choice.',x+18,y+47,wide?13:10,PALETTE.mint);
+  ui.deliveryBookLabels={};ui.deliveryPages={};ui.deliveryTabCaptions={};
+  const sets=[
+    {id:'instruments',label:'THE MUSIC SHELVES',ids:BOOK_IDS.filter(id=>LIBRARY_CATALOG[id].topic!=='voice')},
+    {id:'voice',label:'VOICE COLLECTION',ids:BOOK_IDS.filter(id=>LIBRARY_CATALOG[id].topic==='voice')}
+  ];
+  const tabW=(bw-48)/2,tabY=y+79;
+  sets.forEach((set,index)=>{
+    const tx=x+18+index*(tabW+12),tab=new Graphics();layer.addChild(tab);
+    rect(tab,tx,tabY,tabW,36,11,index===1?0x4d4251:0x214a40,.9);
+    tab.roundRect(tx,tabY,tabW,36,11).stroke({color:PALETTE.gold,width:1,alpha:.53});
+    tab.eventMode='static';tab.cursor='pointer';tab.hitArea=new Rectangle(tx,tabY,tabW,36);
+    tab.on('pointertap',()=>{deliveryCategory=set.id;refreshText();});
+    const label=textAt(layer,set.label,tx+tabW/2,tabY+11,wide?12:10,PALETTE.cream,'bold',.25,.5);
+    ui.deliveryTabCaptions[set.id]={tab,label};
+    const page=new Container();layer.addChild(page);
+    ui.deliveryPages[set.id]=page;
+    const gap=11,margin=18,cols=2,cw=(bw-margin*2-gap)/cols;
+    const top=y+135,rowH=wide?98:106,ch=wide?90:96;
+    set.ids.forEach((id,i)=>{
+      const def=LIBRARY_CATALOG[id],col=i%cols,row=Math.floor(i/cols);
+      const cx=x+margin+col*(cw+gap),cy=top+row*rowH;
+      const cover=new Graphics();page.addChild(cover);
+      rect(cover,cx,cy,cw,ch,9,0x21443b);
+      cover.roundRect(cx,cy,cw,ch,9).stroke({color:0x54705f,width:1,alpha:.78});
+      rect(cover,cx+9,cy+10,29,ch-20,4,def.color,.94);
+      line(cover,cx+16,cy+15,cx+16,cy+ch-16,0x193e37,2,.6);
+      circle(cover,cx+23,cy+ch*.5,6,0x163632,.75);
+      const tx=cx+46,tw=cw-55;
+      textAt(page,set.id==='voice'?'MURMUR':'MUSIC',cx+cw-8,cy+6,8,PALETTE.gold,'bold',.45,1);
+      const title=textAt(page,def.title,tx,cy+20,wide?14:12,PALETTE.cream,'bold');
+      title.style.wordWrap=true;title.style.wordWrapWidth=tw;
+      const subtitle=textAt(page,def.subtitle,tx,cy+64,wide?11:10,PALETTE.muted);
+      subtitle.style.wordWrap=true;subtitle.style.wordWrapWidth=tw;
+      cover.eventMode='static';cover.cursor='pointer';cover.hitArea=new Rectangle(cx,cy,cw,ch);
+      cover.on('pointertap',()=>{
+        if(remoteLive)deliverRemoteBook(id);
+        else{
+          const outcome=grove.library.donate(id);
+          grove.push(outcome.ok?'A copy of '+def.title+' arrives in the library.':outcome.reason);
+          if(outcome.ok)saveMemory(grove.snapshot());
+        }
+        deliveryOpen=false;refreshText();
+      });
+      ui.deliveryBookLabels[id]=textAt(page,'ON SHELF',cx+cw-8,cy+ch-15,wide?10:9,PALETTE.gold,'bold',.45,1);
     });
-    ui.deliveryBookLabels[id]=textAt(layer,'ON SHELF',cx+cw-8,cy+ch-15,wide?10:9,PALETTE.gold,'bold',.45,1);
+    if(set.id==='voice'){
+      const note=textAt(page,'Vowels · breath · melodies, all without words.\nBooks offer ideas; they never require Murmur to sing.',
+        x+22,y+381,wide?15:12,PALETTE.mint);
+      note.style.wordWrap=true;note.style.wordWrapWidth=bw-44;
+    }
   });
-  textAt(layer,'Tap outside the case to return to the music',x+bw/2,y+bh-24,wide?12:10,PALETTE.gold,'normal',0,.5);
+  textAt(layer,'Tap outside to return to the woodland',x+bw/2,y+bh-26,wide?12:11,PALETTE.gold,'normal',0,.5);
   layer.visible=deliveryOpen;
 }
 function moveReaders(){
@@ -909,6 +928,12 @@ function refreshText(){
     camera.mode==='place'?'VIEWING '+PLACES[camera.target].label+' · SWIPE TO EXPLORE':
     'FOLLOWING '+camera.target.toUpperCase()+' · SWIPE TO EXPLORE';
   if(ui.deliveryTray)ui.deliveryTray.visible=deliveryOpen && !journalOpen;
+  for(const [category,page] of Object.entries(ui.deliveryPages||{}))
+    page.visible=category===deliveryCategory;
+  for(const [category,tab] of Object.entries(ui.deliveryTabCaptions||{})){
+    tab.label.alpha=category===deliveryCategory?1:.64;
+    tab.tab.alpha=category===deliveryCategory?1:.67;
+  }
   if(ui.journalOverlay)ui.journalOverlay.visible=journalOpen;
   if(ui.journalHeading && grove){
     const report=grove.understanding.report(journalName);
