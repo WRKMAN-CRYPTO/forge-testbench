@@ -128,6 +128,7 @@ class SoundEngine {
     }
     if(ctx!==this.context)return;
     if(ctx.state!=='running')throw new Error('Audio is '+ctx.state+'. Tap AUDIO to reconnect.');
+    if(passive && this.timer){clearInterval(this.timer);this.timer=null;}
     if(!passive && !this.timer){
       this.nextTime=ctx.currentTime+.12;
       this.timer=setInterval(()=>this.schedule(),23);
