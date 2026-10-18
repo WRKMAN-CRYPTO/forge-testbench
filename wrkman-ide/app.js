@@ -114,6 +114,7 @@
     clearConsole: document.querySelector('#clearConsole'),
     toolsBtn: document.querySelector('#toolsBtn'),
     resetProject: document.querySelector('#resetProject'),
+    importHtmlFile: document.querySelector('#importHtmlFile'),
     toast: document.querySelector('#toast'),
     fileTabs: [...document.querySelectorAll('[data-file]')]
   };
@@ -165,6 +166,26 @@
       case 'CLEAR_CONSOLE':
         state.ui.logs = [];
         state.ui.errorCount = 0;
+        break;
+      case 'IMPORT_HTML':
+        state.durable = {
+          version: SCHEMA_VERSION,
+          revision: state.durable.revision + 1,
+          activeFile: 'html',
+          importedName: event.payload.name,
+          files: { html: event.payload.html, css: '', js: '' }
+        };
+        state.ui.mode = 'code';
+        state.ui.editorFocused = false;
+        els.editor.blur();
+        state.ui.undo = emptyHistory();
+        state.ui.redo = emptyHistory();
+        state.ui.logs = [];
+        state.ui.errorCount = 0;
+        state.ui.selectionRequest = null;
+        persistCurrentState();
+        prepareRun(true);
+        setToast('Imported ' + event.payload.name);
         break;
       case 'RESET':
         state.durable = starter();
@@ -379,6 +400,24 @@
   function buildPreviewDocument() {
     const { html, css, js } = state.durable.files;
     const safeJs = js.replace(/<\/script/gi, '<\\/script');
+    // Complete HTML documents are already valid pages; do not nest them in a new <body>.
+    if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(html)) {
+      const bridge = '<script>(function(){var send=function(level,msg){parent.postMessage({source:"wrkman-preview",level:level,message:String(msg)},"*")};["log","info","warn","error"].forEach(function(level){var original=console[level];console[level]=function(){send(level==="error"?"error":"info",Array.from(arguments).map(function(item){try{return typeof item==="string"?item:JSON.stringify(item)}catch(e){return String(item)}}).join(" "));original.apply(console,arguments)}});window.addEventListener("error",function(e){send("error",e.message)});window.addEventListener("unhandledrejection",function(e){send("error",e.reason&&e.reason.message||e.reason)})})();</script>';
+      const injectedHead = (css.trim() ? '<style>' + css.replace(/<\/style/gi, '<\\/style') + '</style>' : '') + bridge;
+      let documentHTML = html;
+      if (/<head\b[^>]*>/i.test(documentHTML)) {
+        documentHTML = documentHTML.replace(/<head\b[^>]*>/i, opening => opening + injectedHead);
+      } else if (/<html\b[^>]*>/i.test(documentHTML)) {
+        documentHTML = documentHTML.replace(/<html\b[^>]*>/i, opening => opening + '<head>' + injectedHead + '</head>');
+      } else {
+        documentHTML = injectedHead + documentHTML;
+      }
+      const appendedJS = js.trim() ? '<script>' + safeJs + '</script>' : '';
+      return /<\/body\s*>/i.test(documentHTML)
+        ? documentHTML.replace(/<\/body\s*>/i, appendedJS + '</body>')
+        : documentHTML + appendedJS;
+    }
+
     return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body>${html}<script>
       (() => {
         const send = (level, parts) => parent.postMessage({source:'wrkman-preview', level, message:parts.map(part => {
@@ -453,7 +492,7 @@
     const active = state.durable.activeFile;
     const source = state.durable.files[active];
     if (els.editor.value !== source && document.activeElement !== els.editor) els.editor.value = source;
-    els.fileName.textContent = FILE_META[active].name;
+    els.fileName.textContent = active === 'html' && state.durable.importedName ? state.durable.importedName : FILE_META[active].name;
     const lines = source.split('\n').length;
     els.lineCount.textContent = `${lines} ${lines === 1 ? 'LINE' : 'LINES'}`;
     els.saveStatus.textContent = state.ui.saveStatus;
@@ -535,6 +574,33 @@
     els.consoleBtn.addEventListener('click', () => enqueue('SET_MODE', { mode: 'console' }));
     els.clearConsole.addEventListener('click', () => enqueue('CLEAR_CONSOLE'));
     els.toolsBtn.addEventListener('click', () => enqueue('SET_MODE', { mode: 'tools' }));
+
+    els.importHtmlFile.addEventListener('change', async event => {
+      const picker = event.currentTarget;
+      const file = picker.files && picker.files[0];
+      picker.value = '';
+      if (!file) return;
+      if (!/\.html?$/i.test(file.name) && file.type !== 'text/html') {
+        setToast('Choose an HTML file');
+        render();
+        return;
+      }
+      if (file.size > 1800000) {
+        setToast('HTML file is too large (1.8 MB max)');
+        render();
+        return;
+      }
+      try {
+        const source = await file.text();
+        if (!source.trim()) throw new Error('Selected file is empty');
+        if (!confirm('Import ' + file.name + '? This replaces the current HTML, CSS, and JavaScript project.')) return;
+        enqueue('IMPORT_HTML', { html: source.replace(/^\uFEFF/, ''), name: file.name.slice(0, 120) });
+      } catch (error) {
+        appendLog('error', 'Import failed: ' + error.message);
+        setToast('Could not import file');
+        render();
+      }
+    });
     els.resetProject.addEventListener('click', () => {
       if (confirm('Reset all three files to the WRKMAN starter project?')) enqueue('RESET');
     });
