@@ -2,8 +2,8 @@
 import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261018-voice';
 import {ListeningJournal} from './listening-journal.js';
 import {GroveWorld} from './grove-world.js?v=20261018-ensemble';
-import {VoiceJournal} from './voice-journal.js?v=20261018-ensemble';
-import {tryVocalPhrase} from './voice-music.js?v=20261018-ensemble';
+import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
+import {tryVocalPhrase} from './voice-music.js?v=20261018-sustain';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const rand=(a,b)=>a+(b-a)*Math.random();
