@@ -1004,7 +1004,7 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./pixi-fire-clusters.js?v=085b"></script>
 <script src="./pixi-fire-perimeter.js?v=085fix2"></script>
 <script src="./pixi-fire-stability.js?v=085fix2"></script>
-<script src="./pixi-swarm-bridge.js?v=085fix2"></script>
+<script src="./pixi-swarm-bridge.js?v=086embers"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1835,7 +1835,7 @@ class Lab extends Phaser.Scene{
     if((this.pixiStatusTick=(this.pixiStatusTick||0)+1)%12===0){
      const p=this.pixiSpellRenderer;
      $("pixiFlowStatus").textContent=p?.active?
-      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS / "+(p.fireEmbers?p.fireEmberBoosted+" EMBERS":"EMBERS OFF")+"):"PHASER";
+      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS / "+(p.fireEmbers?p.fireEmberBoosted+" EMBERS":"EMBERS OFF")):"PHASER";
      $("fireClusterStatus").textContent=p?.active&&p.fireDebug?
       (p.fireGroups+" GROUPS / "+p.fireLargest+" MAX / "+p.fireSingles+" SOLO / "+p.fireEdges+" LINKS"):"OFF";
      $("fireShellStatus").textContent=p?.active&&(p.fireShell||p.fireBody)?
