@@ -809,6 +809,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <button class="minibtn" id="pixiRendererMode" type="button" title="Switch crafted swarm visuals without changing physics or saves">RENDER: PHASER</button>
     <button class="minibtn" id="pixiLookMode" type="button" title="Cycle between original particle opacity, restored brightness, and geometry-aware formation glow">VFX: FORMATION</button>
     <button class="minibtn" id="pixiArtMode" type="button" title="Compare soft migration textures with authentic faceted Wandrune material artwork and sparse elemental accents">ART: FORGE</button>
+    <button class="minibtn" id="pixiFireEmbers" type="button" title="086: restore small individual flames with the existing material artwork and no extra sprites">EMBERS: ON</button>
     <button class="minibtn" id="pixiFireDebug" type="button" title="Pass A: outline each nearby connected fire cluster, without adding damage, mass, glow or new physics">FIRE GROUPS: OFF</button>
     <button class="minibtn" id="pixiFireShell" type="button" title="Pass B: shared plasma edge around nearby fire agents">PLASMA EDGE: ON</button>
     <button class="minibtn" id="pixiFireBody" type="button" title="Pass C: translucent density-based plasma material inside the shared fire boundary">PLASMA BODY: ON</button>
@@ -1222,7 +1223,8 @@ class Lab extends Phaser.Scene{
     fireBody:new URLSearchParams(window.location.search).get("fireBody")!=="0",
     fireHot:new URLSearchParams(window.location.search).get("fireHot")!=="0",
     fireStable:new URLSearchParams(window.location.search).get("fireStable")!=="0",
-    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY"))return;
+    fireEmbers:new URLSearchParams(window.location.search).get("fireEmbers")!=="0",
+    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY")||message.startsWith("FIRE EMBERS"))return;
      const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
    if(this.pixiSpellRenderer){
@@ -1247,6 +1249,7 @@ class Lab extends Phaser.Scene{
     this.events.on(Phaser.Scenes.Events.RENDER,renderPixiFrame);
     $("pixiLookMode").textContent="VFX: "+this.pixiSpellRenderer.look.toUpperCase();
     $("pixiArtMode").textContent="ART: "+this.pixiSpellRenderer.art.toUpperCase();
+    $("pixiFireEmbers").textContent="EMBERS: "+(this.pixiSpellRenderer.fireEmbers?"ON":"OFF");
     $("pixiFireDebug").textContent="FIRE GROUPS: "+(this.pixiSpellRenderer.fireDebug?"ON":"OFF");
     $("pixiFireShell").textContent="PLASMA EDGE: "+(this.pixiSpellRenderer.fireShell?"ON":"OFF");
     $("pixiFireBody").textContent="PLASMA BODY: "+(this.pixiSpellRenderer.fireBody?"ON":"OFF");
@@ -1832,7 +1835,7 @@ class Lab extends Phaser.Scene{
     if((this.pixiStatusTick=(this.pixiStatusTick||0)+1)%12===0){
      const p=this.pixiSpellRenderer;
      $("pixiFlowStatus").textContent=p?.active?
-      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS"):"PHASER";
+      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS / "+(p.fireEmbers?p.fireEmberBoosted+" EMBERS":"EMBERS OFF")+"):"PHASER";
      $("fireClusterStatus").textContent=p?.active&&p.fireDebug?
       (p.fireGroups+" GROUPS / "+p.fireLargest+" MAX / "+p.fireSingles+" SOLO / "+p.fireEdges+" LINKS"):"OFF";
      $("fireShellStatus").textContent=p?.active&&(p.fireShell||p.fireBody)?
@@ -2996,6 +2999,14 @@ $("pixiArtMode").addEventListener("click",()=>{
  const choices=["soft","forge","forge-hot"];
  const next=choices[(choices.indexOf(adapter.art)+1)%choices.length];
  $("pixiArtMode").textContent="ART: "+adapter.setArt(next).toUpperCase();
+});
+// Fire 086: compare the native tiny fire particles to visually supported embers.
+// One particle per agent, same atlas and faded alpha, no gameplay modifications.
+$("pixiFireEmbers").addEventListener("click",()=>{
+ const adapter=scene?.pixiSpellRenderer;
+ if(!adapter){$("pixiFireEmbers").textContent="EMBERS: UNAVAILABLE";return;}
+ const enabled=adapter.setFireEmbers(!adapter.fireEmbers);
+ $("pixiFireEmbers").textContent="EMBERS: "+(enabled?"ON":"OFF");
 });
 // Fire cohesion Pass A: debug-only spatial clustering. Absolutely no spell
 // instructions, damage or animation settings are persisted here.
