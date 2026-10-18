@@ -118,6 +118,9 @@ export class MusicLibrary{
       const book=this.copyById(task.copyId);
       if(!book||book.owner!==name){this.activity[name]=null;continue;}
       const def=LIBRARY_CATALOG[book.type];
+      // Carrying the book to the actual library is part of reading it.
+      // Progress pauses while walking; never erase an interrupted chapter.
+      if(grove.space && !grove.space.at(name,'library',110))continue;
       task.ticks++;
       if(task.stage==='carried' && task.ticks>=1){
         task.stage='reading';task.ticks=0;book.state='reading';
