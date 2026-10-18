@@ -5,6 +5,45 @@
 const assert=require("node:assert/strict");
 const Water=require("./pixi-water-vfx.js");
 const Bridge=require("./pixi-swarm-bridge.js");
+const movingRecord=(x,y,t,i=0,seed=1)=>({
+ element:2,x,y,time:t,castIndex:0,agentIndex:i,seed,alpha:.82,angle:0,r:3
+});
+const T=Water.makeMotionTracker();
+T.beginFrame();
+eq(T.sample(movingRecord(0,0,0)).influence,0,"First frame has zero visual speed");
+let fast;
+for(let i=1;i<=16;i++){T.beginFrame();fast=T.sample(movingRecord(i*5,0,i*16))}
+ok(fast.valid&&fast.influence>.9,"Fast motion reaches high stretch influence");
+const stretched=Water.dropPose(movingRecord(80,0,256),20,fast);
+const compact=Water.dropPose(movingRecord(80,0,256),20);
+ok(stretched.height>compact.height*1.45,"Fast droplet stretches in travel axis");
+ok(stretched.width<compact.width*.86,"Fast droplet narrows rather than growing uniformly");
+near(stretched.rotation,-Math.PI/2,.05,"Corrected water point faces travel in world X");
+const wakes=Water.collectSmears([{record:movingRecord(80,0,256),motion:fast}]);
+eq(wakes.length,1,"Motion generates one short water smear");
+ok(wakes[0].tailX<80&&wakes[0].tailY===0,"Smear ends behind rightward motion");
+ok(wakes[0].length<=26,"Smear cannot grow into a huge blue streak");
+const samples=Array.from({length:600},(_,i)=>({
+ record:{...movingRecord(i,0,256,i%200,i+1),castIndex:Math.floor(i/200)},motion:fast
+}));
+eq(Water.collectSmears(samples).length,72,"600 moving agents use at most 72 smear strokes");
+const stationary=Water.makeMotionTracker();
+stationary.beginFrame();stationary.sample(movingRecord(0,0,0));
+for(let i=1;i<=12;i++){stationary.beginFrame();stationary.sample(movingRecord(i*5,0,i*16))}
+let stopped;
+for(let i=13;i<=50;i++){stationary.beginFrame();stopped=stationary.sample(movingRecord(60,0,i*16))}
+ok(stopped.influence<.025&&!stopped.valid,"Stopping water relaxes and stops smearing");
+ok(Water.dropPose(movingRecord(60,0,800),20,stopped).height<stretched.height*.76,
+ "Stopped droplet returns to its compact silhouette");
+const teleport=Water.makeMotionTracker();
+teleport.beginFrame();teleport.sample(movingRecord(0,0,0));
+teleport.beginFrame();
+ok(!teleport.sample(movingRecord(1000,0,16)).valid,"Teleport does not streak");
+teleport.beginFrame();
+eq(teleport.sample(movingRecord(20,0,32,0,777)).influence,0,
+ "Reused agent index with new seed resets history");
+teleport.reset();eq(teleport.size,0,"Motion history can be cleared on toggle");
+
 let checks=0;
 function ok(x,m){assert.ok(x,m);checks++}
 function eq(x,y,m){assert.equal(x,y,m);checks++}
@@ -83,15 +122,15 @@ const scene={cameras:{main:{getWorldPoint(x,y){return{x,y}}}},
 (async()=>{
  const bridge=Bridge.createBridge(scene,{window:win,stage,art:"forge",look:"bright",
   fireBody:false,fireHot:false,fireShell:false,fireFlames:false,
-  waterDrops:true,waterStreams:true});
+  waterDrops:true,waterStreams:true,waterMotion:true});
  ok(await bridge.enable(),"Bridge initializes with water appearance");
- ok(bridge.waterDrops&&bridge.waterStreams,"Independent water visuals enabled");
+ ok(bridge.waterDrops&&bridge.waterStreams&&bridge.waterMotion,"Water effects are independent and enabled");
  const afterInitCanvases=canvases;
  ok(afterInitCanvases>=18,"Three textures made once, alongside fallback textures");
  ok(specular>=3,"Canonical water material embedded once per cached droplet texture");
- function frame(time=400,alpha){
+ function frame(time=400,alpha,offset=0){
   bridge.begin();
-  for(const r of records)bridge.paint({...r,time,
+  for(const r of records)bridge.paint({...r,time,x:r.x+offset,
     alpha:alpha===undefined?r.alpha:alpha});
   bridge.end();
  }
@@ -105,6 +144,21 @@ const scene={cameras:{main:{getWorldPoint(x,y){return{x,y}}}},
  const frost=particleList.find(x=>x.texture.id==="wandrune-mat069-frost");
  ok(frost&&frost.alpha>0,"Original frost source texture remains intact");
  const oldCount=particleList.length+spriteList.length;
+ const firstHeight=watery[0].scaleY;
+ for(let i=1;i<=16;i++)frame(400+i*16,undefined,i*5);
+ ok(bridge.waterSmearsDrawn>0&&bridge.waterSmearsDrawn<=72,
+  "Pixi paints speed-gated water smears within the mobile budget");
+ ok(watery[0].scaleY>firstHeight*1.35,
+  "Fast water visibly stretches the existing ParticleContainer visual");
+ ok(bridge.waterStreamsDrawn>0,"Long water streams coexist with short smears");
+ eq(bridge.setWaterMotion(false),false,"Water motion can be disabled independently");
+ frame(672);
+ eq(bridge.waterSmearsDrawn,0,"No wakes when motion is OFF");
+ ok(watery[0].scaleY<firstHeight*1.3,"Motion OFF returns compact droplet shape");
+ ok(bridge.waterStreamsDrawn>0,"Streams survive water motion toggle OFF");
+ eq(bridge.setWaterMotion(true),true,"Water motion reenabled live");
+ frame(688);
+ eq(bridge.waterSmearsDrawn,0,"Restart does not invent false motion");
  frame(600);
  eq(particleList.length+spriteList.length,oldCount,"No new visuals allocated during normal animation");
  eq(canvases,afterInitCanvases,"No per-frame procedural canvas creation");
