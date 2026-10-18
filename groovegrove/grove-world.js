@@ -12,6 +12,14 @@ export const PLACES=Object.freeze({
 });
 const NAMES=['Pip','Riff','Murmur'];
 const LINKS={clearing:['library','studio','pond'],library:['clearing'],studio:['clearing','pond'],pond:['clearing','studio']};
+// These are landmarks along the actual painted footpaths, not teleport points.
+const WAYPOINTS={
+  'trail-clearing-library':{x:505,y:500},
+  'trail-clearing-studio':{x:1005,y:485},
+  'trail-clearing-pond':{x:940,y:750},
+  'trail-studio-pond':{x:1290,y:580}
+};
+const between=(a,b)=>'trail-'+[a,b].sort().join('-');
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const valid=n=>Number.isFinite(n);
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -32,7 +40,15 @@ const road=(from,to)=>{
     for(const next of LINKS[node]||[]){
       if(seen.has(next))continue;
       const route=[...path,next];
-      if(next===to)return route.slice(1);
+      if(next===to){
+        const full=[];
+        for(let i=0;i<route.length-1;i++){
+          const waypoint=between(route[i],route[i+1]);
+          if(WAYPOINTS[waypoint])full.push(waypoint);
+          full.push(route[i+1]);
+        }
+        return full;
+      }
       q.push(route);seen.add(next);
     }
   }
@@ -51,7 +67,7 @@ export class GroveWorld {
         y:clamp(valid(old.y)?old.y:home.y,25,WORLD_SIZE.height-25),
         place:safePlace(old.place||home.place),
         destination:safePlace(old.destination||home.place),
-        route:Array.isArray(old.route)?old.route.filter(x=>Object.hasOwn(PLACES,x)).slice(0,5):[],
+        route:Array.isArray(old.route)?old.route.filter(x=>Object.hasOwn(PLACES,x)||Object.hasOwn(WAYPOINTS,x)).slice(0,9):[],
         purpose:typeof old.purpose==='string'?old.purpose.slice(0,85):'listening to the grove',
         lastChoice:valid(old.lastChoice)?old.lastChoice:-20,
         heard:Math.max(0,Math.floor(old.heard||0)),
@@ -92,10 +108,12 @@ export class GroveWorld {
         if(p.destination!=='library')this.chooseDestination(name,'library','reading a borrowed book',grove.bar);
       }
       const next=p.route[0];if(!next)continue;
-      const to=PLACES[next],dx=to.x-p.x,dy=to.y-p.y,d=Math.hypot(dx,dy);
+      const to=PLACES[next]||WAYPOINTS[next];
+      if(!to){p.route.shift();continue;}
+      const dx=to.x-p.x,dy=to.y-p.y,d=Math.hypot(dx,dy);
       const step=SPEED[name]*beatSeconds;
       if(d<=step+0.001){
-        p.x=to.x;p.y=to.y;p.place=next;p.route.shift();
+        p.x=to.x;p.y=to.y;if(PLACES[next])p.place=next;p.route.shift();
       }else{
         p.x+=dx/d*step;p.y+=dy/d*step;
       }
