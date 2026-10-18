@@ -9,7 +9,7 @@
  if(root)root.WRKMAN_WATER_VFX=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="091-liquid-droplets-and-streams",SIDE=64;
+ const VERSION="091b-water-trailing-motion",SIDE=64;
  const clamp=(n,a,b)=>Math.min(b,Math.max(a,Number.isFinite(n)?n:a));
  const finite=x=>typeof x==="number"&&Number.isFinite(x);
  function makeDropTexture(win,P,source,variant=0){
@@ -29,7 +29,8 @@
   halo.addColorStop(1,"rgba(32,149,227,0)");
   g.fillStyle=halo;g.fillRect(3,6,58,56);
   // Authored point is UP at (32,8); rounded water volume hangs behind.
-  // A clockwise +90-degree rotation therefore faces a rightward velocity.
+  // 091b: device feedback established the visible forward axis is inverted.
+  // We correct it in the visual pose, not world vectors or spell physics.
   const body=g.createLinearGradient(20,9,45,59);
   body.addColorStop(0,"rgba(208,250,255,.85)");
   body.addColorStop(.32,"rgba(57,190,228,.68)");
@@ -58,16 +59,99 @@
   g.restore();
   return P.Texture.from(canvas);
  }
- function dropPose(r,size){
+ function smoothstep(a,b,v){
+  const t=clamp((v-a)/(b-a),0,1);
+  return t*t*(3-2*t);
+ }
+ // Dedicated renderer history. Keys contain both cast and agent to avoid
+ // conflating overlapping spells. History cannot change spell state.
+ function makeMotionTracker(){
+  const history=new Map();
+  let frame=0;
+  const keyOf=r=>Number.isInteger(r?.castIndex)&&r.castIndex>=0&&
+   Number.isInteger(r?.agentIndex)&&r.agentIndex>=0?
+    r.castIndex+":"+r.agentIndex:null;
+  function beginFrame(){
+   frame++;
+   if(frame%24===0)for(const [key,h] of history)
+    if(frame-h.frame>45)history.delete(key);
+  }
+  function sample(r){
+   const key=keyOf(r),x=Number(r?.x),y=Number(r?.y),time=Number(r?.time);
+   const neutral={speed:0,influence:0,valid:false};
+   if(key===null||!finite(x)||!finite(y)||!finite(time))return neutral;
+   const seed=Number(r.seed)||0;
+   let h=history.get(key);
+   if(!h||h.seed!==seed||time<h.time||time-h.time>220){
+    history.set(key,{x,y,time,seed,speed:0,frame});
+    return neutral;
+   }
+   if(time<=h.time){h.frame=frame;return {speed:h.speed,
+    influence:smoothstep(35,240,h.speed),valid:h.speed>=45};}
+   const dt=time-h.time,dist=Math.hypot(x-h.x,y-h.y);
+   // Teleporting and cast resets must never produce giant water needles.
+   const instantaneous=dist>100?0:Math.min(1200,dist*1000/dt);
+   const ease=clamp(dt/(dt+36),0,1);
+   const speed=h.speed+(instantaneous-h.speed)*ease;
+   h.x=x;h.y=y;h.time=time;h.frame=frame;h.speed=speed;
+   return {speed,influence:smoothstep(35,240,speed),valid:dist<=100&&speed>=45};
+  }
+  function reset(){history.clear();frame=0;}
+  return {beginFrame,sample,reset,get size(){return history.size;}};
+ }
+ function dropPose(r,size,motion){
   const t=finite(r?.time)?r.time*.001:0;
   const seed=(Number(r?.seed)||0)*.69+(Number(r?.agentIndex)||0)*.11;
   const pulse=Math.sin(t*7.4+seed),sway=Math.sin(t*5.1+seed*1.9);
   const angle=finite(r?.angle)?r.angle:0;
+  const stretch=clamp(Number(motion?.influence)||0,0,1);
   return {
-   width:size*(.77+.045*pulse),
-   height:size*(1.19+.065*pulse),
-   rotation:angle+Math.PI/2+sway*.045
+   width:size*(.77+.045*pulse)*(1-.18*stretch),
+   height:size*(1.19+.065*pulse)*(1+.52*stretch),
+   // Screen-space correction is exactly PI from Pass 091.
+   // The tip now visually LEADS; its broad tail drags behind velocity.
+   rotation:angle-Math.PI/2+sway*.045
   };
+ }
+ // A short, tapered wake is distinct from the longer WATER STREAMS path.
+ // Draw only a few credible, moving element-2 agents; no extra particles.
+ function collectSmears(samples,opts={}){
+  const limit=clamp(Math.floor(opts.maxSmears??72),0,100);
+  const eligible=(samples||[]).filter(s=>s?.record?.element===2&&
+   s.record.alpha>.035&&s.motion?.valid&&s.motion.influence>.12&&
+   finite(s.record.x)&&finite(s.record.y)&&finite(s.record.angle));
+  const stride=Math.max(1,Math.ceil(eligible.length/Math.max(1,limit)));
+  const out=[];
+  for(let i=0;i<eligible.length&&out.length<limit;i+=stride){
+   const {record:r,motion:m}=eligible[i];
+   const ux=Math.cos(r.angle),uy=Math.sin(r.angle);
+   const length=clamp(3+23*m.influence,4,26);
+   const width=clamp((Number(r.r)||2)*1.15,1.4,7);
+   out.push({x:r.x,y:r.y,
+    tailX:r.x-ux*length,tailY:r.y-uy*length,
+    width,length,alpha:clamp(r.alpha,0,1)*clamp(.24+.50*m.influence,0,.74),
+    castIndex:r.castIndex,agentIndex:r.agentIndex});
+  }
+  return out;
+ }
+ function drawSmears(g,smears){
+  if(!g)return 0;
+  let drawn=0;
+  for(const s of smears||[]){
+   if(s.alpha<=.001)continue;
+   // Taper to a pinpoint at the old position so the wake never
+   // looks like another detached agent or a cyan rocket exhaust.
+   g.moveTo(s.tailX,s.tailY);
+   g.lineTo(s.x,s.y);
+   g.stroke({width:s.width,color:0x5ebde7,alpha:.18*s.alpha,
+    cap:"round",join:"round"});
+   g.moveTo(s.tailX+(s.x-s.tailX)*.35,s.tailY+(s.y-s.tailY)*.35);
+   g.lineTo(s.x,s.y);
+   g.stroke({width:s.width*.38,color:0xe4faff,alpha:.21*s.alpha,
+    cap:"round",join:"round"});
+   drawn++;
+  }
+  return drawn;
  }
  function validTrail(r){
   if(!r||r.element!==2||!(r.alpha>.03)||!finite(r.x)||!finite(r.y)||
@@ -124,5 +208,5 @@
   }
   return count;
  }
- return Object.freeze({VERSION,SIDE,makeDropTexture,dropPose,validTrail,collectStreams,drawStreams});
+ return Object.freeze({VERSION,SIDE,makeDropTexture,makeMotionTracker,dropPose,collectSmears,drawSmears,validTrail,collectStreams,drawStreams});
 });
