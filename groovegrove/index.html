@@ -18,7 +18,8 @@
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
 import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261018-pass004';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
-import { Grove } from './grove-core.js?v=20261018-pass004';
+import { Grove } from './grove-core.js?v=20261018-world';
+import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261018-spatial';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
 import { LiveNoteConductor } from './live-note-conductor.js?v=20261018-voice';
 
@@ -228,6 +229,8 @@ let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false,journ
 let floatingNotes=[],talkBubble=null,ambient=[],now=0,visualBeat=-1;
 let noteFlash={Pip:0,Riff:0};
 let redrawAccum=0;
+let liveLocations=null;
+const camera={mode:'follow',target:'Pip',x:740,y:530,drag:null};
 const noteMarks=[];
 
 function makeBackground(world){
@@ -288,6 +291,78 @@ function makeBackground(world){
     ambient.push({sprite:p,x:p.x,y:p.y,phase:r()*6.28,speed:.35+r()*.8});
   }
 }
+
+// The real map lives in fixed world coordinates, entirely independent of the
+// phone orientation or viewport size. Canvas UI is rendered in a separate layer.
+function makeWorldLandscape(scene){
+  const g=new Graphics();scene.addChild(g);
+  rect(g,0,0,WORLD_SIZE.width,WORLD_SIZE.height,0,0x17352e);
+  const rng=seeded(57003);
+  for(let i=0;i<115;i++){
+    const x=25+rng()*(WORLD_SIZE.width-50),y=25+rng()*(WORLD_SIZE.height-50);
+    ellipse(g,x,y,24+rng()*75,19+rng()*56,i%4?0x21493a:0x275442,.3+rng()*.2);
+  }
+  // Footpaths are navigable roads, not a schedule for the residents.
+  const roads=[
+    [PLACES.library,PLACES.clearing,{x:505,y:500}],
+    [PLACES.clearing,PLACES.studio,{x:1005,y:485}],
+    [PLACES.clearing,PLACES.pond,{x:940,y:750}],
+    [PLACES.studio,PLACES.pond,{x:1290,y:580}]
+  ];
+  for(const [a,b,mid] of roads){
+    g.moveTo(a.x,a.y).quadraticCurveTo(mid.x,mid.y,b.x,b.y)
+      .stroke({color:0x0d2a27,width:47,alpha:.37,cap:'round'});
+    g.moveTo(a.x,a.y).quadraticCurveTo(mid.x,mid.y,b.x,b.y)
+      .stroke({color:0x897b54,width:22,alpha:.65,cap:'round'});
+    g.moveTo(a.x,a.y).quadraticCurveTo(mid.x,mid.y,b.x,b.y)
+      .stroke({color:0xc1a977,width:4,alpha:.2,cap:'round'});
+  }
+  // Deterministic tree placement leaves breathing room around every destination.
+  for(let i=0;i<205;i++){
+    const x=20+rng()*(WORLD_SIZE.width-40),y=20+rng()*(WORLD_SIZE.height-40);
+    if(Object.values(PLACES).some(p=>Math.hypot(x-p.x,y-p.y)<172))continue;
+    const r=11+rng()*20;
+    ellipse(g,x+3,y+r*.68,r*.67,r*.36,0x0a2526,.27);
+    circle(g,x,y,r,0x285d46,.95);
+    circle(g,x-r*.2,y-r*.24,r*.69,i%3?0x367354:0x4d8258,.83);
+    circle(g,x+r*.3,y-r*.1,r*.47,0x1a4e40,.66);
+  }
+  const c=PLACES.clearing;
+  ellipse(g,c.x,c.y,201,146,0x4b7856,.8);
+  ellipse(g,c.x,c.y+8,176,122,0x608b60,.42);
+  ellipse(g,c.x,c.y+95,132,22,0x0b2928,.38);
+  textAt(scene,'THE CLEARING',c.x,c.y-156,18,PALETTE.cream,'bold',1.5,.5);
+  const st=PLACES.studio;
+  rect(g,st.x-155,st.y-128,310,242,22,0x1b4239,.93);
+  rect(g,st.x-141,st.y-115,282,216,17,0x294c43);
+  rect(g,st.x-126,st.y-101,252,181,14,0x3b5846);
+  rect(g,st.x-101,st.y-73,66,74,9,0x393a42);
+  circle(g,st.x-68,st.y-45,20,0x1b262b);
+  circle(g,st.x-68,st.y-45,10,0x64695d);
+  rect(g,st.x+37,st.y-68,61,10,3,0xba8659);
+  ellipse(g,st.x+70,st.y-4,32,19,0xb47c5f);
+  textAt(scene,'THE STUDIO',st.x,st.y-151,16,PALETTE.cream,'bold',1.5,.5);
+  const pond=PLACES.pond;
+  ellipse(g,pond.x,pond.y,185,133,0x102b2c,.98);
+  ellipse(g,pond.x,pond.y,172,121,0x38767c,.85);
+  ellipse(g,pond.x-21,pond.y-11,116,79,0x6cb4ae,.28);
+  ellipse(g,pond.x+62,pond.y+37,39,9,0xb8d5b0,.18);
+  for(let i=0;i<16;i++){
+    const angle=i/16*Math.PI*2,x=pond.x+Math.cos(angle)*190,y=pond.y+Math.sin(angle)*139;
+    line(g,x,y,x-3,y-13-rng()*14,0x8da36c,2,.63);
+  }
+  textAt(scene,'THE POND',pond.x,pond.y-157,16,PALETTE.cream,'bold',1.5,.5);
+  const lib=PLACES.library;
+  rect(g,lib.x-159,lib.y-150,318,292,23,0x0b2526,.82);
+  rect(g,lib.x-150,lib.y-139,300,271,17,0x395944);
+  rect(g,lib.x-139,lib.y-128,278,251,14,0x47664d,.85);
+  const deco=new Graphics();scene.addChild(deco);
+  for(let i=0;i<22;i++){
+    const x=30+rng()*(WORLD_SIZE.width-60),y=35+rng()*(WORLD_SIZE.height-70);
+    circle(deco,x,y,2+rng()*2,PALETTE.gold,.15+rng()*.23);
+  }
+}
+
 function makeDrummer(parent,x,y,s){
   const c=new Container();c.position.set(x,y);c.scale.set(s);parent.addChild(c);
   const shadow=new Graphics();ellipse(shadow,0,122,108,24,0x051f20,.38);c.addChild(shadow);
@@ -372,8 +447,8 @@ function scheduleViewportSize(){
 // This is a physical shelf in the clearing, not an inventory screen.
 // It begins with six visibly empty spaces; the gardener chooses when to deliver books.
 function makeLibraryNook(world){
-  const x=landscape?W-243:(W-190)/2;
-  const y=landscape?123:155;
+  const x=PLACES.library.x-95;
+  const y=PLACES.library.y-96;
   const w=190,unitH=111,gap=landscape?12:10,secondH=landscape?111:61,h=unitH+gap+secondH;
   ui.shelfBounds={x,y,w,h,unitH,gap,secondH};
   const g=new Graphics();world.addChild(g);
