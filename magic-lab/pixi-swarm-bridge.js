@@ -11,7 +11,7 @@
  if(root)root.WRKMAN_PIXI_SWARM=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="086-fire-ember-fidelity",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
+ const VERSION="087-living-flame-silhouette",CDN="https://cdn.jsdelivr.net/npm/pixi.js@8.10.0/dist/pixi.min.js";
  let scriptLoading=null;
  function clamp(n,a=0,b=1){return Math.min(b,Math.max(a,Number.isFinite(n)?n:a));}
  function wantPixi(search){return !/(?:[?&])(?:renderer|render)=legacy(?:&|$)/.test(search||"");}
@@ -87,6 +87,7 @@
   const FIRE_CLUSTERS=win.WRKMAN_FIRE_CLUSTERS||null;
   const FIRE_PERIMETER=win.WRKMAN_FIRE_PERIMETER||null;
   const FIRE_STABILITY=win.WRKMAN_FIRE_STABILITY||null;
+  const FIRE_FLAME=win.WRKMAN_FIRE_FLAME||null;
   const fireTracker=FIRE_STABILITY?.makeTracker?FIRE_STABILITY.makeTracker({
    maxSlots:3,fadeMs:180,heatHoldMs:110,heatFadeMs:190}):null;
   const allowedLooks=["original","bright","formation"];
@@ -108,11 +109,13 @@
    fireHotPaths:0,firePeakPaths:0,fireHotFills:0,fireHotGlows:0,
    fireStable:opts.fireStable!==false&&!!fireTracker,
    fireEmbers:opts.fireEmbers!==false,fireEmberBoosted:0,
+   fireFlames:opts.fireFlames!==false&&!!FIRE_FLAME?.makeFlameTexture,
+   fireFlamesDrawn:0,
    fireStableSlots:0,fireStableGhosts:0,fireStableFading:0,
    fireStableSwaps:0,fireStableHeldHot:0,fireStableCached:0};
   let P=null,app=null,world=null,detailsLayer=null,shapeLayer=null,shapeGraphics=null,
    registrationGraphics=null,registrationPoint=null,textureSet=[],bulkGroups=new Map(),spritePool=[],
-   restoredTextures=new Map(),accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,fireBodyGraphics=null,fireHotGraphics=null,disposed=false,heroUsed=0;
+   restoredTextures=new Map(),flameTextures=[],accentGraphics=null,fireDebugGraphics=null,fireShellGraphics=null,fireBodyGraphics=null,fireHotGraphics=null,disposed=false,heroUsed=0;
   const DETAIL_RATIO=.10;
   function announce(msg){
    if(typeof opts.status==="function")try{opts.status(msg);}catch(_){}
@@ -201,6 +204,11 @@
    }
    announce("FIRE CLUSTERS · "+(state.fireDebug?"DEBUG ON":"OFF"));
    return state.fireDebug;
+  }
+  function setFireFlames(enabled){
+   state.fireFlames=!!enabled&&flameTextures.length===3&&flameTextures.every(Boolean);
+   announce("FIRE FLAMES · "+(state.fireFlames?"ON":"OFF"));
+   return state.fireFlames;
   }
   function setFireEmbers(enabled){
    state.fireEmbers=!!enabled;
@@ -597,6 +605,17 @@
      world.addChild(registrationGraphics);
     }
     textureSet=ELEMENTS.map((_,e)=>[0,1,2].map(v=>makeTexture(win,P,e,v)));
+    // Three shared flame silhouettes, allocated ONCE. Subsequent frames
+    // still submit exactly one visual per existing fire agent.
+    if(FIRE_FLAME?.makeFlameTexture){
+     try{
+      const source=scene.textures?.get?.("wandrune-mat069-fire")?.getSourceImage?.();
+      if(source?.width>0&&source?.height>0){
+       flameTextures=[0,1,2].map(v=>FIRE_FLAME.makeFlameTexture(win,P,source,v));
+      }
+     }catch(error){console.warn("Optional fire appearance unavailable",error);flameTextures=[];}
+    }
+    state.fireFlames=state.fireFlames&&flameTextures.length===3&&flameTextures.every(Boolean);
     const cv=app.canvas;cv.classList.add("wandrune-pixi-canvas");
     Object.assign(cv.style,{position:"absolute",pointerEvents:"none",zIndex:"2",display:"block",maxWidth:"none",maxHeight:"none"});
     stage.appendChild(cv);
@@ -615,7 +634,7 @@
    fireTracker?.reset();
    state.fireStableSlots=state.fireStableGhosts=state.fireStableFading=0;
    state.fireStableSwaps=state.fireStableHeldHot=state.fireStableCached=0;
-   state.fireEmberBoosted=0;
+   state.fireEmberBoosted=0;state.fireFlamesDrawn=0;
    if(app?.canvas)app.canvas.style.display="none";
    shapeGraphics?.clear();accentGraphics?.clear();fireDebugGraphics?.clear();fireShellGraphics?.clear();fireBodyGraphics?.clear();fireHotGraphics?.clear();state.fireBodyLayers=state.fireBodyFills=0;state.fireHotFills=state.fireHotGlows=0;state.fireShellGroups=state.fireShellPaths=state.fireShellVertices=0;state.formations=0;state.formationSegments=0;state.ambientDrawn=0;
    if(reason)state.error=String(reason);
@@ -636,7 +655,7 @@
    try{
     state.frame++;heroUsed=0;
     for(const group of bulkGroups.values())group.used=0;
-    let detailed=0,bulk=0,materialDrawn=0,artFallback=0,emberBoosted=0;
+    let detailed=0,bulk=0,materialDrawn=0,artFallback=0,emberBoosted=0,flamesDrawn=0;
     for(const r of state.records){
      const elem=classify(r),index=Math.max(0,Number(r.agentIndex)||0);
      const hero=(index%10===0)||(r.r>9&&index%4===0);
@@ -655,25 +674,29 @@
        (state.look==="original"?(hero?.86:.62):(hero?1.12:1.22)));
      const visualTint=useMaterial?0xffffff:
       typeof r.color==="number"&&Number.isFinite(r.color)?(r.color&0xffffff):0xffffff;
+     const flame=elem===1&&useMaterial&&state.fireFlames&&!!flameTextures[variant];
+     const pose=flame?FIRE_FLAME.flamePose(r,size):null;
+     if(flame)flamesDrawn++;
      if(hero){
       const sprite=allocateHero();
-      sprite.texture=texture||textureSet[elem][variant];
+      sprite.texture=flame?flameTextures[variant]:(texture||textureSet[elem][variant]);
       sprite.position.set(r.x,r.y);
-      sprite.rotation=useMaterial?(elem===3?Math.sin(r.seed||0)*.1:elem===1?Math.sin((r.time||0)*.0008+(r.seed||0))*.12:0):(r.angle||0);
-      sprite.width=size;sprite.height=size*(useMaterial?1:1.55);
+      sprite.rotation=flame?pose.rotation:(useMaterial?(elem===3?Math.sin(r.seed||0)*.1:elem===1?Math.sin((r.time||0)*.0008+(r.seed||0))*.12:0):(r.angle||0));
+      sprite.width=flame?pose.width:size;
+      sprite.height=flame?pose.height:size*(useMaterial?1:1.55);
       sprite.alpha=alpha;sprite.visible=true;
       // Texture contains its own elemental glow, with bright hero accents.
       sprite.tint=visualTint;
       detailed++;
      }else{
-      const selectedTexture=texture||textureSet[elem][variant];
-      const sourceKey=useMaterial?"material:"+materialKey(r,elem):"soft:"+elem+":"+variant;
+      const selectedTexture=flame?flameTextures[variant]:(texture||textureSet[elem][variant]);
+      const sourceKey=flame?"flame087:"+variant:(useMaterial?"material:"+materialKey(r,elem):"soft:"+elem+":"+variant);
       const particle=takeParticle(selectedTexture,sourceKey);
       particle.x=r.x;particle.y=r.y;
-      particle.rotation=useMaterial?(elem===3?Math.sin(r.seed||0)*.1:0):(r.angle||0);
-      const sourceSide=useMaterial?48:128;
-      particle.scaleX=size/sourceSide;
-      particle.scaleY=size*(useMaterial?1:1.5)/sourceSide;
+      particle.rotation=flame?pose.rotation:(useMaterial?(elem===3?Math.sin(r.seed||0)*.1:0):(r.angle||0));
+      const sourceSide=flame?FIRE_FLAME.SIDE:(useMaterial?48:128);
+      particle.scaleX=(flame?pose.width:size)/sourceSide;
+      particle.scaleY=(flame?pose.height:size*(useMaterial?1:1.5))/sourceSide;
       particle.alpha=alpha;
       particle.tint=visualTint;
       bulk++;
@@ -683,7 +706,7 @@
     // purely visual geometric interpretation of already-computed records.
     paintFormations();paintAccents();paintFireEffects();
     state.materialDrawn=materialDrawn;state.artFallback=artFallback;
-    state.fireEmberBoosted=emberBoosted;
+    state.fireEmberBoosted=emberBoosted;state.fireFlamesDrawn=flamesDrawn;
     for(let i=heroUsed;i<spritePool.length;i++)spritePool[i].visible=false;
     for(const group of bulkGroups.values())for(let i=group.used;i<group.pool.length;i++)group.pool[i].alpha=0;
     align();drawReference();app.render();
@@ -694,9 +717,9 @@
   function destroy(){
    disposed=true;disable();
    try{app?.destroy(true,{children:true,texture:false,textureSource:false});}catch(_){}
-   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();state.ready=false;
+   app=null;world=null;shapeLayer=null;shapeGraphics=null;accentGraphics=null;fireDebugGraphics=null;fireShellGraphics=null;fireBodyGraphics=null;fireHotGraphics=null;registrationGraphics=null;registrationPoint=null;bulkGroups.clear();spritePool=[];restoredTextures.clear();flameTextures=[];state.ready=false;
   }
-  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setReference,ratio:DETAIL_RATIO,version:VERSION});
+  return Object.assign(state,{enable,disable,begin,paint,end,destroy,align,setLook,setArt,setFireDebug,setFireShell,setFireBody,setFireHot,setFireStable,setFireEmbers,setFireFlames,setReference,ratio:DETAIL_RATIO,version:VERSION});
  }
  return Object.freeze({VERSION,CDN,loadPixi,wantPixi,classify,fireEmberFootprint,createBridge});
 });
