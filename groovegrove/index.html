@@ -227,7 +227,7 @@ let sound=new SoundEngine(),grove=null;
 let started=false,startError='',selected='Pip',soundNeedsRefresh=false,audioStartPending=false;
 let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false,journalOpen=false,journalName='Pip';
 let floatingNotes=[],talkBubble=null,ambient=[],now=0,visualBeat=-1;
-let noteFlash={Pip:0,Riff:0};
+let noteFlash={Pip:0,Riff:0,Murmur:0};
 let redrawAccum=0;
 let liveLocations=null;
 const camera={mode:'follow',target:'Pip',x:740,y:530,drag:null};
@@ -555,19 +555,32 @@ function makeDeliveryTray(world){
   layer.visible=deliveryOpen;
 }
 function moveReaders(){
-  if(!grove || !ui.homePositions || !ui.readPads)return;
-  const smoothing=Math.min(1,app.ticker.deltaMS/16.667*.065);
-  for(const name of ['Pip','Riff']){
-    const task=grove.library.status(name);
-    const home=ui.homePositions[name];
-    const position=task && task.stage!=='returning'?ui.readPads[name]:home;
-    const avatar=name==='Pip'?ui.pip:ui.riff;
-    if(!avatar?.group)continue;
-    const displayed=name==='Pip'?ui.pipPos:ui.riffPos;
-    displayed.x+=(position.x-displayed.x)*smoothing;
-    displayed.y+=(position.y-displayed.y)*smoothing;
+  if(!grove || !ui.scene)return;
+  const smoothing=Math.min(1,Math.max(.06,app.ticker.deltaMS/16.667*.13));
+  for(const name of ['Pip','Riff','Murmur']){
+    const target=(remoteLive && liveLocations?.[name])||grove.space?.people[name];
+    if(!target)continue;
+    const avatar=name==='Pip'?ui.pip:name==='Riff'?ui.riff:ui.murmur;
+    const displayed=name==='Pip'?ui.pipPos:name==='Riff'?ui.riffPos:ui.vocalPos;
+    if(!avatar?.group||!displayed)continue;
+    displayed.x+=(target.x-displayed.x)*smoothing;
+    displayed.y+=(target.y-displayed.y)*smoothing;
     avatar.group.position.set(displayed.x,displayed.y);
   }
+  let desired=null;
+  if(camera.mode==='follow')desired=camera.target==='Pip'?ui.pipPos:
+    camera.target==='Riff'?ui.riffPos:ui.vocalPos;
+  if(camera.mode==='place')desired=PLACES[camera.target]||PLACES.clearing;
+  if(desired){
+    camera.x+=(desired.x-camera.x)*Math.min(1,smoothing*.92);
+    camera.y+=(desired.y-camera.y)*Math.min(1,smoothing*.92);
+  }
+  const viewTop=landscape?152:187;
+  const viewBottom=(ui.panelY||H-284)-48;
+  const focusY=(viewTop+viewBottom)*.5;
+  camera.x=clamp(camera.x,W*.36,WORLD_SIZE.width-W*.36);
+  camera.y=clamp(camera.y,focusY-20,WORLD_SIZE.height-(H-focusY)*.5);
+  ui.scene.position.set(W*.5-camera.x,focusY-camera.y);
 }
 function renderPhysicalBooks(){
   const g=ui.booksDrawing;if(!g || !grove)return;
@@ -816,14 +829,29 @@ function refreshText(){
       const rows=grove.logs.slice(0,3);
       ui.log.forEach((t,i)=>{t.text=rows[i]?.message||'';});
     }else ui.log[0].text=grove.logs[0]?.message||'';
-    const who=selected==='Pip'?grove.pip:grove.riff;
-    ui.inspect.text=who.name.toUpperCase()+' · '+who.currentGoal+(grove.library.known[who.name].length?' · '+grove.library.known[who.name].length+' book skills':'')+'  |  tap either musician';
+    if(selected==='Murmur'){
+      const v=grove.vocalist;
+      ui.inspect.text='MURMUR · '+v.stage+' · '+v.notes+' hums · '+v.rests+' rests · tap to follow';
+    }else{
+      const who=selected==='Pip'?grove.pip:grove.riff;
+      const purpose=((remoteLive&&liveLocations?.[selected])||grove.space?.people[selected])?.purpose;
+      ui.inspect.text=who.name.toUpperCase()+' · '+(purpose||who.currentGoal)+
+        (grove.library.known[who.name].length?' · '+grove.library.known[who.name].length+' book skills':'');
+    }
   }else ui.inspect.text='Tap a musician to follow their decisions';
   ui.badgeText.text=(remoteLive && returnReport && Date.now()<returnReportUntil)?('+'+returnReport.bars+' BARS WHILE AWAY'):!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(soundNeedsRefresh || (sound.context && sound.context.state!=='running'))?'TAP TO RECONNECT AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
   ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
   if(ui.audioLabel)ui.audioLabel.text=!started?'▶ AUDIO':soundNeedsRefresh?'↻ REPAIR':'↻ AUDIO';
   if(ui.audioWidget)ui.audioWidget.visible=!deliveryOpen && !journalOpen;
   if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 12';
+  for(const [name,button] of Object.entries(ui.cameraButtons||{})){
+    const active=camera.mode==='follow'?camera.target===name:camera.mode==='place'&&camera.target===name;
+    button.caption.alpha=active?1:.63;
+    button.g.alpha=active?1:.76;
+  }
+  if(ui.cameraHint)ui.cameraHint.text=camera.mode==='free'?'FREE CAMERA · TAP A MUSICIAN TO FOLLOW':
+    camera.mode==='place'?'VIEWING '+PLACES[camera.target].label+' · SWIPE TO EXPLORE':
+    'FOLLOWING '+camera.target.toUpperCase()+' · SWIPE TO EXPLORE';
   if(ui.deliveryTray)ui.deliveryTray.visible=deliveryOpen && !journalOpen;
   if(ui.journalOverlay)ui.journalOverlay.visible=journalOpen;
   if(ui.journalHeading && grove){
@@ -873,7 +901,8 @@ function emitVisualNote(e){
   const p=e.agent==='Pip'?ui.pipPos:e.agent==='Riff'?ui.riffPos:ui.vocalPos;
   if(!p)return;
   const tone=e.agent==='Pip'?PALETTE.mint:e.agent==='Riff'?PALETTE.lilac:0xf5cf9c;
-  floatingNotes.push({x:p.x+rand(-20,18),y:p.y-110+(landscape?0:25),vx:rand(-.38,.38),born:performance.now(),color:tone,size:rand(6,10)});
+  const x=Number.isFinite(e.x)?e.x:p.x,y=Number.isFinite(e.y)?e.y:p.y;
+  floatingNotes.push({x:x+rand(-20,18),y:y-110+(landscape?0:25),vx:rand(-.38,.38),born:performance.now(),color:tone,size:rand(6,10)});
   if(floatingNotes.length>24)floatingNotes.shift();
   noteFlash[e.agent]=performance.now();
 }
@@ -886,9 +915,10 @@ function renderEffects(time){
   const pulse=(grove?.beat||0);
   const elapsed=(time-(noteFlash.Pip||0))/1000;
   const elapsedR=(time-(noteFlash.Riff||0))/1000;
-  [ ['Pip',elapsed,PALETTE.mint],['Riff',elapsedR,PALETTE.lilac] ].forEach(([name,dt,color])=>{
+  const elapsedV=(time-(noteFlash.Murmur||0))/1000;
+  [ ['Pip',elapsed,PALETTE.mint],['Riff',elapsedR,PALETTE.lilac],['Murmur',elapsedV,0xf1d5ae] ].forEach(([name,dt,color])=>{
     if(dt<.38 && dt>=0){
-      const p=name==='Pip'?ui.pipPos:ui.riffPos;
+      const p=name==='Pip'?ui.pipPos:name==='Riff'?ui.riffPos:ui.vocalPos;
       fx.circle(p.x,p.y+54,38+dt*170).stroke({color,width:3,alpha:(1-dt/.38)*.45});
     }
   });
@@ -922,13 +952,14 @@ function renderEffects(time){
     circle(a,20,35+motionR*19,8,0xe0c7e0);
     ui.riff.group.y=ui.riffPos.y+Math.sin(time/470+2)*2;
   }
+  if(ui.murmur?.group)ui.murmur.group.y=ui.vocalPos.y+Math.sin(time/690+1)*2.2;
   ui.bubbleLayer.visible=!!(talkBubble && time-talkBubble.born<4300);
   if(ui.bubbleLayer.visible){
     const age=(time-talkBubble.born)/1000;
-    const pos=talkBubble.from==='Pip'?ui.pipPos:ui.riffPos;
+    const pos=talkBubble.from==='Pip'?ui.pipPos:talkBubble.from==='Riff'?ui.riffPos:ui.vocalPos;
     const boxW=landscape?230:182;
     const boxY=pos.y-(landscape?195:151);
-    const x=clamp(pos.x-boxW/2,12,W-boxW-12);
+    const x=clamp(pos.x-boxW/2,12,WORLD_SIZE.width-boxW-12);
     if(ui.lastBubble!==talkBubble){
       const b=ui.bubbleShape;b.clear();
       rect(b,x,boxY,boxW,landscape?74:78,13,0x082527,.93);
