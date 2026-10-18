@@ -28,7 +28,7 @@ ok(Water.validTrail(far)===null,"Teleport/absurd path is ignored");
 ok(Water.validTrail({...record(2,1),alpha:0})===null,"Zero-alpha records create no ribbons");
 ok(Water.validTrail({...record(3,1)})===null,"Frost never has liquid ribbons");
 const pose=Water.dropPose({...record(2,3),angle:0},20);
-near(pose.rotation,Math.PI/2,.05,"Droplet's authored point faces positive X");
+near(pose.rotation,-Math.PI/2,.05,"091b corrected droplet orientation is flipped 180 degrees");
 ok(pose.height>pose.width,"Silhouette is longer along travel direction");
 ok(Water.dropPose({...record(2,3),time:800},20).height!==pose.height,"Droplet surface breathes over time");
 eq(JSON.stringify(records),before,"Geometry calculation never mutates inputs");
