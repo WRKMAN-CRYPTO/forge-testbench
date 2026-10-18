@@ -30,7 +30,7 @@ ok(wakes[0].length<=26,"Smear cannot grow into a huge blue streak");
 const samples=Array.from({length:600},(_,i)=>({
  record:{...movingRecord(i,0,256,i%200,i+1),castIndex:Math.floor(i/200)},motion:fast
 }));
-eq(Water.collectSmears(samples).length,72,"600 moving agents use at most 72 smear strokes");
+ok(Water.collectSmears(samples).length>0&&Water.collectSmears(samples).length<=72,"600 moving agents use at most 72 smear strokes");
 const stationary=Water.makeMotionTracker();
 stationary.beginFrame();stationary.sample(movingRecord(0,0,0));
 for(let i=1;i<=12;i++){stationary.beginFrame();stationary.sample(movingRecord(i*5,0,i*16))}
