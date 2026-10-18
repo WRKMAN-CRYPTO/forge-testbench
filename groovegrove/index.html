@@ -638,12 +638,12 @@ function refreshText(){
   if(!ui.modeLabel)return;
   const mode=grove?.mode||'solo';
   ui.modeLabel.text=remoteLive?(remoteOnline?'LIVE · THE GROVE IS HOME':'SERVER RECONNECTING'):(grove?.library.anyBusy()?'READING IN THE GROVE':mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES');
-  ui.statusLine.text=serverMessage&&!remoteLive?serverMessage:startError?startError:!started?(grove?.library.anyBusy()?'Tap the clearing to continue the interrupted reading':'Tap the clearing to hear their first notes'):soundNeedsRefresh?'Audio route may be muted · tap ↻ AUDIO to reconnect':(sound.context && sound.context.state!=='running'?'Audio paused · tap ↻ AUDIO to reconnect':grove.highlight);
+  ui.statusLine.text=remoteLive && returnReport && Date.now()<returnReportUntil?('While away: '+returnReport.bars+' bars practiced · Pip +'+returnReport.pip+' · Riff +'+returnReport.riff):serverMessage&&!remoteLive?serverMessage:startError?startError:!started?(grove?.library.anyBusy()?'Tap the clearing to continue the interrupted reading':'Tap the clearing to hear their first notes'):soundNeedsRefresh?'Audio route may be muted · tap ↻ AUDIO to reconnect':(sound.context && sound.context.state!=='running'?'Audio paused · tap ↻ AUDIO to reconnect':grove.highlight);
   if(grove){
     const error=grove.baseline();
     ui.pipMetric.text='PIP   '+(error==null?'collecting timing...':fmt(error)+' RMS drift');
     ui.riffMetric.text='RIFF   guitar pulse · ~7 ms spread';
-    ui.memoryMetric.text=grove.familiarity+' shared sessions  ·  '+grove.lessons+' lessons  ·  '+grove.jams+' jams';
+    ui.memoryMetric.text=remoteLive?('BAR '+grove.bar+' · '+grove.familiarity+' shared · '+grove.jams+' jams'):(grove.familiarity+' shared sessions  ·  '+grove.lessons+' lessons  ·  '+grove.jams+' jams');
     if(landscape){
       const rows=grove.logs.slice(0,3);
       ui.log.forEach((t,i)=>{t.text=rows[i]?.message||'';});
@@ -651,7 +651,7 @@ function refreshText(){
     const who=selected==='Pip'?grove.pip:grove.riff;
     ui.inspect.text=who.name.toUpperCase()+' · '+who.currentGoal+(grove.library.known[who.name].length?' · '+grove.library.known[who.name].length+' book skills':'')+'  |  tap either musician';
   }else ui.inspect.text='Tap a musician to follow their decisions';
-  ui.badgeText.text=!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(soundNeedsRefresh || (sound.context && sound.context.state!=='running'))?'TAP TO RECONNECT AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
+  ui.badgeText.text=(remoteLive && returnReport && Date.now()<returnReportUntil)?('+'+returnReport.bars+' BARS WHILE AWAY'):!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(soundNeedsRefresh || (sound.context && sound.context.state!=='running'))?'TAP TO RECONNECT AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
   ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
   if(ui.audioLabel)ui.audioLabel.text=!started?'▶ AUDIO':soundNeedsRefresh?'↻ REPAIR':'↻ AUDIO';
   if(ui.audioWidget)ui.audioWidget.visible=!deliveryOpen && !journalOpen;
@@ -661,7 +661,7 @@ function refreshText(){
   if(ui.journalHeading && grove){
     const report=grove.understanding.report(journalName);
     ui.journalHeading.text=journalName.toUpperCase()+" · PERSONAL NOTES";
-    ui.journalInfo.text=report.observations+" observed bars  ·  "+report.experiments+" experiments";
+    ui.journalInfo.text=report.observations+" lifetime observed bars  ·  "+report.experiments+" total experiments";
     ui.journalTexture.text="Partner's last texture: "+report.partnerTexture+"  ·  Last measured overlap: "+(report.latest?Math.round(report.latest.overlap*100)+"%":"collecting");
     ui.journalRows.forEach((field,i)=>{
       const entry=report.recent[i];
@@ -776,7 +776,7 @@ function elapsedP(x){return Math.max(0,x);}
 // Remote is optional until a Railway service exists. No client secret is
 // published in source; pairing lives in the URL fragment and local phone store.
 let remoteLive=false,remoteOnline=false,remotePolling=false,remoteSequence=0;
-let remoteTimer=null,serverMessage='',serverKey='';
+let remoteTimer=null,serverMessage='',serverKey='',returnReport=null,returnReportUntil=0,serverLastBeat=0;
 const SERVER_KEY_STORE='groovegrove.private.server.key';
 const serverBase=(GROVE_SERVER_URL||'').replace(/\/+$/,'');
 function readPairingKey(){
@@ -836,7 +836,21 @@ async function attachLivingServer(){
       serverMessage='Waiting for private pairing key; offline Grove continues.';
       return;
     }
-    remoteLive=true;remoteOnline=true;remoteSequence=status.seq;
+    // Compare the authoritative server clock with the phone's last local
+    // checkpoint BEFORE replacing local Grove. Counts cannot be faked by UI.
+    const priorBar=grove.bar||0;
+    const priorPip=grove.understanding.report('Pip').observations||0;
+    const priorRiff=grove.understanding.report('Riff').observations||0;
+    const serverBar=status.world?.bar||0;
+    if(serverBar>priorBar){
+      returnReport={
+        bars:serverBar-priorBar,
+        pip:Math.max(0,(status.world.understanding?.totalBars?.Pip||0)-priorPip),
+        riff:Math.max(0,(status.world.understanding?.totalBars?.Riff||0)-priorRiff)
+      };
+      returnReportUntil=Date.now()+120000;
+    }
+    remoteLive=true;remoteOnline=true;remoteSequence=status.seq;serverLastBeat=status.beat||0;
     acceptRemoteWorld(status.world);
     grove.push('The grove now keeps playing when you close the page.');
     saveMemory(grove.snapshot());
@@ -878,6 +892,7 @@ async function pollLivingServer(){
   try{
     const data=await serverRequest('/v1/poll?since='+remoteSequence);
     remoteSequence=data.seq;
+    serverLastBeat=data.beat||serverLastBeat;
     remoteOnline=true;serverMessage='';
     // Schedule the exact notes chosen in the remote world. The browser
     // never runs a rival simulation while connected.
@@ -996,7 +1011,7 @@ app.ticker.add(()=>{
   if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
 });
 // Inspectable test hooks; not part of the rendered interface.
-window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get journal(){return grove.understanding.snapshot();},get server(){return {connected:remoteLive,online:remoteOnline,message:serverMessage,beat:remoteSequence,url:serverBase};},journalReport(name){return grove.understanding.report(name==='Riff'?'Riff':'Pip');},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get audioError(){return startError;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove(null,saveMemory);grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
+window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get journal(){return grove.understanding.snapshot();},get server(){return {connected:remoteLive,online:remoteOnline,message:serverMessage,beat:serverLastBeat,sequence:remoteSequence,returnReport,url:serverBase};},journalReport(name){return grove.understanding.report(name==='Riff'?'Riff':'Pip');},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get audioError(){return startError;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove(null,saveMemory);grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
 </script>
 </body>
 </html>
