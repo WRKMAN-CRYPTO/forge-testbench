@@ -489,6 +489,139 @@ function scheduleViewportSize(){
   clearTimeout(settleTimer);
   settleTimer=setTimeout(()=>applyViewportSize(),330);
 }
+// This is a physical shelf in the clearing, not an inventory screen.
+// It begins with six visibly empty spaces; the gardener chooses when to deliver books.
+function makeLibraryNook(world){
+  const x=landscape?W-243:(W-190)/2;
+  const y=landscape?123:155;
+  const w=190,h=111;
+  ui.shelfBounds={x,y,w,h};
+  const g=new Graphics();world.addChild(g);
+  rect(g,x-7,y-9,w+14,h+30,13,0x051c1c,.48);
+  rect(g,x,y,w,h,7,0x4b362b);
+  rect(g,x+5,y+5,w-10,h-10,4,0x786043);
+  rect(g,x+12,y+23,w-24,32,4,0x172b28);
+  rect(g,x+12,y+64,w-24,32,4,0x172b28);
+  for(let col=0;col<4;col++){
+    const cx=x+12+col*55;
+    if(col<3)line(g,cx+54,y+23,cx+54,y+96,0xa5875c,2,.63);
+  }
+  line(g,x+10,y+58,x+w-10,y+58,0xd6ad74,5,.8);
+  line(g,x+10,y+100,x+w-10,y+100,0xd6ad74,5,.8);
+  textAt(world,'THE LIBRARY',x+w/2,y-26,13,PALETTE.gold,'bold',2,.5);
+  ui.shelfCounter=textAt(world,'LIBRARY  0 / 6',x+8,y+8,9,PALETTE.cream,'bold',.6);
+  ui.shelfStatus=textAt(world,'Empty shelves · tap to deliver books',x+w/2,y+h+21,landscape?10:9,PALETTE.muted,'normal',0,.5);
+  ui.shelfStatus.style.wordWrap=true;
+  ui.shelfStatus.style.wordWrapWidth=landscape?270:220;
+  ui.shelfStatus.style.align='center';
+  const hit=new Graphics();rect(hit,x-8,y-8,w+16,h+25,7,0xffffff,.001);
+  hit.eventMode='static';hit.cursor='pointer';
+  hit.hitArea=new Rectangle(x-8,y-8,w+16,h+25);
+  hit.on('pointertap',()=>{deliveryOpen=!deliveryOpen;refreshText();});
+  world.addChild(hit);
+  ui.readPads=landscape?{
+    Pip:{x:x-32,y:y+h+89},Riff:{x:x+125,y:y+h+89}
+  }:{
+    Pip:{x:x+35,y:y+h+85},Riff:{x:x+153,y:y+h+85}
+  };
+  const pads=new Graphics();world.addChild(pads);
+  for(const [name,point] of Object.entries(ui.readPads)){
+    ellipse(pads,point.x,point.y+90,52,16,name==='Pip'?0x3c8577:0x8172aa,.41);
+    ellipse(pads,point.x,point.y+94,42,10,PALETTE.dark,.36);
+  }
+}
+function makeDeliveryTray(world){
+  const layer=new Container();world.addChild(layer);
+  ui.deliveryTray=layer;
+  const dimmer=new Graphics();rect(dimmer,0,0,W,H,0,0x041518,.79);
+  dimmer.eventMode='static';dimmer.hitArea=new Rectangle(0,0,W,H);
+  dimmer.on('pointertap',()=>{deliveryOpen=false;refreshText();});
+  layer.addChild(dimmer);
+  const wide=landscape;
+  const bw=wide?Math.min(W-90,705):Math.min(W-24,402);
+  const bh=wide?272:405;
+  const x=(W-bw)/2,y=Math.max(18,(H-bh)/2);
+  const backing=new Graphics();layer.addChild(backing);
+  rect(backing,x,y,bw,bh,16,0x10302d);
+  backing.roundRect(x,y,bw,bh,16).stroke({color:PALETTE.gold,width:2,alpha:.7});
+  textAt(layer,'BOOK DELIVERY',x+20,y+17,wide?22:18,PALETTE.cream,'bold',1.6);
+  textAt(layer,'Choose a cover to put one real copy on an empty shelf.',x+20,y+49,wide?14:11,PALETTE.mint);
+  const cols=wide?3:1;
+  BOOK_IDS.forEach((id,i)=>{
+    const def=LIBRARY_CATALOG[id];
+    const cx=wide?x+19+i*(bw-38)/3:x+20;
+    const cy=wide?y+83:y+79+i*99;
+    const cw=wide?(bw-56)/3:bw-40;
+    const ch=wide?165:86;
+    const cover=new Graphics();layer.addChild(cover);
+    rect(cover,cx,cy,cw,ch,10,0x21443b);
+    cover.roundRect(cx,cy,cw,ch,10).stroke({color:0x54705f,width:1,alpha:.75});
+    rect(cover,cx+12,cy+9,wide?49:47,ch-18,5,def.color,.92);
+    line(cover,cx+21,cy+16,cx+21,cy+ch-16,0x193e37,2,.6);
+    circle(cover,cx+(wide?36:35),cy+ch*.52,9,0x163632,.76);
+    const textX=cx+(wide?69:70);
+    const title=textAt(layer,def.title,textX,cy+(wide?31:12),wide?15:14,PALETTE.cream,'bold');
+    title.style.wordWrap=true;title.style.wordWrapWidth=cw-(wide?78:84);
+    const subtitle=textAt(layer,def.subtitle,textX,cy+(wide?76:39),wide?11:10,PALETTE.muted);
+    subtitle.style.wordWrap=true;subtitle.style.wordWrapWidth=cw-(wide?78:84);
+    cover.eventMode='static';cover.cursor='pointer';cover.hitArea=new Rectangle(cx,cy,cw,ch);
+    cover.on('pointertap',()=>{
+      const outcome=grove.library.donate(id);
+      grove.push(outcome.ok?'A copy of '+def.title+' arrives on the shelf.':outcome.reason);
+      if(outcome.ok)saveMemory(grove.snapshot());
+      deliveryOpen=false;refreshText();
+    });
+    const donated=grove.library.books.some(b=>b.type===id);
+    if(donated){
+      // The cover exists in the delivery case, but cannot generate duplicate stock.
+      textAt(layer,'ALREADY DELIVERED',cx+cw-10,cy+ch-18,wide?9:10,PALETTE.gold,'bold',0,1);
+    }
+  });
+  textAt(layer,'Tap outside the case to return to the grove.',x+bw/2,y+bh-26,11,PALETTE.muted,'normal',0,.5);
+  layer.visible=deliveryOpen;
+}
+function moveReaders(){
+  if(!grove || !ui.homePositions || !ui.readPads)return;
+  const smoothing=Math.min(1,app.ticker.deltaMS/16.667*.065);
+  for(const name of ['Pip','Riff']){
+    const task=grove.library.status(name);
+    const home=ui.homePositions[name];
+    const position=task && task.stage!=='returning'?ui.readPads[name]:home;
+    const avatar=name==='Pip'?ui.pip:ui.riff;
+    if(!avatar?.group)continue;
+    avatar.group.x+=(position.x-avatar.group.x)*smoothing;
+    avatar.group.y+=(position.y-avatar.group.y)*smoothing;
+    const displayed=name==='Pip'?ui.pipPos:ui.riffPos;
+    displayed.x=avatar.group.x;displayed.y=avatar.group.y;
+  }
+}
+function renderPhysicalBooks(){
+  const g=ui.booksDrawing;if(!g || !grove)return;
+  g.clear();
+  const {x,y}=ui.shelfBounds;
+  for(const book of grove.library.books){
+    const def=LIBRARY_CATALOG[book.type];
+    if(book.state==='shelf'){
+      const px=x+17+(book.slot%3)*55,py=y+31+Math.floor(book.slot/3)*41;
+      rect(g,px,py,43,25,3,def.color);
+      rect(g,px+4,py+3,7,19,2,0x21443b,.62);
+      line(g,px+16,py+8,px+37,py+8,0x123b30,2,.55);
+      line(g,px+16,py+15,px+32,py+15,0x123b30,2,.36);
+      continue;
+    }
+    const agent=book.owner==='Pip'?ui.pip:ui.riff;
+    if(!agent?.group)continue;
+    const bx=agent.group.x+20,by=agent.group.y+36;
+    rect(g,bx-11,by-9,26,19,3,def.color);
+    rect(g,bx-9,by-7,4,15,1,0x17372e,.6);
+    line(g,bx-2,by-2,bx+10,by-2,0x234438,2,.7);
+    if(book.state==='reading'){
+      const fraction=Math.min(1,book.progress/def.readBars);
+      rect(g,bx-22,by-27,49,4,2,0x0c2828);
+      rect(g,bx-22,by-27,49*fraction,4,2,PALETTE.mint);
+    }
+  }
+}
 function buildCanvas(){
   // Rebuild graphics, never the agent state, on resize/orientation change.
   for(const child of root.removeChildren())child.destroy({children:true});
@@ -512,6 +645,7 @@ function buildCanvas(){
   ui.homePositions={Pip:{...ui.pipPos},Riff:{...ui.riffPos}};
   ui.pip=makeDrummer(world,ui.pipPos.x,ui.pipPos.y,actorScale);
   ui.riff=makeGuitarist(world,ui.riffPos.x,ui.riffPos.y,actorScale);
+  ui.booksDrawing=new Graphics();world.addChild(ui.booksDrawing);
   ui.pip.group.eventMode='static';ui.pip.group.hitArea=new Rectangle(-115,-125,230,285);
   ui.riff.group.eventMode='static';ui.riff.group.hitArea=new Rectangle(-115,-125,230,285);
   ui.pip.group.cursor='pointer';ui.riff.group.cursor='pointer';
@@ -646,8 +780,8 @@ function renderEffects(time){
     circle(fx,x,y,n.size*.47,n.color,fade*.83);
     line(fx,x+n.size*.3,y-7,x+n.size*.3,y,n.color,2,fade);
   });
-  renderPhysicalBooks();
   moveReaders();
+  renderPhysicalBooks();
   for(const a of ambient){
     const t=time/1000*a.speed+a.phase;
     a.sprite.position.set(a.x+Math.cos(t)*9,a.y+Math.sin(t*.77)*13);
