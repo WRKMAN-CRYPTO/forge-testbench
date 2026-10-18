@@ -21,9 +21,47 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys.add(k);if(['arro
 addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
 function setStick(e){const bx=92,by=H-98,dx=e.clientX-bx,dy=e.clientY-by,l=Math.max(1,Math.hypot(dx,dy));move.x=dx/l*Math.min(1,l/60);move.y=dy/l*Math.min(1,l/60)}
 function editTap(e){const x=W*.1,y=H*.13,w=W*.8,h=H*.74;if(mode==='menu'){const i=Math.floor((e.clientY-(y+65))/58);if(i>=0&&i<2){selection=i;choose()}}else{if(e.clientY>y+h-58){if(e.clientX<x+146)back();else if(e.clientX<x+300)map.fill(0);return}const cell=Math.min((w-48)/32,(h-145)/32),gx=x+24,gy=y+82,cx=Math.floor((e.clientX-gx)/cell),cy=Math.floor((e.clientY-gy)/cell);if(cx>=0&&cx<32&&cy>=0&&cy<32)map[cy*32+cx]^=1}}
-canvas.addEventListener('pointerdown',e=>{e.preventDefault();touchMode=touchMode||e.pointerType==='touch';canvas.setPointerCapture(e.pointerId);pointer.x=e.clientX;pointer.y=e.clientY;if(e.clientX>W-125&&e.clientY<58){mode=mode==='world'?'menu':'world';move.x=move.y=0;return}if(mode!=='world'){editTap(e);return}if(touchMode&&stick.id===null&&e.clientX<170&&e.clientY>H-180){stick.id=e.pointerId;setStick(e);return}if(touchMode){aim.id=e.pointerId;pointer.x=e.clientX;pointer.y=e.clientY;cast();return}cast()});
-canvas.addEventListener('pointermove',e=>{if(e.pointerId===stick.id){setStick(e);return}if(e.pointerId===aim.id||!touchMode){pointer.x=e.clientX;pointer.y=e.clientY}});
-function release(e){if(e.pointerId===stick.id){stick.id=null;move.x=move.y=0}if(e.pointerId===aim.id)aim.id=null}
+canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch')return;e.preventDefault();touchMode=touchMode||e.pointerType==='touch';canvas.setPointerCapture(e.pointerId);pointer.x=e.clientX;pointer.y=e.clientY;if(e.clientX>W-125&&e.clientY<58){mode=mode==='world'?'menu':'world';move.x=move.y=0;return}if(mode!=='world'){editTap(e);return}if(touchMode&&stick.id===null&&e.clientX<170&&e.clientY>H-180){stick.id=e.pointerId;setStick(e);return}if(touchMode){aim.id=e.pointerId;pointer.x=e.clientX;pointer.y=e.clientY;cast();return}cast()});
+canvas.addEventListener('pointermove',e=>{if(e.pointerType==='touch')return;if(e.pointerId===stick.id){setStick(e);return}if(e.pointerId===aim.id||!touchMode){pointer.x=e.clientX;pointer.y=e.clientY}});
+function release(e){if(e.pointerType==='touch')return;if(e.pointerId===stick.id){stick.id=null;move.x=move.y=0}if(e.pointerId===aim.id)aim.id=null}
+// On iOS, multitouch pointer capture can cancel the movement pointer when another finger casts.
+// Track actual touches by stable Touch.identifier and reconcile ownership on every event.
+const touchStick={id:null};
+function touchCoords(t){return {clientX:t.clientX,clientY:t.clientY}}
+function reconcileTouches(e){
+  const active=new Set(Array.from(e.touches,t=>t.identifier));
+  if(touchStick.id!==null&&!active.has(touchStick.id)){touchStick.id=null;move.x=0;move.y=0}
+  if(aim.id!==null&&!active.has(aim.id))aim.id=null;
+}
+function handleTouchStart(e){
+  e.preventDefault();touchMode=true;reconcileTouches(e);
+  for(const t of Array.from(e.changedTouches)){
+    const p=touchCoords(t);
+    if(p.clientX>W-125&&p.clientY<58){mode=mode==='world'?'menu':'world';move.x=move.y=0;touchStick.id=null;continue}
+    if(mode!=='world'){editTap(p);continue}
+    if(touchStick.id===null&&p.clientX<170&&p.clientY>H-180){touchStick.id=t.identifier;setStick(p)}
+    else{aim.id=t.identifier;pointer.x=p.clientX;pointer.y=p.clientY;cast()}
+  }
+}
+function handleTouchMove(e){
+  e.preventDefault();reconcileTouches(e);
+  for(const t of Array.from(e.changedTouches)){
+    if(t.identifier===touchStick.id)setStick(touchCoords(t));
+    else if(t.identifier===aim.id){pointer.x=t.clientX;pointer.y=t.clientY}
+  }
+}
+function handleTouchEnd(e){
+  e.preventDefault();
+  for(const t of Array.from(e.changedTouches)){
+    if(t.identifier===touchStick.id){touchStick.id=null;move.x=move.y=0}
+    if(t.identifier===aim.id)aim.id=null;
+  }
+  reconcileTouches(e);
+}
+canvas.addEventListener('touchstart',handleTouchStart,{passive:false});
+canvas.addEventListener('touchmove',handleTouchMove,{passive:false});
+canvas.addEventListener('touchend',handleTouchEnd,{passive:false});
+canvas.addEventListener('touchcancel',handleTouchEnd,{passive:false});
 canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);addEventListener('blur',()=>{move.x=move.y=0;stick.id=aim.id=null;keys.clear()});
 function loop(t){const dt=Math.min(.05,(t-last)/1000||0);last=t;acc+=dt;let n=0;while(acc>=1/60&&n++<4){step(1/60);acc-=1/60}draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
 })();
