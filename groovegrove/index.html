@@ -199,8 +199,8 @@ class Grove {
     const solo=this.mode==='solo';
     // A practice room can hold two soloists without making them a duo.
     // They exchange turns every two bars. Only a mutual choice creates joint music.
-    const pipActive=(!solo || bar%4<2) && !this.library.busy('Pip');
-    const riffActive=(!solo || bar%4>=2) && !this.library.busy('Riff');
+    const pipActive=(!solo || bar%4<2 || this.library.busy('Riff')) && !this.library.busy('Pip');
+    const riffActive=(!solo || bar%4>=2 || this.library.busy('Pip')) && !this.library.busy('Riff');
     const riffOffset=this.riff.rhythmOffset();
     const guitarOnset=t+riffOffset/1000;
     const originalChords=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[146.83,185,220]];
@@ -714,7 +714,7 @@ function refreshText(){
       ui.log.forEach((t,i)=>{t.text=rows[i]?.message||'';});
     }else ui.log[0].text=grove.logs[0]?.message||'';
     const who=selected==='Pip'?grove.pip:grove.riff;
-    ui.inspect.text=who.name.toUpperCase()+' · '+who.currentGoal+'  |  tap either musician to inspect';
+    ui.inspect.text=who.name.toUpperCase()+' · '+who.currentGoal+(grove.library.known[who.name].length?' · '+grove.library.known[who.name].length+' book skills':'')+'  |  tap either musician';
   }else ui.inspect.text='Tap a musician to follow their decisions';
   ui.badgeText.text=!started?'TAP ANYWHERE TO START':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
   ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
