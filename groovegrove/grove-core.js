@@ -99,14 +99,6 @@ export class Grove {
       }
       if(singer.stage==='humming')singer.curiosity=clamp(singer.curiosity+.0003,0,1);
     }
-    if(beat===0){
-      const vocal=tryVocalPhrase({
-        singer,library:this.library,space:this.space,bar,time:t,beatDur,
-        audio,journal:this.voiceJournal,onNote:this.onNote
-      });
-      if(vocal?.ensemble&&this.voiceJournal.sharedPhrases===1)
-        this.push('Murmur chooses to sing with the others for the first time.');
-    }
     // A practice room can hold two soloists without making them a duo.
     // They exchange turns every two bars. Only a mutual choice creates joint music.
     const pipActive=(!solo || bar%4<2 || this.library.busy('Riff')) &&
@@ -115,6 +107,15 @@ export class Grove {
     const riffActive=(!solo || bar%4>=2 || this.library.busy('Pip')) &&
       !this.library.busy('Riff') && !this.space.traveling('Riff') &&
       this.space.destination('Riff')!=='pond';
+    if(beat===0){
+      const vocal=tryVocalPhrase({
+        singer,library:this.library,space:this.space,bar,time:t,beatDur,
+        audio,journal:this.voiceJournal,onNote:this.onNote,
+        playing:{Pip:pipActive,Riff:riffActive}
+      });
+      if(vocal?.ensemble&&this.voiceJournal.sharedPhrases===1)
+        this.push('Murmur chooses to sing with the others for the first time.');
+    }
     const riffOffset=this.riff.rhythmOffset();
     const guitarOnset=t+riffOffset/1000;
     const originalChords=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[146.83,185,220]];
