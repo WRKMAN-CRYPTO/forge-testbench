@@ -18,7 +18,7 @@ const mockGlobal={
  WRKMAN_AGENT_SIZING:Size,
  WRKMAN_SWARM_RUNES:Runes,
  WRKMAN_FIELD_PHYSICS:{VERSION:"037"},
- WRKMAN_ELEMENT_SOURCES:{},
+ WRKMAN_ELEMENT_SOURCES:{byId:id=>({rgb:[0,0xff8744,0x44c9ed,0xa7d8ff,0xffee55][id]||0xffffff})},
  WRKMAN_SPELL_PRESENCE:{paintAccents(){}}
 };
 function load(filename,extra={}){
