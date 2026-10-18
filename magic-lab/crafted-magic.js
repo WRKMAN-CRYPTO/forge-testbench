@@ -12,6 +12,8 @@
  'use strict';
  const Motion=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_PHYSICS:null;
  if(!Motion)throw Error('Canonical field physics 037 is missing');
+ const SIZE=typeof globalThis==='object'?globalThis.WRKMAN_AGENT_SIZING:null;
+ const doubledRadius=r=>SIZE?.visualRadius?SIZE.visualRadius(r):r*2;
  const Impacts=typeof globalThis==='object'?globalThis.WRKMAN_FIELD_IMPACTS:null;
  if(!Impacts)throw Error('Field collision kernel 039 is missing');
  const Sources=typeof globalThis==='object'?globalThis.WRKMAN_ELEMENT_SOURCES:null;
@@ -95,7 +97,7 @@
     a.vx*st.right.x*st.worldW+a.vy*st.forward.x*st.worldH:a.vx;
    const vy=st.delivery==='world'?
     a.vx*st.right.y*st.worldW+a.vy*st.forward.y*st.worldH:a.vy;
-   pieces.push({agent:a,x:p.x,y:p.y,r:Math.max(.9,radius),color,angle:Math.atan2(vy,vx),
+   pieces.push({agent:a,x:p.x,y:p.y,r:doubledRadius(Math.max(.9,radius)),color,angle:Math.atan2(vy,vx),
     element:a.element||0,seed:a.seed||i,palette:cfg.palette,progress:a.progress||.44,
     texture:cfg.texture,opacity:(.18+(.14+cfg.light/100*.84)*.63)});
   }
@@ -279,8 +281,9 @@
     colors[1].map((v,j)=>lerp(v,colors[2][j],(t-.5)*2));
    const col=a.element?Sources.byId(a.element).rgb:
      (Math.round(c[0])<<16)|(Math.round(c[1])<<8)|Math.round(c[2]);
-   const r=(cfg.mode==='ab'?1.2+3.1*clamp(a.progress,0,1):2.8)+
-     (Runes.mass(a)>1?Runes.radius(a):0)+(st.focus?.radiusBonus||0)+Math.sin(st.motionTime*3.3+a.seed)*.28;
+   // 092 2× footprint across all agent elements, runes and draw backends.
+   const r=doubledRadius((cfg.mode==='ab'?1.2+3.1*clamp(a.progress,0,1):2.8)+
+     (Runes.mass(a)>1?Runes.radius(a):0)+(st.focus?.radiusBonus||0)+Math.sin(st.motionTime*3.3+a.seed)*.28);
    if(a.tail?.length){
     const first=worldPosition(st,a,a.tail[0][0],a.tail[0][1]);
     g.lineStyle(Math.max(.55,r*.6),col,st.focus?.focused?st.focus.trailAlpha*light:.075*light);
