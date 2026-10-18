@@ -85,7 +85,7 @@
   const colors=palettes[cfg.palette],pieces=[];
   for(let i=0;i<dead.length;i+=stride){
    const a=dead[i],p=worldPosition(st,a);
-   if(camera&&(p.x<camera.x-24||p.x>camera.right+24||p.y<camera.y-24||p.y>camera.bottom+24))continue;
+   if(camera&&(p.x<camera.x-48||p.x>camera.right+48||p.y<camera.y-48||p.y>camera.bottom+48))continue;
    const t=cfg.mode==='ab'?clamp(a.progress||0,0,1):.44;
    const c=t<.5?colors[0].map((v,j)=>lerp(v,colors[1][j],t*2)):
     colors[1].map((v,j)=>lerp(v,colors[2][j],(t-.5)*2));
@@ -275,7 +275,7 @@
   let visible=0;
   for(let i=0;i<n;i+=stride){
    const a=st.agents[i],pt=worldPosition(st,a),x=pt.x,y=pt.y;
-   if(camera&&(x<camera.x-24||x>camera.right+24||y<camera.y-24||y>camera.bottom+24))continue;
+   if(camera&&(x<camera.x-48||x>camera.right+48||y<camera.y-48||y>camera.bottom+48))continue;
    const t=cfg.mode==='ab'?clamp(a.progress,0,1):.44,c=t<.5?
     colors[0].map((v,j)=>lerp(v,colors[1][j],t*2)):
     colors[1].map((v,j)=>lerp(v,colors[2][j],(t-.5)*2));
