@@ -20,6 +20,7 @@ import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
 import { Grove } from './grove-core.js';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
+import { LiveNoteConductor } from './live-note-conductor.js?v=20261018-jitter';
 
 document.documentElement.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;background:#081b1d';
 document.body.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;touch-action:none';
@@ -643,7 +644,7 @@ function refreshText(){
     const error=grove.baseline();
     ui.pipMetric.text='PIP   '+(error==null?'collecting timing...':fmt(error)+' RMS drift');
     ui.riffMetric.text='RIFF   guitar pulse · ~7 ms spread';
-    ui.memoryMetric.text=remoteLive?('BAR '+grove.bar+' · '+grove.familiarity+' shared · '+grove.jams+' jams'):(grove.familiarity+' shared sessions  ·  '+grove.lessons+' lessons  ·  '+grove.jams+' jams');
+    ui.memoryMetric.text=remoteLive?('BAR '+Math.max(grove.bar,Math.floor(serverLastBeat/4))+' · '+grove.familiarity+' shared · '+grove.jams+' jams'):(grove.familiarity+' shared sessions  ·  '+grove.lessons+' lessons  ·  '+grove.jams+' jams');
     if(landscape){
       const rows=grove.logs.slice(0,3);
       ui.log.forEach((t,i)=>{t.text=rows[i]?.message||'';});
@@ -776,6 +777,9 @@ function elapsedP(x){return Math.max(0,x);}
 // Remote is optional until a Railway service exists. No client secret is
 // published in source; pairing lives in the URL fragment and local phone store.
 let remoteLive=false,remoteOnline=false,remotePolling=false,remoteSequence=0;
+const liveConductor=new LiveNoteConductor({delayMs:1900});
+const pendingVisualNotes=[];
+let lastRemoteWorldAt=0;
 let remoteTimer=null,serverMessage='',serverKey='',returnReport=null,returnReportUntil=0,serverLastBeat=0;
 const SERVER_KEY_STORE='groovegrove.private.server.key';
 const serverBase=(GROVE_SERVER_URL||'').replace(/\/+$/,'');
@@ -852,52 +856,76 @@ async function attachLivingServer(){
     }
     remoteLive=true;remoteOnline=true;remoteSequence=status.seq;serverLastBeat=status.beat||0;
     acceptRemoteWorld(status.world);
+    lastRemoteWorldAt=Date.now();
     grove.push('The grove now keeps playing when you close the page.');
     saveMemory(grove.snapshot());
-    remoteTimer=setInterval(pollLivingServer,700);
+    // Compact 450 ms note polls; detailed journals refresh every 5 seconds.
+    remoteTimer=setInterval(pollLivingServer,450);
     await pollLivingServer();
   }catch(e){
     serverMessage='Server not ready · local Grove remains available';
     remoteOnline=false;
   }
 }
-function playLivingEvents(data){
+function playLivingEvents(data,sentAtMs,receivedAtMs){
   if(!started || sound.context?.state!=='running')return;
-  const ctx=sound.context;
-  const now=ctx.currentTime;
-  const received=Array.isArray(data.events)?data.events:[];
-  const rendered=new Set();
-  for(const event of received){
-    if(!event || !Number.isFinite(event.atMs))continue;
-    const at=now+.85+(event.atMs-data.serverNow)/1000;
-    if(at<now+.025 || at>now+2.7)continue;
-    const v=Number(event.volume);
-    if(!Number.isFinite(v))continue;
-    if(event.kind==='guitar' && Number.isFinite(event.freq)){
-      sound.guitar(event.freq,at,v,Number(event.duration)||.3);
-    }else if(event.kind==='kick')sound.kick(at,v);
-    else if(event.kind==='snare')sound.snare(at,v);
-    else if(event.kind==='hat')sound.hat(at,v);
-    const musician=event.kind==='guitar'?'Riff':'Pip';
-    const beatKey=musician+'/'+event.bar+'/'+event.beat;
-    if(!rendered.has(beatKey)){
-      rendered.add(beatKey);
-      emitVisualNote({agent:musician,time:at,beat:event.beat,delta:0});
+  // One Web Audio clock determines all beat positions, independent of the
+  // timing of HTTP responses. Never alter the musicians' scheduled notes.
+  const playedKeys=new Set();
+  liveConductor.receive(data,{
+    context:sound.context,sentAtMs,receivedAtMs,
+    play:(event,when)=>{
+      const v=event.volume;
+      if(event.kind==='guitar')sound.guitar(event.freq,when,v,Number(event.duration)||.3);
+      else if(event.kind==='kick')sound.kick(when,v);
+      else if(event.kind==='snare')sound.snare(when,v);
+      else if(event.kind==='hat')sound.hat(when,v);
+    },
+    onNote:(event,when)=>{
+      const name=event.kind==='guitar'?'Riff':'Pip';
+      const key=name+'/'+event.bar+'/'+event.beat;
+      if(playedKeys.has(key))return;
+      playedKeys.add(key);
+      // Visible drum strikes and strums belong to the actual sound time.
+      pendingVisualNotes.push({name,at:when,beat:event.beat});
+      if(pendingVisualNotes.length>240)pendingVisualNotes.splice(0,pendingVisualNotes.length-240);
     }
+  });
+}
+function flushLiveVisuals(){
+  if(!remoteLive||!pendingVisualNotes.length)return;
+  const ctx=sound.context;
+  if(!ctx||ctx.state!=='running'){pendingVisualNotes.length=0;return;}
+  const now=ctx.currentTime;
+  for(let i=0;i<pendingVisualNotes.length;){
+    const note=pendingVisualNotes[i];
+    if(note.at>now+.04){i++;continue;}
+    pendingVisualNotes.splice(i,1);
+    if(note.at>=now-.18)emitVisualNote({agent:note.name,beat:note.beat});
   }
 }
 async function pollLivingServer(){
   if(!remoteLive||remotePolling)return;
   remotePolling=true;
   try{
-    const data=await serverRequest('/v1/poll?since='+remoteSequence);
+    const wantWorld=Date.now()-lastRemoteWorldAt>5000;
+    const sendAt=performance.now();
+    const data=await serverRequest('/v1/poll?since='+remoteSequence+'&compact=1'+(wantWorld?'&world=1':''));
+    const receivedAt=performance.now();
+    if(Number.isFinite(data.seq) && data.seq<remoteSequence){
+      // Railway restart: sequence numbers roll over to a fresh session.
+      remoteSequence=0;
+      liveConductor.reset();pendingVisualNotes.length=0;
+      lastRemoteWorldAt=0;
+    }
     remoteSequence=data.seq;
     serverLastBeat=data.beat||serverLastBeat;
     remoteOnline=true;serverMessage='';
-    // Schedule the exact notes chosen in the remote world. The browser
-    // never runs a rival simulation while connected.
-    playLivingEvents(data);
-    acceptRemoteWorld(data.world);
+    playLivingEvents(data,sendAt,receivedAt);
+    if(data.world){
+      lastRemoteWorldAt=Date.now();
+      acceptRemoteWorld(data.world);
+    }else refreshText();
   }catch(e){
     remoteOnline=false;serverMessage='Connection interrupted; the server keeps its own journal.';
     refreshText();
@@ -907,6 +935,7 @@ async function deliverRemoteBook(type){
   try{
     if(!serverKey)throw Error('Open your private pairing link to donate books.');
     await serverRequest('/v1/donate',{method:'POST',body:{type},privateAction:true});
+    lastRemoteWorldAt=0;
     await pollLivingServer();
   }catch(e){
     grove.push('Book delivery failed: '+e.message);
@@ -925,6 +954,7 @@ async function startAudio(force=false){
   const repair=force || soundNeedsRefresh || (started && sound.context?.state==='closed');
   try{
     await sound.start(remoteLive?null:onScheduledBeat,{fresh:repair,chime:repair,passive:remoteLive});
+    if(remoteLive){liveConductor.reset();pendingVisualNotes.length=0;}
     started=true;startError='';soundNeedsRefresh=false;
     if(repair)grove.push('The audio engine was reconnected without resetting the musicians.');
     else if(first)grove.push(grove.library.anyBusy()?'The music resumes. Interrupted reading continues.':'Pip and Riff begin playing. Neither has been told to form a band.');
@@ -969,6 +999,7 @@ function checkpointAndRecover(){
   if(grove)saveMemory(grove.snapshot());
   // A WebKit AudioContext can remain 'running' but silent after a phone call.
   if(started)soundNeedsRefresh=true;
+  if(remoteLive){liveConductor.reset();pendingVisualNotes.length=0;lastRemoteWorldAt=0;}
 }
 function recoverAudioAfterInterruption(){
   if(!document.hidden && started && sound.context){
@@ -1006,12 +1037,13 @@ applyViewportSize(true);
 await attachLivingServer();
 app.ticker.add(()=>{
   const t=performance.now();
+  flushLiveVisuals();
   renderEffects(t);
   redrawAccum+=app.ticker.deltaMS;
   if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
 });
 // Inspectable test hooks; not part of the rendered interface.
-window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get journal(){return grove.understanding.snapshot();},get server(){return {connected:remoteLive,online:remoteOnline,message:serverMessage,beat:serverLastBeat,sequence:remoteSequence,returnReport,url:serverBase};},journalReport(name){return grove.understanding.report(name==='Riff'?'Riff':'Pip');},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get audioError(){return startError;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove(null,saveMemory);grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
+window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get journal(){return grove.understanding.snapshot();},get server(){return {connected:remoteLive,online:remoteOnline,message:serverMessage,beat:serverLastBeat,sequence:remoteSequence,returnReport,url:serverBase,audioBuffer:liveConductor.stats};},journalReport(name){return grove.understanding.report(name==='Riff'?'Riff':'Pip');},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get audioError(){return startError;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove(null,saveMemory);grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
 </script>
 </body>
 </html>
