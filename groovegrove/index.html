@@ -589,10 +589,10 @@ function moveReaders(){
     const position=task && task.stage!=='returning'?ui.readPads[name]:home;
     const avatar=name==='Pip'?ui.pip:ui.riff;
     if(!avatar?.group)continue;
-    avatar.group.x+=(position.x-avatar.group.x)*smoothing;
-    avatar.group.y+=(position.y-avatar.group.y)*smoothing;
     const displayed=name==='Pip'?ui.pipPos:ui.riffPos;
-    displayed.x=avatar.group.x;displayed.y=avatar.group.y;
+    displayed.x+=(position.x-displayed.x)*smoothing;
+    displayed.y+=(position.y-displayed.y)*smoothing;
+    avatar.group.position.set(displayed.x,displayed.y);
   }
 }
 function renderPhysicalBooks(){
@@ -886,7 +886,7 @@ app.ticker.add(()=>{
   if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
 });
 // Inspectable test hooks; not part of the rendered interface.
-window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},,get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove();grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
+window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},restart(){grove=new Grove();grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
 </script>
 </body>
 </html>
