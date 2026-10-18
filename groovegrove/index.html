@@ -173,6 +173,22 @@ class SoundEngine {
     if(ctx.createStereoPanner){const p=ctx.createStereoPanner();p.pan.value=pan;env.connect(p);p.connect(this.master);}else env.connect(this.master);
     src.start(t);src.stop(t+duration+.005);
   }
+  voice(freq,t,volume=.15,duration=.5){
+    const ctx=this.context;if(!ctx||ctx.state!=='running')return;
+    // Three resonant vowel formants create a soft wordless humming voice.
+    const envelope=ctx.createGain();
+    envelope.gain.setValueAtTime(.0001,t);
+    envelope.gain.exponentialRampToValueAtTime(Math.max(.001,volume*.42),t+.075);
+    envelope.gain.exponentialRampToValueAtTime(.0001,t+duration);
+    envelope.connect(this.master);
+    for(const [formant,weight] of [[330,.55],[870,.26],[2240,.12]]){
+      const osc=ctx.createOscillator(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+      osc.type='sawtooth';osc.frequency.setValueAtTime(freq,t);
+      filter.type='bandpass';filter.frequency.setValueAtTime(formant,t);filter.Q.value=3.4;
+      gain.gain.value=weight;osc.connect(filter);filter.connect(gain);gain.connect(envelope);
+      osc.start(t);osc.stop(t+duration+.04);
+    }
+  }
   kick(t,volume=1){
     const ctx=this.context,osc=ctx.createOscillator(),gain=ctx.createGain();
     t=Math.max(ctx.currentTime+.002,t);osc.type='sine';
@@ -576,6 +592,14 @@ function buildCanvas(){
   ui.homePositions={Pip:{...ui.pipPos},Riff:{...ui.riffPos}};
   ui.pip=makeDrummer(world,ui.pipPos.x,ui.pipPos.y,actorScale);
   ui.riff=makeGuitarist(world,ui.riffPos.x,ui.riffPos.y,actorScale);
+  // Murmur watches the other two before discovering any sound.
+  ui.vocalPos={x:W*.5,y:cy+132};
+  const singer=new Graphics();world.addChild(singer);
+  ellipse(singer,ui.vocalPos.x,ui.vocalPos.y+24,26,7,0x142e2c,.45);
+  circle(singer,ui.vocalPos.x,ui.vocalPos.y,20,0xe3c2a0);
+  circle(singer,ui.vocalPos.x-6,ui.vocalPos.y-3,2,0x29463f);
+  circle(singer,ui.vocalPos.x+6,ui.vocalPos.y-3,2,0x29463f);
+  textAt(world,'MURMUR',ui.vocalPos.x,ui.vocalPos.y+27,11,PALETTE.cream,'bold',0,.5);
   ui.booksDrawing=new Graphics();world.addChild(ui.booksDrawing);
   ui.pip.group.eventMode='static';ui.pip.group.hitArea=new Rectangle(-115,-125,230,285);
   ui.riff.group.eventMode='static';ui.riff.group.hitArea=new Rectangle(-115,-125,230,285);
@@ -703,9 +727,9 @@ function renderMeter(){
 }
 
 function emitVisualNote(e){
-  const p=e.agent==='Pip'?ui.pipPos:ui.riffPos;
+  const p=e.agent==='Pip'?ui.pipPos:e.agent==='Riff'?ui.riffPos:ui.vocalPos;
   if(!p)return;
-  const tone=e.agent==='Pip'?PALETTE.mint:PALETTE.lilac;
+  const tone=e.agent==='Pip'?PALETTE.mint:e.agent==='Riff'?PALETTE.lilac:0xf5cf9c;
   floatingNotes.push({x:p.x+rand(-20,18),y:p.y-110+(landscape?0:25),vx:rand(-.38,.38),born:performance.now(),color:tone,size:rand(6,10)});
   if(floatingNotes.length>24)floatingNotes.shift();
   noteFlash[e.agent]=performance.now();
@@ -880,9 +904,10 @@ function playLivingEvents(data,sentAtMs,receivedAtMs){
       else if(event.kind==='kick')sound.kick(when,v);
       else if(event.kind==='snare')sound.snare(when,v);
       else if(event.kind==='hat')sound.hat(when,v);
+      else if(event.kind==='voice')sound.voice(event.freq,when,v,Number(event.duration)||.5);
     },
     onNote:(event,when)=>{
-      const name=event.kind==='guitar'?'Riff':'Pip';
+      const name=event.kind==='guitar'?'Riff':event.kind==='voice'?'Murmur':'Pip';
       const key=name+'/'+event.bar+'/'+event.beat;
       if(playedKeys.has(key))return;
       playedKeys.add(key);
