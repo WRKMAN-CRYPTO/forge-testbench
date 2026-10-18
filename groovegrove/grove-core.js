@@ -1,7 +1,9 @@
 /* GrooveGrove shared simulation. Same classes in server + client. */
 import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261018-pass004';
 import {ListeningJournal} from './listening-journal.js';
-import {GroveWorld} from './grove-world.js?v=20261018-spatial';
+import {GroveWorld} from './grove-world.js?v=20261018-voice';
+import {VoiceJournal} from './voice-journal.js?v=20261018-voice';
+import {tryVocalPhrase} from './voice-music.js?v=20261018-voice';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const rand=(a,b)=>a+(b-a)*Math.random();
@@ -36,7 +38,9 @@ export class Grove {
       listening:Math.max(0,old.listening||0),curiosity:clamp(old.curiosity??.35,0,1),
       attempts:Math.max(0,old.attempts||0),notes:Math.max(0,old.notes||0),
       firstSound:old.firstSound||null,lastPitch:old.lastPitch||220,
-      rests:Math.max(0,old.rests||0),lastAttemptBar:old.lastAttemptBar??-1};
+      rests:Math.max(0,old.rests||0),lastAttemptBar:old.lastAttemptBar??-1,
+       motif:Array.isArray(old.motif)?old.motif.filter(Number.isFinite).slice(0,4):null,
+       motifCreatedAt:Number.isFinite(old.motifCreatedAt)?old.motifCreatedAt:null};
     this.familiarity=clamp(saved?.familiarity??0,0,99);
     this.lessons=saved?.lessons??0;this.jams=saved?.jams??0;
     this.mode=['solo','jam','lesson'].includes(saved?.mode)?saved.mode:'solo';this.modeBars=Number.isInteger(saved?.modeBars)?clamp(saved.modeBars,0,500):0;this.bar=Number.isInteger(saved?.bar)?Math.max(0,saved.bar):0;this.beat=Number.isInteger(saved?.beat)?clamp(saved.beat,0,3):0;
@@ -45,6 +49,7 @@ export class Grove {
     this.pipPlayed=0;this.riffPlayed=0;this.lastLearning=null;
     this.library=new MusicLibrary(saved?.library);
     this.understanding=new ListeningJournal(saved?.understanding);
+    this.voiceJournal=new VoiceJournal(saved?.voiceJournal);
     this.space=new GroveWorld(saved?.space);
     for(const name of ['Pip','Riff']){
       const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
@@ -67,7 +72,7 @@ export class Grove {
     if(this.onTalk)this.onTalk(from.name,message);
   }
   baseline(){return rms(this.relativeErrors.slice(-16));}
-  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},vocalist:{...this.vocalist},space:this.space.snapshot(),logs:this.logs.slice(0,12)};}
+  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),space:this.space.snapshot(),logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
@@ -94,17 +99,10 @@ export class Grove {
       }
       if(singer.stage==='humming')singer.curiosity=clamp(singer.curiosity+.0003,0,1);
     }
-    if(singer.stage==='humming' && beat===0 && bar-singer.lastAttemptBar>=2 &&
-       Math.random()<.19*singer.curiosity){
-      const pitches=[196,220,246.94,261.63,293.66];
-      const pitch=pitches[Math.floor(Math.random()*pitches.length)];
-      singer.lastPitch=pitch;singer.lastAttemptBar=bar;singer.notes++;
-      const strength=.12+Math.random()*.07;
-      const duration=.36+Math.random()*.45;
-      if(typeof audio.voice==='function')audio.voice(pitch,t+.13,strength,duration);
-      this.space.sound('Murmur','voice',bar,strength*4);
-      if(this.onNote)this.onNote({agent:'Murmur',time:t+.13,beat});
-    }else if(beat===0)singer.rests++;
+    if(beat===0)tryVocalPhrase({
+      singer,library:this.library,space:this.space,bar,time:t,beatDur,
+      audio,journal:this.voiceJournal,onNote:this.onNote
+    });
     // A practice room can hold two soloists without making them a duo.
     // They exchange turns every two bars. Only a mutual choice creates joint music.
     const pipActive=(!solo || bar%4<2 || this.library.busy('Riff')) &&
@@ -138,7 +136,7 @@ export class Grove {
     const play={
       guitar:(freq,at,volume,duration,extra=false)=>{
         audio.guitar(freq,at,volume,duration);
-        this.space.sound('Riff','guitar',bar,volume);
+        this.space.sound('Riff','guitar',bar,volume,freq);
         this.understanding.hear({who:'Riff',kind:'guitar',time:at,bar,beat,velocity:volume,offsetMs:riffOffset,extra,pitch:freq});
       },
       kick:(at,volume,extra=false)=>{
