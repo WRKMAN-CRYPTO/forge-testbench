@@ -1400,6 +1400,9 @@ window.addEventListener('orientationchange',()=>{
 window.addEventListener('pageshow',scheduleViewportSize,{passive:true});
 const saved=await (async()=>{await openMemory();return loadMemory();})();
 grove=new Grove(saved,saveMemory);
+// The offline Web Audio transport resumes at the saved musical beat too.
+// A held chord from last visit must never suppress hours of fresh guitar.
+sound.beat=Math.max(0,grove.bar*4+grove.beat+1);
 grove.onNote=emitVisualNote;
 grove.onTalk=showSpeech;
 applyViewportSize(true);
