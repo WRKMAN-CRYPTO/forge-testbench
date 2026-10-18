@@ -28,6 +28,14 @@ export class Grove {
     this.onCheckpoint=onCheckpoint;
     this.pip=new MusicalAgent('Pip','drummer',{biasMs:clamp(saved?.pipBias??78,-100,150),jitterMs:clamp(saved?.pipJitter??34,7,75)});
     this.riff=new MusicalAgent('Riff','guitarist',{biasMs:0,jitterMs:7});
+    // A third musician arrives without a voice. No timer guarantees a song.
+    // Observation can lead to curiosity, and curiosity can lead to an attempt.
+    const old=saved?.vocalist||{};
+    this.vocalist={name:'Murmur',stage:['silent','exploring','humming'].includes(old.stage)?old.stage:'silent',
+      listening:Math.max(0,old.listening||0),curiosity:clamp(old.curiosity??.35,0,1),
+      attempts:Math.max(0,old.attempts||0),notes:Math.max(0,old.notes||0),
+      firstSound:old.firstSound||null,lastPitch:old.lastPitch||220,
+      rests:Math.max(0,old.rests||0),lastAttemptBar:old.lastAttemptBar??-1};
     this.familiarity=clamp(saved?.familiarity??0,0,99);
     this.lessons=saved?.lessons??0;this.jams=saved?.jams??0;
     this.mode=['solo','jam','lesson'].includes(saved?.mode)?saved.mode:'solo';this.modeBars=Number.isInteger(saved?.modeBars)?clamp(saved.modeBars,0,500):0;this.bar=Number.isInteger(saved?.bar)?Math.max(0,saved.bar):0;this.beat=Number.isInteger(saved?.beat)?clamp(saved.beat,0,3):0;
@@ -57,12 +65,37 @@ export class Grove {
     if(this.onTalk)this.onTalk(from.name,message);
   }
   baseline(){return rms(this.relativeErrors.slice(-16));}
-  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},logs:this.logs.slice(0,12)};}
+  snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},vocalist:{...this.vocalist},logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
     this.beat=beat;this.bar=bar;
     const solo=this.mode==='solo';
+    const singer=this.vocalist;
+    // No random breakthrough countdown. Silence remains an independent choice.
+    if(beat===0){
+      singer.listening++;
+      if(singer.stage==='silent' && Math.random()<.018*singer.curiosity &&
+         singer.listening>12)singer.stage='exploring';
+      if(singer.stage==='exploring' && Math.random()<.055*singer.curiosity &&
+         bar-singer.lastAttemptBar>3){
+        singer.attempts++;singer.lastAttemptBar=bar;
+        // Most exploratory breaths produce no pitched sound.
+        if(Math.random()<.23*singer.curiosity){
+          singer.stage='humming';
+          singer.firstSound={bar,heard:'Pip and Riff',pitch:singer.lastPitch,attempt:singer.attempts};
+          this.push('Murmur discovers a voice: a small, uncertain hum.');
+        }
+      }
+      if(singer.stage==='humming')singer.curiosity=clamp(singer.curiosity+.0003,0,1);
+    }
+    if(singer.stage==='humming' && beat===0 && bar-singer.lastAttemptBar>=2 &&
+       Math.random()<.19*singer.curiosity){
+      const pitches=[196,220,246.94,261.63,293.66];
+      const pitch=pitches[Math.floor(Math.random()*pitches.length)];
+      singer.lastPitch=pitch;singer.lastAttemptBar=bar;singer.notes++;
+      if(typeof audio.voice==='function')audio.voice(pitch,t+.13,.12+Math.random()*.07,.36+Math.random()*.45);
+    }else if(beat===0)singer.rests++;
     // A practice room can hold two soloists without making them a duo.
     // They exchange turns every two bars. Only a mutual choice creates joint music.
     const pipActive=(!solo || bar%4<2 || this.library.busy('Riff')) && !this.library.busy('Pip');
