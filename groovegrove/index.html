@@ -174,20 +174,55 @@ class SoundEngine {
     if(ctx.createStereoPanner){const p=ctx.createStereoPanner();p.pan.value=pan;env.connect(p);p.connect(this.master);}else env.connect(this.master);
     src.start(t);src.stop(t+duration+.005);
   }
-  voice(freq,t,volume=.15,duration=.5){
+  voice(freq,t,volume=.15,duration=.5,expression={}){
     const ctx=this.context;if(!ctx||ctx.state!=='running')return;
-    // Three resonant vowel formants create a soft wordless humming voice.
-    const envelope=ctx.createGain();
-    envelope.gain.setValueAtTime(.0001,t);
-    envelope.gain.exponentialRampToValueAtTime(Math.max(.001,volume*.42),t+.075);
-    envelope.gain.exponentialRampToValueAtTime(.0001,t+duration);
-    envelope.connect(this.master);
-    for(const [formant,weight] of [[330,.55],[870,.26],[2240,.12]]){
-      const osc=ctx.createOscillator(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
-      osc.type='sawtooth';osc.frequency.setValueAtTime(freq,t);
-      filter.type='bandpass';filter.frequency.setValueAtTime(formant,t);filter.Q.value=3.4;
-      gain.gain.value=weight;osc.connect(filter);filter.connect(gain);gain.connect(envelope);
-      osc.start(t);osc.stop(t+duration+.04);
+    // A single oscillator bank is sculpted by vowel-specific vocal formants.
+    // No speech, recordings or text: this is a synthesized musical instrument.
+    const vowels={
+      m:[[300,.53],[870,.24],[2180,.13]],
+      u:[[360,.5],[760,.28],[2320,.11]],
+      o:[[490,.54],[920,.25],[2500,.1]],
+      a:[[810,.44],[1320,.3],[2720,.16]],
+      i:[[300,.39],[2230,.32],[2930,.15]]
+    };
+    const choice=Object.prototype.hasOwnProperty.call(vowels,expression?.vowel)?expression.vowel:'m';
+    const specs=vowels[choice];
+    const onset=Math.max(ctx.currentTime+.003,t);
+    const len=clamp(Number.isFinite(duration)?duration:.5,.17,1.8);
+    const pitch=clamp(Number.isFinite(freq)?freq:220,100,750);
+    const glide=clamp(Number.isFinite(expression?.glide)?expression.glide:0,-2,2);
+    const attack=clamp(Number.isFinite(expression?.attack)?expression.attack:.075,.025,Math.min(.23,len*.33));
+    const release=clamp(Number.isFinite(expression?.release)?expression.release:.08,.035,Math.min(.29,len*.35));
+    const peak=Math.max(.0009,volume*.48);
+    const env=ctx.createGain();
+    env.gain.setValueAtTime(.0001,onset);
+    env.gain.exponentialRampToValueAtTime(peak,onset+attack);
+    env.gain.setValueAtTime(peak*.78,onset+Math.max(attack+.004,len-release));
+    env.gain.exponentialRampToValueAtTime(.0001,onset+len);
+    env.connect(this.master);
+    for(const [formant,mix] of specs){
+      const oscillator=ctx.createOscillator();
+      const filter=ctx.createBiquadFilter();
+      const weight=ctx.createGain();
+      oscillator.type='sawtooth';
+      oscillator.frequency.setValueAtTime(pitch*Math.pow(2,glide/12),onset);
+      oscillator.frequency.linearRampToValueAtTime(pitch,onset+Math.min(.23,len*.55));
+      filter.type='bandpass';
+      filter.frequency.setValueAtTime(formant,onset);
+      filter.Q.value=choice==='m'?3.5:2.7;
+      weight.gain.value=mix;
+      oscillator.connect(filter);filter.connect(weight);weight.connect(env);
+      oscillator.start(onset);oscillator.stop(onset+len+.025);
+    }
+    // Soft audible breath for phrased entrances, without vocal syllables.
+    if(attack>.09 && this.noise){
+      const breath=ctx.createBufferSource(),high=ctx.createBiquadFilter(),air=ctx.createGain();
+      breath.buffer=this.noise;high.type='highpass';high.frequency.value=1700;
+      air.gain.setValueAtTime(.0001,onset);
+      air.gain.linearRampToValueAtTime(Math.max(.0002,volume*.035),onset+.025);
+      air.gain.exponentialRampToValueAtTime(.0001,onset+attack);
+      breath.connect(high);high.connect(air);air.connect(this.master);
+      breath.start(onset);breath.stop(onset+attack+.01);
     }
   }
   kick(t,volume=1){
@@ -1085,7 +1120,7 @@ function playLivingEvents(data,sentAtMs,receivedAtMs){
       else if(event.kind==='kick')sound.kick(when,v);
       else if(event.kind==='snare')sound.snare(when,v);
       else if(event.kind==='hat')sound.hat(when,v);
-      else if(event.kind==='voice')sound.voice(event.freq,when,v,Number(event.duration)||.5);
+      else if(event.kind==='voice')sound.voice(event.freq,when,v,Number(event.duration)||.5,event.expression||{});
     },
     onNote:(event,when)=>{
       const name=event.kind==='guitar'?'Riff':event.kind==='voice'?'Murmur':'Pip';
