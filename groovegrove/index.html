@@ -18,8 +18,8 @@
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
 import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261018-voice';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
-import { Grove } from './grove-core.js?v=20261018-voice';
-import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261018-voice';
+import { Grove } from './grove-core.js?v=20261018-ensemble';
+import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261018-ensemble';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
 import { LiveNoteConductor } from './live-note-conductor.js?v=20261018-voice';
 
@@ -815,7 +815,7 @@ function buildCanvas(){
   const left=landscape?56:28;
   const title=textAt(world,'GROOVEGROVE',left,landscape?22:42,landscape?35:29,PALETTE.cream,'bold',3.4);
   textAt(world,'THREE MINDS  ·  ONE GROOVE',left,landscape?66:83,landscape?12:11,PALETTE.mint,'bold',2.4);
-  textAt(world,'PASS 006    /    VOICE COLLECTION',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
+  textAt(world,'PASS 007    /    MUSICAL CONVERSATIONS',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
   const pip=grove?.space?.people.Pip||{x:681,y:538};
   const riff=grove?.space?.people.Riff||{x:798,y:530};
   const singer=grove?.space?.people.Murmur||{x:754,y:659};
@@ -909,9 +909,12 @@ function refreshText(){
       const v=grove.vocalist;
       const task=grove.library.status('Murmur');
       const book=task&&grove.library.copyById(task.copyId);
-      ui.inspect.text='MURMUR · '+(book?'reading '+LIBRARY_CATALOG[book.type].title:v.stage)+
-        ' · '+v.notes+' sounds · '+grove.voiceJournal.phrases+' phrases'+
-        (grove.library.known.Murmur.length?' · '+grove.library.known.Murmur.length+' vocal skills':'');
+      const actor=(remoteLive&&liveLocations?.Murmur)||grove.space?.people.Murmur;
+      const intent=actor?.ensembleIntent==='joining'?'joining the music':
+        actor?.ensembleIntent==='listening'?'choosing to listen':v.stage;
+      ui.inspect.text='MURMUR · '+(book?'reading '+LIBRARY_CATALOG[book.type].title:intent)+
+        ' · '+grove.voiceJournal.sharedPhrases+' shared phrases'+
+        ' · '+grove.voiceJournal.phrases+' vocal phrases';
     }else{
       const who=selected==='Pip'?grove.pip:grove.riff;
       const purpose=((remoteLive&&liveLocations?.[selected])||grove.space?.people[selected])?.purpose;
@@ -931,7 +934,10 @@ function refreshText(){
   }
   if(ui.cameraHint)ui.cameraHint.text=camera.mode==='free'?'FREE CAMERA · TAP A MUSICIAN TO FOLLOW':
     camera.mode==='place'?'VIEWING '+PLACES[camera.target].label+' · SWIPE TO EXPLORE':
-    'FOLLOWING '+camera.target.toUpperCase()+' · SWIPE TO EXPLORE';
+    'FOLLOWING '+camera.target.toUpperCase()+
+      (camera.target==='Murmur'&&
+        ((remoteLive&&liveLocations?.Murmur)||grove.space?.people.Murmur)?.ensembleIntent==='joining'
+        ?' · JOINING THE MUSIC':'')+' · SWIPE TO EXPLORE';
   if(ui.deliveryTray)ui.deliveryTray.visible=deliveryOpen && !journalOpen;
   for(const [category,page] of Object.entries(ui.deliveryPages||{}))
     page.visible=category===deliveryCategory;
@@ -944,18 +950,22 @@ function refreshText(){
     if(journalName==='Murmur'){
       const v=grove.vocalist,report=grove.voiceJournal.report();
       ui.journalHeading.text='MURMUR · VOCAL NOTEBOOK';
-      ui.journalInfo.text=v.stage+' · '+v.notes+' vocal notes · '+report.phrases+
-        ' phrases · '+report.experiments+' recorded experiments';
-      ui.journalTexture.text='First voice: '+(v.firstSound?'bar '+v.firstSound.bar:'still listening')+
-        ' · '+grove.library.known.Murmur.length+' vocal books studied';
+      ui.journalInfo.text=v.stage+' · '+report.phrases+' phrases · '+
+        report.sharedPhrases+' shared with nearby musicians';
+      ui.journalTexture.text='Riff answered '+report.partnerReplies.Riff+
+        ' · Pip answered '+report.partnerReplies.Pip+
+        ' · '+grove.library.known.Murmur.length+' books studied';
       ui.journalRows.forEach((field,i)=>{
         const note=report.recent[i];
         field.text=note?'Bar '+note.bar+' · '+note.kind+' · vowel '+note.vowel+
           ' · '+note.pitches.length+' notes'+(note.response?' · answered '+note.response:'')+
-          (note.repeated?' · remembered motif':''):
+          (note.repeated?' · remembered motif':'')+
+          (note.ensemble?' · joined in':''):
           (i===0?'No vocal phrases recorded yet. Silence is welcome.':'');
       });
-      ui.journalFoot.text='Real scheduled vocal sounds only. Listening and quiet are valid choices.';
+      ui.journalFoot.text='First hum: '+(v.firstSound?'bar '+v.firstSound.bar:'still listening')+
+        ' · First shared phrase: '+(report.firstSharedPhrase?'bar '+report.firstSharedPhrase.bar:'not yet')+
+        '. Silence remains a choice.';
     }else{
       const report=grove.understanding.report(journalName);
       ui.journalHeading.text=journalName.toUpperCase()+' · PERSONAL NOTES';
