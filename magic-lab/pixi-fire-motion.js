@@ -9,7 +9,7 @@
  if(root)root.WRKMAN_FIRE_MOTION=api;
 })(typeof window!=="undefined"?window:typeof globalThis!=="undefined"?globalThis:null,function(){
  "use strict";
- const VERSION="088-motion-aligned-flames",PI=Math.PI,TWO_PI=PI*2;
+ const VERSION="088b-direction-lock",PI=Math.PI;
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,Number.isFinite(n)?n:a));
  const wrap=x=>Math.atan2(Math.sin(x),Math.cos(x));
  function interpolateAngle(start,target,weight){
@@ -17,6 +17,21 @@
  }
  function smoothstep(a,b,v){
   const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);
+ }
+ // Last meaningful world-space trail segment is preferred over noisy
+ // frame-to-frame displacement. The source already passes trail coordinates
+ // from physics; here they are READ ONLY. Ignore the most recent point if it
+ // happens to coincide with the current agent position.
+ function trailHeading(r){
+  const trail=r?.trail;
+  if(!Array.isArray(trail)||trail.length===0)return null;
+  for(let i=trail.length-1;i>=0;i--){
+   const p=trail[i];
+   if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
+   const dx=r.x-p.x,dy=r.y-p.y,dist=Math.hypot(dx,dy);
+   if(dist>=1.1&&dist<=90)return {dx,dy,dist,angle:Math.atan2(dy,dx)+PI/2};
+  }
+  return null;
  }
  // Each draw submits fresh *references* to the original visual records;
  // never copies or edits any physics agent.
@@ -70,9 +85,11 @@
    const seed=Number(r.seed)||0;
    let old=tracks.get(key);
    if(!old||old.seed!==seed||t-old.t>180||t<old.t){
-    tracks.set(key,{seed,t,x,y,angle:idleAngle,speed:0,heading:idleAngle,
+    const path=trailHeading(r);
+    const angle=path?wrap(path.angle+idleAngle*.03):idleAngle;
+    tracks.set(key,{seed,t,x,y,angle,speed:0,heading:path?.angle??idleAngle,
      frame});
-    return neutral;
+    return {...neutral,rotation:angle,aligned:!!path};
    }
    const dt=t-old.t;
    if(dt<=0){old.frame=frame;return{
@@ -80,25 +97,39 @@
     neighbors};}
    const dx=x-old.x,dy=y-old.y,dist=Math.hypot(dx,dy);
    const measured=dist>95?0:dist*1000/dt;
-   // Frame-rate independent easing, no velocity noise from subpixel drift.
-   const response=clamp(dt/(dt+38),0,1);
+   // Use true scene elapsed time. The visual heading gets its own smoothing;
+   // only the stretch/width responds to measured speed, never to art wobble.
+   const response=clamp(dt/(dt+32),0,1);
    const speed=old.speed+(Math.min(1200,measured)-old.speed)*response;
+   const path=trailHeading(r);
+   const measuredValid=dist>=.45&&dist<=95;
    let heading=old.heading;
-   if(dist>.10&&dist<=95)heading=Math.atan2(dy,dx)+PI/2;
-   // Dense material is allowed to billow rather than looking like arrows.
+   if(path){
+    heading=path.angle;
+    // During reversals, a three-frame-old path can be stale. Use current
+    // displacement when its vector clearly disagrees with the recent trail.
+    if(measuredValid&&(dx*path.dx+dy*path.dy)/(dist*path.dist)<.35)
+     heading=Math.atan2(dy,dx)+PI/2;
+   }else if(measuredValid)heading=Math.atan2(dy,dx)+PI/2;
+   // Most important correction: speed LOCKS orientation, not just a gentle
+   // nudge from idle. Even a mid-speed moving agent must visibly face travel.
+   // Density damps *stretch* and body deformation, not heading accuracy.
    const crowd=clamp(Number(neighbors)||0,0,8);
    const spacing=crowd<=1?1:1-.79*smoothstep(1,7,crowd);
    const influence=smoothstep(24,225,speed)*spacing;
-   const target=interpolateAngle(idleAngle,heading+idleAngle*.16,influence);
-   const turnResponse=clamp(dt/(dt+(influence>.5?30:65)),0,1);
+   const hasDirection=(path!==null||measuredValid)&&dist<=95;
+   const lock=smoothstep(5,38,speed)*(hasDirection?1:.82);
+   const target=interpolateAngle(idleAngle,heading+idleAngle*.035,lock);
+   // 12ms angular lag for confident motion; slower relaxation at rest.
+   const turnResponse=clamp(dt/(dt+(lock>.5?12:42)),0,1);
    const rotation=interpolateAngle(old.angle,target,turnResponse);
    old.t=t;old.x=x;old.y=y;old.frame=frame;
    old.speed=speed;old.heading=heading;old.angle=rotation;
    return {rotation,stretch:1+.39*influence,width:1-.12*influence,
-    influence,speed,neighbors:crowd,aligned:influence>.12};
+    influence,speed,neighbors:crowd,aligned:lock>.6};
   }
   function reset(){tracks.clear();frame=0;}
   return {beginFrame,sample,reset,get size(){return tracks.size;}};
  }
- return Object.freeze({VERSION,interpolateAngle,smoothstep,countNearbyFire,makeTracker});
+ return Object.freeze({VERSION,interpolateAngle,smoothstep,trailHeading,countNearbyFire,makeTracker});
 });
