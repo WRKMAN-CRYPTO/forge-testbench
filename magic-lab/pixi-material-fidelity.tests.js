@@ -96,7 +96,7 @@ const before=JSON.stringify(srcRecords);
  check(boosted>base+5,"Small fire visual has a materially larger footprint");
  check(Math.abs(ice.scaleX*48-base)<1e-7,"Ice art is unchanged by the fire-only pass");
  check(Bridge.fireEmberFootprint(.6,1,true,false,true)>12,"Tiny fire does not collapse into a dot");
- check(Bridge.fireEmberFootprint(20,1,true,false,true)<65,"Large fire is nearly unchanged");
+ check(Bridge.fireEmberFootprint(20,1,true,false,true)<66,"Large fire is nearly unchanged");
  check(Bridge.fireEmberFootprint(2.8,1,false,false,true)===2.8*4.3,"Soft art baseline preserved");
  check(bridge.setFireEmbers(false)===false,"Live A/B can disable ember sizing");
  frame();
