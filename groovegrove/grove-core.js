@@ -185,8 +185,8 @@ export class Grove {
         // Riff may choose a single sustained melody note *instead* of
         // a chord. Recent nearby singing makes a held answer more attractive,
         // while solo practice still leaves room for this discovery.
-        const singleChance=.16+(singingNearby?.16:0)+(onJam?.045:0)+
-          (this.library.has('Riff','partnerListening')?.035:0);
+        const singleChance=.075+(singingNearby?.065:0)+(onJam?.025:0)+
+          (this.library.has('Riff','partnerListening')?.02:0);
         const longSingle=Math.random()<singleChance;
         if(longSingle){
           const tones=[voicing[1],voicing[2],voicing[0]*2];
