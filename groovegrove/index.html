@@ -197,18 +197,18 @@ class SoundEngine {
     const choice=Object.prototype.hasOwnProperty.call(vowels,expression?.vowel)?expression.vowel:'m';
     const specs=vowels[choice];
     const onset=Math.max(ctx.currentTime+.003,t);
-    const len=clamp(Number.isFinite(duration)?duration:.5,.17,1.8);
+    const len=clamp(Number.isFinite(duration)?duration:.5,.17,3.3);
     const pitch=clamp(Number.isFinite(freq)?freq:220,100,750);
     const glide=clamp(Number.isFinite(expression?.glide)?expression.glide:0,-2,2);
-    const attack=clamp(Number.isFinite(expression?.attack)?expression.attack:.075,.025,Math.min(.23,len*.33));
-    const release=clamp(Number.isFinite(expression?.release)?expression.release:.08,.035,Math.min(.29,len*.35));
-    const peak=Math.max(.0009,volume*.48);
+    const attack=clamp(Number.isFinite(expression?.attack)?expression.attack:.075,.025,Math.min(.26,len*.33));
+    const release=clamp(Number.isFinite(expression?.release)?expression.release:.08,.035,Math.min(.42,len*.35));
+    const peak=Math.max(.0009,volume*.62);
     const env=ctx.createGain();
     env.gain.setValueAtTime(.0001,onset);
     env.gain.exponentialRampToValueAtTime(peak,onset+attack);
-    env.gain.setValueAtTime(peak*.78,onset+Math.max(attack+.004,len-release));
+    env.gain.linearRampToValueAtTime(peak*.75,onset+Math.max(attack+.004,len-release));
     env.gain.exponentialRampToValueAtTime(.0001,onset+len);
-    env.connect(this.master);
+    env.connect(this.mix?.voice||this.master);
     for(const [formant,mix] of specs){
       const oscillator=ctx.createOscillator();
       const filter=ctx.createBiquadFilter();
@@ -216,6 +216,12 @@ class SoundEngine {
       oscillator.type='sawtooth';
       oscillator.frequency.setValueAtTime(pitch*Math.pow(2,glide/12),onset);
       oscillator.frequency.linearRampToValueAtTime(pitch,onset+Math.min(.23,len*.55));
+      if(len>1.15){
+        // A restrained pitch breath is audible on a held vowel, not an
+        // artificial constant vibrato imposed on every little hum.
+        oscillator.frequency.linearRampToValueAtTime(pitch*1.003,onset+len*.72);
+        oscillator.frequency.linearRampToValueAtTime(pitch,onset+len*.93);
+      }
       filter.type='bandpass';
       filter.frequency.setValueAtTime(formant,onset);
       filter.Q.value=choice==='m'?3.5:2.7;
@@ -230,7 +236,7 @@ class SoundEngine {
       air.gain.setValueAtTime(.0001,onset);
       air.gain.linearRampToValueAtTime(Math.max(.0002,volume*.035),onset+.025);
       air.gain.exponentialRampToValueAtTime(.0001,onset+attack);
-      breath.connect(high);high.connect(air);air.connect(this.master);
+      breath.connect(high);high.connect(air);air.connect(this.mix?.voice||this.master);
       breath.start(onset);breath.stop(onset+attack+.01);
     }
   }
