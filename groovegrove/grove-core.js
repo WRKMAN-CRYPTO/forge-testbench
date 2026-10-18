@@ -109,6 +109,8 @@ export class Grove {
     const onLesson=this.mode==='lesson';
     const onJam=this.mode==='jam';
     const dynamic=onJam?.9:onLesson?.69:.51;
+    const riffRest=this.library.has('Riff','deliberateSpace') && beat===3 && bar%4===1;
+    const pipRest=this.library.has('Pip','deliberateSpace') && beat===3 && bar%4===1;
     // Live onset bus: every heard note corresponds to an actual scheduled
     // Web Audio event. Extra notes are marked so timing drift is not faked.
     const drumOffset=this.pip.rhythmOffset();
@@ -141,16 +143,34 @@ export class Grove {
       const voicing=riffChoice==='voicing'?[pitches[1],pitches[2],pitches[0]*2]:pitches;
       if(beat===0||beat===2){
         voicing.forEach((p,i)=>play.guitar(p,guitarOnset+i*.026,dynamic*feeling*(i===0?1:.72),.42));
-      }else if(!(riffChoice==='breath' && beat===3)){
+      }else if(!(riffChoice==='breath' && beat===3) && !riffRest){
         play.guitar(voicing[(beat+bar)%3]*2,guitarOnset,dynamic*.72*feeling,.23);
       }
       if(usesNewChords && beat===0)this.playedKnowledge.Riff++;
-      if(onJam && beat===3 && this.library.has('Riff','callResponse')){
+      if(!riffRest && onJam && beat===3 && this.library.has('Riff','callResponse')){
         play.guitar(voicing[(bar+1)%3]*2,guitarOnset+beatDur*.47,dynamic*.42*feeling,.2,true);
         this.playedKnowledge.Riff++;
       }
-      if(riffChoice==='answer' && beat===3){
+      if(!riffRest && riffChoice==='answer' && beat===3){
         play.guitar(voicing[bar%3]*2,guitarOnset+beatDur*.73,dynamic*.24,.16,true);
+      }
+      if(this.library.has('Riff','walkingBass') && bar%2===1 && (beat===1 || beat===3)){
+        // Gently lead the ear from this chord's root toward the following chord.
+        const palette=usesNewChords?newChords:originalChords;
+        const nextRoot=palette[(Math.floor((bar+1)/2))%4][0];
+        const bassPitch=beat===1?pitches[0]*.5:(pitches[0]+nextRoot)*.25;
+        play.guitar(bassPitch,guitarOnset+beatDur*.33,dynamic*.29,.29,true);
+        if(beat===3)this.playedKnowledge.Riff++;
+      }
+      if(!riffRest && this.library.has('Riff','syncopation') && beat===1 && bar%3===0){
+        play.guitar(voicing[(bar+2)%3]*2,guitarOnset+beatDur*.57,dynamic*.32,.17,true);
+        this.playedKnowledge.Riff++;
+      }
+      if(!riffRest && this.library.has('Riff','partnerListening') && onJam && pipActive &&
+         beat===3 && bar%4===2){
+        // An answer, not a compulsory band: only during a chosen shared jam.
+        play.guitar(voicing[(bar+1)%3]*2,guitarOnset+beatDur*.72,dynamic*.25,.19,true);
+        this.playedKnowledge.Riff++;
       }
       this.riffPlayed++;
       this.pip.observe({type:'heard-guitar',bar,beat,time:guitarOnset});
@@ -160,19 +180,33 @@ export class Grove {
       if(beat===0||beat===2)play.kick(drumOnset,beat===0?.9:.68);
       else play.snare(drumOnset,.7);
       play.hat(drumOnset+.017,.6);
-      if(!(pipChoice==='breath' && beat===3))play.hat(drumOnset+beatDur*.5+.017,.32);
-      if(onJam && beat===3 && this.pip.curiosity>.7 && bar%4===0)play.snare(drumOnset+beatDur*.74,.28,true);
+      if(!(pipChoice==='breath' && beat===3) && !pipRest)play.hat(drumOnset+beatDur*.5+.017,.32);
+      if(!pipRest && onJam && beat===3 && this.pip.curiosity>.7 && bar%4===0)play.snare(drumOnset+beatDur*.74,.28,true);
       // Book-learned motor vocabulary remains playable even without an experiment.
       if(this.library.has('Pip','offbeatPulse') && beat===1 && bar%2===0){
         play.kick(drumOnset+beatDur*.5,.32,true);play.snare(drumOnset+beatDur*.75,.18,true);
         this.playedKnowledge.Pip++;
       }
-      if(onJam && beat===3 && this.library.has('Pip','callResponse')){
+      if(!pipRest && onJam && beat===3 && this.library.has('Pip','callResponse')){
         play.snare(drumOnset+beatDur*.5,.31,true);this.playedKnowledge.Pip++;
       }
       // Mild optional variations: core four-beat pulse is never removed.
       if(pipChoice==='ghost' && beat===2)play.snare(drumOnset+beatDur*.5,.17,true);
       if(pipChoice==='offbeat' && beat===2)play.kick(drumOnset+beatDur*.53,.23,true);
+      if(this.library.has('Pip','ghostNotes') && beat===2 && bar%3===1){
+        play.snare(drumOnset+beatDur*.24,.115,true);
+        play.snare(drumOnset+beatDur*.7,.145,true);
+        this.playedKnowledge.Pip++;
+      }
+      if(this.library.has('Pip','syncopation') && beat===1 && bar%3===2){
+        play.kick(drumOnset+beatDur*.63,.25,true);
+        this.playedKnowledge.Pip++;
+      }
+      if(!pipRest && this.library.has('Pip','partnerListening') && onJam && riffActive &&
+         beat===3 && bar%4===2){
+        play.snare(drumOnset+beatDur*.7,.19,true);
+        this.playedKnowledge.Pip++;
+      }
       this.pipPlayed++;
       this.riff.observe({type:'heard-drum',bar,beat,time:drumOnset});
       this.pip.ownOnsets.push({bar,beat,time:drumOnset});
