@@ -108,13 +108,19 @@ export class ListeningJournal{
    const attacks=own.filter(e=>e.kind!=='hat');
    const hits=attacks.filter(e=>others.some(o=>Math.abs(o.time-e.time)<.085)).length;
    const overlap=attacks.length?hits/attacks.length:0;
+   // Track overlapping attack energy separately: playing softer should be
+   // distinguishable from merely scheduling the same onsets at lower volume.
+   const pressure=attacks.length?mean(attacks.map(e=>{
+     const coincident=others.filter(o=>Math.abs(o.time-e.time)<.085);
+     return coincident.length?Math.min(1,e.velocity*Math.max(...coincident.map(o=>o.velocity))):0;
+   })):0;
    const timing=attacks.filter(e=>!e.extra).map(e=>Math.abs(e.offsetMs));
    // How many of four beat cells contain a meaningful attack?
    const coverage=new Set(attacks.map(e=>Math.floor(e.beat)%4)).size/4;
    const driftMs=mean(timing);
    // A transparent, imperfect timing-and-spacing proxy. This isn't musical
    // goodness. Penalize dropped beats so "play nothing" cannot win by default.
-   const cost=cap(.48*cap(driftMs/140,0,1)+.32*overlap+.2*(1-coverage),0,2);
+   const cost=cap(.42*cap(driftMs/140,0,1)+.23*overlap+.15*pressure+.2*(1-coverage),0,2);
    const variant=this.active.choices[who]||'steady';
    const record={who,variant,context:this.active.contexts[who],bar,cost,overlap,
      attackCount:attacks.length,driftMs,coverage,partnerAttacks:others.length};
