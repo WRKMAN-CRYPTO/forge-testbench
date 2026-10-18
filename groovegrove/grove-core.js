@@ -50,6 +50,11 @@ export class Grove {
     // Actual scheduled long chords, not an XP badge. Kept across restarts.
     this.riffHoldUntilBeat=Number.isFinite(saved?.riffHoldUntilBeat)?Math.max(0,Math.floor(saved.riffHoldUntilBeat)):0;
     this.riffHeldChords=Math.max(0,Math.floor(saved?.riffHeldChords||0));
+    // One held guitar string is a separate musical choice from a chord.
+    this.riffHeldNotes=Number.isSafeInteger(saved?.riffHeldNotes)&&saved.riffHeldNotes>=0?
+      saved.riffHeldNotes:0;
+    this.riffLastHeldNote=saved?.riffLastHeldNote&&Number.isFinite(saved.riffLastHeldNote.pitch)?
+      {...saved.riffLastHeldNote}:null;
     this.library=new MusicLibrary(saved?.library);
     this.understanding=new ListeningJournal(saved?.understanding);
     this.voiceJournal=new VoiceJournal(saved?.voiceJournal);
@@ -76,7 +81,8 @@ export class Grove {
   }
   baseline(){return rms(this.relativeErrors.slice(-16));}
   snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},
-    riffHoldUntilBeat:this.riffHoldUntilBeat,riffHeldChords:this.riffHeldChords,vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),space:this.space.snapshot(),logs:this.logs.slice(0,12)};}
+    riffHoldUntilBeat:this.riffHoldUntilBeat,riffHeldChords:this.riffHeldChords,
+    riffHeldNotes:this.riffHeldNotes,riffLastHeldNote:this.riffLastHeldNote?{...this.riffLastHeldNote}:null,vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),space:this.space.snapshot(),logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
@@ -176,19 +182,46 @@ export class Grove {
         const voiceHeard=this.space.people.Riff.lastHeardVoice;
         const singingNearby=!!(voiceHeard && bar-voiceHeard.bar<=2 &&
           this.space.canHear('Riff','Murmur','voice')>.10);
-        const holdingChance=.19+
-          (this.library.has('Riff','openChords')?.13:0)+
-          (singingNearby?.18:0)+(onJam?.07:0);
-        const longChord=Math.random()<holdingChance;
-        const holdBeats=longChord?(beat===0?(Math.random()<.42?4:3):2):0;
-        const duration=longChord?holdBeats*beatDur-.06:.43;
-        if(longChord){
+        // Riff may choose a single sustained melody note *instead* of
+        // a chord. Recent nearby singing makes a held answer more attractive,
+        // while solo practice still leaves room for this discovery.
+        const singleChance=.16+(singingNearby?.16:0)+(onJam?.045:0)+
+          (this.library.has('Riff','partnerListening')?.035:0);
+        const longSingle=Math.random()<singleChance;
+        if(longSingle){
+          const tones=[voicing[1],voicing[2],voicing[0]*2];
+          const singerPitch=voiceHeard?.pitch;
+          // Choose a chord tone close to the singer's octave, not a
+          // random pitch that clashes with the current harmony.
+          const target=singingNearby&&Number.isFinite(singerPitch)?
+            singerPitch*(Math.random()<.3?1:2):null;
+          const note=target==null?tones[Math.floor(Math.random()*tones.length)]:
+            tones.reduce((best,p)=>Math.abs(Math.log2(p/target))<
+              Math.abs(Math.log2(best/target))?p:best,tones[0]);
+          const holdBeats=singingNearby?(Math.random()<.35?4:3):
+            (Math.random()<.62?2:3);
+          const duration=holdBeats*beatDur-.075;
           this.riffHoldUntilBeat=index+holdBeats;
-          this.riffHeldChords++;
+          play.guitar(note,guitarOnset,dynamic*feeling*.93,duration);
+          this.riffHeldNotes++;
+          this.riffLastHeldNote={bar,beat,pitch:note,
+            seconds:Math.round(duration*100)/100,
+            context:singingNearby?'answering Murmur':onJam?'playing together':'solo idea'};
+        }else{
+          const holdingChance=.19+
+            (this.library.has('Riff','openChords')?.13:0)+
+            (singingNearby?.18:0)+(onJam?.07:0);
+          const longChord=Math.random()<holdingChance;
+          const holdBeats=longChord?(beat===0?(Math.random()<.42?4:3):2):0;
+          const duration=longChord?holdBeats*beatDur-.06:.43;
+          if(longChord){
+            this.riffHoldUntilBeat=index+holdBeats;
+            this.riffHeldChords++;
+          }
+          voicing.forEach((p,i)=>play.guitar(
+            p,guitarOnset+i*.026,dynamic*feeling*(i===0?1:.72),duration
+          ));
         }
-        voicing.forEach((p,i)=>play.guitar(
-          p,guitarOnset+i*.026,dynamic*feeling*(i===0?1:.72),duration
-        ));
       }else if(!alreadyHolding && !(riffChoice==='breath' && beat===3) && !riffRest){
         play.guitar(voicing[(beat+bar)%3]*2,guitarOnset,dynamic*.72*feeling,.29);
       }
