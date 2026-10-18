@@ -142,8 +142,10 @@ export class Grove {
     }
     const riffChoice=this.understanding.variation('Riff');
     const pipChoice=this.understanding.variation('Pip');
+    let riffSoundedThisBeat=false;
     const play={
       guitar:(freq,at,volume,duration,extra=false)=>{
+        riffSoundedThisBeat=true;
         audio.guitar(freq,at,volume,duration);
         this.space.sound('Riff','guitar',bar,volume,freq);
         this.understanding.hear({who:'Riff',kind:'guitar',time:at,bar,beat,velocity:volume,offsetMs:riffOffset,extra,pitch:freq});
@@ -216,10 +218,9 @@ export class Grove {
         play.guitar(voicing[(bar+1)%3]*2,guitarOnset+beatDur*.72,dynamic*.25,.19,true);
         this.playedKnowledge.Riff++;
       }
-      this.riffPlayed++;
-      if(this.space.canHear('Pip','Riff','guitar')>.05)
+      if(riffSoundedThisBeat && this.space.canHear('Pip','Riff','guitar')>.05)
         this.pip.observe({type:'heard-guitar',bar,beat,time:guitarOnset});
-      this.riff.ownOnsets.push({bar,beat,time:guitarOnset});
+      if(riffSoundedThisBeat)this.riff.ownOnsets.push({bar,beat,time:guitarOnset});
     }
     if(pipActive){
       if(beat===0||beat===2)play.kick(drumOnset,beat===0?.9:.68);
@@ -258,7 +259,7 @@ export class Grove {
       this.pip.ownOnsets.push({bar,beat,time:drumOnset});
       // The partner's reliable reference pulse exists even while the guitar is silent.
       // Difference is measured from actual synthesized drum onsets, not a cosmetic score.
-      if(riffActive && this.space.canHear('Pip','Riff','guitar')>.12){
+      if(riffSoundedThisBeat && this.space.canHear('Pip','Riff','guitar')>.12){
         const delta=(drumOnset-guitarOnset)*1000;
         this.relativeErrors.push(delta);this.barErrors.push(delta);
         this.sessionMeasurements.push({bar,beat,errorMs:delta,mode:this.mode});
@@ -293,9 +294,10 @@ export class Grove {
           this.push('Pip answers Murmur with a small rhythmic accent.');
       }
     }
+    if(riffSoundedThisBeat)this.riffPlayed++;
     if(this.onNote){
       if(pipActive)this.onNote({agent:'Pip',time:drumOnset,beat,delta:drumOffset-riffOffset});
-      if(riffActive)this.onNote({agent:'Riff',time:guitarOnset,beat,delta:riffOffset});
+      if(riffSoundedThisBeat)this.onNote({agent:'Riff',time:guitarOnset,beat,delta:riffOffset});
     }
   }
   finishBar(){
