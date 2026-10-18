@@ -813,7 +813,7 @@ if(window.WRKMAN_WANDRUNE_ART){
     <button class="minibtn" id="pixiFireFlames" type="button" title="087: independent cached flame silhouettes and subtle motion; compare with previous faceted fire particles">FLAMES: ON</button>
     <button class="minibtn" id="pixiFireEmbers" type="button" title="086: restore small individual flames with the existing material artwork and no extra sprites">EMBERS: ON</button>
     <button class="minibtn" id="pixiFireDebug" type="button" title="Pass A: outline each nearby connected fire cluster, without adding damage, mass, glow or new physics">FIRE GROUPS: OFF</button>
-    <button class="minibtn" id="pixiFireGroupFlames" type="button" title="089: organic flame tongues follow real plasma contours; compare against the old rounded glow masses">GROUP FIRE: ON</button>
+    <button class="minibtn" id="pixiFireGroupFlames" type="button" title="090: cycle flowing fire, old centipede spikes, and original smooth groups">GROUP FIRE: FLOW</button>
     <button class="minibtn" id="pixiFireShell" type="button" title="Pass B: shared plasma edge around nearby fire agents">PLASMA EDGE: ON</button>
     <button class="minibtn" id="pixiFireBody" type="button" title="Pass C: translucent density-based plasma material inside the shared fire boundary">PLASMA BODY: ON</button>
     <button class="minibtn" id="pixiFireHot" type="button" title="Pass D: real density-driven amber and pale-hot fire cores, only where agents cooperate">HOT CORE: ON</button>
@@ -1010,7 +1010,8 @@ if(window.WRKMAN_WANDRUNE_ART){
 <script src="./pixi-fire-flame.js?v=087"></script>
 <script src="./pixi-fire-motion.js?v=088c-axis-flip"></script>
 <script src="./pixi-fire-group-flames.js?v=089"></script>
-<script src="./pixi-swarm-bridge.js?v=089-groupfire"></script>
+<script src="./pixi-fire-group-flow.js?v=090"></script>
+<script src="./pixi-swarm-bridge.js?v=090-flowingfire"></script>
 <script src="./field-viewport.js?v=040"></script>
 <script src="./field-precision-ui.js?v=078"></script>
 <script src="./scroll-generator.js?v=047"></script>
@@ -1233,7 +1234,8 @@ class Lab extends Phaser.Scene{
     fireFlames:new URLSearchParams(window.location.search).get("fireFlames")!=="0",
     fireMotion:new URLSearchParams(window.location.search).get("fireMotion")!=="0",
     fireGroupFlames:new URLSearchParams(window.location.search).get("fireGroupFlames")!=="0",
-    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY")||message.startsWith("FIRE EMBERS")||message.startsWith("FIRE FLAMES")||message.startsWith("FIRE MOTION")||message.startsWith("GROUP FLAMES"))return;
+    fireGroupStyle:new URLSearchParams(window.location.search).get("fireGroupStyle")||"flow",
+    status:message=>{if(message.startsWith("PIXI LOOK")||message.startsWith("FORMATION UNAVAILABLE")||message.startsWith("FIRE CLUSTERS")||message.startsWith("FIRE SHELL")||message.startsWith("FIRE BODY")||message.startsWith("FIRE HOT CORE")||message.startsWith("FIRE STABILITY")||message.startsWith("FIRE EMBERS")||message.startsWith("FIRE FLAMES")||message.startsWith("FIRE MOTION")||message.startsWith("GROUP FLAMES")||message.startsWith("GROUP FIRE"))return;
      const b=$("pixiRendererMode");if(b)b.textContent=message;}
    }):null;
    if(this.pixiSpellRenderer){
@@ -1261,7 +1263,7 @@ class Lab extends Phaser.Scene{
     $("pixiFireEmbers").textContent="EMBERS: "+(this.pixiSpellRenderer.fireEmbers?"ON":"OFF");
     $("pixiFireFlames").textContent="FLAMES: "+(this.pixiSpellRenderer.fireFlames?"ON":"OFF");
     $("pixiFireMotion").textContent="MOTION: "+(this.pixiSpellRenderer.fireMotion?"ON":"OFF");
-    $("pixiFireGroupFlames").textContent="GROUP FIRE: "+(this.pixiSpellRenderer.fireGroupFlames?"ON":"OFF");
+    $("pixiFireGroupFlames").textContent="GROUP FIRE: "+this.pixiSpellRenderer.fireGroupStyle.toUpperCase();
     $("pixiFireDebug").textContent="FIRE GROUPS: "+(this.pixiSpellRenderer.fireDebug?"ON":"OFF");
     $("pixiFireShell").textContent="PLASMA EDGE: "+(this.pixiSpellRenderer.fireShell?"ON":"OFF");
     $("pixiFireBody").textContent="PLASMA BODY: "+(this.pixiSpellRenderer.fireBody?"ON":"OFF");
@@ -1847,7 +1849,7 @@ class Lab extends Phaser.Scene{
     if((this.pixiStatusTick=(this.pixiStatusTick||0)+1)%12===0){
      const p=this.pixiSpellRenderer;
      $("pixiFlowStatus").textContent=p?.active?
-      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS / "+(p.fireEmbers?p.fireEmberBoosted+" EMBERS":"EMBERS OFF")+" / "+(p.fireFlames?p.fireFlamesDrawn+" FLAMES":"FLAMES OFF")+" / "+(p.fireMotion?p.fireMotionAligned+" TRAILING":"MOTION OFF")+" / "+(p.fireGroupFlames?p.fireGroupTongues+" FIRE TONGUES":"GROUP FIRE OFF")):"PHASER";
+      (p.look.toUpperCase()+" · "+p.art.toUpperCase()+" · "+p.materialDrawn+" MATERIAL / "+p.artFallback+" FALLBACK / "+p.ambientDrawn+" SPARKS / "+(p.fireEmbers?p.fireEmberBoosted+" EMBERS":"EMBERS OFF")+" / "+(p.fireFlames?p.fireFlamesDrawn+" FLAMES":"FLAMES OFF")+" / "+(p.fireMotion?p.fireMotionAligned+" TRAILING":"MOTION OFF")+" / "+(p.fireGroupFlames?p.fireGroupTongues+" "+(p.fireGroupStyle==="flow"?"FLOW RIBBONS":"OLD SPIKES"):"GROUP FIRE OFF")):"PHASER";
      $("fireClusterStatus").textContent=p?.active&&p.fireDebug?
       (p.fireGroups+" GROUPS / "+p.fireLargest+" MAX / "+p.fireSingles+" SOLO / "+p.fireEdges+" LINKS"):"OFF";
      $("fireShellStatus").textContent=p?.active&&(p.fireShell||p.fireBody)?
@@ -3042,12 +3044,13 @@ $("pixiFireDebug").addEventListener("click",()=>{
  const enabled=adapter.setFireDebug(!adapter.fireDebug);
  $("pixiFireDebug").textContent="FIRE GROUPS: "+(enabled?"ON":"OFF");
 });
-// 089: A/B the organic group contour without changing any agent state.
+// 090: three-way display-only comparison, no new game or spell state.
 $("pixiFireGroupFlames").addEventListener("click",()=>{
  const adapter=scene?.pixiSpellRenderer;
  if(!adapter){$("pixiFireGroupFlames").textContent="GROUP FIRE: UNAVAILABLE";return;}
- const enabled=adapter.setFireGroupFlames(!adapter.fireGroupFlames);
- $("pixiFireGroupFlames").textContent="GROUP FIRE: "+(enabled?"ON":"OFF");
+ const order=["flow","spikes","off"];
+ const next=order[(order.indexOf(adapter.fireGroupStyle)+1)%order.length];
+ $("pixiFireGroupFlames").textContent="GROUP FIRE: "+adapter.setFireGroupStyle(next).toUpperCase();
 });
 // Pass B is optional shared plasma boundary only. It cannot add/destroy
 // agents or write to saves, even while toggled in combat.
