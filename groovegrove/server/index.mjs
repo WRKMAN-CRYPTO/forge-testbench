@@ -16,7 +16,7 @@ const allowedOrigins=new Set([
 const beatMs=60000/98;
 const events=[];
 let nextSeq=1,world=null,nextBeat=0,nextAt=0,dirty=false,ready=false,bootAt=Date.now(),lastWrite=0,writeQueue=Promise.resolve();
-let subscribers=0;
+let lastAdvanceAt=0;
 const noCache={'Cache-Control':'no-store, no-cache, max-age=0'};
 function authorized(req){
  const value=req.headers.authorization||'';
@@ -72,6 +72,7 @@ function run(){
  while(nextAt<=now && count++<32){
   world.onBeatEvent(nextBeat,nextAt/1000,sink);
   nextBeat++;
+  lastAdvanceAt=Date.now();
   nextAt+=beatMs;
   // world checkpoint is called at every bar boundary; disk persists every 10s.
  }
@@ -95,6 +96,18 @@ async function init(){
  // All writes use a single ordered queue. Never run two writers on one volume.
  setInterval(run,120);
  setInterval(()=>{if(dirty)void flush();},30000);
+ // Prove progress independent of all client requests, at modest log volume.
+ setInterval(()=>{
+  if(!ready)return;
+  const pip=world.understanding.report('Pip');
+  const riff=world.understanding.report('Riff');
+  console.log('GROVE_HEARTBEAT',JSON.stringify({
+   beat:nextBeat,bar:world.bar,
+   practice:{Pip:pip.observations,Riff:riff.observations},
+   experiments:{Pip:pip.experiments,Riff:riff.experiments},
+   sinceLastBeatMs:Date.now()-lastAdvanceAt,checkpointAt:lastWrite
+  }));
+ },30000);
 }
 const MAX_BODY=120_000;
 async function readBody(req){
@@ -114,7 +127,13 @@ const app=createServer(async(req,res)=>{
  try{
   const url=new URL(req.url,'http://localhost');
   if(req.method==='GET'&&url.pathname==='/health'){
-   send(res,200,{ok:true,ready,beat:nextBeat,persistence:root,uptime:Math.floor((Date.now()-bootAt)/1000)});return;
+   const pip=ready?world.understanding.report('Pip'):null;
+   const riff=ready?world.understanding.report('Riff'):null;
+   send(res,200,{ok:true,ready,beat:nextBeat,bar:ready?world.bar:0,
+    practice:ready?{Pip:pip.observations,Riff:riff.observations}:null,
+    experiments:ready?{Pip:pip.experiments,Riff:riff.experiments}:null,
+    lastAdvanceAt,lastSavedAt:lastWrite,
+    uptime:Math.floor((Date.now()-bootAt)/1000)});return;
   }
   if(req.method==='GET'&&(url.pathname==='/v1/state'||url.pathname==='/v1/poll')){
    const since=Math.max(0,Number(url.searchParams.get('since')||0)||0);
