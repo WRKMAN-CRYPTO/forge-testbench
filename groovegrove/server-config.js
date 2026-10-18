@@ -1,3 +1,3 @@
-// Empty until the owner explicitly approves and the living server is deployed.
-// Public config contains only its URL. The private pairing key is NEVER here.
-export const GROVE_SERVER_URL='';
+// Public address only. The admin pairing key stays in Railway secrets and
+// on the owner's device; it is never committed to GitHub.
+export const GROVE_SERVER_URL='https://groovegrove-production.up.railway.app';
