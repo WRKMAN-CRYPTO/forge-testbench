@@ -67,7 +67,7 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   const response=present&&Math.random()<.83
     ?riffNearby&&pipNearby?(Math.random()<.68?'Riff':'Pip'):riffNearby?'Riff':pipNearby?'Pip':null
     :riffNearby&&Math.random()<.36?'Riff':null;
-  const root=response?nearestRoot(guitar.pitch):nearestRoot(singer.lastPitch);
+  const root=response==='Riff'&&Number.isFinite(guitar?.pitch)?nearestRoot(guitar.pitch):nearestRoot(singer.lastPitch);
   const pitches=[],durations=[];
   const gap=phrased?(length>2?.55:.73):.44;
   const baseLength=length===1?.37+Math.random()*.42:phrased?.31+Math.random()*.16:.25;
