@@ -176,7 +176,8 @@ export class GroveWorld {
       if(grove.library?.busy(name)||grove.disciplines?.people?.[name]?.interest)continue;
       if(this.traveling(name) || bar-p.lastChoice<9)continue;
       // Music becomes an invitation, never an obligation.
-      if(name==='Murmur'&&grove.vocalist?.stage==='humming'){
+      if(name==='Murmur'&&grove.vocalist?.stage==='humming'&&
+         grove.disciplines?.current('Murmur')==='voice'){
         const fresh=[p.lastHeardGuitar,p.lastHeardDrum,p.lastHeardViolin]
           .filter(h=>h&&bar-h.bar<=4&&h.strength>.045);
         const source=fresh.sort((a,b)=>b.bar-a.bar)[0];
