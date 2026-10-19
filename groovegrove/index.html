@@ -18,10 +18,10 @@
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
 import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261018-voice';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
-import { Grove } from './grove-core.js?v=20261018-riff-lead';
-import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261018-ensemble';
+import { Grove } from './grove-core.js?v=20261019-disciplines';
+import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261019-disciplines';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
-import { LiveNoteConductor } from './live-note-conductor.js?v=20261018-sustain';
+import { LiveNoteConductor } from './live-note-conductor.js?v=20261019-disciplines';
 
 document.documentElement.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;background:#081b1d';
 document.body.style.cssText = 'margin:0;width:100%;height:100%;overflow:hidden;touch-action:none';
@@ -109,7 +109,7 @@ class SoundEngine {
     // Technical balance, separate from musical dynamics chosen by agents.
     // Drum peaks no longer occupy the entire mix; melodic voices stay present.
     this.mix={};
-    for(const [instrument,level] of Object.entries({drums:.57,guitar:1.34,voice:1.72})){
+    for(const [instrument,level] of Object.entries({drums:.57,guitar:1.34,voice:1.72,violin:1.08})){
       const bus=ctx.createGain();
       bus.gain.value=level;
       bus.connect(this.master);
@@ -289,6 +289,58 @@ class SoundEngine {
     oscillator.stop(onset+len+.035);upper.stop(onset+len+.035);
     // A small pick transient keeps the held chord recognizably Riff's.
     this.tone(freq*2,onset+.004,.16,.018*volume,'sine',.33,bus);
+  }
+  violin(freq,t,volume=.24,duration=.95,expression={}){
+    const ctx=this.context;if(!ctx||ctx.state!=='running')return;
+    const onset=Math.max(ctx.currentTime+.003,t);
+    const len=clamp(Number.isFinite(duration)?duration:.95,.28,2.8);
+    const pitch=clamp(Number.isFinite(freq)?freq:262,125,950);
+    const rough=clamp(Number.isFinite(expression?.roughness)?expression.roughness:.27,0,.7);
+    const pressure=clamp(Number.isFinite(expression?.pressure)?expression.pressure:.58,.15,1);
+    const vibrato=clamp(Number.isFinite(expression?.vibrato)?expression.vibrato:0,0,.012);
+    const bus=this.mix?.violin||this.master;
+    // Bowed string: the note has a moving bow, sustained tone and true release,
+    // not a plucked oscillator with a longer timer.
+    const body=ctx.createOscillator(),edge=ctx.createOscillator();
+    const edgeGain=ctx.createGain(),color=ctx.createBiquadFilter(),env=ctx.createGain();
+    body.type='sawtooth';edge.type='triangle';
+    body.frequency.setValueAtTime(pitch,onset);
+    edge.frequency.setValueAtTime(pitch*2,onset);
+    if(vibrato>0 && len>.6){
+      body.frequency.linearRampToValueAtTime(pitch*(1+vibrato),onset+len*.37);
+      body.frequency.linearRampToValueAtTime(pitch*(1-vibrato*.65),onset+len*.65);
+      body.frequency.linearRampToValueAtTime(pitch,onset+len*.94);
+    }
+    edgeGain.gain.value=.12+pressure*.17;
+    body.connect(color);edge.connect(edgeGain);edgeGain.connect(color);
+    color.type='lowpass';
+    color.frequency.setValueAtTime(1900+pressure*1150,onset);
+    color.frequency.linearRampToValueAtTime(1500+pressure*680,onset+Math.min(.5,len*.55));
+    const attack=Math.min(.22,.082+rough*.16,len*.33);
+    const release=Math.min(.31,len*.32);
+    const peak=Math.max(.00012,volume*(.12+pressure*.065));
+    env.gain.setValueAtTime(.0001,onset);
+    env.gain.exponentialRampToValueAtTime(peak,onset+attack);
+    env.gain.linearRampToValueAtTime(peak*.81,onset+len-release);
+    env.gain.exponentialRampToValueAtTime(.0001,onset+len);
+    color.connect(env);
+    if(ctx.createStereoPanner){
+      const pan=ctx.createStereoPanner();pan.pan.value=-.08;
+      env.connect(pan);pan.connect(bus);
+    }else env.connect(bus);
+    body.start(onset);edge.start(onset);
+    body.stop(onset+len+.025);edge.stop(onset+len+.025);
+    // Slight bow friction is a real part of the instrument's early learning.
+    if(this.noise&&rough>.06){
+      const bow=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),friction=ctx.createGain();
+      bow.buffer=this.noise;filter.type='bandpass';filter.frequency.value=2650;
+      filter.Q.value=1.3;
+      friction.gain.setValueAtTime(.0001,onset);
+      friction.gain.linearRampToValueAtTime(Math.max(.00015,.016*rough*volume),onset+attack);
+      friction.gain.exponentialRampToValueAtTime(.0001,onset+Math.min(.3,len*.6));
+      bow.connect(filter);filter.connect(friction);friction.connect(bus);
+      bow.start(onset);bow.stop(onset+Math.min(.31,len*.62));
+    }
   }
 }
 
