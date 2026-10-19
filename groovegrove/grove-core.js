@@ -4,6 +4,7 @@ import {ListeningJournal} from './listening-journal.js';
 import {GroveWorld} from './grove-world.js?v=20261018-ensemble';
 import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
 import {tryVocalPhrase} from './voice-music.js?v=20261018-sustain';
+import {MusicalDisciplines} from './groove-disciplines.js?v=20261019-disciplines';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const rand=(a,b)=>a+(b-a)*Math.random();
@@ -59,6 +60,7 @@ export class Grove {
     this.understanding=new ListeningJournal(saved?.understanding);
     this.voiceJournal=new VoiceJournal(saved?.voiceJournal);
     this.space=new GroveWorld(saved?.space);
+    this.disciplines=new MusicalDisciplines(saved?.disciplines);
     for(const name of ['Pip','Riff']){
       const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
       if(book)(name==='Pip'?this.pip:this.riff).currentGoal='finishing '+LIBRARY_CATALOG[book.type].title;
@@ -82,7 +84,8 @@ export class Grove {
   baseline(){return rms(this.relativeErrors.slice(-16));}
   snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},
     riffHoldUntilBeat:this.riffHoldUntilBeat,riffHeldChords:this.riffHeldChords,
-    riffHeldNotes:this.riffHeldNotes,riffLastHeldNote:this.riffLastHeldNote?{...this.riffLastHeldNote}:null,vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),space:this.space.snapshot(),logs:this.logs.slice(0,12)};}
+    riffHeldNotes:this.riffHeldNotes,riffLastHeldNote:this.riffLastHeldNote?{...this.riffLastHeldNote}:null,vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),space:this.space.snapshot(),
+    disciplines:this.disciplines.snapshot(),logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
@@ -111,13 +114,15 @@ export class Grove {
     }
     // A practice room can hold two soloists without making them a duo.
     // They exchange turns every two bars. Only a mutual choice creates joint music.
-    const pipActive=(!solo || bar%4<2 || this.library.busy('Riff')) &&
+    const pipActive=this.disciplines.current('Pip')==='drums' &&
+      (!solo || bar%4<2 || this.library.busy('Riff')) &&
       !this.library.busy('Pip') && !this.space.traveling('Pip') &&
       this.space.destination('Pip')!=='pond';
-    const riffActive=(!solo || bar%4>=2 || this.library.busy('Pip')) &&
+    const riffActive=this.disciplines.current('Riff')==='guitar' &&
+      (!solo || bar%4>=2 || this.library.busy('Pip')) &&
       !this.library.busy('Riff') && !this.space.traveling('Riff') &&
       this.space.destination('Riff')!=='pond';
-    if(beat===0){
+    if(beat===0 && this.disciplines.current('Murmur')==='voice'){
       const vocal=tryVocalPhrase({
         singer,library:this.library,space:this.space,bar,time:t,beatDur,
         audio,journal:this.voiceJournal,onNote:this.onNote,
@@ -153,21 +158,25 @@ export class Grove {
       guitar:(freq,at,volume,duration,extra=false)=>{
         riffSoundedThisBeat=true;
         audio.guitar(freq,at,volume,duration);
+        this.disciplines.record('Riff','guitar',{bar,pitch:freq,duration});
         this.space.sound('Riff','guitar',bar,volume,freq);
         this.understanding.hear({who:'Riff',kind:'guitar',time:at,bar,beat,velocity:volume,offsetMs:riffOffset,extra,pitch:freq});
       },
       kick:(at,volume,extra=false)=>{
         audio.kick(at,volume);
+        this.disciplines.record('Pip','drums',{bar,duration:0});
         this.space.sound('Pip','kick',bar,volume);
         this.understanding.hear({who:'Pip',kind:'kick',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
       },
       snare:(at,volume,extra=false)=>{
         audio.snare(at,volume);
+        this.disciplines.record('Pip','drums',{bar,duration:0});
         this.space.sound('Pip','snare',bar,volume);
         this.understanding.hear({who:'Pip',kind:'snare',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
       },
       hat:(at,volume,extra=false)=>{
         audio.hat(at,volume);
+        this.disciplines.record('Pip','drums',{bar,duration:0});
         this.space.sound('Pip','hat',bar,volume);
         this.understanding.hear({who:'Pip',kind:'hat',time:at,bar,beat,velocity:volume,offsetMs:drumOffset,extra});
       }
@@ -306,10 +315,12 @@ export class Grove {
       const riffHeard=this.space.people.Riff.lastHeardVoice;
       const pipHeard=this.space.people.Pip.lastHeardVoice;
       const riffCanAnswer=riffHeard?.bar===bar && this.riffHoldUntilBeat<=index &&
+        this.disciplines.current('Riff')==='guitar' &&
         this.space.canHear('Riff','Murmur','voice')>.08 &&
         !this.space.traveling('Riff')&&!this.library.busy('Riff') &&
         this.space.destination('Riff')!=='pond';
       const pipCanAnswer=pipHeard?.bar===bar &&
+        this.disciplines.current('Pip')==='drums' &&
         this.space.canHear('Pip','Murmur','voice')>.08 &&
         !this.space.traveling('Pip')&&!this.library.busy('Pip') &&
         this.space.destination('Pip')!=='pond';
@@ -327,6 +338,9 @@ export class Grove {
           this.push('Pip answers Murmur with a small rhythmic accent.');
       }
     }
+    // Every instrument can now have a different owner. The alternate
+    // performance bus uses real player identities rather than preset roles.
+    this.disciplines.play(this,index,t,audio,{harmony:pitches});
     if(riffSoundedThisBeat)this.riffPlayed++;
     if(this.onNote){
       if(pipActive)this.onNote({agent:'Pip',time:drumOnset,beat,delta:drumOffset-riffOffset});
@@ -356,7 +370,8 @@ export class Grove {
     this.modeBars++;
     if(this.mode==='solo')this.considerNewActivity(before);
     else if(this.mode==='lesson'){
-      const together=this.space.distance('Pip','Riff')<260 &&
+      const together=this.disciplines.current('Pip')==='drums' &&
+        this.disciplines.current('Riff')==='guitar' && this.space.distance('Pip','Riff')<260 &&
         !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.busy('Pip')&&!this.library.busy('Riff');
       if(!together){
         // Leaving is allowed: no credits for a lesson nobody heard.
@@ -373,7 +388,8 @@ export class Grove {
         this.pip.currentGoal='trying new patterns';this.riff.currentGoal='looking for a new idea';
       }
     }else if(this.mode==='jam'){
-      const together=this.space.distance('Pip','Riff')<260 &&
+      const together=this.disciplines.current('Pip')==='drums' &&
+        this.disciplines.current('Riff')==='guitar' && this.space.distance('Pip','Riff')<260 &&
         !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.busy('Pip')&&!this.library.busy('Riff');
       if(!together){
         this.mode='solo';this.modeBars=0;
@@ -388,6 +404,7 @@ export class Grove {
       }
     }
     this.library.tick(this);
+    this.disciplines.decide(this);
     this.space.decide(this);
     // Save every bar (about 2.45 s), including each reading page and return.
     // The old four-bar cadence could preserve a 75% book checkpoint indefinitely
@@ -395,7 +412,9 @@ export class Grove {
     if(this.onCheckpoint)this.onCheckpoint(this.snapshot());
   }
   considerNewActivity(measuredError){
-    if(this.modeBars<3 || this.library.busy('Pip')||this.library.busy('Riff') || this.space.traveling('Pip') ||
+    if(this.modeBars<3 || this.disciplines.current('Pip')!=='drums' ||
+       this.disciplines.current('Riff')!=='guitar' || this.library.busy('Pip')||
+       this.library.busy('Riff') || this.space.traveling('Pip') ||
        this.space.traveling('Riff') || this.space.distance('Pip','Riff')>245)return;
     // Riff recognizes a timing problem from HEARD onset differences, then chooses whether to help.
     const needsHelp=measuredError!=null && measuredError>40;
