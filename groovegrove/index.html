@@ -1082,18 +1082,23 @@ function refreshText(){
     }else ui.log[0].text=grove.logs[0]?.message||'';
     if(selected==='Murmur'){
       const v=grove.vocalist;
+      const equipment=(remoteLive&&liveLocations?.Murmur?.instrument)||grove.disciplines.current('Murmur');
       const task=grove.library.status('Murmur');
       const book=task&&grove.library.copyById(task.copyId);
       const actor=(remoteLive&&liveLocations?.Murmur)||grove.space?.people.Murmur;
       const intent=actor?.ensembleIntent==='joining'?'joining the music':
         actor?.ensembleIntent==='listening'?'choosing to listen':v.stage;
-      ui.inspect.text='MURMUR · '+(book?'reading '+LIBRARY_CATALOG[book.type].title:intent)+
+      ui.inspect.text='MURMUR · '+(equipment==='voice'?(book?'reading '+LIBRARY_CATALOG[book.type].title:intent):
+        equipment.toUpperCase()+' · '+grove.disciplines.people.Murmur.practice[equipment]?.notes+' notes')+
         ' · '+grove.voiceJournal.sharedPhrases+' shared phrases'+
         ' · '+(grove.voiceJournal.heldNotes||0)+' held notes';
     }else{
       const who=selected==='Pip'?grove.pip:grove.riff;
       const purpose=((remoteLive&&liveLocations?.[selected])||grove.space?.people[selected])?.purpose;
-      ui.inspect.text=who.name.toUpperCase()+' · '+(purpose||who.currentGoal)+
+      const equipment=(remoteLive&&liveLocations?.[selected]?.instrument)||grove.disciplines.current(selected);
+      const practice=grove.disciplines.people[selected].practice[equipment];
+      ui.inspect.text=who.name.toUpperCase()+' · '+equipment.toUpperCase()+' · '+(purpose||who.currentGoal)+
+        (equipment==='violin'?' · '+(practice?.notes||0)+' bow experiments':'')+
         (selected==='Riff'?' · '+(grove.riffHeldChords||0)+' chords · '+(grove.riffHeldNotes||0)+' held notes':
           grove.library.known[who.name].length?' · '+grove.library.known[who.name].length+' book skills':'');
     }
@@ -1379,9 +1384,11 @@ function playLivingEvents(data,sentAtMs,receivedAtMs){
       else if(event.kind==='snare')sound.snare(when,v);
       else if(event.kind==='hat')sound.hat(when,v);
       else if(event.kind==='voice')sound.voice(event.freq,when,v,Number(event.duration)||.5,event.expression||{});
+      else if(event.kind==='violin')sound.violin(event.freq,when,v,Number(event.duration)||.95,event.expression||{});
     },
     onNote:(event,when)=>{
-      const name=event.kind==='guitar'?'Riff':event.kind==='voice'?'Murmur':'Pip';
+      const name=['Pip','Riff','Murmur'].includes(event.source)?event.source:
+        event.kind==='guitar'?'Riff':event.kind==='voice'?'Murmur':'Pip';
       const key=name+'/'+event.bar+'/'+event.beat;
       if(playedKeys.has(key))return;
       playedKeys.add(key);
@@ -1540,7 +1547,7 @@ app.ticker.add(()=>{
   if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
 });
 // Inspectable test hooks; not part of the rendered interface.
-window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get journal(){return grove.understanding.snapshot();},get server(){return {connected:remoteLive,online:remoteOnline,message:serverMessage,beat:serverLastBeat,sequence:remoteSequence,returnReport,url:serverBase,audioBuffer:liveConductor.stats};},journalReport(name){return name==='Murmur'?grove.voiceJournal.report():grove.understanding.report(name==='Riff'?'Riff':'Pip');},get voiceJournal(){return grove.voiceJournal.snapshot();},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get audioError(){return startError;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},get camera(){return {...camera,drag:null};},get locations(){return liveLocations||grove.space?.snapshot()?.people;},restart(){grove=new Grove(null,saveMemory);grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
+window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get journal(){return grove.understanding.snapshot();},get server(){return {connected:remoteLive,online:remoteOnline,message:serverMessage,beat:serverLastBeat,sequence:remoteSequence,returnReport,url:serverBase,audioBuffer:liveConductor.stats};},journalReport(name){return name==='Murmur'?grove.voiceJournal.report():grove.understanding.report(name==='Riff'?'Riff':'Pip');},get voiceJournal(){return grove.voiceJournal.snapshot();},get disciplines(){return grove.disciplines.snapshot();},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get audioError(){return startError;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},get camera(){return {...camera,drag:null};},get locations(){return liveLocations||grove.space?.snapshot()?.people;},restart(){grove=new Grove(null,saveMemory);grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
 </script>
 </body>
 </html>
