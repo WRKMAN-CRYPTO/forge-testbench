@@ -61,8 +61,8 @@ export class JamArchive{
   const meta=pitched?(kind==='voice'||kind==='violin'?args[5]:args[4]):args[2];
   const source=MUSICIANS.includes(meta?.player)?meta.player:
     kind==='voice'?'Murmur':kind==='guitar'?'Riff':'Pip';
-  if(source==='Murmur' && (space?.distance('Murmur','Pip')||Infinity)>410 &&
-    (space?.distance('Murmur','Riff')||Infinity)>410)return;
+  if(source==='Murmur'&&space&&space.distance('Murmur','Pip')>410&&
+    space.distance('Murmur','Riff')>410)return;
   if(!valid(at)||at<0)return;
   if(session.firstAt==null)session.firstAt=at;
   const ms=Math.max(0,Math.round((at-session.firstAt)*1000));
