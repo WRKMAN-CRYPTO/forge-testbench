@@ -7,15 +7,22 @@ export const WORLD_SIZE=Object.freeze({width:1500,height:1120});
 export const PLACES=Object.freeze({
   clearing:Object.freeze({x:740,y:530,label:'THE CLEARING',kind:'open'}),
   library:Object.freeze({x:350,y:310,label:'THE LIBRARY',kind:'indoor'}),
+  instrumentRoom:Object.freeze({x:955,y:310,label:'INSTRUMENT ROOM',kind:'indoor'}),
   studio:Object.freeze({x:1130,y:310,label:'PRACTICE STUDIO',kind:'indoor'}),
+  recording:Object.freeze({x:1310,y:310,label:'RECORDING ROOM',kind:'indoor'}),
   pond:Object.freeze({x:1130,y:850,label:'THE POND',kind:'open'})
 });
 const NAMES=['Pip','Riff','Murmur'];
-const LINKS={clearing:['library','studio','pond'],library:['clearing'],studio:['clearing','pond'],pond:['clearing','studio']};
+const LINKS={clearing:['library','instrumentRoom','pond'],library:['clearing'],
+  instrumentRoom:['clearing','studio'],studio:['instrumentRoom','recording','pond'],
+  recording:['studio'],pond:['clearing','studio']};
 // These are landmarks along the actual painted footpaths, not teleport points.
 const WAYPOINTS={
   'trail-clearing-library':{x:505,y:500},
-  'trail-clearing-studio':{x:1005,y:485},
+  'trail-clearing-studio':{x:1005,y:485}, // historical in-flight routes
+  'trail-clearing-instrumentRoom':{x:920,y:470},
+  'trail-instrumentRoom-studio':{x:1042,y:306},
+  'trail-recording-studio':{x:1220,y:306},
   'trail-clearing-pond':{x:940,y:750},
   'trail-pond-studio':{x:1290,y:580}
 };
@@ -30,9 +37,9 @@ const initial={
 };
 const SPEED={Pip:63,Riff:57,Murmur:46};
 const PLACE_OFFSETS={
- Pip:{clearing:[-67,11],studio:[-67,23],library:[-54,20],pond:[-55,24]},
- Riff:{clearing:[68,9],studio:[63,17],library:[54,20],pond:[50,12]},
- Murmur:{clearing:[4,65],studio:[3,70],library:[0,76],pond:[3,64]}
+ Pip:{clearing:[-67,11],instrumentRoom:[-31,17],studio:[-67,23],recording:[-27,12],library:[-54,20],pond:[-55,24]},
+ Riff:{clearing:[68,9],instrumentRoom:[27,19],studio:[63,17],recording:[24,20],library:[54,20],pond:[50,12]},
+ Murmur:{clearing:[4,65],instrumentRoom:[1,44],studio:[3,70],recording:[1,47],library:[0,76],pond:[3,64]}
 };
 const arrival=(name,node)=>{
  const center=PLACES[node]||WAYPOINTS[node];
@@ -142,8 +149,9 @@ export class GroveWorld {
     if(!a||!b)return 0;
     // Doors and walls soften indoor performances for listeners outside.
     let range=RANGES[kind]||430;
-    const aInside=this.at(listener,'library',125)||this.at(listener,'studio',135);
-    const bInside=this.at(source,'library',125)||this.at(source,'studio',135);
+    const rooms=['library','instrumentRoom','studio','recording'];
+    const inside=name=>rooms.some(room=>this.at(name,room,room==='library'?125:86));
+    const aInside=inside(listener),bInside=inside(source);
     if(aInside!==bInside)range*=.48;
     else if(aInside&&bInside && a.destination!==b.destination)range*=.3;
     const d=distance(a,b);
@@ -175,6 +183,20 @@ export class GroveWorld {
       const p=this.people[name],curious=name==='Pip'?grove.pip?.curiosity:name==='Riff'?grove.riff?.curiosity:grove.vocalist?.curiosity;
       if(grove.library?.busy(name)||grove.disciplines?.people?.[name]?.interest)continue;
       if(this.traveling(name) || bar-p.lastChoice<9)continue;
+      // A room with a real tape can be explored voluntarily. Playback is
+      // audible but never credits musical practice or awards skill.
+      if(p.destination==='recording'&&this.at(name,'recording',98)&&
+         grove.archive?.recordings.length&&!grove.archive.deck&&
+         Math.random()<.22*(curious??.6)){
+        const tape=grove.archive.startListening(name,bar);
+        if(tape){
+          p.lastChoice=bar;
+          p.purpose='listening back to '+tape.id;
+          grove.push(name+' chooses to listen back to a recorded jam.');
+          grove.onTalk?.(name,'♪ Listening to a real past jam');
+          continue;
+        }
+      }
       // Music becomes an invitation, never an obligation.
       if(name==='Murmur'&&grove.vocalist?.stage==='humming'&&
          grove.disciplines?.current('Murmur')==='voice'){
@@ -222,16 +244,22 @@ export class GroveWorld {
         }
       }else if(name==='Murmur'){
         const roll=Math.random();
-        if(roll<.2){where='studio';why='curious about the studio instruments';}
-        else if(roll<.64){where='pond';why='listening to quiet and testing melodies';}
+        if(roll<.11&&grove.archive?.recordings.length){
+          where='recording';why='curious to hear a recorded jam';
+        }else if(roll<.29){where='studio';why='curious about the practice studio';}
+        else if(roll<.68){where='pond';why='listening to quiet and testing melodies';}
         else {where='clearing';why='listening for other musicians';}
       }else if(name==='Pip'){
-        if(Math.random()<.38){where='studio';why='experimenting with rhythm';}
-        else if(Math.random()<.47){where='library';why='curious about musical ideas';}
+        const roll=Math.random();
+        if(roll<.11&&grove.archive?.recordings.length){where='recording';why='curious about old rhythms';}
+        else if(roll<.42){where='studio';why='experimenting with rhythm';}
+        else if(roll<.71){where='library';why='curious about musical ideas';}
         else {where='clearing';why='listening for a possible jam';}
       }else{
-        if(Math.random()<.43){where='studio';why='exploring harmonies';}
-        else if(Math.random()<.45){where='library';why='studying chord language';}
+        const roll=Math.random();
+        if(roll<.12&&grove.archive?.recordings.length){where='recording';why='curious to hear an earlier performance';}
+        else if(roll<.47){where='studio';why='exploring harmonies';}
+        else if(roll<.72){where='library';why='studying chord language';}
         else {where='clearing';why='listening for a possible jam';}
       }
       if(name==='Murmur'&&p.ensembleIntent==='joining'&&where!==p.destination)
