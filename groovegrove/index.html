@@ -381,6 +381,7 @@ let sound=new SoundEngine(),grove=null;
 let started=false,startError='',selected='Pip',soundNeedsRefresh=false,audioStartPending=false;
 let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false,deliveryCategory='instruments',journalOpen=false,journalName='Pip';
 let floatingNotes=[],talkBubble=null,speechQueue=[],ambient=[],now=0,visualBeat=-1;
+let tapesOpen=false,tapeSelection=0,tapePlayback=null;
 let noteFlash={Pip:0,Riff:0,Murmur:0};
 let redrawAccum=0;
 let liveLocations=null;
@@ -468,20 +469,34 @@ function drawInstrumentGlyph(g,id,x,y,k=1){
  }
 }
 function makeInstrumentStudio(scene){
- const st=PLACES.studio,g=new Graphics();scene.addChild(g);
- rect(g,st.x-132,st.y-3,264,94,8,0x173b35,.72);
- textAt(scene,'ONE PHYSICAL INSTRUMENT EACH',st.x,st.y-17,10,PALETTE.gold,'bold',.6,.5);
- ui.instrumentRack={};
- for(const [i,id] of ['drums','guitar','violin'].entries()){
-   const x=st.x+(i-1)*87,frame=new Graphics();scene.addChild(frame);
-   rect(frame,x-32,st.y+2,64,62,6,0x092a29,.72);
-   frame.roundRect(x-32,st.y+2,64,62,6).stroke({color:0x829c7c,width:1,alpha:.55});
-   const shape=new Graphics();scene.addChild(shape);
-   drawInstrumentGlyph(shape,id,x,st.y+31,.57);
-   ui.instrumentRack[id]=shape;
-   textAt(scene,id.toUpperCase(),x,st.y+70,10,PALETTE.cream,'bold',.6,.5);
- }
- ui.studioActivity=textAt(scene,'VIOLIN AWAITS A CURIOUS MUSICIAN',st.x,st.y+97,10,PALETTE.mint,'normal',.2,.5);
+  const st=PLACES.instrumentRoom,rec=PLACES.recording;
+  const g=new Graphics();scene.addChild(g);
+  textAt(scene,'THE INSTRUMENT ROOM',st.x,st.y-95,11,PALETTE.cream,'bold',1.2,.5);
+  textAt(scene,'ONE PHYSICAL INSTRUMENT EACH',st.x,st.y-71,9,PALETTE.gold,'bold',.7,.5);
+  ui.instrumentRack={};
+  for(const [i,id] of ['drums','guitar','violin'].entries()){
+    const x=st.x+(i-1)*52;
+    const frame=new Graphics();scene.addChild(frame);
+    rect(frame,x-22,st.y-24,44,70,7,0x092a29,.8);
+    frame.roundRect(x-22,st.y-24,44,70,7).stroke({color:0x829c7c,width:1,alpha:.65});
+    const shape=new Graphics();scene.addChild(shape);
+    drawInstrumentGlyph(shape,id,x,st.y+8,.38);
+    ui.instrumentRack[id]=shape;
+    textAt(scene,id.toUpperCase(),x,st.y+59,8,PALETTE.cream,'bold',.6,.5);
+  }
+  ui.studioActivity=textAt(scene,'A VIOLIN AWAITS',st.x,st.y+91,9,PALETTE.mint,'normal',.2,.5);
+  const tape=new Graphics();scene.addChild(tape);
+  rect(tape,rec.x-61,rec.y-38,122,84,11,0x152a2b,.98);
+  tape.roundRect(rec.x-61,rec.y-38,122,84,11).stroke({color:PALETTE.gold,width:2,alpha:.7});
+  circle(tape,rec.x-33,rec.y-9,19,0x6b8d83,.9);
+  circle(tape,rec.x+32,rec.y-9,19,0x6b8d83,.9);
+  circle(tape,rec.x-33,rec.y-9,6,0x182b29,.9);
+  circle(tape,rec.x+32,rec.y-9,6,0x182b29,.9);
+  rect(tape,rec.x-32,rec.y+26,64,5,2,PALETTE.gold,.7);
+  tape.eventMode='static';tape.cursor='pointer';
+  tape.hitArea=new Rectangle(rec.x-67,rec.y-47,134,113);
+  tape.on('pointertap',()=>{tapesOpen=true;journalOpen=false;deliveryOpen=false;refreshText();});
+  textAt(scene,'TAP TO REPLAY',rec.x,rec.y+69,10,PALETTE.gold,'bold',.5,.5);
 }
 function makeCarriedInstruments(){
  ui.instrumentMarks={};
@@ -529,7 +544,7 @@ function makeWorldLandscape(scene){
   // Footpaths are navigable roads, not a schedule for the residents.
   const roads=[
     [PLACES.library,PLACES.clearing,{x:505,y:500}],
-    [PLACES.clearing,PLACES.studio,{x:1005,y:485}],
+    [PLACES.clearing,PLACES.instrumentRoom,{x:920,y:470}],
     [PLACES.clearing,PLACES.pond,{x:940,y:750}],
     [PLACES.studio,PLACES.pond,{x:1290,y:580}]
   ];
@@ -556,16 +571,29 @@ function makeWorldLandscape(scene){
   ellipse(g,c.x,c.y+8,176,122,0x608b60,.42);
   ellipse(g,c.x,c.y+95,132,22,0x0b2928,.38);
   textAt(scene,'THE CLEARING',c.x,c.y-156,18,PALETTE.cream,'bold',1.5,.5);
+  // The old practice space stays central; a gear room leads in, and
+  // the recording room extends beyond it. All three are on the path graph.
   const st=PLACES.studio;
-  rect(g,st.x-155,st.y-128,310,242,22,0x1b4239,.93);
-  rect(g,st.x-141,st.y-115,282,216,17,0x294c43);
-  rect(g,st.x-126,st.y-101,252,181,14,0x3b5846);
+  const left=PLACES.instrumentRoom.x-92,right=PLACES.recording.x+93;
+  rect(g,left,st.y-132,right-left,244,19,0x1b4239,.99);
+  for(const [place,w,color] of [
+    [PLACES.instrumentRoom,186,0x29483f],
+    [PLACES.studio,182,0x3b5846],
+    [PLACES.recording,187,0x343e43]]){
+    rect(g,place.x-w/2+5,place.y-112,w-10,199,12,color,.97);
+    rect(g,place.x-w/2+7,place.y+79,w-14,18,4,0x1a292a,.65);
+  }
+  for(const mid of [(PLACES.instrumentRoom.x+st.x)/2,(PLACES.recording.x+st.x)/2]){
+    rect(g,mid-6,st.y-108,12,177,4,0x102826,.95);
+    rect(g,mid-9,st.y+20,18,50,5,0xc4ac7c,.48);
+  }
   rect(g,st.x-101,st.y-73,66,74,9,0x393a42);
   circle(g,st.x-68,st.y-45,20,0x1b262b);
   circle(g,st.x-68,st.y-45,10,0x64695d);
   rect(g,st.x+37,st.y-68,61,10,3,0xba8659);
   ellipse(g,st.x+70,st.y-4,32,19,0xb47c5f);
-  textAt(scene,'THE STUDIO',st.x,st.y-151,16,PALETTE.cream,'bold',1.5,.5);
+  textAt(scene,'PRACTICE STUDIO',st.x,st.y-151,13,PALETTE.cream,'bold',1.5,.5);
+  textAt(scene,'RECORDING ROOM',PLACES.recording.x,st.y-151,13,PALETTE.gold,'bold',1.2,.5);
   const pond=PLACES.pond;
   ellipse(g,pond.x,pond.y,185,133,0x102b2c,.98);
   ellipse(g,pond.x,pond.y,172,121,0x38767c,.85);
@@ -967,7 +995,7 @@ function makeVocalist(parent,x,y,s){
 function makeCameraControls(hud){
   const options=[
     ['PIP','Pip'],['RIFF','Riff'],['MURMUR','Murmur'],
-    ['LIBRARY','library'],['STUDIO','studio'],['CLEARING','clearing']
+    ['LIBRARY','library'],['ROOMS','studio'],['CLEARING','clearing']
   ];
   const x=landscape?W*.34:12,barW=landscape?Math.min(W*.48,570):W-24;
   const width=(barW-5*5)/6;
