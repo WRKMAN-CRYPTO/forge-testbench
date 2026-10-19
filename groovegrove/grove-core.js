@@ -126,7 +126,8 @@ export class Grove {
       const vocal=tryVocalPhrase({
         singer,library:this.library,space:this.space,bar,time:t,beatDur,
         audio,journal:this.voiceJournal,onNote:this.onNote,
-        playing:{Pip:pipActive,Riff:riffActive}
+        playing:{Pip:pipActive||['drums','guitar','violin'].includes(this.disciplines.current('Pip')),
+          Riff:riffActive||['drums','guitar','violin'].includes(this.disciplines.current('Riff'))}
       });
       if(vocal?.ensemble&&this.voiceJournal.sharedPhrases===1)
         this.push('Murmur chooses to sing with the others for the first time.');
