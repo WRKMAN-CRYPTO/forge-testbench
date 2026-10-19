@@ -1056,6 +1056,14 @@ function buildCanvas(){
   const badgeX=landscape?W*.5:W*.5,badgeY=landscape?panelY-44:panelY-51;
   ui.badge=new Graphics();rect(ui.badge,badgeX-124,badgeY-13,248,36,18,0x102d2d,.92);
   world.addChild(ui.badge);
+  ui.badge.eventMode='static';ui.badge.cursor='pointer';
+  ui.badge.hitArea=new Rectangle(badgeX-124,badgeY-13,248,36);
+  ui.badge.on('pointertap',()=>{
+    if(!remoteLive&&serverHome){
+      if(location.origin!==serverHome)location.assign(serverHome+'/?v=20261019-mobile-recovery');
+      else void attachLivingServer();
+    }else if(!started)void startAudio(soundNeedsRefresh);
+  });
   ui.badgeText=textAt(world,'TAP ANYWHERE TO START',badgeX,badgeY-4,12,PALETTE.gold,'bold',1.7,.5);
   ui.inspect=textAt(world,'',landscape?W*.5:W*.5,landscape?panelY-84:panelY-93,landscape?13:12,PALETTE.cream,'normal',0,.5);
   ui.inspect.style.wordWrap=true;ui.inspect.style.wordWrapWidth=landscape?620:W-40;
@@ -1069,7 +1077,7 @@ function buildCanvas(){
 function refreshText(){
   if(!ui.modeLabel)return;
   const mode=grove?.mode||'solo';
-  ui.modeLabel.text=remoteLive?(remoteOnline?'LIVE · THE GROVE IS HOME':'SERVER RECONNECTING'):(grove?.library.anyBusy()?'READING IN THE GROVE':mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES');
+  ui.modeLabel.text=remoteLive?(remoteOnline?'LIVE · THE GROVE IS HOME':'SERVER RECONNECTING'):serverBase?'CONNECTING TO THE LIVE GROVE':(grove?.library.anyBusy()?'READING IN THE GROVE':mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES');
   ui.statusLine.text=remoteLive && returnReport && Date.now()<returnReportUntil?('While away: '+returnReport.bars+' bars practiced · Pip +'+returnReport.pip+' · Riff +'+returnReport.riff):serverMessage&&!remoteLive?serverMessage:startError?startError:!started?(grove?.library.anyBusy()?'Tap the clearing to continue the interrupted reading':'Tap the clearing to hear their first notes'):soundNeedsRefresh?'Audio route may be muted · tap ↻ AUDIO to reconnect':(sound.context && sound.context.state!=='running'?'Audio paused · tap ↻ AUDIO to reconnect':grove.highlight);
   if(grove){
     const error=grove.baseline();
@@ -1113,7 +1121,7 @@ function refreshText(){
         ' · '+grove.library.known[who.name].length+' books';
     }
   }else ui.inspect.text='Tap a musician to follow their decisions';
-  ui.badgeText.text=(remoteLive && returnReport && Date.now()<returnReportUntil)?('+'+returnReport.bars+' BARS WHILE AWAY'):!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(soundNeedsRefresh || (sound.context && sound.context.state!=='running'))?'TAP TO RECONNECT AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
+  ui.badgeText.text=(!remoteLive&&serverHome)?(location.origin!==serverHome?'↗ OPEN LIVE GROVE':'↻ CONNECT TO GROVE'):(remoteLive && returnReport && Date.now()<returnReportUntil)?('+'+returnReport.bars+' BARS WHILE AWAY'):!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(soundNeedsRefresh || (sound.context && sound.context.state!=='running'))?'TAP TO RECONNECT AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
   ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
   if(ui.audioLabel)ui.audioLabel.text=!started?'▶ AUDIO':soundNeedsRefresh?'↻ REPAIR':'↻ AUDIO';
   if(ui.audioWidget)ui.audioWidget.visible=!deliveryOpen && !journalOpen;
@@ -1297,8 +1305,12 @@ const liveConductor=new LiveNoteConductor({delayMs:1900});
 const pendingVisualNotes=[];
 let lastRemoteWorldAt=0;
 let remoteTimer=null,serverMessage='',serverKey='',returnReport=null,returnReportUntil=0,serverLastBeat=0;
+let connectingServer=false,lastServerFailure='';
 const SERVER_KEY_STORE='groovegrove.private.server.key';
-const serverBase=(GROVE_SERVER_URL||'').replace(/\/+$/,'');
+const serverHome=(GROVE_SERVER_URL||'').replace(/\/+$/,'');
+// The direct Railway viewer uses same-origin requests on iPhone Safari.
+const serverBase=typeof location!=='undefined'&&location.origin===serverHome
+  ?location.origin:serverHome;
 function readPairingKey(){
   try{
     const params=new URLSearchParams(location.hash.replace(/^#/,''));
@@ -1332,7 +1344,10 @@ function acceptRemoteWorld(snapshot){
   refreshText();
 }
 async function attachLivingServer(){
-  if(!serverBase)return;
+  if(!serverBase||remoteLive||connectingServer)return;
+  connectingServer=true;
+  serverMessage='CONTACTING LIVE GROVE · THEIR MEMORIES ARE SAFE ON RAILWAY';
+  refreshText();
   serverKey=readPairingKey();
   try{
     let status=await serverRequest('/v1/state');
@@ -1379,8 +1394,14 @@ async function attachLivingServer(){
     remoteTimer=setInterval(pollLivingServer,450);
     await pollLivingServer();
   }catch(e){
-    serverMessage='Server not ready · local Grove remains available';
+    lastServerFailure=String(e?.message||e||'network unavailable').slice(0,110);
+    serverMessage='LIVE GROVE NOT CONNECTED · '+lastServerFailure+
+      (location.origin!==serverHome?' · TAP OPEN LIVE GROVE':' · RETRYING');
     remoteOnline=false;
+    console.warn('GrooveGrove live connection unavailable:',lastServerFailure);
+    refreshText();
+  }finally{
+    connectingServer=false;
   }
 }
 function playLivingEvents(data,sentAtMs,receivedAtMs){
@@ -1499,7 +1520,10 @@ app.canvas.addEventListener('pointerdown',(ev)=>{
   const button=ui.audioRect;
   if(button && lx>=button.x && lx<=button.x+button.w &&
      ly>=button.y && ly<=button.y+button.h){startAudio(true);return;}
-  startAudio(soundNeedsRefresh);
+  // Network and audio failures must not disable camera navigation.
+  // An empty local grove must not advance independently of the live band.
+  if(!remoteLive&&serverBase)void attachLivingServer();
+  else void startAudio(soundNeedsRefresh);
   if(ly>(ui.cameraBand?.y||145)+48 && ly<(ui.panelY||H-280)-48){
     camera.drag={pointerId:ev.pointerId,x:lx,y:ly,startX:camera.x,startY:camera.y,moved:false};
   }
@@ -1556,7 +1580,7 @@ sound.beat=Math.max(0,grove.bar*4+grove.beat+1);
 grove.onNote=emitVisualNote;
 grove.onTalk=showSpeech;
 applyViewportSize(true);
-await attachLivingServer();
+// Start movement and camera interactions BEFORE any asynchronous fetch.
 app.ticker.add(()=>{
   const t=performance.now();
   flushLiveVisuals();
@@ -1564,6 +1588,11 @@ app.ticker.add(()=>{
   redrawAccum+=app.ticker.deltaMS;
   if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
 });
+// The band keeps playing on Railway while a reconnect is attempted.
+void attachLivingServer();
+setInterval(()=>{
+  if(!remoteLive&&!connectingServer&&!document.hidden)void attachLivingServer();
+},6500);
 // Inspectable test hooks; not part of the rendered interface.
 window.GrooveGroveDebug={get state(){return grove.snapshot();},get library(){return grove.library.snapshot();},get journal(){return grove.understanding.snapshot();},get server(){return {connected:remoteLive,online:remoteOnline,message:serverMessage,beat:serverLastBeat,sequence:remoteSequence,returnReport,url:serverBase,audioBuffer:liveConductor.stats};},journalReport(name){return name==='Murmur'?grove.voiceJournal.report():grove.understanding.report(name==='Riff'?'Riff':'Pip');},get voiceJournal(){return grove.voiceJournal.snapshot();},get disciplines(){return grove.disciplines.snapshot();},get knowledgePlayed(){return {...grove.playedKnowledge};},addBook(type){const result=grove.library.donate(type);if(result.ok){grove.push('A copy of '+LIBRARY_CATALOG[type].title+' was delivered.');saveMemory(grove.snapshot());refreshText();}return result;},get errorSeries(){return [...grove.sessionMeasurements];},get logs(){return grove.logs.map(x=>x.message);},get mode(){return grove.mode;},get audioState(){return sound.context?.state||'not started';},get audioNeedsRefresh(){return soundNeedsRefresh;},get audioError(){return startError;},get lastBeat(){return sound.beat;},repairAudio(){return startAudio(true);},get viewport(){return {width:viewportWidth,height:viewportHeight,landscape,scale};},get camera(){return {...camera,drag:null};},get locations(){return liveLocations||grove.space?.snapshot()?.people;},restart(){grove=new Grove(null,saveMemory);grove.onNote=emitVisualNote;grove.onTalk=showSpeech;saveMemory(grove.snapshot());refreshText();}};
 </script>
