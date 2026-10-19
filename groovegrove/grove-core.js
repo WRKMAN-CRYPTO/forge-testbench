@@ -1,9 +1,9 @@
 /* GrooveGrove shared simulation. Same classes in server + client. */
 import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261018-voice';
 import {ListeningJournal} from './listening-journal.js';
-import {GroveWorld} from './grove-world.js?v=20261018-ensemble';
+import {GroveWorld} from './grove-world.js?v=20261019-disciplines';
 import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
-import {tryVocalPhrase} from './voice-music.js?v=20261018-sustain';
+import {tryVocalPhrase} from './voice-music.js?v=20261019-disciplines';
 import {MusicalDisciplines} from './groove-disciplines.js?v=20261019-disciplines';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
