@@ -205,6 +205,12 @@ class SoundEngine {
     };
     const choice=Object.prototype.hasOwnProperty.call(vowels,expression?.vowel)?expression.vowel:'m';
     const specs=vowels[choice];
+    // Per-musician natural timbre, separate from learned singing skill.
+    // The legacy path (Murmur) retains the exact original synthesis values.
+    const profile=expression?.voiceprint;
+    const distinct=profile?.version===1&&Number.isFinite(profile.formant)&&
+      Number.isFinite(profile.brightness)&&Number.isFinite(profile.warmth)&&
+      Number.isFinite(profile.air);
     const onset=Math.max(ctx.currentTime+.003,t);
     const len=clamp(Number.isFinite(duration)?duration:.5,.17,3.3);
     const pitch=clamp(Number.isFinite(freq)?freq:220,100,750);
@@ -218,7 +224,7 @@ class SoundEngine {
     env.gain.linearRampToValueAtTime(peak*.75,onset+Math.max(attack+.004,len-release));
     env.gain.exponentialRampToValueAtTime(.0001,onset+len);
     env.connect(this.mix?.voice||this.master);
-    for(const [formant,mix] of specs){
+    for(const [index,[formant,mix]] of specs.entries()){
       const oscillator=ctx.createOscillator();
       const filter=ctx.createBiquadFilter();
       const weight=ctx.createGain();
@@ -232,9 +238,10 @@ class SoundEngine {
         oscillator.frequency.linearRampToValueAtTime(pitch,onset+len*.93);
       }
       filter.type='bandpass';
-      filter.frequency.setValueAtTime(formant,onset);
+      filter.frequency.setValueAtTime(formant*(distinct?clamp(profile.formant,.75,1.3):1),onset);
       filter.Q.value=choice==='m'?3.5:2.7;
-      weight.gain.value=mix;
+      weight.gain.value=distinct?mix*(index===0?clamp(profile.warmth,.5,1.5):
+        index===2?clamp(profile.brightness,.5,1.5):1):mix;
       oscillator.connect(filter);filter.connect(weight);weight.connect(env);
       oscillator.start(onset);oscillator.stop(onset+len+.025);
     }
@@ -243,7 +250,7 @@ class SoundEngine {
       const breath=ctx.createBufferSource(),high=ctx.createBiquadFilter(),air=ctx.createGain();
       breath.buffer=this.noise;high.type='highpass';high.frequency.value=1700;
       air.gain.setValueAtTime(.0001,onset);
-      air.gain.linearRampToValueAtTime(Math.max(.0002,volume*.035),onset+.025);
+      air.gain.linearRampToValueAtTime(Math.max(.0002,volume*.035*(distinct?clamp(profile.air,.5,1.5):1)),onset+.025);
       air.gain.exponentialRampToValueAtTime(.0001,onset+attack);
       breath.connect(high);high.connect(air);air.connect(this.mix?.voice||this.master);
       breath.start(onset);breath.stop(onset+attack+.01);
