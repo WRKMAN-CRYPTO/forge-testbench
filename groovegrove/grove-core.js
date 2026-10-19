@@ -66,6 +66,9 @@ export class Grove {
     this.space=new GroveWorld(saved?.space);
     this.disciplines=new MusicalDisciplines(saved?.disciplines);
     this.archive=new JamArchive(saved?.archive);
+    // An in-progress jam cannot be called a complete recording after restart:
+    // its earlier note stream was not checkpointed as an open tape.
+    this.recordingResumingJam=!!saved&&saved.mode==='jam';
     for(const name of ['Pip','Riff']){
       const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
       if(book)(name==='Pip'?this.pip:this.riff).currentGoal='finishing '+LIBRARY_CATALOG[book.type].title;
@@ -104,7 +107,7 @@ export class Grove {
     // any living musician's practice, listening journal or motor development.
     const liveOutput=audio;
     this.archive.playDeck(t,liveOutput,this.space);
-    if(this.mode==='jam'){
+    if(this.mode==='jam'&&!this.recordingResumingJam){
       this.archive.begin(bar,t);
       // Capture the very same note arguments sent to the renderer. An archive
       // never reconstructs a groove from counters, stats or random seeds.
@@ -449,12 +452,15 @@ export class Grove {
         this.disciplines.current('Riff')==='guitar' && this.space.distance('Pip','Riff')<260 &&
         !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.busy('Pip')&&!this.library.busy('Riff');
       if(!together){
+        this.recordingResumingJam=false;
         this.archive.discard(); // an interrupted jam is not a completed tape
         this.mode='solo';this.modeBars=0;
         this.push('The jam falls quiet as the musicians move apart.');
       }else if(this.modeBars>=6 && Math.random()<.46){
         this.jams++;this.familiarity++;
-        const tape=this.archive.finish(this.bar);
+        const tape=this.recordingResumingJam?null:this.archive.finish(this.bar);
+        if(this.recordingResumingJam)this.archive.discard();
+        this.recordingResumingJam=false;
         if(tape)this.push('The recording room archived jam '+tape.id+'.');
         this.exchange(this.riff,this.pip,'That groove was worth remembering.');
         this.pip.remember('Shared a jam with Riff; familiar grooves feel easier.');
@@ -497,6 +503,7 @@ export class Grove {
       if(Math.random()<riffWillingness){
         this.exchange(this.riff,this.pip,'Let’s find out.');
         this.mode='jam';this.modeBars=0;
+        this.recordingResumingJam=false;
         this.archive.begin(this.bar+1);
         this.pip.currentGoal='improvising with Riff';
         this.riff.currentGoal='responding to Pip’s rhythm';
