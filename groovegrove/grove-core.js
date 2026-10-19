@@ -3,7 +3,7 @@ import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261018-voice'
 import {ListeningJournal} from './listening-journal.js';
 import {GroveWorld} from './grove-world.js?v=20261019-disciplines';
 import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
-import {tryVocalPhrase} from './voice-music.js?v=20261019-disciplines';
+import {tryVocalPhrase} from './voice-music.js?v=20261019-transfer';
 import {MusicalDisciplines} from './grove-disciplines.js?v=20261019-disciplines';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -126,8 +126,12 @@ export class Grove {
       const vocal=tryVocalPhrase({
         singer,library:this.library,space:this.space,bar,time:t,beatDur,
         audio,journal:this.voiceJournal,onNote:this.onNote,
-        playing:{Pip:pipActive||['drums','guitar','violin'].includes(this.disciplines.current('Pip')),
-          Riff:riffActive||['drums','guitar','violin'].includes(this.disciplines.current('Riff'))}
+        transfer:this.disciplines.transfer('Murmur',this),
+        playing:Object.fromEntries(['Pip','Riff'].map(name=>[name,
+          !this.library.busy(name)&&!this.space.traveling(name)&&
+          this.space.destination(name)!=='pond'&&(
+            (name==='Pip'&&pipActive)||(name==='Riff'&&riffActive)||
+            ['drums','guitar','violin'].includes(this.disciplines.current(name)))]))
       });
       if(vocal?.ensemble&&this.voiceJournal.sharedPhrases===1)
         this.push('Murmur chooses to sing with the others for the first time.');
@@ -196,7 +200,8 @@ export class Grove {
         // a chord. Recent nearby singing makes a held answer more attractive,
         // while solo practice still leaves room for this discovery.
         const singleChance=.075+(singingNearby?.065:0)+(onJam?.025:0)+
-          (this.library.has('Riff','partnerListening')?.02:0);
+          (this.library.has('Riff','partnerListening')?.02:0)+
+          (this.library.has('Riff','melodicContours')?.035:0);
         const longSingle=Math.random()<singleChance;
         if(longSingle){
           const tones=[voicing[1],voicing[2],voicing[0]*2];
@@ -220,7 +225,8 @@ export class Grove {
         }else{
           const holdingChance=.19+
             (this.library.has('Riff','openChords')?.13:0)+
-            (singingNearby?.18:0)+(onJam?.07:0);
+            (singingNearby?.18:0)+(onJam?.07:0)+
+            (this.library.has('Riff','breathPhrasing')?.09:0);
           const longChord=Math.random()<holdingChance;
           const holdBeats=longChord?(beat===0?(Math.random()<.42?4:3):2):0;
           const duration=longChord?holdBeats*beatDur-.06:.43;
@@ -240,6 +246,12 @@ export class Grove {
         play.guitar(voicing[(bar+1)%3]*2,guitarOnset+beatDur*.47,dynamic*.42*feeling,.2,true);
         this.playedKnowledge.Riff++;
       }
+      if(!alreadyHolding&&!riffRest&&
+         this.library.has('Riff','ghostNotes')&&beat===2&&bar%3===0)
+        play.guitar(voicing[1]*2,guitarOnset+beatDur*.46,dynamic*.12,.15,true);
+      if(!alreadyHolding&&!riffRest&&
+         this.library.has('Riff','offbeatPulse')&&beat===1&&bar%2===0)
+        play.guitar(voicing[(bar+2)%3]*2,guitarOnset+beatDur*.5,dynamic*.25,.21,true);
       if(!alreadyHolding && !riffRest && riffChoice==='answer' && beat===3){
         play.guitar(voicing[bar%3]*2,guitarOnset+beatDur*.73,dynamic*.24,.16,true);
       }
@@ -276,6 +288,10 @@ export class Grove {
         play.kick(drumOnset+beatDur*.5,.32,true);play.snare(drumOnset+beatDur*.75,.18,true);
         this.playedKnowledge.Pip++;
       }
+      if(this.library.has('Pip','breathPhrasing') && beat===3 && bar%4===0)
+        play.hat(drumOnset+.01,.18,true);
+      if(this.library.has('Pip','walkingBass') && beat===3 && bar%2===1)
+        play.kick(drumOnset+beatDur*.34,.23,true);
       if(!pipRest && onJam && beat===3 && this.library.has('Pip','callResponse')){
         play.snare(drumOnset+beatDur*.5,.31,true);this.playedKnowledge.Pip++;
       }
