@@ -70,7 +70,7 @@ export class MusicalDisciplines {
    const takeBreak=name!=='Murmur'&&id==='none';
    if(!player||(!INSTRUMENTS.includes(id)&&!returnToVoice&&!takeBreak)||
       id===player.current||(!returnToVoice&&!takeBreak&&!this.available(name,id))||player.interest||
-      grove.library?.busy(name)||bar-player.lastSwitch<14)return false;
+      grove.library?.busy(name)||bar-player.lastSwitch<24)return false;
    player.interest=id;player.lastDecision=bar;
    grove.space.people[name].lastChoice=bar;
    grove.space.chooseDestination(name,'studio','wondering how '+id+' feels to play',bar);
@@ -115,7 +115,7 @@ export class MusicalDisciplines {
        continue;
      }
      if(grove.library.busy(name)||grove.space.traveling(name)||
-        bar-p.lastSwitch<14||bar-p.lastDecision<8)continue;
+        bar-p.lastSwitch<24||bar-p.lastDecision<12)continue;
      // Instrument choice arises from physically visiting the studio, or
      // following an actually heard violin back to its home.
      const inStudio=grove.space.at(name,'studio',112);
@@ -126,7 +126,13 @@ export class MusicalDisciplines {
      const curiosity=clamp(name==='Murmur'?grove.vocalist.curiosity:
        (name==='Pip'?grove.pip:grove.riff).curiosity,0,1);
      if(!inStudio && Math.random()>.08*curiosity)continue;
-     if(inStudio && Math.random()>.07+.11*curiosity)continue;
+     // Being engaged in actual practice is a reason to continue, not a
+     // level gate. A curious beginner can still change their mind any time.
+     const lastPlay=p.current==='voice'&&name==='Murmur'?
+       grove.vocalist.lastAttemptBar:p.practice[p.current]?.lastBar;
+     const engaged=Number.isFinite(lastPlay)&&bar-lastPlay<=3;
+     const desire=(.036+.068*curiosity)*(engaged?.35:1);
+     if(inStudio && Math.random()>desire)continue;
      const offered=INSTRUMENTS.filter(id=>id!==p.current&&this.available(name,id));
      // Silence and the human voice require no equipment. They can always
      // relinquish a borrowed instrument without permission or a skill gate.
@@ -137,7 +143,7 @@ export class MusicalDisciplines {
      // is eligible. Nothing locks the musician into a prescribed sequence.
      const weights=offered.map(id=>{
        if(id==='violin')return 2;
-       if(id==='voice'||id==='none')return p.current==='violin'?2.5:.65;
+       if(id==='voice'||id==='none')return p.current==='violin'?1.9:.27;
        const explored=p.practice[id].notes;
        return 1.1/(1+Math.log1p(explored)*.08);
      });
