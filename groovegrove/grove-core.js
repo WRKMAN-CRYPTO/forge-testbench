@@ -74,6 +74,8 @@ export class Grove {
       if(typeof saved.goals.Riff==='string')this.riff.currentGoal=saved.goals.Riff.slice(0,80);
     }
     this.highlight='Two musicians, one little clearing.';
+    // Display-only cooldown: it never changes how Murmur learns, sings or rests.
+    this.lastMurmurPhraseCueBar=-999;
     this.onSound=null;this.onNote=null;
     this.push('The grove is quiet. Two musicians are finding their sound.');
     if(saved?.logs?.length)this.logs=saved.logs.filter(x=>typeof x?.message==='string').slice(0,12);
@@ -140,6 +142,16 @@ export class Grove {
       });
       if(vocal?.ensemble&&this.voiceJournal.sharedPhrases===1)
         this.push('Murmur chooses to sing with the others for the first time.');
+      // These are captions of music that was ACTUALLY scheduled. Murmur's
+      // existing wordless synthesizer is not made to speak or perform more.
+      if(vocal?.sang && this.onTalk &&
+         (this.voiceJournal.attempts===1 || bar-this.lastMurmurPhraseCueBar>=16)){
+        const cue=this.voiceJournal.attempts===1?'♪ My first humming notes':
+          vocal.response?'♪ Answering '+vocal.response+' in melody':
+          vocal.pitches.length>1?'♪ Trying a new melodic phrase':'♪ Exploring a quiet hum';
+        this.onTalk('Murmur',cue);
+        this.lastMurmurPhraseCueBar=bar;
+      }
     }
     // Independent beginners can choose the unheld voice as their instrument.
     // Murmur continues using his original, separate vocal engine and journal.
