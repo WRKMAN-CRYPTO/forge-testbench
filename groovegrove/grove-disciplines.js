@@ -4,6 +4,7 @@
  * technique. No fixed classes, level caps or mastery gates.
  */
 export const INSTRUMENTS=Object.freeze(['drums','guitar','violin']);
+const PRACTICES=[...INSTRUMENTS,'voice'];
 export const MUSICIANS=Object.freeze(['Pip','Riff','Murmur']);
 const DEFAULT=Object.freeze({Pip:'drums',Riff:'guitar',Murmur:'voice'});
 const validInstrument=id=>INSTRUMENTS.includes(id)||id==='voice'||id==='none';
@@ -32,6 +33,14 @@ const restoration=raw=>{
  return p;
 };
 const safeChoice=(n,f)=>validInstrument(n)?n:f;
+const vocalMemory=old=>({
+  attempts:count(old?.attempts),rests:count(old?.rests),notes:count(old?.notes),
+  phrases:count(old?.phrases),lastAttemptBar:Number.isSafeInteger(old?.lastAttemptBar)?old.lastAttemptBar:-12,
+  lastNoteBar:Number.isSafeInteger(old?.lastNoteBar)?old.lastNoteBar:null,
+  lastPitch:Number.isFinite(old?.lastPitch)?old.lastPitch:null,
+  motif:Array.isArray(old?.motif)?old.motif.filter(Number.isFinite).slice(0,4):null,
+  firstSound:old?.firstSound&&Number.isFinite(old.firstSound.pitch)?{...old.firstSound}:null
+});
 export class MusicalDisciplines {
  constructor(saved=null){
    this.people={};this.instruments={};
@@ -51,7 +60,8 @@ export class MusicalDisciplines {
        lastDecision:Number.isSafeInteger(old?.lastDecision)?old.lastDecision:-80,
        bowUntilBeat:Number.isSafeInteger(old?.bowUntilBeat)?old.bowUntilBeat:0,
        guitarUntilBeat:Number.isSafeInteger(old?.guitarUntilBeat)?old.guitarUntilBeat:0,
-       practice:Object.fromEntries(INSTRUMENTS.map(id=>[id,restoration(old?.practice?.[id])])),
+       practice:Object.fromEntries(PRACTICES.map(id=>[id,restoration(old?.practice?.[id])])),
+        vocal:vocalMemory(old?.vocal),
        studies:Array.isArray(old?.studies)?old.studies.filter(x=>x&&
          typeof x.book==='string'&&typeof x.skill==='string').slice(0,30)
          .map(x=>({...x})):[],
@@ -68,7 +78,9 @@ export class MusicalDisciplines {
    people:Object.fromEntries(MUSICIANS.map(n=>{const p=this.people[n];
      return [n,{current:p.current,interest:p.interest,lastSwitch:p.lastSwitch,
        lastDecision:p.lastDecision,bowUntilBeat:p.bowUntilBeat,guitarUntilBeat:p.guitarUntilBeat,
-       practice:Object.fromEntries(INSTRUMENTS.map(id=>[id,{...p.practice[id],
+       vocal:{...p.vocal,motif:p.vocal.motif?[...p.vocal.motif]:null,
+         firstSound:p.vocal.firstSound?{...p.vocal.firstSound}:null},
+       practice:Object.fromEntries(PRACTICES.map(id=>[id,{...p.practice[id],
          recent:p.practice[id].recent.map(x=>({...x})),
          firstNote:p.practice[id].firstNote?{...p.practice[id].firstNote}:null}])),
        studies:p.studies.map(x=>({...x})),
@@ -91,7 +103,7 @@ export class MusicalDisciplines {
    if(!p)return {rhythm:0,melody:0,bowing:0,timingMs:42,skills:knowledge};
    const rhythm=logProgress(p.practice.drums.notes,6000);
    const pitchedNotes=p.practice.guitar.notes+
-     (name==='Murmur'?(grove.voiceJournal?.notes||0):0);
+     (name==='Murmur'?(grove.voiceJournal?.notes||0):p.practice.voice.notes);
    const melody=logProgress(pitchedNotes,5400);
    const bowed=logProgress(p.practice.violin.notes,1800);
    // The original rhythm and guitar models carry real measured motor state.
@@ -113,7 +125,7 @@ export class MusicalDisciplines {
    (!this.instruments[id].owner||this.instruments[id].owner===name);}
  wants(name,id,grove){
    const player=this.people[name],bar=grove.bar;
-   const returnToVoice=name==='Murmur'&&id==='voice';
+   const returnToVoice=id==='voice';
    const takeBreak=name!=='Murmur'&&id==='none';
    if(!player||(!INSTRUMENTS.includes(id)&&!returnToVoice&&!takeBreak)||
       id===player.current||(!returnToVoice&&!takeBreak&&!this.available(name,id))||player.interest||
@@ -183,7 +195,7 @@ export class MusicalDisciplines {
      const offered=INSTRUMENTS.filter(id=>id!==p.current&&this.available(name,id));
      // Silence and the human voice require no equipment. They can always
      // relinquish a borrowed instrument without permission or a skill gate.
-     if(p.current!=='voice'&&name==='Murmur')offered.push('voice');
+     if(p.current!=='voice')offered.push('voice');
      if(p.current!=='none'&&name!=='Murmur')offered.push('none');
      if(!offered.length)continue;
      // A violin can attract the curious, but every available instrument
@@ -195,7 +207,9 @@ export class MusicalDisciplines {
          // of rhythm or harmony, without requiring or assigning violin mastery.
          return 1.65+profile.rhythm*.72+profile.melody*.28;
        }
-       if(id==='voice'||id==='none')return p.current==='violin'?1.9:.27;
+       if(id==='voice')return name==='Murmur'?(p.current==='violin'?1.9:.27):
+         p.current==='none'?1.6:p.current==='violin'?1.3:.82;
+       if(id==='none')return p.current==='violin'?1.9:.27;
        const explored=p.practice[id].notes;
        return 1.1/(1+Math.log1p(explored)*.08);
      });
