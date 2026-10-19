@@ -1,13 +1,26 @@
 // GrooveGrove's living world. Node 20+, no audio hardware.
 import {createServer} from 'node:http';
 import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';
-import {join} from 'node:path';
+import {join,dirname} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {randomUUID,timingSafeEqual} from 'node:crypto';
 import {Grove} from '../grove-core.js';
 
 const port=Number(process.env.PORT||3000);
 const root=process.env.DATA_DIR||'/data';
 const file=join(root,'groovegrove-world.json');
+// Serve this public canvas on the SAME origin as the live world, so iPhones
+// need no cross-site request to read the band's actual Railway memory.
+// A strict whitelist prevents access to /data and private server files.
+const appDirectory=join(dirname(fileURLToPath(import.meta.url)),'..');
+const publicAssets=new Map([
+  ['/','index.html'],['/index.html','index.html'],
+  ...['grove-core.js','grove-world.js','grove-disciplines.js',
+      'music-library.js','listening-journal.js','voice-journal.js',
+      'voice-music.js','live-note-conductor.js','server-config.js']
+     .map(name=>['/'+name,name])
+]);
+const fileMimes={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8'};
 const secret=process.env.GROVE_WRITE_TOKEN||'';
 const allowedOrigins=new Set([
   'https://wrkman-crypto.github.io',
@@ -164,6 +177,14 @@ const app=createServer(async(req,res)=>{
  if(req.method==='OPTIONS'){res.writeHead(origin&&!allowedOrigins.has(origin)?403:204);res.end();return;}
  try{
   const url=new URL(req.url,'http://localhost');
+  if(req.method==='GET'&&publicAssets.has(url.pathname)){
+   const asset=publicAssets.get(url.pathname);
+   const payload=await readFile(join(appDirectory,asset));
+   const ext=asset.split('.').at(-1);
+   res.writeHead(200,{'Content-Type':fileMimes[ext]||'application/octet-stream',
+     'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+   res.end(payload);return;
+  }
   if(req.method==='GET'&&url.pathname==='/health'){
    const pip=ready?world.understanding.report('Pip'):null;
    const riff=ready?world.understanding.report('Riff'):null;
