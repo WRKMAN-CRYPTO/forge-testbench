@@ -1,7 +1,7 @@
 /*
  * GrooveGrove Pass 002: physical books, unique copies, exclusive borrowing,
  * independent reading choices, persistent knowledge. No DOM and no extra renderer.
- * A book teaches an actionable piece of musical vocabulary, not an arbitrary XP score.
+ * All musicians may learn any book; musical ideas travel between instruments.
  */
 export const LIBRARY_CATALOG=Object.freeze({
   'pocket-pulse':Object.freeze({id:'pocket-pulse',title:'Pocket Pulse',subtitle:'A displaced backbeat',color:0x83dbb3,skill:'offbeatPulse',topic:'rhythm',reader:'Pip',readBars:3}),
@@ -93,7 +93,6 @@ export class MusicLibrary{
   borrow(name,book){
     if(!AGENTS.includes(name)||this.busy(name)||!book||book.state!=='shelf'||book.owner)return false;
     const def=LIBRARY_CATALOG[book.type];
-    if(name==='Murmur'?def.reader!=='Murmur':def.reader==='Murmur')return false;
     if(this.has(name,def.skill))return false;
     book.owner=name;book.state='carried';book.progress=0;
     this.activity[name]={copyId:book.copyId,stage:'carried',ticks:0};
@@ -104,15 +103,24 @@ export class MusicLibrary{
     const candidates=this.books.filter(b=>{
       const def=LIBRARY_CATALOG[b.type];
       return b.state==='shelf' &&
-        (name==='Murmur'?def.reader==='Murmur':def.reader!=='Murmur') &&
         !this.has(name,def.skill);
     });
     if(!candidates.length)return;
     const scored=candidates.map(b=>{
       const def=LIBRARY_CATALOG[b.type];
-      const relevant=def.reader===name?.32:def.reader===null?.17:-.16;
-      const interest=(name==='Pip'?grove.pip.curiosity:name==='Riff'?grove.riff.curiosity:grove.vocalist.curiosity)*.32;
-      return {book:b,score:relevant+interest+Math.random()*.32};
+      // The 'reader' property is descriptive metadata, never an access gate.
+      // What seems interesting depends on the instrument they currently hold.
+      const instrument=grove.disciplines?.current(name);
+      const topic=def.topic;
+      const relevant=topic==='voice'
+        ?(instrument==='voice'?.39:instrument==='violin'?.26:.13)
+        :topic==='rhythm'
+        ?(instrument==='drums'?.37:instrument==='violin'?.30:.23)
+        :topic==='harmony'
+        ?(instrument==='guitar'?.38:instrument==='violin'?.28:.20):.3;
+      const curiosity=(name==='Pip'?grove.pip.curiosity:name==='Riff'?grove.riff.curiosity:grove.vocalist.curiosity)*.33;
+      const newInstrument=grove.disciplines?.people?.[name]?.practice?.[instrument]?.notes<40?.03:0;
+      return {book:b,score:relevant+curiosity+newInstrument+Math.random()*.32};
     }).sort((a,b)=>b.score-a.score);
     // Choice is probabilistic. A book being on the shelf is not an order to read.
     if(scored[0].score<.57 || Math.random()>.42)return;
@@ -145,11 +153,13 @@ export class MusicLibrary{
         if(book.progress>=def.readBars){
           if(!this.has(name,def.skill))this.known[name].push(def.skill);
           grove.push(name+' learned '+def.subtitle.toLowerCase()+' from '+def.title+'.');
-          if(name==='Murmur')grove.voiceJournal?.study({bar:grove.bar,title:def.title,skill:def.skill});
-          else{
+          if(def.topic==='voice'&&name==='Murmur')
+            grove.voiceJournal?.study({bar:grove.bar,title:def.title,skill:def.skill});
+          if(name!=='Murmur'){
             const agent=name==='Pip'?grove.pip:grove.riff;
             agent.remember('Read '+def.title+' and learned '+def.subtitle.toLowerCase()+'.');
           }
+          grove.disciplines?.study?.(name,{bar:grove.bar,book:book.type,skill:def.skill,topic:def.topic});
           task.stage='returning';task.ticks=0;book.state='returning';
         }
       }else if(task.stage==='returning' && task.ticks>=1){
