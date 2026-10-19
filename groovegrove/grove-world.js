@@ -39,7 +39,7 @@ const arrival=(name,node)=>{
  const [dx,dy]=PLACE_OFFSETS[name]?.[node]||[0,0];
  return center?{x:center.x+dx,y:center.y+dy}:null;
 };
-const RANGES={kick:650,snare:530,hat:310,guitar:470,voice:255};
+const RANGES={kick:650,snare:530,hat:310,guitar:470,voice:255,violin:425};
 const safePlace=p=>Object.hasOwn(PLACES,p)?p:'clearing';
 const road=(from,to)=>{
   if(from===to)return [];
@@ -82,12 +82,13 @@ export class GroveWorld {
         lastChoice:valid(old.lastChoice)?old.lastChoice:-20,
         heard:Math.max(0,Math.floor(old.heard||0)),
         lastHeard:old.lastHeard&&NAMES.includes(old.lastHeard.from)?old.lastHeard:null,
-        lastHeardDrum:old.lastHeardDrum?.from==='Pip'?old.lastHeardDrum:null,
-        lastHeardVoice:old.lastHeardVoice?.from==='Murmur'?old.lastHeardVoice:null,
-        lastHeardGuitar:old.lastHeardGuitar?.from==='Riff'?old.lastHeardGuitar:null,
+        lastHeardDrum:NAMES.includes(old.lastHeardDrum?.from)?old.lastHeardDrum:null,
+        lastHeardVoice:NAMES.includes(old.lastHeardVoice?.from)?old.lastHeardVoice:null,
+        lastHeardGuitar:NAMES.includes(old.lastHeardGuitar?.from)?old.lastHeardGuitar:null,
+        lastHeardViolin:NAMES.includes(old.lastHeardViolin?.from)?old.lastHeardViolin:null,
         ensembleIntent:name==='Murmur'&&['solo','listening','joining'].includes(old.ensembleIntent)?old.ensembleIntent:'solo',
         lastEnsembleChoice:valid(old.lastEnsembleChoice)?old.lastEnsembleChoice:-99,
-        lastHeardGuitar:old.lastHeardGuitar?.from==='Riff' ? old.lastHeardGuitar : null,
+
         soundBar:valid(old.soundBar)?old.soundBar:-1,
         voluntaryRests:Math.max(0,Math.floor(old.voluntaryRests||0))
       };
@@ -159,8 +160,9 @@ export class GroveWorld {
       listener.heard++;
       listener.lastHeard={from:source,kind,bar,strength:Math.round(intensity*100)/100,
         pitch:Number.isFinite(pitch)?pitch:null};
-      if(source==='Riff'&&kind==='guitar')listener.lastHeardGuitar={...listener.lastHeard};
-      if(source==='Pip'&&(kind==='kick'||kind==='snare'))listener.lastHeardDrum={...listener.lastHeard};
+      if(kind==='guitar')listener.lastHeardGuitar={...listener.lastHeard};
+      if(kind==='violin')listener.lastHeardViolin={...listener.lastHeard};
+      if(kind==='kick'||kind==='snare')listener.lastHeardDrum={...listener.lastHeard};
       if(source==='Murmur'&&kind==='voice')listener.lastHeardVoice={...listener.lastHeard};
       this.heard[name]++;
       if(this.recent.length>19)this.recent.shift();
@@ -171,11 +173,11 @@ export class GroveWorld {
     const bar=grove.bar;
     for(const name of NAMES){
       const p=this.people[name],curious=name==='Pip'?grove.pip?.curiosity:name==='Riff'?grove.riff?.curiosity:grove.vocalist?.curiosity;
-      if(grove.library?.busy(name))continue;
+      if(grove.library?.busy(name)||grove.disciplines?.people?.[name]?.interest)continue;
       if(this.traveling(name) || bar-p.lastChoice<9)continue;
       // Music becomes an invitation, never an obligation.
       if(name==='Murmur'&&grove.vocalist?.stage==='humming'){
-        const fresh=[p.lastHeardGuitar,p.lastHeardDrum]
+        const fresh=[p.lastHeardGuitar,p.lastHeardDrum,p.lastHeardViolin]
           .filter(h=>h&&bar-h.bar<=4&&h.strength>.045);
         const source=fresh.sort((a,b)=>b.bar-a.bar)[0];
         const performer=source&&this.people[source.from];
@@ -215,7 +217,9 @@ export class GroveWorld {
           why='curious about '+recentlyHeard.from+'\'s '+recentlyHeard.kind;
         }
       }else if(name==='Murmur'){
-        if(Math.random()<.57){where='pond';why='listening to quiet and testing melodies';}
+        const roll=Math.random();
+        if(roll<.2){where='studio';why='curious about the studio instruments';}
+        else if(roll<.64){where='pond';why='listening to quiet and testing melodies';}
         else {where='clearing';why='listening for other musicians';}
       }else if(name==='Pip'){
         if(Math.random()<.38){where='studio';why='experimenting with rhythm';}
