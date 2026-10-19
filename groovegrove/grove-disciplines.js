@@ -50,6 +50,7 @@ export class MusicalDisciplines {
        lastSwitch:Number.isSafeInteger(old?.lastSwitch)?old.lastSwitch:-45,
        lastDecision:Number.isSafeInteger(old?.lastDecision)?old.lastDecision:-80,
        bowUntilBeat:Number.isSafeInteger(old?.bowUntilBeat)?old.bowUntilBeat:0,
+       guitarUntilBeat:Number.isSafeInteger(old?.guitarUntilBeat)?old.guitarUntilBeat:0,
        practice:Object.fromEntries(INSTRUMENTS.map(id=>[id,restoration(old?.practice?.[id])])),
        studies:Array.isArray(old?.studies)?old.studies.filter(x=>x&&
          typeof x.book==='string'&&typeof x.skill==='string').slice(0,30)
@@ -66,7 +67,7 @@ export class MusicalDisciplines {
  snapshot(){return {version:1,instruments:Object.fromEntries(INSTRUMENTS.map(id=>[id,{...this.instruments[id]}])),
    people:Object.fromEntries(MUSICIANS.map(n=>{const p=this.people[n];
      return [n,{current:p.current,interest:p.interest,lastSwitch:p.lastSwitch,
-       lastDecision:p.lastDecision,bowUntilBeat:p.bowUntilBeat,
+       lastDecision:p.lastDecision,bowUntilBeat:p.bowUntilBeat,guitarUntilBeat:p.guitarUntilBeat,
        practice:Object.fromEntries(INSTRUMENTS.map(id=>[id,{...p.practice[id],
          recent:p.practice[id].recent.map(x=>({...x})),
          firstNote:p.practice[id].firstNote?{...p.practice[id].firstNote}:null}])),
@@ -134,7 +135,7 @@ export class MusicalDisciplines {
    if(INSTRUMENTS.includes(previous))this.instruments[previous].owner=null;
    if(INSTRUMENTS.includes(id))this.instruments[id].owner=name;
    p.current=id;p.interest=null;p.lastSwitch=grove.bar;
-   p.bowUntilBeat=0;
+   p.bowUntilBeat=0;p.guitarUntilBeat=0;
    // The original guitarist's previous sustained note cannot silence a later
    // return to guitar, because the instrument itself has been set down.
    if(name==='Riff'&&previous==='guitar')grove.riffHoldUntilBeat=0;
@@ -188,7 +189,12 @@ export class MusicalDisciplines {
      // A violin can attract the curious, but every available instrument
      // is eligible. Nothing locks the musician into a prescribed sequence.
      const weights=offered.map(id=>{
-       if(id==='violin')return 2;
+       if(id==='violin'){
+         const profile=this.transfer(name,grove);
+         // The interesting new sound can appeal to players carrying years
+         // of rhythm or harmony, without requiring or assigning violin mastery.
+         return 1.65+profile.rhythm*.72+profile.melody*.28;
+       }
        if(id==='voice'||id==='none')return p.current==='violin'?1.9:.27;
        const explored=p.practice[id].notes;
        return 1.1/(1+Math.log1p(explored)*.08);
@@ -217,69 +223,192 @@ export class MusicalDisciplines {
    }
    return true;
  }
+ // Borrowed drum timing develops from actual scheduled strikes, especially
+ // when another musician is audible as a reference. No instant mastery bonus.
+ observeMotor(name,errorMs,reference){
+   const p=this.people[name]?.practice.drums;
+   if(!p||!Number.isFinite(errorMs))return;
+   const learning=reference?.03:.012;
+   p.motorBiasMs=clamp(p.motorBiasMs-errorMs*learning,-110,110);
+   p.motorJitterMs=clamp(p.motorJitterMs*(reference?.9989:.9996),9,75);
+   p.measuredAttacks++;
+ }
  play(grove,index,t,audio,{harmony}={}){
-   const beat=index%4,bar=Math.floor(index/4);
+   const beat=index%4,bar=Math.floor(index/4),beatDur=60/98;
+   const harmonyNotes=Array.isArray(harmony)&&harmony.length?harmony:[196,246.94,293.66];
+   const hasSound=(person,kind)=>person&&
+     bar-person.bar<=3&&Number.isFinite(person.pitch)&&person.pitch>0 &&
+     grove.space.canHear(person.listener||'Pip',person.from,kind)>.07;
    for(const name of MUSICIANS){
      const p=this.people[name],instrument=p.current;
-     // Existing Pip/Riff/Murmur scores remain owned by the original systems.
-     if(instrument==='voice' || (name==='Pip'&&instrument==='drums') ||
-        (name==='Riff'&&instrument==='guitar') || grove.library.busy(name) ||
-        grove.space.traveling(name)||grove.space.destination(name)==='pond')continue;
+     // Original, well-developed Pip drum, Riff guitar and Murmur voice
+     // performances remain authored in the established musical engines.
+     if(!p || !INSTRUMENTS.includes(instrument) ||
+        (name==='Pip'&&instrument==='drums')||
+        (name==='Riff'&&instrument==='guitar')||
+        grove.library.busy(name)||grove.space.traveling(name)||
+        grove.space.destination(name)==='pond')continue;
      const person=grove.space.people[name],stats=p.practice[instrument];
-     const known=grove.library.known[name]||[];
-     const offset=name==='Pip'?grove.pip.rhythmOffset()/1000:
-       name==='Riff'?grove.riff.rhythmOffset()/1000:
-       (Math.random()-.5)*.062;
-     const time=t+offset;
+     const known=grove.library.known[name]||[],skills=new Set(known);
+     const transfer=this.transfer(name,grove);
+     const rhythmic=transfer.rhythm,melodic=transfer.melody;
+     // Reuse the original musician's demonstrated motor timing when known.
+     // Everyone else's instrument pulse starts less steady and can develop.
+     let offsetMs;
+     if(name==='Pip')offsetMs=grove.pip.rhythmOffset();
+     else if(name==='Riff')offsetMs=grove.riff.rhythmOffset();
+     else{
+       const jitter=clamp(p.practice.drums.motorJitterMs*(1-.16*melodic),12,62);
+       const impulse=(Math.random()+Math.random()+Math.random()-1.5)*1.2;
+       offsetMs=clamp(p.practice.drums.motorBiasMs+jitter*impulse,-145,145);
+     }
+     const time=t+offsetMs/1000;
+     const heard=[person.lastHeardGuitar,person.lastHeardViolin,person.lastHeardVoice]
+       .filter(h=>h&&Number.isFinite(h.pitch)&&bar-h.bar<=3&&
+         grove.space.canHear(name,h.from,h.kind)>.065)
+       .sort((a,b)=>b.bar-a.bar);
+     const partner=heard[0]||null;
+     const silence=skills.has('deliberateSpace')&&beat===3&&bar%4===1;
      if(instrument==='violin'){
-       if(typeof audio.violin!=='function'||index<p.bowUntilBeat||!(beat===0||beat===2)||
-          Math.random()>.72)continue;
-       const tones=Array.isArray(harmony)&&harmony.length?harmony:[196,246.94,293.66];
-       const heard=person.lastHeardGuitar;
-       const tuning=heard&&bar-heard.bar<=3&&Number.isFinite(heard.pitch)?
-         heard.pitch:null;
-       let intended=tuning&&Math.random()<.55?tuning:
-         tones[Math.floor(Math.random()*tones.length)]*(Math.random()<.23?2:1);
-       intended=clamp(intended,185,800);
-       // Violin intonation improves only after real attempts. Transfer from
-       // rhythmic/harmonic knowledge can help timing or note selection, not
-       // magically grant bowing mastery.
-       const acquired=stats.notes;
-       const uncertainty=.52/(1+Math.log1p(acquired)*.23);
-       const deviation=(Math.random()+Math.random()-1)*uncertainty;
-       const pitch=intended*Math.pow(2,deviation/12);
-       const duration=(Math.random()<.52?1:2)*(60/98)+
-         (Math.random()-.5)*.13;
-       const length=clamp(duration,.32,1.4);
-       const roughness=clamp(.38/(1+Math.log1p(acquired)*.22)+Math.random()*.12,.015,.55);
-       const pressure=clamp(.58+(Math.random()-.5)*.34,.25,.86);
-       const expression={roughness,pressure,vibrato:Math.random()<.32?.0035:0};
-       audio.violin?.(pitch,time,.24,length,expression,{player:name});
-       grove.space.sound(name,'violin',bar,.67,pitch);
-       this.record(name,'violin',{bar,pitch,duration:length});
-       p.bowUntilBeat=index+Math.max(1,Math.ceil(length/(60/98)));
-       if(grove.onNote)grove.onNote({agent:name,time,beat});
-     }else if(instrument==='drums'){
-       // A new drummer has access to the kit, not Pip's lifetime technique.
-       if(beat===0||beat===2){
-         audio.kick?.(time,beat===0?.5:.38,{player:name});
-         grove.space.sound(name,'kick',bar,.47);
-       }else{
-         audio.snare?.(time,.41,{player:name});
-         grove.space.sound(name,'snare',bar,.41);
+       if(typeof audio.violin!=='function'||index<p.bowUntilBeat||silence)continue;
+       // A drummer's reliable timing and accents become rhythmic *bow strokes*.
+       // The new bow and violin pitch remain unfamiliar until actually played.
+       const offbeat=beat%2!==0;
+       const rhythmVocabulary=skills.has('offbeatPulse')||skills.has('syncopation')||
+         skills.has('ghostNotes');
+       const offbeatChance=(.035+rhythmic*.27+
+         (rhythmVocabulary?.16:0))*(beat===3?.72:1);
+       if(offbeat && Math.random()>offbeatChance)continue;
+       if(!offbeat && Math.random()>.78)continue;
+       const phraseSkill=skills.has('breathPhrasing');
+       const contourSkill=skills.has('melodicContours');
+       const listenSkill=skills.has('partnerListening');
+       const vowelSkill=skills.has('vowelShapes');
+       const pitchKnowledge=melodic*(1+(contourSkill?.18:0));
+       const longBowChance=clamp(.46+pitchKnowledge*.32+(phraseSkill?.16:0)-
+         rhythmic*.29-(offbeat?.35:0),.07,.86);
+       const longBow=!offbeat&&Math.random()<longBowChance;
+       const articulation=longBow?'sustained phrase':
+         offbeat?'offbeat bow accent':rhythmic>.5?'rhythmic bow pulse':'short bow attempt';
+       const available=harmonyNotes.map(n=>clamp(n*(Math.random()<.2?2:1),185,800));
+       const candidate=partner&&(listenSkill||melodic>.38)&&Math.random()<.66?
+         clamp(partner.pitch,185,800):available[Math.floor(Math.random()*available.length)];
+       let intended=candidate;
+       if((contourSkill||melodic>.56)&&Number.isFinite(stats.lastPitch)&&
+          Math.random()<.46){
+         const step=[-3,-2,0,2,3][Math.floor(Math.random()*5)];
+         intended=clamp(stats.lastPitch*Math.pow(2,step/12),185,800);
        }
-       audio.hat?.(time+.025,.31,{player:name});
-       this.record(name,'drums',{bar,duration:0});
+       // Violin-specific pitch and bow skill only follows *violin practice*.
+       // Prior guitar/singing helps hear targets, not magically fret a violin.
+       const acquired=stats.notes,uncertainty=
+         .52/(1+Math.log1p(acquired)*.23)*(1-.2*clamp(pitchKnowledge,0,1));
+       const pitch=intended*Math.pow(2,
+         ((Math.random()+Math.random()-1)*uncertainty)/12);
+       let duration=longBow?beatDur*(1.45+Math.random()*.7):
+         beatDur*(.28+Math.random()*.32);
+       if(offbeat)duration*=.78;
+       duration=clamp(duration,.14,1.52);
+       const bowSkill=Math.log1p(acquired);
+       let roughness=clamp(.38/(1+bowSkill*.22)+Math.random()*.12,.015,.55);
+       if(vowelSkill)roughness*=.92; // vowel shaping informs tonal color
+       const precision=clamp(1-transfer.timingMs/80,0,1);
+       const pressure=clamp(.58+(Math.random()-.5)*(.36-.15*precision)+
+         (offbeat?.07:0),.25,.9);
+       const volume=.24*(offbeat?.83:1)*(longBow?.95:1);
+       const expression={roughness,pressure,vibrato:
+         (longBow&&(skills.has('vowelShapes')||pitchKnowledge>.5)&&Math.random()<.45)
+           ?.0025+Math.random()*.003:0};
+       audio.violin(pitch,time,volume,duration,expression,{player:name});
+       grove.space.sound(name,'violin',bar,volume*2.75,pitch);
+       this.record(name,'violin',{bar,pitch,duration,articulation});
+       if(grove.onNote)grove.onNote({agent:name,time,beat});
+       p.bowUntilBeat=index+Math.max(1,Math.ceil(duration/beatDur));
+       // Two short, controlled bow attacks within a beat are a transfer
+       // of real rhythmic vocabulary, not a fictitious violin level.
+       const secondAccent=!offbeat&&duration<beatDur*.63&&
+         (skills.has('offbeatPulse')||skills.has('syncopation')||rhythmic>.72)&&
+         Math.random()<.12+rhythmic*.38;
+       if(secondAccent){
+         const secondAt=time+beatDur*.53;
+         const secondDuration=beatDur*(.22+.16*Math.random());
+         const nextPitch=clamp(pitch*(skills.has('melodicContours')?Math.pow(2,2/12):1),185,800);
+         audio.violin(nextPitch,secondAt,volume*.76,secondDuration,
+           {...expression,pressure:clamp(pressure*.83,.22,.78)},
+           {player:name});
+         grove.space.sound(name,'violin',bar,volume*2,nextPitch);
+         this.record(name,'violin',{bar,pitch:nextPitch,duration:secondDuration,
+           articulation:'rhythmic second bow stroke'});
+         p.bowUntilBeat=Math.max(p.bowUntilBeat,index+1);
+         if(grove.onNote)grove.onNote({agent:name,time:secondAt,beat});
+       }
+     }else if(instrument==='drums'){
+       // Alternate drummers borrow the real kit, never Pip's achieved timing.
+       if(silence)continue;
+       const reference=person.lastHeardDrum?.bar>=bar-2||
+         person.lastHeardGuitar?.bar>=bar-2;
+       if(beat===0||beat===2){
+         audio.kick?.(time,beat===0?.51:.39,{player:name});
+         grove.space.sound(name,'kick',bar,.46);
+       }else{
+         audio.snare?.(time,.43,{player:name});
+         grove.space.sound(name,'snare',bar,.43);
+       }
+       audio.hat?.(time+.025,.3,{player:name});
+       if(skills.has('ghostNotes')&&beat===2&&Math.random()<.5)
+         audio.snare?.(time+beatDur*.37,.16,{player:name});
+       if((skills.has('offbeatPulse')||skills.has('syncopation'))&&
+          beat===1&&Math.random()<.44)
+         audio.kick?.(time+beatDur*.5,.23,{player:name});
+       if((skills.has('callResponse')||skills.has('partnerListening'))&&partner&&
+          beat===3&&Math.random()<.42)
+         audio.snare?.(time+beatDur*.54,.2,{player:name});
+       this.record(name,'drums',{bar,duration:0,articulation:
+         skills.has('ghostNotes')?'percussion with ghost accents':'basic beat'});
+       this.observeMotor(name,offsetMs,reference);
        if(grove.onNote)grove.onNote({agent:name,time,beat});
      }else if(instrument==='guitar'){
-       const tones=Array.isArray(harmony)&&harmony.length?harmony:[196,246.94,293.66];
-       if(beat===0||beat===2){
-         const n=tones[Math.floor(Math.random()*tones.length)];
-         const d=known.includes('openChords')&&Math.random()<.4?1.2:.38;
-         audio.guitar?.(n,time,.3,d,{player:name});
-         grove.space.sound(name,'guitar',bar,.3,n);
-         this.record(name,'guitar',{bar,pitch:n,duration:d});
-         if(grove.onNote)grove.onNote({agent:name,time,beat});
+       if(index<p.guitarUntilBeat||silence)continue;
+       const offbeat=beat===1||beat===3;
+       if(offbeat){
+         const allowed=(skills.has('syncopation')||skills.has('offbeatPulse')||
+           rhythmic>.61)&&Math.random()<.17+rhythmic*.21;
+         if(!allowed)continue;
+       }
+       const chordKnown=skills.has('openChords');
+       const melodySkill=skills.has('melodicContours');
+       const longPhrase=skills.has('breathPhrasing')||melodic>.47;
+       const canChord=chordKnown && Math.random()<.48+.2*melodic && !offbeat;
+       const root=partner&&skills.has('partnerListening')&&
+         Math.random()<.58?partner.pitch:null;
+       const candidate=root!=null?
+         harmonyNotes.reduce((best,n)=>Math.abs(Math.log2(n/root))<
+           Math.abs(Math.log2(best/root))?n:best,harmonyNotes[0]):
+         harmonyNotes[Math.floor(Math.random()*harmonyNotes.length)];
+       const holdChance=.07+.20*melodic+(longPhrase?.14:0);
+       const hold=!offbeat&&Math.random()<holdChance;
+       const length=hold?beatDur*(1.8+Math.random()*.65):.34+
+         (Math.random()-.5)*.13;
+       const duration=clamp(length,.14,1.55);
+       const voicing=canChord?[candidate,harmonyNotes[1],harmonyNotes[2]]:[candidate];
+       for(const [i,pitch] of voicing.entries()){
+         const at=time+i*.026;
+         const volume=(offbeat?.27:.34)*(i>0?.72:1);
+         audio.guitar?.(pitch,at,volume,duration,{player:name});
+         grove.space.sound(name,'guitar',bar,volume,pitch);
+         this.record(name,'guitar',{bar,pitch,duration,
+           articulation:canChord?'learned chord voicing':hold?'held melodic note':
+             offbeat?'syncopated guitar note':'picked guitar note'});
+       }
+       if(hold)p.guitarUntilBeat=index+Math.max(1,Math.ceil(duration/beatDur));
+       if(grove.onNote)grove.onNote({agent:name,time,beat});
+       if((skills.has('walkingBass')||skills.has('callResponse'))&&
+         !hold&&beat===3){
+         const next=skills.has('walkingBass')?candidate*.5:candidate*2;
+         const at=time+beatDur*.48;
+         audio.guitar?.(next,at,.19,.2,{player:name});
+         this.record(name,'guitar',{bar,pitch:next,duration:.2,
+           articulation:skills.has('walkingBass')?'walking bass step':'answer'});
        }
      }
    }
