@@ -5,7 +5,7 @@
  */
 const KINDS=['guitar','voice','violin','kick','snare','hat'];
 const MUSICIANS=['Pip','Riff','Murmur'];
-const COUNT=32,MAX_EVENTS=1200,MAX_MS=125000;
+const COUNT=24,MAX_EVENTS=850,MAX_MS=125000;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const valid=n=>Number.isFinite(n);
 const cleanEvent=e=>{
@@ -49,8 +49,9 @@ export class JamArchive{
  }
  list(){return [...this.recordings].reverse().map(({events,...r})=>({...r,noteCount:events.length}));}
  get(id){return this.recordings.find(r=>r.id===id)||null;}
- begin(bar){
+ begin(bar,time=null){
   if(!this.active)this.active={startBar:bar,firstAt:null,events:[]};
+  if(this.active.firstAt==null&&valid(time))this.active.firstAt=time;
  }
  capture(kind,args,bar,space){
   const session=this.active;
@@ -64,7 +65,7 @@ export class JamArchive{
     (space?.distance('Murmur','Riff')||Infinity)>410)return;
   if(!valid(at)||at<0)return;
   if(session.firstAt==null)session.firstAt=at;
-  const ms=Math.round((at-session.firstAt)*1000);
+  const ms=Math.max(0,Math.round((at-session.firstAt)*1000));
   const candidate={kind,source,ms,volume:pitched?args[2]:args[1]};
   if(pitched){candidate.freq=args[0];candidate.duration=args[3];}
   if(kind==='voice'||kind==='violin')candidate.expression=args[4];
@@ -74,6 +75,8 @@ export class JamArchive{
  finish(bar){
   const a=this.active;this.active=null;
   if(!a||a.events.length===0)return null;
+  // Scheduling across instruments is not necessarily chronological.
+  a.events.sort((x,y)=>x.ms-y.ms);
   const endMs=Math.max(...a.events.map(e=>e.ms+Math.round((e.duration||.05)*1000)));
   const r={id:'jam-'+a.startBar+'-'+bar,startBar:a.startBar,endBar:bar,
    durationMs:Math.min(MAX_MS,endMs),
