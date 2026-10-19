@@ -1,0 +1,29 @@
+name: GrooveGrove voice regression tests
+on:
+  pull_request:
+    paths:
+      - 'groovegrove/**'
+      - '.github/workflows/groovegrove-voices.yml'
+  push:
+    paths:
+      - 'groovegrove/**'
+jobs:
+  voice-regressions:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: groovegrove
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate JavaScript syntax
+        run: |
+          node --check grove-core.js
+          node --check grove-disciplines.js
+          node --check learner-vocals.js
+          node --check voiceprints.js
+          node --check server/index.mjs
+      - name: Exercise persisted musical memories and voice choices
+        run: node --test tests/voiceprints.test.mjs

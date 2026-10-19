@@ -5,6 +5,8 @@ import {GroveWorld} from './grove-world.js?v=20261019-transfer';
 import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
 import {tryVocalPhrase} from './voice-music.js?v=20261019-transfer';
 import {MusicalDisciplines} from './grove-disciplines.js?v=20261019-transfer';
+import {restoreVoiceprints} from './voiceprints.js';
+import {tryLearnerVocalPhrase} from './learner-vocals.js';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const rand=(a,b)=>a+(b-a)*Math.random();
@@ -59,6 +61,7 @@ export class Grove {
     this.library=new MusicLibrary(saved?.library);
     this.understanding=new ListeningJournal(saved?.understanding);
     this.voiceJournal=new VoiceJournal(saved?.voiceJournal);
+    this.voiceprints=restoreVoiceprints(saved?.voiceprints);
     this.space=new GroveWorld(saved?.space);
     this.disciplines=new MusicalDisciplines(saved?.disciplines);
     for(const name of ['Pip','Riff']){
@@ -84,7 +87,9 @@ export class Grove {
   baseline(){return rms(this.relativeErrors.slice(-16));}
   snapshot(){return {pipBias:this.pip.biasMs,pipJitter:this.pip.jitterMs,familiarity:this.familiarity,lessons:this.lessons,jams:this.jams,library:this.library.snapshot(),understanding:this.understanding.snapshot(),mode:this.mode,modeBars:this.modeBars,bar:this.bar,beat:this.beat,goals:{Pip:this.pip.currentGoal,Riff:this.riff.currentGoal},playedKnowledge:{...this.playedKnowledge},
     riffHoldUntilBeat:this.riffHoldUntilBeat,riffHeldChords:this.riffHeldChords,
-    riffHeldNotes:this.riffHeldNotes,riffLastHeldNote:this.riffLastHeldNote?{...this.riffLastHeldNote}:null,vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),space:this.space.snapshot(),
+    riffHeldNotes:this.riffHeldNotes,riffLastHeldNote:this.riffLastHeldNote?{...this.riffLastHeldNote}:null,vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),
+    voiceprints:Object.fromEntries(Object.entries(this.voiceprints).map(([name,profile])=>[name,{...profile}])),
+    space:this.space.snapshot(),
     disciplines:this.disciplines.snapshot(),logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
@@ -136,6 +141,10 @@ export class Grove {
       if(vocal?.ensemble&&this.voiceJournal.sharedPhrases===1)
         this.push('Murmur chooses to sing with the others for the first time.');
     }
+    // Independent beginners can choose the unheld voice as their instrument.
+    // Murmur continues using his original, separate vocal engine and journal.
+    if(beat===0)for(const name of ['Pip','Riff'])
+      tryLearnerVocalPhrase({name,grove:this,bar,time:t,audio});
     const riffOffset=this.riff.rhythmOffset();
     const guitarOnset=t+riffOffset/1000;
     const originalChords=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[146.83,185,220]];
@@ -331,12 +340,12 @@ export class Grove {
     if(beat===3){
       const riffHeard=this.space.people.Riff.lastHeardVoice;
       const pipHeard=this.space.people.Pip.lastHeardVoice;
-      const riffCanAnswer=riffHeard?.bar===bar && this.riffHoldUntilBeat<=index &&
+      const riffCanAnswer=riffHeard?.from==='Murmur' && riffHeard?.bar===bar && this.riffHoldUntilBeat<=index &&
         this.disciplines.current('Riff')==='guitar' &&
         this.space.canHear('Riff','Murmur','voice')>.08 &&
         !this.space.traveling('Riff')&&!this.library.busy('Riff') &&
         this.space.destination('Riff')!=='pond';
-      const pipCanAnswer=pipHeard?.bar===bar &&
+      const pipCanAnswer=pipHeard?.from==='Murmur' && pipHeard?.bar===bar &&
         this.disciplines.current('Pip')==='drums' &&
         this.space.canHear('Pip','Murmur','voice')>.08 &&
         !this.space.traveling('Pip')&&!this.library.busy('Pip') &&
