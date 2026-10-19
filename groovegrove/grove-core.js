@@ -103,7 +103,7 @@ export class Grove {
     // Replay from the recording room goes to the sound bus, but cannot modify
     // any living musician's practice, listening journal or motor development.
     const liveOutput=audio;
-    this.archive.playDeck(t,liveOutput);
+    this.archive.playDeck(t,liveOutput,this.space);
     if(this.mode==='jam'){
       this.archive.begin(bar);
       // Capture the very same note arguments sent to the renderer. An archive
