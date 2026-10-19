@@ -146,7 +146,7 @@ export class Grove {
       // existing wordless synthesizer is not made to speak or perform more.
       if(vocal?.sang && this.onTalk &&
          (this.voiceJournal.attempts===1 || bar-this.lastMurmurPhraseCueBar>=16)){
-        const cue=this.voiceJournal.attempts===1?'♪ My first humming notes':
+        const cue=this.voiceJournal.attempts===1?'♪ First humming notes':
           vocal.response?'♪ Answering '+vocal.response+' in melody':
           vocal.pitches.length>1?'♪ Trying a new melodic phrase':'♪ Exploring a quiet hum';
         this.onTalk('Murmur',cue);
