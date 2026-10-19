@@ -1,7 +1,7 @@
 /*
  * GrooveGrove: Musical Disciplines, pass 010.
- * People keep their identities and musical memory; physical instruments are
- * mutually exclusive objects. There are no job classes, levels or skill gates.
+ * People retain cross-instrument musicianship; instruments teach their own motor
+ * technique. No fixed classes, level caps or mastery gates.
  */
 export const INSTRUMENTS=Object.freeze(['drums','guitar','violin']);
 export const MUSICIANS=Object.freeze(['Pip','Riff','Murmur']);
@@ -10,8 +10,10 @@ const validInstrument=id=>INSTRUMENTS.includes(id)||id==='voice'||id==='none';
 const finite=(v,f=0)=>Number.isFinite(v)?v:f;
 const count=v=>Number.isSafeInteger(v)&&v>=0?v:0;
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const logProgress=(attempts,scale=1500)=>clamp(Math.log1p(Math.max(0,attempts||0))/Math.log1p(scale),0,1);
 const emptyPractice=()=>({notes:0,seconds:0,holds:0,lastPitch:null,lastBar:null,
-  firstNote:null,recent:[]});
+  firstNote:null,recent:[],motorBiasMs:0,motorJitterMs:42,measuredAttacks:0,
+  lastArticulation:null});
 const restoration=raw=>{
  const p=emptyPractice();
  p.notes=count(raw?.notes);p.seconds=clamp(finite(raw?.seconds),0,1e12);
@@ -20,6 +22,10 @@ const restoration=raw=>{
  p.lastBar=Number.isSafeInteger(raw?.lastBar)?raw.lastBar:null;
  p.firstNote=raw?.firstNote&&Number.isSafeInteger(raw.firstNote.bar)?
    {...raw.firstNote}:null;
+ p.motorBiasMs=clamp(finite(raw?.motorBiasMs),-130,130);
+ p.motorJitterMs=clamp(finite(raw?.motorJitterMs,42),7,75);
+ p.measuredAttacks=count(raw?.measuredAttacks);
+ p.lastArticulation=typeof raw?.lastArticulation==='string'?raw.lastArticulation.slice(0,45):null;
  p.recent=Array.isArray(raw?.recent)?raw.recent.filter(x=>x&&
    Number.isSafeInteger(x.bar)&&Number.isFinite(x.pitch)).slice(0,12)
    .map(x=>({...x})):[];
@@ -34,14 +40,20 @@ export class MusicalDisciplines {
      const old=saved?.people?.[name];
      let current=safeChoice(old?.current,DEFAULT[name]);
      // A single violin/guitar/kit is never owned by two musicians.
-     if(current!=='voice'&&allocated.has(current))current='voice';
-     if(current!=='voice')allocated.add(current);
+     if(INSTRUMENTS.includes(current)&&allocated.has(current))
+       current=name==='Murmur'?'voice':'none';
+     if(INSTRUMENTS.includes(current))allocated.add(current);
      this.people[name]={
-       current,interest:INSTRUMENTS.includes(old?.interest)?old.interest:null,
+       current,interest:INSTRUMENTS.includes(old?.interest)||
+         (name==='Murmur'&&old?.interest==='voice')||
+         (name!=='Murmur'&&old?.interest==='none')?old.interest:null,
        lastSwitch:Number.isSafeInteger(old?.lastSwitch)?old.lastSwitch:-45,
        lastDecision:Number.isSafeInteger(old?.lastDecision)?old.lastDecision:-80,
        bowUntilBeat:Number.isSafeInteger(old?.bowUntilBeat)?old.bowUntilBeat:0,
        practice:Object.fromEntries(INSTRUMENTS.map(id=>[id,restoration(old?.practice?.[id])])),
+       studies:Array.isArray(old?.studies)?old.studies.filter(x=>x&&
+         typeof x.book==='string'&&typeof x.skill==='string').slice(0,30)
+         .map(x=>({...x})):[],
        discoveries:Array.isArray(old?.discoveries)?old.discoveries.filter(x=>x&&
          typeof x.instrument==='string').slice(0,20).map(x=>({...x})):[]
      };
@@ -58,9 +70,43 @@ export class MusicalDisciplines {
        practice:Object.fromEntries(INSTRUMENTS.map(id=>[id,{...p.practice[id],
          recent:p.practice[id].recent.map(x=>({...x})),
          firstNote:p.practice[id].firstNote?{...p.practice[id].firstNote}:null}])),
+       studies:p.studies.map(x=>({...x})),
        discoveries:p.discoveries.map(x=>({...x}))}];
    }))};}
  current(name){return this.people[name]?.current||DEFAULT[name]||'voice';}
+ study(name,{bar,book,skill,topic}){
+   const p=this.people[name];if(!p||typeof book!=='string'||typeof skill!=='string')return;
+   if(!p.studies.some(s=>s.book===book)){
+     p.studies.unshift({bar,book,skill,topic:typeof topic==='string'?topic:'theory'});
+     p.studies.length=Math.min(p.studies.length,30);
+   }
+ }
+ // Musical experience belongs to people. A strong drummer can transfer timing
+ // and articulations, not years of bow technique he has never actually done.
+ // All derived strengths come from scheduled notes, learned books or measured
+ // onset precision. Values describe potential vocabulary, not innate talent.
+ transfer(name,grove){
+   const p=this.people[name],knowledge=new Set(grove.library?.known?.[name]||[]);
+   if(!p)return {rhythm:0,melody:0,bowing:0,timingMs:42,skills:knowledge};
+   const rhythm=logProgress(p.practice.drums.notes,6000);
+   const pitchedNotes=p.practice.guitar.notes+
+     (name==='Murmur'?(grove.voiceJournal?.notes||0):0);
+   const melody=logProgress(pitchedNotes,5400);
+   const bowed=logProgress(p.practice.violin.notes,1800);
+   // The original rhythm and guitar models carry real measured motor state.
+   // A borrowed instrument gets the player's existing timing, not a fixed
+   // per-character violin aptitude assignment.
+   const original=name==='Pip'?grove.pip:name==='Riff'?grove.riff:null;
+   const baseline=original&&
+     ((name==='Pip'&&p.practice.drums.notes>0)||
+      (name==='Riff'&&p.practice.guitar.notes>0))
+       ?Math.hypot(original.biasMs||0,original.jitterMs||0):null;
+   const currentMeasured=p.practice.drums.measuredAttacks>=12?
+     Math.hypot(p.practice.drums.motorBiasMs,p.practice.drums.motorJitterMs):null;
+   const timingMs=clamp(baseline??currentMeasured??(41-12*rhythm-5*melody),7,75);
+   return {rhythm,melody,bowing,timingMs,skills:knowledge,
+     rhythmNotes:p.practice.drums.notes,pitchNotes:pitchedNotes};
+ }
  holder(id){return this.instruments[id]?.owner||null;}
  available(name,id){return INSTRUMENTS.includes(id) &&
    (!this.instruments[id].owner||this.instruments[id].owner===name);}
@@ -152,18 +198,21 @@ export class MusicalDisciplines {
      if(this.wants(name,chosen,grove))this.switchAtStudio(name,grove);
    }
  }
- record(name,id,{bar,pitch=null,duration=0}={}){
+ record(name,id,{bar,pitch=null,duration=0,articulation=null}={}){
    const person=this.people[name];
    if(!person||person.current!==id||!person.practice[id])return false;
    const record=person.practice[id];
    const d=clamp(finite(duration),0,9);
    record.notes++;record.seconds+=d;
    if(d>=1)record.holds++;
+   if(typeof articulation==='string')record.lastArticulation=articulation.slice(0,45);
    if(Number.isFinite(pitch))record.lastPitch=pitch;
    record.lastBar=bar;
    if(!record.firstNote)record.firstNote={bar,pitch,duration:Math.round(d*100)/100};
    if(Number.isFinite(pitch)){
-     record.recent.unshift({bar,pitch:Math.round(pitch*100)/100,duration:Math.round(d*100)/100});
+     record.recent.unshift({bar,pitch:Math.round(pitch*100)/100,
+       duration:Math.round(d*100)/100,
+       articulation:record.lastArticulation});
      if(record.recent.length>12)record.recent.length=12;
    }
    return true;
