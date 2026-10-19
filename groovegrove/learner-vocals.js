@@ -33,15 +33,26 @@ export function tryLearnerVocalPhrase({name,grove,bar,time,audio}){
     .sort((a,b)=>b.bar-a.bar);
   const inspiration=heard[0]?.pitch??personal[0]?.pitch??null;
   const imprint=grove.voiceprints[name];
-  const center=clamp((inspiration&&Math.random()<.72?inspiration:
-    state.lastPitch||220)*imprint.register,150,465);
   const developing=stats.notes;
   const phraseReady=developing>18 && (knows('melodicContours')||knows('breathPhrasing')||
     developing>95);
+  // A remembered instrument phrase is made only from notes this musician
+  // actually scheduled. One pitch per bar avoids mistaking chords for melody.
+  const byBar=new Map();
+  for(const e of [...person.practice.guitar.recent,...person.practice.violin.recent]
+    .filter(e=>Number.isFinite(e.pitch)&&e.pitch>0&&Number.isSafeInteger(e.bar))
+    .sort((a,b)=>a.bar-b.bar))byBar.set(e.bar,e.pitch);
+  const remembered=[...byBar.values()].slice(-3);
+  const borrowed=phraseReady&&remembered.length===3&&Math.random()<.42;
   const motifReady=phraseReady&&Array.isArray(state.motif)&&state.motif.length>1 &&
     Math.random()<.3;
-  const steps=motifReady?[...state.motif]:phraseReady&&Math.random()<.48?
-    [0,pick([-3,-2,0,2,3]),pick([-4,-2,0,2,4])]:[0];
+  const steps=motifReady?[...state.motif]:borrowed?
+    remembered.map(p=>clamp(Math.round(12*Math.log2(p/remembered[0])),-12,12)):
+    phraseReady&&Math.random()<.48?
+      [0,pick([-3,-2,0,2,3]),pick([-4,-2,0,2,4])]:[0];
+  const center=clamp((borrowed&&!motifReady?remembered[0]:
+    inspiration&&Math.random()<.72?inspiration:state.lastPitch||220)*
+    imprint.register,150,465);
   if(steps.length>1&&!motifReady)state.motif=[...steps];
   const vowel=knows('vowelShapes')||developing>40?pick(vowels):'m';
   const rhythmic=knows('syncopation')||knows('offbeatPulse')||transfer.rhythm>.55;
