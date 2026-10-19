@@ -85,7 +85,7 @@ export class MusicalDisciplines {
    if(!id||(id!=='voice'&&id!=='none'&&!this.available(name,id)))return false;
    if(!grove.space.at(name,'studio',105)||grove.space.traveling(name))return false;
    const previous=p.current;
-   if(previous!=='voice')this.instruments[previous].owner=null;
+   if(INSTRUMENTS.includes(previous))this.instruments[previous].owner=null;
    if(INSTRUMENTS.includes(id))this.instruments[id].owner=name;
    p.current=id;p.interest=null;p.lastSwitch=grove.bar;
    p.bowUntilBeat=0;
