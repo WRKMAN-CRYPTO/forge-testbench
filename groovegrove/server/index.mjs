@@ -35,19 +35,23 @@ function packageState(includeEvents=false,since=0,includeWorld=true){
   uptimeSeconds:Math.floor((now-bootAt)/1000),
   locations:ready&&world.space?Object.fromEntries(['Pip','Riff','Murmur'].map(name=>{
    const p=world.space.people[name];
-   return [name,{x:p.x,y:p.y,place:p.place,destination:p.destination,purpose:p.purpose,traveling:p.route.length>0,ensembleIntent:p.ensembleIntent||null}];
+   return [name,{x:p.x,y:p.y,place:p.place,destination:p.destination,purpose:p.purpose,traveling:p.route.length>0,ensembleIntent:p.ensembleIntent||null,instrument:world.disciplines?.current(name)||null}];
   })):null,
   world:ready&&includeWorld?snapshot():null,
   events:list};
 }
 function capture(kind,args){
- const [a,b,c,d,expression]=args;
- const time=(kind==='guitar'||kind==='voice')?b:a;
- const source=kind==='voice'?'Murmur':kind==='guitar'?'Riff':'Pip';
+ const [a,b,c,d,expression,meta]=args;
+ const pitched=kind==='guitar'||kind==='voice'||kind==='violin';
+ const time=pitched?b:a;
+ const candidate=pitched?(kind==='guitar'?expression:meta):c;
+ const fallback=kind==='voice'?'Murmur':kind==='guitar'?'Riff':'Pip';
+ const source=['Pip','Riff','Murmur'].includes(candidate?.player)?candidate.player:fallback;
  const position=world.space?.people[source]||null;
  const ev={seq:nextSeq++,kind,atMs:Math.round(time*1000),
   bar:world.bar,beat:world.beat,x:position?Math.round(position.x):null,y:position?Math.round(position.y):null};
- if(kind==='guitar'||kind==='voice'){ev.freq=a;ev.volume=c;ev.duration=d;}
+ ev.source=source;
+ if(pitched){ev.freq=a;ev.volume=c;ev.duration=d;}
  else ev.volume=b;
  if(kind==='voice'){
   const v=['m','u','o','a','i'].includes(expression?.vowel)?expression.vowel:'m';
@@ -58,11 +62,18 @@ function capture(kind,args){
    release:safe(expression?.release,.08,.03,.3)
   };
  }
+ if(kind==='violin'){
+  const safe=(n,f,min,max)=>Number.isFinite(n)?Math.min(max,Math.max(min,n)):f;
+  ev.expression={roughness:safe(expression?.roughness,.25,0,.7),
+   pressure:safe(expression?.pressure,.58,.15,1),
+   vibrato:safe(expression?.vibrato,0,0,.012)};
+ }
  events.push(ev);if(events.length>420)events.shift();
 }
 const sink={
  guitar(...a){capture('guitar',a)},
  voice(...a){capture('voice',a)},
+ violin(...a){capture('violin',a)},
  kick(...a){capture('kick',a)},
  snare(...a){capture('snare',a)},
  hat(...a){capture('hat',a)}
@@ -121,6 +132,8 @@ async function init(){
    beat:nextBeat,bar:world.bar,
    practice:{Pip:pip.observations,Riff:riff.observations},
    experiments:{Pip:pip.experiments,Riff:riff.experiments},
+   disciplines:{owners:Object.fromEntries(['drums','guitar','violin'].map(id=>[id,world.disciplines?.holder(id)||null])),
+    violinPractice:Object.fromEntries(['Pip','Riff','Murmur'].map(n=>[n,world.disciplines?.people[n]?.practice.violin.notes||0]))},
    sustained:{Riff:world.riffHeldChords||0,RiffSingle:world.riffHeldNotes||0,Murmur:world.voiceJournal?.heldNotes||0,longestVocalSeconds:Math.round((world.voiceJournal?.longestNoteSeconds||0)*100)/100},
    voice:{stage:world.vocalist.stage,notes:world.vocalist.notes,phrases:world.voiceJournal?.phrases||0,shared:world.voiceJournal?.sharedPhrases||0,partnerReplies:world.voiceJournal?.partnerReplies||{Pip:0,Riff:0},books:world.library.known.Murmur?.length||0},
    sinceLastBeatMs:Date.now()-lastAdvanceAt,checkpointAt:lastWrite
