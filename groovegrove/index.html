@@ -430,6 +430,76 @@ function makeBackground(world){
   }
 }
 
+
+function drawInstrumentGlyph(g,id,x,y,k=1){
+ const li=(x1,y1,x2,y2,color,width)=>line(g,x+x1*k,y+y1*k,x+x2*k,y+y2*k,color,width*k,.95);
+ const el=(dx,dy,w,h,color)=>ellipse(g,x+dx*k,y+dy*k,w*k,h*k,color);
+ if(id==='violin'){
+   el(-10,13,13,18,0xb86c3f);el(9,13,13,18,0xd89a58);
+   el(0,27,15,12,0xcf8d54);el(0,-1,11,12,0xe6ab6a);
+   li(0,-8,0,-40,0xd6af79,7);el(0,-43,5,6,0xcba471);
+   for(let i=-1;i<=1;i++)li(i*3,-30,i*3,34,0xf1d2a4,.75);
+   li(-25,-32,28,38,0xe1d4b6,2.5);li(-28,-35,25,35,0x78583a,1.4);
+ }else if(id==='guitar'){
+   el(-8,12,18,21,0xc68a60);el(5,-10,14,16,0xdaab73);
+   li(6,-14,15,-45,0xc99a62,8);el(15,-49,7,6,0xe1b27e);
+   el(-1,1,7,9,0x3d3838);
+   for(let i=-1;i<=1;i++)li(10+i*2,-42,-7+i*2,29,0xffe8c5,.75);
+ }else if(id==='drums'){
+   el(-15,14,18,13,0xbd806c);el(15,14,18,13,0xcb977b);
+   el(0,28,23,15,0xa46852);el(0,24,19,10,0xedd1ac);
+   li(-25,-25,-8,9,0xf6d49d,3);li(25,-25,8,9,0xf6d49d,3);
+ }
+}
+function makeInstrumentStudio(scene){
+ const st=PLACES.studio,g=new Graphics();scene.addChild(g);
+ rect(g,st.x-132,st.y-3,264,94,8,0x173b35,.72);
+ textAt(scene,'ONE PHYSICAL INSTRUMENT EACH',st.x,st.y-17,10,PALETTE.gold,'bold',.6,.5);
+ ui.instrumentRack={};
+ for(const [i,id] of ['drums','guitar','violin'].entries()){
+   const x=st.x+(i-1)*87,frame=new Graphics();scene.addChild(frame);
+   rect(frame,x-32,st.y+2,64,62,6,0x092a29,.72);
+   frame.roundRect(x-32,st.y+2,64,62,6).stroke({color:0x829c7c,width:1,alpha:.55});
+   const shape=new Graphics();scene.addChild(shape);
+   drawInstrumentGlyph(shape,id,x,st.y+31,.57);
+   ui.instrumentRack[id]=shape;
+   textAt(scene,id.toUpperCase(),x,st.y+70,10,PALETTE.cream,'bold',.6,.5);
+ }
+ ui.studioActivity=textAt(scene,'VIOLIN AWAITS A CURIOUS MUSICIAN',st.x,st.y+97,10,PALETTE.mint,'normal',.2,.5);
+}
+function makeCarriedInstruments(){
+ ui.instrumentMarks={};
+ for(const [name,avatar] of [['Pip',ui.pip],['Riff',ui.riff],['Murmur',ui.murmur]]){
+   ui.instrumentMarks[name]={};
+   for(const id of ['violin','drums','guitar']){
+     if((name==='Pip'&&id==='drums')||(name==='Riff'&&id==='guitar'))continue;
+     const mark=new Graphics();avatar.group.addChild(mark);
+     drawInstrumentGlyph(mark,id,20,25,id==='violin'?.87:.7);
+     mark.visible=false;ui.instrumentMarks[name][id]=mark;
+   }
+ }
+}
+function updateEquipmentGraphics(){
+ if(!grove?.disciplines)return;
+ const equipped=name=>(remoteLive&&liveLocations?.[name]?.instrument)||
+   grove.disciplines.current(name);
+ const owners={};
+ for(const name of ['Pip','Riff','Murmur']){
+   const id=equipped(name);if(id!=='voice')owners[id]=name;
+   for(const [type,shape] of Object.entries(ui.instrumentMarks?.[name]||{}))
+     shape.visible=type===id;
+ }
+ if(ui.pip?.kit)ui.pip.kit.visible=equipped('Pip')==='drums';
+ if(ui.pip?.sticks)ui.pip.sticks.visible=equipped('Pip')==='drums';
+ if(ui.riff?.guitar)ui.riff.guitar.visible=equipped('Riff')==='guitar';
+ if(ui.riff?.arm)ui.riff.arm.visible=equipped('Riff')==='guitar';
+ for(const [type,shape] of Object.entries(ui.instrumentRack||{}))
+   shape.visible=!owners[type];
+ if(ui.studioActivity)ui.studioActivity.text=owners.violin?
+   'VIOLIN WITH '+owners.violin.toUpperCase():
+   'VIOLIN AWAITS A CURIOUS MUSICIAN';
+}
+
 // The real map lives in fixed world coordinates, entirely independent of the
 // phone orientation or viewport size. Canvas UI is rendered in a separate layer.
 function makeWorldLandscape(scene){
@@ -526,7 +596,7 @@ function makeDrummer(parent,x,y,s){
   line(drums,-57,105,-64,125,0xf7bb8e,3);line(drums,59,107,66,126,0xf7bb8e,3);
   c.addChild(drums);
   const label=textAt(c,'PIP',0,145,22,PALETTE.mint,'bold',3,.5);
-  return {group:c,sticks,face:body,label};
+  return {group:c,sticks,kit:drums,face:body,label};
 }
 function makeGuitarist(parent,x,y,s){
   const c=new Container();c.position.set(x,y);c.scale.set(s);parent.addChild(c);
@@ -913,12 +983,13 @@ function buildCanvas(){
   root.scale.set(scale);W=winW/scale;H=winH/scale;
   const scene=new Container();root.addChild(scene);ui.scene=scene;
   makeWorldLandscape(scene);
+  makeInstrumentStudio(scene);
   makeLibraryNook(scene);
   const world=new Container();root.addChild(world);ui.hud=world;
   const left=landscape?56:28;
   const title=textAt(world,'GROOVEGROVE',left,landscape?22:42,landscape?35:29,PALETTE.cream,'bold',3.4);
   textAt(world,'THREE MINDS  ·  ONE GROOVE',left,landscape?66:83,landscape?12:11,PALETTE.mint,'bold',2.4);
-  textAt(world,'PASS 009    /    RIFF LEAD NOTES',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
+  textAt(world,'PASS 010    /    MUSICAL DISCIPLINES',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
   const pip=grove?.space?.people.Pip||{x:681,y:538};
   const riff=grove?.space?.people.Riff||{x:798,y:530};
   const singer=grove?.space?.people.Murmur||{x:754,y:659};
@@ -929,6 +1000,7 @@ function buildCanvas(){
   ui.pip=makeDrummer(scene,ui.pipPos.x,ui.pipPos.y,actorScale);
   ui.riff=makeGuitarist(scene,ui.riffPos.x,ui.riffPos.y,actorScale);
   ui.murmur=makeVocalist(scene,ui.vocalPos.x,ui.vocalPos.y,actorScale*.91);
+  makeCarriedInstruments();
   ui.booksDrawing=new Graphics();scene.addChild(ui.booksDrawing);
   ui.pip.group.eventMode='static';ui.pip.group.hitArea=new Rectangle(-115,-125,230,285);
   ui.riff.group.eventMode='static';ui.riff.group.hitArea=new Rectangle(-115,-125,230,285);
@@ -1153,6 +1225,7 @@ function renderEffects(time){
     line(fx,x+n.size*.3,y-7,x+n.size*.3,y,n.color,2,fade);
   });
   moveReaders();
+  updateEquipmentGraphics();
   renderPhysicalBooks();
   for(const a of ambient){
     const t=time/1000*a.speed+a.phase;
