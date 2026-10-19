@@ -130,10 +130,19 @@ class SoundEngine {
     // Called directly from the pointerdown handler; don't defer resume()
     // past the user-activation window on iOS.
     if(ctx.state!=='running'){
+      // Safari sometimes creates a suspended graph even during pointerdown.
+      // Start a near-silent, short oscillator synchronously within that same
+      // user gesture BEFORE awaiting resume(). Do not autoplay music.
+      try{
+        const pulse=ctx.createOscillator(),gain=ctx.createGain();
+        gain.gain.value=.000001;pulse.frequency.value=440;
+        pulse.connect(gain);gain.connect(ctx.destination);
+        pulse.start(ctx.currentTime);pulse.stop(ctx.currentTime+.025);
+      }catch(e){}
       const attempt=ctx.resume();
       const resumed=await Promise.race([
         Promise.resolve(attempt).then(()=>true),
-        new Promise(resolve=>setTimeout(()=>resolve(false),1600))
+        new Promise(resolve=>setTimeout(()=>resolve(false),2800))
       ]);
       if(!resumed && ctx.state!=='running')throw new Error('Audio is blocked by iOS. Tap AUDIO again.');
     }
@@ -1493,6 +1502,11 @@ function onScheduledBeat(beat,time){
   if(beat%4===0)refreshText();
 }
 async function startAudio(force=false){
+  if(serverBase&&!remoteLive){
+    // The remote simulation must attach first; otherwise an iOS audio
+    // failure could accidentally launch and overwrite an empty local world.
+    void attachLivingServer();return;
+  }
   if(audioStartPending)return;
   if(started && !force && !soundNeedsRefresh && sound.context?.state==='running')return;
   audioStartPending=true;
