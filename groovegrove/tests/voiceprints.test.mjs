@@ -77,3 +77,23 @@ test('Old instrumental performance history can inspire later vocal notes',()=>{
     assert.equal(g.snapshot().disciplines.people.Riff.practice.voice.notes,1);
   } finally {Math.random=original;}
 });
+
+test('A practiced singer can revisit a motif from three real instrumental bars',()=>{
+  const g=new Grove(),r=g.disciplines.people.Riff;
+  r.current='voice';g.disciplines.instruments.guitar.owner=null;
+  r.practice.voice.notes=120; r.vocal.notes=120;
+  r.practice.guitar.recent=[
+    {bar:3,pitch:293.66},{bar:2,pitch:246.94},{bar:1,pitch:220}
+  ];
+  const heard=[];const previous=Math.random;Math.random=()=>0;
+  try {
+    const result=tryLearnerVocalPhrase({name:'Riff',grove:g,bar:40,time:2,
+      audio:{voice:(...args)=>heard.push(args)}});
+    assert.equal(result.pitches.length,3);
+    assert.equal(heard.length,3);
+    assert.notEqual(heard[0][0],heard[2][0]);
+    assert.equal(r.vocal.phrases,1);
+    assert.deepEqual(r.vocal.motif,[0,2,5]);
+    assert.equal(g.voiceJournal.notes,0);
+  } finally {Math.random=previous;}
+});
