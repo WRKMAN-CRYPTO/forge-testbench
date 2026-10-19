@@ -9,7 +9,7 @@
  * This module owns no simulation state. It only plays real server notes.
  */
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-const SOUND_KINDS=new Set(['guitar','kick','snare','hat','voice']);
+const SOUND_KINDS=new Set(['guitar','kick','snare','hat','voice','violin']);
 
 export class LiveNoteConductor {
  constructor({delayMs=1900}={}){
@@ -71,7 +71,7 @@ export class LiveNoteConductor {
    this.lastSequence=event.seq;
    if(!SOUND_KINDS.has(event.kind) || !Number.isFinite(event.atMs) ||
       !Number.isFinite(event.volume) || event.volume<0 ||
-      (['guitar','voice'].includes(event.kind) && (!Number.isFinite(event.freq)||event.freq<=0))){
+      (['guitar','voice','violin'].includes(event.kind) && (!Number.isFinite(event.freq)||event.freq<=0))){
     this.invalid++;continue;
    }
    const when=this.audioAnchor+(event.atMs-this.serverAnchor)/1000;
