@@ -131,3 +131,15 @@ test('The bounded tape library preserves recent actual sessions and old jam tota
  assert.equal(archive.recordings[0].startBar,42);
  assert.equal(archive.recordings.at(-1).startBar,203);
 });
+
+test('A Railway restart during a jam never creates an incomplete fake tape',()=>{
+ const initial=new Grove().snapshot();
+ initial.mode='jam';initial.modeBars=5;
+ const g=new Grove(initial);
+ const original=Math.random;Math.random=()=>0;
+ try{
+   for(let beat=0;beat<=4;beat++)g.onBeatEvent(beat,10+beat*60/98,sounds());
+ }finally{Math.random=original;}
+ assert.equal(g.jams,1);
+ assert.equal(g.archive.recordings.length,0);
+});
