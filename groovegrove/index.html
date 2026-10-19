@@ -972,6 +972,101 @@ function makeJournalViewer(world){
   textAt(overlay,'Tap outside to return to the music',bx+bw/2,by+bh-25,landscape?12:10,PALETTE.gold,'normal',0,.5);
   overlay.visible=journalOpen;
 }
+
+function makeRecordingViewer(world){
+  const x=landscape?145:W-218,y=landscape?110:88,w=96,h=29;
+  const tab=new Graphics();world.addChild(tab);
+  rect(tab,x,y,w,h,12,0x263c3b,.96);
+  tab.roundRect(x,y,w,h,12).stroke({color:PALETTE.gold,width:1,alpha:.7});
+  textAt(world,'TAPES',x+w/2,y+8,11,PALETTE.gold,'bold',1,.5);
+  tab.eventMode='static';tab.cursor='pointer';tab.hitArea=new Rectangle(x,y,w,h);
+  tab.on('pointertap',()=>{tapesOpen=!tapesOpen;journalOpen=false;deliveryOpen=false;refreshText();});
+  const overlay=new Container();world.addChild(overlay);ui.tapesOverlay=overlay;
+  const dim=new Graphics();overlay.addChild(dim);
+  rect(dim,0,0,W,H,0,0x061818,.92);
+  dim.eventMode='static';dim.hitArea=new Rectangle(0,0,W,H);
+  dim.on('pointertap',()=>{tapesOpen=false;tapePlayback=null;refreshText();});
+  const bw=Math.min(W-30,landscape?610:405),bh=landscape?340:355;
+  const bx=(W-bw)/2,by=Math.max(15,(H-bh)/2);
+  const panel=new Graphics();overlay.addChild(panel);
+  rect(panel,bx,by,bw,bh,17,0x11332f,.99);
+  panel.roundRect(bx,by,bw,bh,17).stroke({color:PALETTE.gold,width:1.7,alpha:.8});
+  textAt(overlay,'THE RECORDING ROOM',bx+19,by+17,19,PALETTE.cream,'bold',1);
+  textAt(overlay,'Real completed jams, preserved as note events',bx+20,by+50,11,PALETTE.mint);
+  ui.tapeCount=textAt(overlay,'',bx+20,by+82,12,PALETTE.gold,'bold');
+  ui.tapeDetails=textAt(overlay,'',bx+20,by+114,landscape?14:12,PALETTE.cream);
+  ui.tapeDetails.style.wordWrap=true;ui.tapeDetails.style.wordWrapWidth=bw-40;
+  ui.tapeStatus=textAt(overlay,'',bx+20,by+189,11,PALETTE.muted);
+  ui.tapeStatus.style.wordWrap=true;ui.tapeStatus.style.wordWrapWidth=bw-40;
+  const button=(label,px,action)=>{
+    const bw2=(bw-52)/3,yy=by+bh-91;
+    const g=new Graphics();overlay.addChild(g);
+    rect(g,px,yy,bw2,41,10,0x294f46,.95);
+    g.roundRect(px,yy,bw2,41,10).stroke({color:PALETTE.gold,width:1,alpha:.65});
+    g.eventMode='static';g.cursor='pointer';g.hitArea=new Rectangle(px,yy,bw2,41);
+    g.on('pointertap',action);
+    return textAt(overlay,label,px+bw2/2,yy+13,landscape?14:12,PALETTE.cream,'bold',.4,.5);
+  };
+  button('◀ PREV',bx+14,()=>{tapeSelection++;tapePlayback=null;refreshText();});
+  ui.tapePlayLabel=button('▶ PLAY',bx+19+(bw-52)/3,()=>{void toggleTapePlayback();});
+  button('NEXT ▶',bx+24+2*(bw-52)/3,()=>{
+    tapeSelection=Math.max(0,tapeSelection-1);tapePlayback=null;refreshText();
+  });
+  textAt(overlay,'Only completed jams made after the recorder was installed exist.',bx+bw/2,by+bh-24,10,PALETTE.muted,'normal',0,.5);
+  overlay.visible=tapesOpen;
+}
+function chosenTape(){
+  const tapes=grove?.archive?.list()||[];
+  tapeSelection=Math.min(Math.max(0,tapeSelection),Math.max(0,tapes.length-1));
+  return tapes[tapeSelection]||null;
+}
+async function toggleTapePlayback(){
+  if(tapePlayback){tapePlayback=null;refreshText();return;}
+  const item=chosenTape();if(!item)return;
+  await startAudio();
+  const ctx=sound.context;
+  if(!ctx||ctx.state!=='running'){refreshText();return;}
+  // The phone's listening experience is separate from what the musicians
+  // choose on Railway. Playback never affects simulation skill or memories.
+  tapePlayback={id:item.id,next:0,started:ctx.currentTime+.12};
+  refreshText();
+}
+function playRecordedNotes(){
+  if(!tapePlayback||!tapesOpen)return;
+  const ctx=sound.context,archive=grove?.archive;
+  if(!ctx||ctx.state!=='running'||!archive){tapePlayback=null;return;}
+  const tape=archive.get(tapePlayback.id);
+  if(!tape){tapePlayback=null;refreshText();return;}
+  while(tapePlayback.next<tape.events.length){
+    const e=tape.events[tapePlayback.next],at=tapePlayback.started+e.ms/1000;
+    if(at>ctx.currentTime+.22)break;
+    if(at>=ctx.currentTime+.01){
+      if(e.kind==='guitar')sound.guitar(e.freq,at,e.volume,e.duration);
+      else if(e.kind==='voice')sound.voice(e.freq,at,e.volume,e.duration,e.expression||{});
+      else if(e.kind==='violin')sound.violin(e.freq,at,e.volume,e.duration,e.expression||{});
+      else sound[e.kind]?.(at,e.volume);
+    }
+    tapePlayback.next++;
+  }
+  if(tapePlayback.next===tape.events.length&&
+     ctx.currentTime>tapePlayback.started+tape.durationMs/1000+.2){
+    tapePlayback=null;refreshText();
+  }
+}
+function refreshTapeViewer(){
+  if(!ui.tapesOverlay)return;
+  ui.tapesOverlay.visible=tapesOpen;
+  const tapes=grove?.archive?.list()||[],clip=chosenTape();
+  ui.tapeCount.text=tapes.length+' recorded jams saved · newest first';
+  ui.tapeDetails.text=clip?
+    'JAM '+(tapeSelection+1)+' / '+tapes.length+'  ·  BARS '+clip.startBar+'–'+clip.endBar+
+    '\\n'+clip.participants.join(', ')+'  ·  '+clip.noteCount+' real notes':
+    'No recordings yet. The next completed formal jam will become the first tape.';
+  ui.tapeStatus.text=tapePlayback?
+    'Now playing: '+tapePlayback.id+' · Tap STOP to return to live music':
+    'Tap PLAY to hear the actual performance. No ratings, no skill bonuses.';
+  if(ui.tapePlayLabel)ui.tapePlayLabel.text=tapePlayback?'■ STOP':'▶ PLAY';
+}
 function makeVocalist(parent,x,y,s){
   const c=new Container();c.position.set(x,y);c.scale.set(s);parent.addChild(c);
   const g=new Graphics();c.addChild(g);
@@ -1066,13 +1161,15 @@ function buildCanvas(){
   makeDeliveryTray(world);
   makeAudioControl(world);
   makeJournalViewer(world);
+  makeRecordingViewer(world);
   refreshText();
 }
 function refreshText(){
   // Musical history stays in the journals; the retired HUD is never drawn.
   if(!ui.audioLabel)return;
   if(ui.audioLabel)ui.audioLabel.text=!started?'▶ AUDIO':soundNeedsRefresh?'↻ REPAIR':'↻ AUDIO';
-  if(ui.audioWidget)ui.audioWidget.visible=!deliveryOpen && !journalOpen;
+  if(ui.audioWidget)ui.audioWidget.visible=!deliveryOpen && !journalOpen && !tapesOpen;
+  refreshTapeViewer();
   if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 15';
   for(const [name,button] of Object.entries(ui.cameraButtons||{})){
     const active=camera.mode==='follow'?camera.target===name:camera.mode==='place'&&camera.target===name;
@@ -1356,6 +1453,7 @@ function playLivingEvents(data,sentAtMs,receivedAtMs){
   liveConductor.receive(data,{
     context:sound.context,sentAtMs,receivedAtMs,
     play:(event,when)=>{
+      if(tapePlayback)return; // private listening doesn't mix with the live grove
       // The person behind the camera hears nearby music more clearly.
       // World hearing between musicians is independently decided on the server.
       const d=Number.isFinite(event.x)&&Number.isFinite(event.y)
@@ -1370,6 +1468,7 @@ function playLivingEvents(data,sentAtMs,receivedAtMs){
       else if(event.kind==='violin')sound.violin(event.freq,when,v,Number(event.duration)||.95,event.expression||{});
     },
     onNote:(event,when)=>{
+      if(tapePlayback||event.source==='Recording')return;
       const name=['Pip','Riff','Murmur'].includes(event.source)?event.source:
         event.kind==='guitar'?'Riff':event.kind==='voice'?'Murmur':'Pip';
       const key=name+'/'+event.bar+'/'+event.beat;
@@ -1474,7 +1573,7 @@ async function startAudio(force=false){
 app.canvas.addEventListener('pointerdown',(ev)=>{
   const bounds=app.canvas.getBoundingClientRect();
   const lx=(ev.clientX-bounds.left)/scale,ly=(ev.clientY-bounds.top)/scale;
-  if(journalOpen||deliveryOpen)return;
+  if(journalOpen||deliveryOpen||tapesOpen)return;
   const button=ui.audioRect;
   if(button && lx>=button.x && lx<=button.x+button.w &&
      ly>=button.y && ly<=button.y+button.h){startAudio(true);return;}
@@ -1542,6 +1641,7 @@ applyViewportSize(true);
 app.ticker.add(()=>{
   const t=performance.now();
   flushLiveVisuals();
+  playRecordedNotes();
   renderEffects(t);
   redrawAccum+=app.ticker.deltaMS;
   if(redrawAccum>150){redrawAccum=0;refreshText();}
