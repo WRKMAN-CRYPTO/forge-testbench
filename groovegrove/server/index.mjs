@@ -133,7 +133,14 @@ async function init(){
    practice:{Pip:pip.observations,Riff:riff.observations},
    experiments:{Pip:pip.experiments,Riff:riff.experiments},
    disciplines:{owners:Object.fromEntries(['drums','guitar','violin'].map(id=>[id,world.disciplines?.holder(id)||null])),
-    violinPractice:Object.fromEntries(['Pip','Riff','Murmur'].map(n=>[n,world.disciplines?.people[n]?.practice.violin.notes||0]))},
+    violinPractice:Object.fromEntries(['Pip','Riff','Murmur'].map(n=>[n,world.disciplines?.people[n]?.practice.violin.notes||0])),
+    musicianship:Object.fromEntries(['Pip','Riff','Murmur'].map(n=>{
+      const knowledge=world.disciplines.transfer(n,world);
+      return [n,{drumNotes:knowledge.rhythmNotes,pitchedNotes:knowledge.pitchNotes,
+        timingMs:Math.round(knowledge.timingMs*10)/10,
+        violinArticulation:world.disciplines.people[n].practice.violin.lastArticulation,
+        books:world.library.known[n].length}];
+    }))},
    sustained:{Riff:world.riffHeldChords||0,RiffSingle:world.riffHeldNotes||0,Murmur:world.voiceJournal?.heldNotes||0,longestVocalSeconds:Math.round((world.voiceJournal?.longestNoteSeconds||0)*100)/100},
    voice:{stage:world.vocalist.stage,notes:world.vocalist.notes,phrases:world.voiceJournal?.phrases||0,shared:world.voiceJournal?.sharedPhrases||0,partnerReplies:world.voiceJournal?.partnerReplies||{Pip:0,Riff:0},books:world.library.known.Murmur?.length||0},
    sinceLastBeatMs:Date.now()-lastAdvanceAt,checkpointAt:lastWrite
