@@ -31,6 +31,7 @@ test('Only the instrument room allows physical instrument switches',()=>{
  assert.equal(g.disciplines.holder('violin'),'Pip');
  assert.equal(g.disciplines.holder('drums'),null);
  assert.equal(g.disciplines.current('Murmur'),'voice');
+ assert.equal(g.space.people.Pip.destination,'studio');
 });
 
 test('A completed jam archive contains real notes with original timing',()=>{
