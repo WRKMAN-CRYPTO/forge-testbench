@@ -950,10 +950,10 @@ function makeVocalist(parent,x,y,s){
 function makeCameraControls(hud){
   const options=[
     ['PIP','Pip'],['RIFF','Riff'],['MURMUR','Murmur'],
-    ['LIBRARY','library'],['CLEARING','clearing']
+    ['LIBRARY','library'],['STUDIO','studio'],['CLEARING','clearing']
   ];
   const x=landscape?W*.34:12,barW=landscape?Math.min(W*.48,570):W-24;
-  const width=(barW-4*5)/5;
+  const width=(barW-5*5)/6;
   const y=landscape?104:146;
   ui.cameraBand={x,y,w:barW,h:34};ui.cameraButtons={};
   for(const [i,[label,value]] of options.entries()){
