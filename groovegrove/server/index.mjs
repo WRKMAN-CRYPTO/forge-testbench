@@ -17,7 +17,8 @@ const publicAssets=new Map([
   ['/','index.html'],['/index.html','index.html'],
   ...['grove-core.js','grove-world.js','grove-disciplines.js',
       'music-library.js','listening-journal.js','voice-journal.js',
-      'voice-music.js','live-note-conductor.js','server-config.js']
+      'voice-music.js','voiceprints.js','learner-vocals.js',
+      'live-note-conductor.js','server-config.js']
      .map(name=>['/'+name,name])
 ]);
 const fileMimes={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8'};
@@ -74,6 +75,15 @@ function capture(kind,args){
    attack:safe(expression?.attack,.07,.02,.25),
    release:safe(expression?.release,.08,.03,.3)
   };
+  // New musicians transmit their immutable timbre with their own note events.
+  // Murmur receives no profile override, preserving every previous formant.
+  const profile=expression?.voiceprint;
+  if(source!=='Murmur'&&profile?.version===1 &&
+     ['formant','brightness','warmth','air'].every(k=>Number.isFinite(profile[k])))
+    ev.expression.voiceprint={version:1,
+      formant:safe(profile.formant,1,.75,1.3),
+      brightness:safe(profile.brightness,1,.5,1.5),
+      warmth:safe(profile.warmth,1,.5,1.5),air:safe(profile.air,1,.5,1.5)};
  }
  if(kind==='violin'){
   const safe=(n,f,min,max)=>Number.isFinite(n)?Math.min(max,Math.max(min,n)):f;
