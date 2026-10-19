@@ -107,3 +107,27 @@ test('The iPhone canvas exposes recording library and real-note player',()=>{
  assert.match(html,/PLACES\.instrumentRoom/);
  assert.match(html,/PLACES\.recording/);
 });
+
+test('A phrase scheduled before an earlier drum attack preserves real chronological timing',()=>{
+ const archive=new JamArchive();
+ archive.begin(42,10);
+ // A vocal phrase can be scheduled first even when its audible onset is later.
+ archive.capture('voice',[330,10.35,.2,.4,{vowel:'o'},{player:'Murmur'}],42);
+ archive.capture('kick',[10.1,.7],42);
+ const tape=archive.finish(48);
+ assert.deepEqual(tape.events.map(e=>e.ms),[100,350]);
+ assert.deepEqual(tape.events.map(e=>e.kind),['kick','voice']);
+ assert.equal(tape.events[1].source,'Murmur');
+ assert.equal(tape.events[1].expression.vowel,'o');
+});
+test('The bounded tape library preserves recent actual sessions and old jam totals',()=>{
+ const archive=new JamArchive();
+ for(let n=0;n<30;n++){
+   archive.begin(n*7,n*20);
+   archive.capture('guitar',[220,n*20+.05,.4,.3,{player:'Riff'}],n*7);
+   archive.finish(n*7+6);
+ }
+ assert.equal(archive.recordings.length,24);
+ assert.equal(archive.recordings[0].startBar,42);
+ assert.equal(archive.recordings.at(-1).startBar,203);
+});
