@@ -163,7 +163,7 @@ export class GroveWorld {
       if(kind==='guitar')listener.lastHeardGuitar={...listener.lastHeard};
       if(kind==='violin')listener.lastHeardViolin={...listener.lastHeard};
       if(kind==='kick'||kind==='snare')listener.lastHeardDrum={...listener.lastHeard};
-      if(source==='Murmur'&&kind==='voice')listener.lastHeardVoice={...listener.lastHeard};
+      if(kind==='voice')listener.lastHeardVoice={...listener.lastHeard};
       this.heard[name]++;
       if(this.recent.length>19)this.recent.shift();
       this.recent.push({listener:name,from:source,kind,bar});
