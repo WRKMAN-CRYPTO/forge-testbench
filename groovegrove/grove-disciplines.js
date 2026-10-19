@@ -6,7 +6,7 @@
 export const INSTRUMENTS=Object.freeze(['drums','guitar','violin']);
 export const MUSICIANS=Object.freeze(['Pip','Riff','Murmur']);
 const DEFAULT=Object.freeze({Pip:'drums',Riff:'guitar',Murmur:'voice'});
-const validInstrument=id=>INSTRUMENTS.includes(id)||id==='voice';
+const validInstrument=id=>INSTRUMENTS.includes(id)||id==='voice'||id==='none';
 const finite=(v,f=0)=>Number.isFinite(v)?v:f;
 const count=v=>Number.isSafeInteger(v)&&v>=0?v:0;
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
@@ -66,23 +66,28 @@ export class MusicalDisciplines {
    (!this.instruments[id].owner||this.instruments[id].owner===name);}
  wants(name,id,grove){
    const player=this.people[name],bar=grove.bar;
-   if(!player||!INSTRUMENTS.includes(id)||id===player.current||
-      !this.available(name,id)||player.interest||
+   const returnToVoice=name==='Murmur'&&id==='voice';
+   const takeBreak=name!=='Murmur'&&id==='none';
+   if(!player||(!INSTRUMENTS.includes(id)&&!returnToVoice&&!takeBreak)||
+      id===player.current||(!returnToVoice&&!takeBreak&&!this.available(name,id))||player.interest||
       grove.library?.busy(name)||bar-player.lastSwitch<14)return false;
    player.interest=id;player.lastDecision=bar;
    grove.space.people[name].lastChoice=bar;
    grove.space.chooseDestination(name,'studio','wondering how '+id+' feels to play',bar);
-   grove.space.people[name].purpose='going to try '+id+' in the studio';
-   grove.push(name+' becomes curious about the '+id+'.');
+   grove.space.people[name].purpose=returnToVoice?'returning to their voice':
+     takeBreak?'taking a break from instruments':'going to try '+id+' in the studio';
+   grove.push(name+(returnToVoice?' wants to sing again.':
+     takeBreak?' decides to put their instrument down.':' becomes curious about the '+id+'.'));
    return true;
  }
  switchAtStudio(name,grove){
    const p=this.people[name],id=p?.interest;
-   if(!id||!this.available(name,id))return false;
+   if(!id||(id!=='voice'&&id!=='none'&&!this.available(name,id)))return false;
    if(!grove.space.at(name,'studio',105)||grove.space.traveling(name))return false;
    const previous=p.current;
    if(previous!=='voice')this.instruments[previous].owner=null;
-   this.instruments[id].owner=name;p.current=id;p.interest=null;p.lastSwitch=grove.bar;
+   if(INSTRUMENTS.includes(id))this.instruments[id].owner=name;
+   p.current=id;p.interest=null;p.lastSwitch=grove.bar;
    p.bowUntilBeat=0;
    // The original guitarist's previous sustained note cannot silence a later
    // return to guitar, because the instrument itself has been set down.
@@ -92,7 +97,9 @@ export class MusicalDisciplines {
    if(name==='Murmur')grove.space.people.Murmur.ensembleIntent='solo';
    p.discoveries.unshift({bar:grove.bar,instrument:id,from:previous});
    p.discoveries.length=Math.min(20,p.discoveries.length);
-   grove.push(name+' sets down '+previous+' and picks up the '+id+'.');
+   grove.push(name+(id==='voice'?' puts down '+previous+' and returns to singing.':
+     id==='none'?' puts down '+previous+' to listen.':
+     ' sets down '+previous+' and picks up the '+id+'.'));
    return true;
  }
  decide(grove){
@@ -100,7 +107,7 @@ export class MusicalDisciplines {
    for(const name of MUSICIANS){
      const p=this.people[name],person=grove.space.people[name];
      if(p.interest){
-       if(!this.available(name,p.interest)){
+       if(INSTRUMENTS.includes(p.interest)&&!this.available(name,p.interest)){
          p.interest=null;person.purpose='the instrument is in use';
        }else if(person.destination!=='studio' && !grove.library.busy(name))
          grove.space.chooseDestination(name,'studio','going to try '+p.interest,bar);
@@ -121,10 +128,19 @@ export class MusicalDisciplines {
      if(!inStudio && Math.random()>.08*curiosity)continue;
      if(inStudio && Math.random()>.07+.11*curiosity)continue;
      const offered=INSTRUMENTS.filter(id=>id!==p.current&&this.available(name,id));
+     // Silence and the human voice require no equipment. They can always
+     // relinquish a borrowed instrument without permission or a skill gate.
+     if(p.current!=='voice'&&name==='Murmur')offered.push('voice');
+     if(p.current!=='none'&&name!=='Murmur')offered.push('none');
      if(!offered.length)continue;
      // A violin can attract the curious, but every available instrument
      // is eligible. Nothing locks the musician into a prescribed sequence.
-     const weights=offered.map(id=>id==='violin'?2:1);
+     const weights=offered.map(id=>{
+       if(id==='violin')return 2;
+       if(id==='voice'||id==='none')return p.current==='violin'?2.5:.65;
+       const explored=p.practice[id].notes;
+       return 1.1/(1+Math.log1p(explored)*.08);
+     });
      let sum=weights.reduce((a,b)=>a+b,0),roll=Math.random()*sum,chosen=offered[0];
      for(let i=0;i<offered.length;i++){roll-=weights[i];if(roll<=0){chosen=offered[i];break;}}
      if(this.wants(name,chosen,grove))this.switchAtStudio(name,grove);
@@ -161,7 +177,7 @@ export class MusicalDisciplines {
        (Math.random()-.5)*.062;
      const time=t+offset;
      if(instrument==='violin'){
-       if(index<p.bowUntilBeat||!(beat===0||beat===2)||
+       if(typeof audio.violin!=='function'||index<p.bowUntilBeat||!(beat===0||beat===2)||
           Math.random()>.72)continue;
        const tones=Array.isArray(harmony)&&harmony.length?harmony:[196,246.94,293.66];
        const heard=person.lastHeardGuitar;
