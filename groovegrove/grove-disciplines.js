@@ -105,7 +105,7 @@ export class MusicalDisciplines {
    const currentMeasured=p.practice.drums.measuredAttacks>=12?
      Math.hypot(p.practice.drums.motorBiasMs,p.practice.drums.motorJitterMs):null;
    const timingMs=clamp(baseline??currentMeasured??(41-12*rhythm-5*melody),7,75);
-   return {rhythm,melody,bowing,timingMs,skills:knowledge,
+   return {rhythm,melody,bowing:bowed,timingMs,skills:knowledge,
      rhythmNotes:p.practice.drums.notes,pitchNotes:pitchedNotes};
  }
  holder(id){return this.instruments[id]?.owner||null;}
