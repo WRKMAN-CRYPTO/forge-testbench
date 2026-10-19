@@ -93,6 +93,19 @@ function capture(kind,args){
  }
  events.push(ev);if(events.length>420)events.shift();
 }
+// The canvas needs the same authentic exchanges that the offline simulator
+// displayed as speech bubbles. Speech is ephemeral transport; the existing
+// world log remains the durable record. No new agent decisions are generated.
+function captureSpeech(source,message){
+ if(!['Pip','Riff','Murmur'].includes(source)||typeof message!=='string')return;
+ const p=world?.space?.people?.[source];
+ events.push({seq:nextSeq++,kind:'speech',source,message:message.slice(0,190),
+  atMs:Date.now(),bar:world.bar,x:p?.x??null,y:p?.y??null});
+ if(events.length>420)events.shift();
+}
+function wireSpeech(){
+ if(world)world.onTalk=captureSpeech;
+}
 const sink={
  guitar(...a){capture('guitar',a)},
  voice(...a){capture('voice',a)},
@@ -138,6 +151,7 @@ async function init(){
   const saved=JSON.parse(await readFile(file,'utf8'));
   if(saved?.world && Number.isInteger(saved.nextBeat) && Number.isFinite(saved.nextAt)){
    world=new Grove(saved.world,()=>{dirty=true;});
+   wireSpeech();
    nextBeat=saved.nextBeat;nextAt=saved.nextAt;ready=true;
    console.log('GrooveGrove resumed from persistent record at beat',nextBeat);
   }
@@ -221,6 +235,7 @@ const app=createServer(async(req,res)=>{
    }
    // Preserve browser-created books/skills/journals without accepting executable code.
    world=new Grove(request.world,()=>{dirty=true;});
+   wireSpeech();
    nextBeat=Math.max(0,(Number.isInteger(request.world.bar)?request.world.bar+1:0)*4);
    nextAt=Date.now()+beatMs;
    ready=true;dirty=true;
