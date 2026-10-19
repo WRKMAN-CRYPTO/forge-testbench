@@ -105,7 +105,7 @@ export class Grove {
     const liveOutput=audio;
     this.archive.playDeck(t,liveOutput,this.space);
     if(this.mode==='jam'){
-      this.archive.begin(bar);
+      this.archive.begin(bar,t);
       // Capture the very same note arguments sent to the renderer. An archive
       // never reconstructs a groove from counters, stats or random seeds.
       const capture=this.archive;
