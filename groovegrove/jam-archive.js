@@ -37,6 +37,7 @@ export class JamArchive{
   this.deck=null;
   this.reviews=Object.fromEntries(MUSICIANS.map(n=>[n,{
    count:Math.max(0,Math.floor(saved?.reviews?.[n]?.count||0)),
+   heardNotes:Math.max(0,Math.floor(saved?.reviews?.[n]?.heardNotes||0)),
    lastId:typeof saved?.reviews?.[n]?.lastId==='string'?saved.reviews[n].lastId:null,
    lastBar:Number.isSafeInteger(saved?.reviews?.[n]?.lastBar)?saved.reviews[n].lastBar:-1000
   }]));
@@ -95,7 +96,7 @@ export class JamArchive{
   who.count++;who.lastId=tape.id;who.lastBar=bar;
   return tape;
  }
- playDeck(t,audio){
+ playDeck(t,audio,space){
   const deck=this.deck;if(!deck)return;
   const tape=this.get(deck.id);
   if(!tape){this.deck=null;return;}
@@ -110,6 +111,11 @@ export class JamArchive{
    else if(e.kind==='guitar')
      audio.guitar?.(e.freq,when,e.volume,e.duration,marker);
    else audio[e.kind]?.(when,e.volume,marker);
+   // This is exposure to actual archival notes, NOT new instrument practice.
+   for(const name of MUSICIANS){
+     if(space?.at(name,'recording',102)&&!space.traveling(name))
+       this.reviews[name].heardNotes++;
+   }
    deck.next++;
   }
   if(deck.next>=tape.events.length&&t>deck.startAt+tape.durationMs/1000+.5)
