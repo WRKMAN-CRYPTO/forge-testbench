@@ -16,10 +16,10 @@
   No LLM, network inference, external sound files, or predetermined band-forming script.
 */
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
-import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261018-voice';
+import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261019-transfer';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
-import { Grove } from './grove-core.js?v=20261019-disciplines';
-import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261019-disciplines';
+import { Grove } from './grove-core.js?v=20261019-transfer';
+import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261019-transfer';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
 import { LiveNoteConductor } from './live-note-conductor.js?v=20261019-disciplines';
 
@@ -773,7 +773,7 @@ function makeDeliveryTray(world){
       line(cover,cx+16,cy+15,cx+16,cy+ch-16,0x193e37,2,.6);
       circle(cover,cx+23,cy+ch*.5,6,0x163632,.75);
       const tx=cx+46,tw=cw-55;
-      textAt(page,set.id==='voice'?'MURMUR':'MUSIC',cx+cw-8,cy+6,8,PALETTE.gold,'bold',.45,1);
+      textAt(page,set.id==='voice'?'VOICE':'MUSIC',cx+cw-8,cy+6,8,PALETTE.gold,'bold',.45,1);
       const title=textAt(page,def.title,tx,cy+20,wide?14:12,PALETTE.cream,'bold');
       title.style.wordWrap=true;title.style.wordWrapWidth=tw;
       const subtitle=textAt(page,def.subtitle,tx,cy+64,wide?11:10,PALETTE.muted);
@@ -791,7 +791,7 @@ function makeDeliveryTray(world){
       ui.deliveryBookLabels[id]=textAt(page,'ON SHELF',cx+cw-8,cy+ch-15,wide?10:9,PALETTE.gold,'bold',.45,1);
     });
     if(set.id==='voice'){
-      const note=textAt(page,'Vowels · breath · melodies, all without words.\nBooks offer ideas; they never require Murmur to sing.',
+      const note=textAt(page,'Vowels · breath · melodies, all without words.\nAnyone may read these. Singing is still a personal choice.',
         x+22,y+381,wide?15:12,PALETTE.mint);
       note.style.wordWrap=true;note.style.wordWrapWidth=bw-44;
     }
@@ -989,7 +989,7 @@ function buildCanvas(){
   const left=landscape?56:28;
   const title=textAt(world,'GROOVEGROVE',left,landscape?22:42,landscape?35:29,PALETTE.cream,'bold',3.4);
   textAt(world,'THREE MINDS  ·  ONE GROOVE',left,landscape?66:83,landscape?12:11,PALETTE.mint,'bold',2.4);
-  textAt(world,'PASS 010    /    MUSICAL DISCIPLINES',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
+  textAt(world,'PASS 011    /    MUSICAL FREEDOM',landscape?W-58:left,landscape?36:111,landscape?13:11,PALETTE.muted,'bold',1.2,landscape?1:0);
   const pip=grove?.space?.people.Pip||{x:681,y:538};
   const riff=grove?.space?.people.Riff||{x:798,y:530};
   const singer=grove?.space?.people.Murmur||{x:754,y:659};
@@ -1088,19 +1088,29 @@ function refreshText(){
       const actor=(remoteLive&&liveLocations?.Murmur)||grove.space?.people.Murmur;
       const intent=actor?.ensembleIntent==='joining'?'joining the music':
         actor?.ensembleIntent==='listening'?'choosing to listen':v.stage;
-      ui.inspect.text='MURMUR · '+(equipment==='voice'?(book?'reading '+LIBRARY_CATALOG[book.type].title:intent):
-        equipment.toUpperCase()+' · '+grove.disciplines.people.Murmur.practice[equipment]?.notes+' notes')+
-        ' · '+grove.voiceJournal.sharedPhrases+' shared phrases'+
-        ' · '+(grove.voiceJournal.heldNotes||0)+' held notes';
+      const musical=grove.disciplines.people.Murmur;
+      const learned=grove.library.known.Murmur.length;
+      const practice=musical.practice[equipment];
+      ui.inspect.text='MURMUR · '+(book?'reading '+LIBRARY_CATALOG[book.type].title:
+        equipment==='voice'?intent:equipment.toUpperCase()+' · '+(practice?.notes||0)+' notes')+
+        (equipment==='violin'&&practice?.lastArticulation?' · '+practice.lastArticulation:'')+
+        (equipment==='voice'?' · '+grove.voiceJournal.sharedPhrases+' shared phrases':
+          ' · '+grove.voiceJournal.notes+' sung notes carried')+
+        ' · '+learned+' books';
     }else{
       const who=selected==='Pip'?grove.pip:grove.riff;
       const purpose=((remoteLive&&liveLocations?.[selected])||grove.space?.people[selected])?.purpose;
       const equipment=(remoteLive&&liveLocations?.[selected]?.instrument)||grove.disciplines.current(selected);
       const practice=grove.disciplines.people[selected].practice[equipment];
-      ui.inspect.text=who.name.toUpperCase()+' · '+equipment.toUpperCase()+' · '+(purpose||who.currentGoal)+
-        (equipment==='violin'?' · '+(practice?.notes||0)+' bow experiments':'')+
-        (selected==='Riff'?' · '+(grove.riffHeldChords||0)+' chords · '+(grove.riffHeldNotes||0)+' held notes':
-          grove.library.known[who.name].length?' · '+grove.library.known[who.name].length+' book skills':'');
+      const profile=grove.disciplines.transfer(selected,grove);
+      const bowApproach=practice?.lastArticulation||'discovering bow strokes';
+      const inherited=profile.rhythm>.66?'drum rhythm carried':
+        profile.melody>.66?'melodic ear carried':'learning a new instrument';
+      ui.inspect.text=who.name.toUpperCase()+' · '+equipment.toUpperCase()+
+        (equipment==='violin'?' · '+(practice?.notes||0)+' bow attempts · '+bowApproach+
+          ' · '+inherited:
+          ' · '+(purpose||who.currentGoal))+
+        ' · '+grove.library.known[who.name].length+' books';
     }
   }else ui.inspect.text='Tap a musician to follow their decisions';
   ui.badgeText.text=(remoteLive && returnReport && Date.now()<returnReportUntil)?('+'+returnReport.bars+' BARS WHILE AWAY'):!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(soundNeedsRefresh || (sound.context && sound.context.state!=='running'))?'TAP TO RECONNECT AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
@@ -1133,9 +1143,12 @@ function refreshText(){
       ui.journalHeading.text='MURMUR · VOCAL NOTEBOOK';
       ui.journalInfo.text=v.stage+' · '+report.sharedPhrases+' shared phrases · '+
         report.heldNotes+' sustained notes · longest '+report.longestNoteSeconds.toFixed(1)+'s';
+      const murmurInstrument=grove.disciplines.current('Murmur');
+      const murmurPractice=grove.disciplines.people.Murmur.practice[murmurInstrument];
       ui.journalTexture.text='Riff answered '+report.partnerReplies.Riff+
         ' · Pip answered '+report.partnerReplies.Pip+
-        ' · '+grove.library.known.Murmur.length+' books studied';
+        ' · '+grove.library.known.Murmur.length+' books studied'+
+        (murmurPractice?' · '+murmurPractice.notes+' '+murmurInstrument+' notes':'');
       ui.journalRows.forEach((field,i)=>{
         const note=report.recent[i];
         field.text=note?'Bar '+note.bar+' · '+note.kind+' · vowel '+note.vowel+
@@ -1151,7 +1164,12 @@ function refreshText(){
     }else{
       const report=grove.understanding.report(journalName);
       ui.journalHeading.text=journalName.toUpperCase()+' · PERSONAL NOTES';
-      ui.journalInfo.text=report.observations+' lifetime observed bars  ·  '+report.experiments+' total experiments';
+      const musician=grove.disciplines.people[journalName];
+      const instrument=grove.disciplines.current(journalName);
+      const currentPractice=musician.practice[instrument];
+      ui.journalInfo.text=report.observations+' observed bars · '+
+        report.experiments+' experiments · '+grove.library.known[journalName].length+' books'+
+        (currentPractice?' · '+currentPractice.notes+' '+instrument+' notes':'');
       ui.journalTexture.text="Partner's last texture: "+report.partnerTexture+' · Last measured overlap: '+
         (report.latest?Math.round(report.latest.overlap*100)+'%':'collecting');
       ui.journalRows.forEach((field,i)=>{
