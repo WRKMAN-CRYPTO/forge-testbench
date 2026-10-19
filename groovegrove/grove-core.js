@@ -4,7 +4,7 @@ import {ListeningJournal} from './listening-journal.js';
 import {GroveWorld} from './grove-world.js?v=20261019-disciplines';
 import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
 import {tryVocalPhrase} from './voice-music.js?v=20261019-disciplines';
-import {MusicalDisciplines} from './groove-disciplines.js?v=20261019-disciplines';
+import {MusicalDisciplines} from './grove-disciplines.js?v=20261019-disciplines';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const rand=(a,b)=>a+(b-a)*Math.random();
