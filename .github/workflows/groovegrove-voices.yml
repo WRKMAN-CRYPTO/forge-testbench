@@ -25,5 +25,6 @@ jobs:
           node --check learner-vocals.js
           node --check voiceprints.js
           node --check server/index.mjs
-      - name: Exercise persisted musical memories and voice choices
-        run: node --test tests/voiceprints.test.mjs
+          node --check live-note-conductor.js
+      - name: Validate persistent musical memories, full canvas and live speech
+        run: node --test tests/*.test.mjs

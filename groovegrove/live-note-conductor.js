@@ -69,6 +69,9 @@ export class LiveNoteConductor {
   for(const event of events){
    if(!event || !Number.isSafeInteger(event.seq) || event.seq<=this.lastSequence)continue;
    this.lastSequence=event.seq;
+   // Speech shares the sequence stream but is rendered by the canvas.
+   // It must not be treated as invalid audio or affect musical scheduling.
+   if(event.kind==='speech')continue;
    if(!SOUND_KINDS.has(event.kind) || !Number.isFinite(event.atMs) ||
       !Number.isFinite(event.volume) || event.volume<0 ||
       (['guitar','voice','violin'].includes(event.kind) && (!Number.isFinite(event.freq)||event.freq<=0))){

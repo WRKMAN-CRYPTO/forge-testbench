@@ -380,7 +380,7 @@ const root=new Container();app.stage.addChild(root);
 let sound=new SoundEngine(),grove=null;
 let started=false,startError='',selected='Pip',soundNeedsRefresh=false,audioStartPending=false;
 let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false,deliveryCategory='instruments',journalOpen=false,journalName='Pip';
-let floatingNotes=[],talkBubble=null,ambient=[],now=0,visualBeat=-1;
+let floatingNotes=[],talkBubble=null,speechQueue=[],ambient=[],now=0,visualBeat=-1;
 let noteFlash={Pip:0,Riff:0,Murmur:0};
 let redrawAccum=0;
 let liveLocations=null;
@@ -837,7 +837,8 @@ function moveReaders(){
     camera.y+=(desired.y-camera.y)*Math.min(1,smoothing*.92);
   }
   const viewTop=landscape?152:187;
-  const viewBottom=(ui.panelY||H-284)-48;
+  // No fixed-bottom telemetry panel: the woodland owns the lower viewport.
+  const viewBottom=H-24;
   const focusY=(viewTop+viewBottom)*.5;
   camera.x=clamp(camera.x,W*.5,WORLD_SIZE.width-W*.5);
   camera.y=clamp(camera.y,focusY-20,WORLD_SIZE.height-(H-focusY)*.5);
@@ -992,7 +993,7 @@ function makeCameraControls(hud){
 function buildCanvas(){
   // Rebuild graphics, never the agent state, on resize/orientation change.
   for(const child of root.removeChildren())child.destroy({children:true});
-  ui={};floatingNotes=[];talkBubble=null;
+  ui={};floatingNotes=[];talkBubble=null;speechQueue=[];
   const winW=app.screen.width,winH=app.screen.height;
   landscape=winW>winH*1.18;
   scale=landscape?Math.min(winW/1170,winH/755):winW/430;
@@ -1031,59 +1032,8 @@ function buildCanvas(){
   ui.bubbleShape=new Graphics();ui.bubbleLayer.addChild(ui.bubbleShape);
   ui.bubbleText=textAt(ui.bubbleLayer,'',0,0,landscape?13:12,PALETTE.cream);
   ui.bubbleLayer.visible=false;
-  const border=new Graphics();world.addChild(border);
-  const panelY=landscape?H-197:H-284;
-  ui.panelY=panelY;
-  const panelW=landscape?Math.min(W-96,1100):W-32;
-  const panelX=(W-panelW)*.5;
-  ui.panelX=panelX;ui.panelW=panelW;
-  rect(border,panelX,panelY,panelW,landscape?174:263,22,0x091f23,.96);
-  rect(border,panelX+3,panelY+3,panelW-6,landscape?168:257,20,0x123432,.91);
-  if(landscape){
-    line(border,panelX+panelW*.47,panelY+21,panelX+panelW*.47,panelY+154,0x41645b,1,.42);
-    line(border,panelX+panelW*.74,panelY+21,panelX+panelW*.74,panelY+154,0x41645b,1,.42);
-  }else{
-    line(border,panelX+15,panelY+91,panelX+panelW-15,panelY+91,0x41645b,1,.42);
-    line(border,panelX+15,panelY+167,panelX+panelW-15,panelY+167,0x41645b,1,.42);
-  }
-  ui.modeLabel=textAt(world,'TWO SOLO PRACTICES',landscape?panelX+20:W*.5,panelY+15,landscape?14:13,PALETTE.gold,'bold',2,landscape?0:.5);
-  ui.statusLine=textAt(world,'Tap the clearing to begin listening',landscape?panelX+20:W*.5,panelY+(landscape?47:43),landscape?16:13,PALETTE.cream,'normal',0,landscape?0:.5);
-  ui.statusLine.style.wordWrap=true;ui.statusLine.style.wordWrapWidth=landscape?panelW*.43:panelW-35;
-  ui.listenLabel=textAt(world,'LIVE TIMING   /   PIP TO RIFF',landscape?panelX+20:panelX+18,panelY+(landscape?86:110),12,PALETTE.muted,'bold',1);
-  ui.meter=new Graphics();world.addChild(ui.meter);
-  if(landscape){
-    const statX=panelX+panelW*.49;
-    textAt(world,'MUSICIANS',statX,panelY+15,12,PALETTE.muted,'bold',1.5);
-    ui.pipMetric=textAt(world,'PIP   collecting...',statX,panelY+49,17,PALETTE.mint,'bold');
-    ui.riffMetric=textAt(world,'RIFF   steady guide',statX,panelY+78,15,PALETTE.lilac);
-    ui.memoryMetric=textAt(world,'MEMORIES   0 shared sessions',statX,panelY+120,12,PALETTE.muted);
-    const feedX=panelX+panelW*.77;
-    textAt(world,'LISTENING LOG',feedX,panelY+15,12,PALETTE.muted,'bold',1.6);
-    ui.log=[textAt(world,'',feedX,panelY+45,14,PALETTE.cream),textAt(world,'',feedX,panelY+83,14,PALETTE.muted),textAt(world,'',feedX,panelY+121,13,PALETTE.muted)];
-    ui.log.forEach(t=>{t.style.wordWrap=true;t.style.wordWrapWidth=panelW*.21;});
-  }else{
-    ui.pipMetric=textAt(world,'PIP   collecting...',panelX+18,panelY+179,15,PALETTE.mint,'bold');
-    ui.riffMetric=textAt(world,'RIFF   steady guide',panelX+18,panelY+202,13,PALETTE.lilac);
-    ui.memoryMetric=textAt(world,'0 shared sessions',panelX+18,panelY+226,12,PALETTE.muted);
-    textAt(world,'LISTENING LOG',panelX+18,panelY+247,10,PALETTE.muted,'bold',1.2);
-    ui.log=[textAt(world,'',panelX+134,panelY+246,12,PALETTE.cream)];
-    ui.log[0].style.wordWrap=true;ui.log[0].style.wordWrapWidth=panelW-154;
-  }
-  const badgeX=landscape?W*.5:W*.5,badgeY=landscape?panelY-44:panelY-51;
-  ui.badge=new Graphics();rect(ui.badge,badgeX-124,badgeY-13,248,36,18,0x102d2d,.92);
-  world.addChild(ui.badge);
-  ui.badge.eventMode='static';ui.badge.cursor='pointer';
-  ui.badge.hitArea=new Rectangle(badgeX-124,badgeY-13,248,36);
-  ui.badge.on('pointertap',()=>{
-    if(!remoteLive&&serverHome){
-      if(location.origin!==serverHome)location.assign(serverHome+'/?v=20261019-mobile-recovery');
-      else void attachLivingServer();
-    }else if(!started)void startAudio(soundNeedsRefresh);
-  });
-  ui.badgeText=textAt(world,'TAP ANYWHERE TO START',badgeX,badgeY-4,12,PALETTE.gold,'bold',1.7,.5);
-  ui.inspect=textAt(world,'',landscape?W*.5:W*.5,landscape?panelY-84:panelY-93,landscape?13:12,PALETTE.cream,'normal',0,.5);
-  ui.inspect.style.wordWrap=true;ui.inspect.style.wordWrapWidth=landscape?620:W-40;
-  ui.inspect.style.align='center';
+  // Keep the woodland visible all the way to the bottom of the canvas.
+  // Audio, camera, library and journals retain their existing controls.
   makeCameraControls(world);
   makeDeliveryTray(world);
   makeAudioControl(world);
@@ -1091,54 +1041,8 @@ function buildCanvas(){
   refreshText();
 }
 function refreshText(){
-  if(!ui.modeLabel)return;
-  const mode=grove?.mode||'solo';
-  ui.modeLabel.text=remoteLive?(remoteOnline?'LIVE · THE GROVE IS HOME':'SERVER RECONNECTING'):serverBase?'CONNECTING TO THE LIVE GROVE':(grove?.library.anyBusy()?'READING IN THE GROVE':mode==='lesson'?'A LESSON IS EMERGING':mode==='jam'?'AN UNSCRIPTED JAM':'TWO SOLO PRACTICES');
-  ui.statusLine.text=remoteLive && returnReport && Date.now()<returnReportUntil?('While away: '+returnReport.bars+' bars practiced · Pip +'+returnReport.pip+' · Riff +'+returnReport.riff):serverMessage&&!remoteLive?serverMessage:startError?startError:!started?(grove?.library.anyBusy()?'Tap the clearing to continue the interrupted reading':'Tap the clearing to hear their first notes'):soundNeedsRefresh?'Audio route may be muted · tap ↻ AUDIO to reconnect':(sound.context && sound.context.state!=='running'?'Audio paused · tap ↻ AUDIO to reconnect':grove.highlight);
-  if(grove){
-    const error=grove.baseline();
-    ui.pipMetric.text='PIP   '+(error==null?'collecting timing...':fmt(error)+' RMS drift');
-    ui.riffMetric.text='RIFF  '+(grove.riffHeldChords||0)+' held chords  ·  '+(grove.riffHeldNotes||0)+' held notes';
-    ui.memoryMetric.text=remoteLive?('BAR '+Math.max(grove.bar,Math.floor(serverLastBeat/4))+' · '+grove.familiarity+' shared · '+grove.jams+' jams'):(grove.familiarity+' shared sessions  ·  '+grove.lessons+' lessons  ·  '+grove.jams+' jams');
-    if(landscape){
-      const rows=grove.logs.slice(0,3);
-      ui.log.forEach((t,i)=>{t.text=rows[i]?.message||'';});
-    }else ui.log[0].text=grove.logs[0]?.message||'';
-    if(selected==='Murmur'){
-      const v=grove.vocalist;
-      const equipment=(remoteLive&&liveLocations?.Murmur?.instrument)||grove.disciplines.current('Murmur');
-      const task=grove.library.status('Murmur');
-      const book=task&&grove.library.copyById(task.copyId);
-      const actor=(remoteLive&&liveLocations?.Murmur)||grove.space?.people.Murmur;
-      const intent=actor?.ensembleIntent==='joining'?'joining the music':
-        actor?.ensembleIntent==='listening'?'choosing to listen':v.stage;
-      const musical=grove.disciplines.people.Murmur;
-      const learned=grove.library.known.Murmur.length;
-      const practice=musical.practice[equipment];
-      ui.inspect.text='MURMUR · '+(book?'reading '+LIBRARY_CATALOG[book.type].title:
-        equipment==='voice'?intent:equipment.toUpperCase()+' · '+(practice?.notes||0)+' notes')+
-        (equipment==='violin'&&practice?.lastArticulation?' · '+practice.lastArticulation:'')+
-        (equipment==='voice'?' · '+grove.voiceJournal.sharedPhrases+' shared phrases':
-          ' · '+grove.voiceJournal.notes+' sung notes carried')+
-        ' · '+learned+' books';
-    }else{
-      const who=selected==='Pip'?grove.pip:grove.riff;
-      const purpose=((remoteLive&&liveLocations?.[selected])||grove.space?.people[selected])?.purpose;
-      const equipment=(remoteLive&&liveLocations?.[selected]?.instrument)||grove.disciplines.current(selected);
-      const practice=grove.disciplines.people[selected].practice[equipment];
-      const profile=grove.disciplines.transfer(selected,grove);
-      const bowApproach=practice?.lastArticulation||'discovering bow strokes';
-      const inherited=profile.rhythm>.66?'drum rhythm carried':
-        profile.melody>.66?'melodic ear carried':'learning a new instrument';
-      ui.inspect.text=who.name.toUpperCase()+' · '+equipment.toUpperCase()+
-        (equipment==='violin'?' · '+(practice?.notes||0)+' bow attempts · '+bowApproach+
-          ' · '+inherited:
-          ' · '+(purpose||who.currentGoal))+
-        ' · '+grove.library.known[who.name].length+' books';
-    }
-  }else ui.inspect.text='Tap a musician to follow their decisions';
-  ui.badgeText.text=(!remoteLive&&serverHome)?(location.origin!==serverHome?'↗ OPEN LIVE GROVE':'↻ CONNECT TO GROVE'):(remoteLive && returnReport && Date.now()<returnReportUntil)?('+'+returnReport.bars+' BARS WHILE AWAY'):!started?(grove?.library.anyBusy()?'TAP TO CONTINUE READING':'TAP ANYWHERE TO START'):(soundNeedsRefresh || (sound.context && sound.context.state!=='running'))?'TAP TO RECONNECT AUDIO':grove?.library.anyBusy()?'STUDYING  ·  LISTENING':mode==='lesson'?'LISTENING  ·  LEARNING':mode==='jam'?'PLAYING TOGETHER':'INDEPENDENT PRACTICE';
-  ui.badgeText.style.fill=mode==='jam'?PALETTE.mint:PALETTE.gold;
+  // Musical history stays in the journals; the retired HUD is never drawn.
+  if(!ui.audioLabel)return;
   if(ui.audioLabel)ui.audioLabel.text=!started?'▶ AUDIO':soundNeedsRefresh?'↻ REPAIR':'↻ AUDIO';
   if(ui.audioWidget)ui.audioWidget.visible=!deliveryOpen && !journalOpen;
   if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 15';
@@ -1220,24 +1124,6 @@ function refreshText(){
   }).filter(Boolean);
   if(ui.shelfStatus)ui.shelfStatus.text=reading.length?(reading.length+' reading · tap for books'):(grove.library.books.length?'Tap shelves for book delivery':'Empty shelves · tap to donate books');
 }
-function renderMeter(){
-  if(!ui.meter)return;
-  const g=ui.meter;g.clear();
-  const x=ui.panelX+19,y=ui.panelY+(landscape?124:145);
-  const width=landscape?ui.panelW*.42:ui.panelW-40;
-  line(g,x,y,x+width,y,0x7b9b8a,1,.55);
-  const ticks=[-100,-50,0,50,100];
-  ticks.forEach(ms=>{
-    const tx=x+(ms+100)/200*width;
-    line(g,tx,y-6,tx,y+7,ms===0?PALETTE.gold:0x628780,ms===0?2:1,.6);
-  });
-  const errors=(grove?.relativeErrors||[]).slice(-14);
-  errors.forEach((value,i)=>{
-    const tx=x+(clamp(value,-100,100)+100)/200*width;
-    circle(g,tx,y-15-(i%3)*5,3.3,PALETTE.mint,.2+i/errors.length*.77);
-  });
-}
-
 function emitVisualNote(e){
   const p=e.agent==='Pip'?ui.pipPos:e.agent==='Riff'?ui.riffPos:ui.vocalPos;
   if(!p)return;
@@ -1248,7 +1134,10 @@ function emitVisualNote(e){
   noteFlash[e.agent]=performance.now();
 }
 function showSpeech(from,message){
-  talkBubble={from,message,born:performance.now()};
+  if(!['Pip','Riff','Murmur'].includes(from)||typeof message!=='string'||!message)return;
+  // Preserve rapid two-way exchanges rather than replacing the first bubble.
+  speechQueue.push({from,message:message.slice(0,190)});
+  if(speechQueue.length>12)speechQueue.shift();
 }
 function renderEffects(time){
   if(!ui.fx)return;
@@ -1295,28 +1184,38 @@ function renderEffects(time){
     ui.riff.group.y=ui.riffPos.y+Math.sin(time/470+2)*2;
   }
   if(ui.murmur?.group)ui.murmur.group.y=ui.vocalPos.y+Math.sin(time/690+1)*2.2;
-  ui.bubbleLayer.visible=!!(talkBubble && time-talkBubble.born<4300);
+  // Spoken dialogue appears at the musician, even when audio is off.
+  if((!talkBubble || time-talkBubble.born>=4200)&&speechQueue.length){
+    talkBubble={...speechQueue.shift(),born:time};
+  }
+  ui.bubbleLayer.visible=!!(talkBubble && time-talkBubble.born<4200);
   if(ui.bubbleLayer.visible){
     const age=(time-talkBubble.born)/1000;
     const pos=talkBubble.from==='Pip'?ui.pipPos:talkBubble.from==='Riff'?ui.riffPos:ui.vocalPos;
     const boxW=landscape?230:182;
     const boxY=pos.y-(landscape?195:151);
     const x=clamp(pos.x-boxW/2,12,WORLD_SIZE.width-boxW-12);
-    if(ui.lastBubble!==talkBubble){
-      const b=ui.bubbleShape;b.clear();
-      rect(b,x,boxY,boxW,landscape?74:78,13,0x082527,.93);
-      b.roundRect(x,boxY,boxW,landscape?74:78,13).stroke({color:talkBubble.from==='Pip'?PALETTE.mint:PALETTE.lilac,width:1,alpha:.5});
-      const text=ui.bubbleText;text.text=talkBubble.message;text.position.set(x+11,boxY+11);
-      text.style.wordWrap=true;text.style.wordWrapWidth=boxW-22;
-      ui.lastBubble=talkBubble;
-    }
+    // Reposition every frame: the speaker may walk during a sentence.
+    const b=ui.bubbleShape;b.clear();
+    rect(b,x,boxY,boxW,landscape?74:78,13,0x082527,.93);
+    b.roundRect(x,boxY,boxW,landscape?74:78,13).stroke({
+      color:talkBubble.from==='Pip'?PALETTE.mint:
+        talkBubble.from==='Riff'?PALETTE.lilac:PALETTE.gold,
+      width:1,alpha:.7
+    });
+    const label=ui.bubbleText;
+    label.text=talkBubble.message;
+    label.position.set(x+11,boxY+11);
+    label.style.wordWrap=true;
+    label.style.wordWrapWidth=boxW-22;
+    label.style.fontSize=landscape?13:11;
     ui.bubbleLayer.alpha=Math.min(1,(4.3-age)*3);
   }
 }
 function elapsedP(x){return Math.max(0,x);}
 // Remote is optional until a Railway service exists. No client secret is
 // published in source; pairing lives in the URL fragment and local phone store.
-let remoteLive=false,remoteOnline=false,remotePolling=false,remoteSequence=0;
+let remoteLive=false,remoteOnline=false,remotePolling=false,remoteSequence=0,lastSpeechSequence=0;
 const liveConductor=new LiveNoteConductor({delayMs:1900});
 const pendingVisualNotes=[];
 let lastRemoteWorldAt=0;
@@ -1401,7 +1300,8 @@ async function attachLivingServer(){
       };
       returnReportUntil=Date.now()+120000;
     }
-    remoteLive=true;remoteOnline=true;remoteSequence=status.seq;serverLastBeat=status.beat||0;
+    remoteLive=true;remoteOnline=true;remoteSequence=status.seq;
+    lastSpeechSequence=status.seq;serverLastBeat=status.beat||0;
     acceptRemoteWorld(status.world);
     lastRemoteWorldAt=Date.now();
     grove.push('The grove now keeps playing when you close the page.');
@@ -1475,9 +1375,18 @@ async function pollLivingServer(){
     const receivedAt=performance.now();
     if(Number.isFinite(data.seq) && data.seq<remoteSequence){
       // Railway restart: sequence numbers roll over to a fresh session.
-      remoteSequence=0;
+      remoteSequence=0;lastSpeechSequence=0;
       liveConductor.reset();pendingVisualNotes.length=0;
       lastRemoteWorldAt=0;
+    }
+    // Spoken words are derived from real onTalk exchanges on Railway.
+    // They remain visible even if Safari's audio context is suspended.
+    for(const ev of data.events||[]){
+      if(ev?.kind!=='speech'||!Number.isSafeInteger(ev.seq)||
+         ev.seq<=lastSpeechSequence)continue;
+      lastSpeechSequence=ev.seq;
+      if(Number.isFinite(ev.atMs)&&Math.abs(data.serverNow-ev.atMs)<10000)
+        showSpeech(ev.source,ev.message);
     }
     remoteSequence=data.seq;
     if(data.locations)liveLocations=data.locations;
@@ -1545,7 +1454,7 @@ app.canvas.addEventListener('pointerdown',(ev)=>{
   // An empty local grove must not advance independently of the live band.
   if(!remoteLive&&serverBase)void attachLivingServer();
   else void startAudio(soundNeedsRefresh);
-  if(ly>(ui.cameraBand?.y||145)+48 && ly<(ui.panelY||H-280)-48){
+  if(ly>(ui.cameraBand?.y||145)+48 && ly<H-14){
     camera.drag={pointerId:ev.pointerId,x:lx,y:ly,startX:camera.x,startY:camera.y,moved:false};
   }
 });
@@ -1607,7 +1516,7 @@ app.ticker.add(()=>{
   flushLiveVisuals();
   renderEffects(t);
   redrawAccum+=app.ticker.deltaMS;
-  if(redrawAccum>150){redrawAccum=0;renderMeter();refreshText();}
+  if(redrawAccum>150){redrawAccum=0;refreshText();}
 });
 // The band keeps playing on Railway while a reconnect is attempted.
 void attachLivingServer();
