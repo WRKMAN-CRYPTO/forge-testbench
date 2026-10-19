@@ -195,7 +195,7 @@ export class GroveWorld {
           continue;
         }
         if(p.ensembleIntent==='joining'){
-          const silentFor=bar-Math.max(p.lastHeardGuitar?.bar??-99,p.lastHeardDrum?.bar??-99);
+          const silentFor=bar-Math.max(p.lastHeardGuitar?.bar??-99,p.lastHeardDrum?.bar??-99,p.lastHeardViolin?.bar??-99);
           const wantsBreak=(bar-p.lastEnsembleChoice>=12&&Math.random()<.16)||
             (silentFor>10&&bar-p.lastEnsembleChoice>=7);
           if(wantsBreak){
