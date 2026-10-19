@@ -192,6 +192,8 @@ export class GroveWorld {
             this.chooseDestination(name,location,reason,bar);
           else {p.purpose=reason;p.lastChoice=bar;}
           grove.push('Murmur chooses to join '+source.from+' and listen for an opening.');
+          // A nonverbal intention caption, grounded in a real voluntary choice.
+          grove.onTalk?.('Murmur','♪ Going to join '+source.from+' and listen');
           continue;
         }
         if(p.ensembleIntent==='joining'){
@@ -202,6 +204,7 @@ export class GroveWorld {
             p.ensembleIntent='listening';p.lastEnsembleChoice=bar;p.lastChoice=bar;
             p.purpose='taking time to listen before singing again';
             grove.push('Murmur chooses a listening break from the music.');
+            grove.onTalk?.('Murmur','♪ Taking time to listen');
             continue;
           }
           if(silentFor<=10)continue;
@@ -237,6 +240,8 @@ export class GroveWorld {
         p.lastChoice=bar;p.voluntaryRests++;
       }else if(this.chooseDestination(name,where,why,bar)){
         grove.push(name+' heads toward '+PLACES[where].label.toLowerCase()+', '+why+'.');
+        if(name==='Murmur')
+          grove.onTalk?.('Murmur','♪ '+why);
       }
     }
   }

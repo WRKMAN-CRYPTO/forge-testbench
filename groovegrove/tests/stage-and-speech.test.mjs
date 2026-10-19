@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {LiveNoteConductor} from '../live-note-conductor.js';
+import {Grove} from '../grove-core.js';
 
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const server=readFileSync(new URL('../server/index.mjs',import.meta.url),'utf8');
@@ -43,4 +44,92 @@ test('Speech packets never alter WebAudio timing or count as invalid sound',()=>
   assert.deepEqual(played,['guitar']);
   assert.equal(conductor.stats.invalid,0);
   assert.equal(conductor.receive(packet,opts),0);
+});
+
+test('Murmur gets a caption only after he actually schedules vocal notes',()=>{
+  const grove=new Grove();
+  const journalBefore=grove.voiceJournal.snapshot();
+  const emissions=[],sung=[];
+  grove.onTalk=(from,message)=>emissions.push({from,message});
+  grove.vocalist.stage='humming';
+  grove.vocalist.curiosity=1;
+  grove.vocalist.lastAttemptBar=-20;
+  const original=Math.random;
+  Math.random=()=>0;
+  try{
+    grove.onBeatEvent(0,2,{
+      voice:(...args)=>sung.push(args),guitar(){},kick(){},snare(){},hat(){},violin(){}
+    });
+    assert.ok(sung.length>0);
+    assert.equal(grove.voiceJournal.notes,journalBefore.notes+sung.length);
+    assert.ok(emissions.some(e=>e.from==='Murmur'&&e.message.startsWith('♪')));
+    assert.deepEqual(grove.voiceJournal.snapshot().firstPhrase,journalBefore.firstPhrase);
+  }finally{Math.random=original;}
+});
+
+test('Murmur can choose to join a real heard musician and receive a bubble',()=>{
+  const grove=new Grove(),heard=[];
+  grove.onTalk=(from,message)=>heard.push({from,message});
+  grove.bar=100;grove.vocalist.stage='humming';grove.vocalist.curiosity=1;
+  grove.space.people.Pip.lastChoice=100;
+  grove.space.people.Riff.lastChoice=100;
+  grove.space.sound('Riff','guitar',100,1,220);
+  const actual=grove.space.people.Murmur.lastHeardGuitar;
+  assert.equal(actual.from,'Riff');
+  const original=Math.random;Math.random=()=>0;
+  try{
+    grove.space.decide(grove);
+    assert.equal(grove.space.people.Murmur.ensembleIntent,'joining');
+    assert.ok(heard.some(e=>e.from==='Murmur'&&e.message.includes('Riff')));
+  }finally{Math.random=original;}
+});
+
+test('Murmur taking a voluntary listening break is visible, not compulsory singing',()=>{
+  const grove=new Grove(),heard=[];
+  grove.onTalk=(from,message)=>heard.push({from,message});
+  grove.bar=100;grove.vocalist.stage='humming';grove.vocalist.curiosity=1;
+  grove.space.people.Pip.lastChoice=100;
+  grove.space.people.Riff.lastChoice=100;
+  const p=grove.space.people.Murmur;
+  p.ensembleIntent='joining';p.lastEnsembleChoice=1;
+  grove.space.sound('Riff','guitar',100,1,220);
+  const journal=grove.voiceJournal.snapshot(),original=Math.random;
+  Math.random=()=>0;
+  try{
+    grove.space.decide(grove);
+    assert.equal(p.ensembleIntent,'listening');
+    assert.ok(heard.some(e=>e.from==='Murmur'&&/listen/i.test(e.message)));
+    assert.deepEqual(grove.voiceJournal.snapshot(),journal);
+  }finally{Math.random=original;}
+});
+
+test('No spontaneous Murmur bubble when silent and no actual musical action',()=>{
+  const grove=new Grove(),heard=[];
+  grove.onTalk=(from,message)=>heard.push({from,message});
+  grove.vocalist.stage='silent';
+  grove.onBeatEvent(0,2,{
+    voice(){throw Error('A silent Murmur must not be forced to sing');},
+    guitar(){},kick(){},snare(){},hat(){},violin(){}
+  });
+  assert.ok(!heard.some(e=>e.from==='Murmur'));
+});
+
+test('The same live transport accepts Murmur without changing audio scheduling',()=>{
+  assert.match(server,/\['Pip','Riff','Murmur'\]\.includes\(source\)/);
+  assert.match(html,/\['Pip','Riff','Murmur'\]\.includes\(from\)/);
+  assert.match(html,/talkBubble\.from==='Riff'\?ui\.riffPos:ui\.vocalPos/);
+  const scheduler=new LiveNoteConductor();
+  const played=[];
+  const packet={serverNow:12000,events:[
+    {seq:1,kind:'speech',atMs:12000,source:'Murmur',
+      message:'♪ Answering Riff in melody'},
+    {seq:2,kind:'voice',atMs:12100,source:'Murmur',
+      freq:220,volume:.5,duration:.3}
+  ]};
+  assert.equal(scheduler.receive(packet,{
+    context:{state:'running',currentTime:10},sentAtMs:1,receivedAtMs:40,
+    play:event=>played.push(event.kind)
+  }),1);
+  assert.deepEqual(played,['voice']);
+  assert.equal(scheduler.stats.invalid,0);
 });
