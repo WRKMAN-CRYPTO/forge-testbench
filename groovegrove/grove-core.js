@@ -7,6 +7,7 @@ import {tryVocalPhrase} from './voice-music.js?v=20261019-transfer';
 import {MusicalDisciplines} from './grove-disciplines.js?v=20261019-transfer';
 import {restoreVoiceprints} from './voiceprints.js';
 import {tryLearnerVocalPhrase} from './learner-vocals.js';
+import {JamArchive} from './jam-archive.js';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const rand=(a,b)=>a+(b-a)*Math.random();
@@ -64,6 +65,10 @@ export class Grove {
     this.voiceprints=restoreVoiceprints(saved?.voiceprints);
     this.space=new GroveWorld(saved?.space);
     this.disciplines=new MusicalDisciplines(saved?.disciplines);
+    this.archive=new JamArchive(saved?.archive);
+    // An in-progress jam cannot be called a complete recording after restart:
+    // its earlier note stream was not checkpointed as an open tape.
+    this.recordingResumingJam=!!saved&&saved.mode==='jam';
     for(const name of ['Pip','Riff']){
       const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
       if(book)(name==='Pip'?this.pip:this.riff).currentGoal='finishing '+LIBRARY_CATALOG[book.type].title;
@@ -92,12 +97,29 @@ export class Grove {
     riffHeldNotes:this.riffHeldNotes,riffLastHeldNote:this.riffLastHeldNote?{...this.riffLastHeldNote}:null,vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),
     voiceprints:Object.fromEntries(Object.entries(this.voiceprints).map(([name,profile])=>[name,{...profile}])),
     space:this.space.snapshot(),
-    disciplines:this.disciplines.snapshot(),logs:this.logs.slice(0,12)};}
+    disciplines:this.disciplines.snapshot(),archive:this.archive.snapshot(),logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
     this.beat=beat;this.bar=bar;
     this.space.advance(this,beatDur);
+    // Replay from the recording room goes to the sound bus, but cannot modify
+    // any living musician's practice, listening journal or motor development.
+    const liveOutput=audio;
+    this.archive.playDeck(t,liveOutput,this.space);
+    if(this.mode==='jam'&&!this.recordingResumingJam){
+      this.archive.begin(bar,t);
+      // Capture the very same note arguments sent to the renderer. An archive
+      // never reconstructs a groove from counters, stats or random seeds.
+      const capture=this.archive;
+      audio=Object.create(liveOutput);
+      for(const kind of ['guitar','violin','voice','kick','snare','hat']){
+        audio[kind]=(...args)=>{
+          capture.capture(kind,args,bar,this.space);
+          return liveOutput[kind]?.apply(liveOutput,args);
+        };
+      }
+    }
     const solo=this.mode==='solo';
     const singer=this.vocalist;
     // No random breakthrough countdown. Silence remains an independent choice.
@@ -430,10 +452,16 @@ export class Grove {
         this.disciplines.current('Riff')==='guitar' && this.space.distance('Pip','Riff')<260 &&
         !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.busy('Pip')&&!this.library.busy('Riff');
       if(!together){
+        this.recordingResumingJam=false;
+        this.archive.discard(); // an interrupted jam is not a completed tape
         this.mode='solo';this.modeBars=0;
         this.push('The jam falls quiet as the musicians move apart.');
       }else if(this.modeBars>=6 && Math.random()<.46){
         this.jams++;this.familiarity++;
+        const tape=this.recordingResumingJam?null:this.archive.finish(this.bar);
+        if(this.recordingResumingJam)this.archive.discard();
+        this.recordingResumingJam=false;
+        if(tape)this.push('The recording room archived jam '+tape.id+'.');
         this.exchange(this.riff,this.pip,'That groove was worth remembering.');
         this.pip.remember('Shared a jam with Riff; familiar grooves feel easier.');
         this.riff.remember('Pip adds playful offbeat accents.');
@@ -475,6 +503,8 @@ export class Grove {
       if(Math.random()<riffWillingness){
         this.exchange(this.riff,this.pip,'Let’s find out.');
         this.mode='jam';this.modeBars=0;
+        this.recordingResumingJam=false;
+        this.archive.begin(this.bar+1);
         this.pip.currentGoal='improvising with Riff';
         this.riff.currentGoal='responding to Pip’s rhythm';
       }else this.push('Riff listens, then returns to practicing chords.');

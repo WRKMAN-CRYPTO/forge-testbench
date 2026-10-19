@@ -71,7 +71,7 @@ export class MusicalDisciplines {
    }
    for(const id of INSTRUMENTS){
      const owner=MUSICIANS.find(n=>this.people[n].current===id)||null;
-     this.instruments[id]={id,owner,home:'studio'};
+     this.instruments[id]={id,owner,home:'instrumentRoom'};
    }
  }
  snapshot(){return {version:1,instruments:Object.fromEntries(INSTRUMENTS.map(id=>[id,{...this.instruments[id]}])),
@@ -132,7 +132,7 @@ export class MusicalDisciplines {
       grove.library?.busy(name)||bar-player.lastSwitch<24)return false;
    player.interest=id;player.lastDecision=bar;
    grove.space.people[name].lastChoice=bar;
-   grove.space.chooseDestination(name,'studio','wondering how '+id+' feels to play',bar);
+   grove.space.chooseDestination(name,'instrumentRoom','wondering how '+id+' feels to play',bar);
    grove.space.people[name].purpose=returnToVoice?'returning to their voice':
      takeBreak?'taking a break from instruments':'going to try '+id+' in the studio';
    grove.push(name+(returnToVoice?' wants to sing again.':
@@ -142,7 +142,7 @@ export class MusicalDisciplines {
  switchAtStudio(name,grove){
    const p=this.people[name],id=p?.interest;
    if(!id||(id!=='voice'&&id!=='none'&&!this.available(name,id)))return false;
-   if(!grove.space.at(name,'studio',105)||grove.space.traveling(name))return false;
+   if(!grove.space.at(name,'instrumentRoom',92)||grove.space.traveling(name))return false;
    const previous=p.current;
    if(INSTRUMENTS.includes(previous))this.instruments[previous].owner=null;
    if(INSTRUMENTS.includes(id))this.instruments[id].owner=name;
@@ -154,6 +154,10 @@ export class MusicalDisciplines {
    grove.space.people[name].lastChoice=grove.bar;
    grove.space.people[name].purpose='experimenting with '+id+' at the studio';
    if(name==='Murmur')grove.space.people.Murmur.ensembleIntent='solo';
+   // After borrowing an instrument, head to the existing practice room.
+   // This is movement, not a training bonus or a forced musical performance.
+   if(INSTRUMENTS.includes(id))
+     grove.space.chooseDestination(name,'studio','trying '+id+' in the practice room',grove.bar);
    p.discoveries.unshift({bar:grove.bar,instrument:id,from:previous});
    p.discoveries.length=Math.min(20,p.discoveries.length);
    grove.push(name+(id==='voice'?' puts down '+previous+' and returns to singing.':
@@ -168,16 +172,16 @@ export class MusicalDisciplines {
      if(p.interest){
        if(INSTRUMENTS.includes(p.interest)&&!this.available(name,p.interest)){
          p.interest=null;person.purpose='the instrument is in use';
-       }else if(person.destination!=='studio' && !grove.library.busy(name))
-         grove.space.chooseDestination(name,'studio','going to try '+p.interest,bar);
+       }else if(person.destination!=='instrumentRoom' && !grove.library.busy(name))
+         grove.space.chooseDestination(name,'instrumentRoom','going to try '+p.interest,bar);
        if(p.interest)this.switchAtStudio(name,grove);
        continue;
      }
      if(grove.library.busy(name)||grove.space.traveling(name)||
         bar-p.lastSwitch<24||bar-p.lastDecision<12)continue;
-     // Instrument choice arises from physically visiting the studio, or
+     // Instrument choice arises from physically visiting the instrument room, or
      // following an actually heard violin back to its home.
-     const inStudio=grove.space.at(name,'studio',112);
+     const inStudio=grove.space.at(name,'instrumentRoom',95);
      const heard=person.lastHeardViolin;
      const heardViolin=heard&&bar-heard.bar<4 &&
        grove.space.canHear(name,heard.from,'violin')>.06;

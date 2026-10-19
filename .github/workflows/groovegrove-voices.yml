@@ -26,5 +26,7 @@ jobs:
           node --check voiceprints.js
           node --check server/index.mjs
           node --check live-note-conductor.js
+          node --check jam-archive.js
+          node --check grove-world.js
       - name: Validate persistent musical memories, full canvas and live speech
         run: node --test tests/*.test.mjs

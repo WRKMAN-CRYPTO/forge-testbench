@@ -17,7 +17,7 @@ const publicAssets=new Map([
   ['/','index.html'],['/index.html','index.html'],
   ...['grove-core.js','grove-world.js','grove-disciplines.js',
       'music-library.js','listening-journal.js','voice-journal.js',
-      'voice-music.js','voiceprints.js','learner-vocals.js',
+      'voice-music.js','voiceprints.js','learner-vocals.js','jam-archive.js',
       'live-note-conductor.js','server-config.js']
      .map(name=>['/'+name,name])
 ]);
@@ -60,11 +60,13 @@ function capture(kind,args){
  const time=pitched?b:a;
  const candidate=pitched?(kind==='guitar'?expression:meta):c;
  const fallback=kind==='voice'?'Murmur':kind==='guitar'?'Riff':'Pip';
- const source=['Pip','Riff','Murmur'].includes(candidate?.player)?candidate.player:fallback;
- const position=world.space?.people[source]||null;
+ const fromTape=candidate?.player==='Recording';
+ const source=fromTape?'Recording':['Pip','Riff','Murmur'].includes(candidate?.player)?candidate.player:fallback;
+ const position=fromTape?{x:1310,y:310}:world.space?.people[source]||null;
  const ev={seq:nextSeq++,kind,atMs:Math.round(time*1000),
   bar:world.bar,beat:world.beat,x:position?Math.round(position.x):null,y:position?Math.round(position.y):null};
  ev.source=source;
+ if(fromTape)ev.archivedPlayback=true;
  if(pitched){ev.freq=a;ev.volume=c;ev.duration=d;}
  else ev.volume=b;
  if(kind==='voice'){
