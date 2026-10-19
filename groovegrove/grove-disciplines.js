@@ -154,6 +154,10 @@ export class MusicalDisciplines {
    grove.space.people[name].lastChoice=grove.bar;
    grove.space.people[name].purpose='experimenting with '+id+' at the studio';
    if(name==='Murmur')grove.space.people.Murmur.ensembleIntent='solo';
+   // After borrowing an instrument, head to the existing practice room.
+   // This is movement, not a training bonus or a forced musical performance.
+   if(INSTRUMENTS.includes(id))
+     grove.space.chooseDestination(name,'studio','trying '+id+' in the practice room',grove.bar);
    p.discoveries.unshift({bar:grove.bar,instrument:id,from:previous});
    p.discoveries.length=Math.min(20,p.discoveries.length);
    grove.push(name+(id==='voice'?' puts down '+previous+' and returns to singing.':
