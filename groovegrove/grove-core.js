@@ -3,7 +3,7 @@ import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261019-transf
 import {ListeningJournal} from './listening-journal.js';
 import {GroveWorld} from './grove-world.js?v=20261019-transfer';
 import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
-import {tryVocalPhrase} from './voice-music.js?v=20261019-transfer';
+import {tryVocalPhrase} from './voice-music.js?v=20261019-triojams';
 import {MusicalDisciplines} from './grove-disciplines.js?v=20261019-transfer';
 import {restoreVoiceprints} from './voiceprints.js';
 import {tryLearnerVocalPhrase} from './learner-vocals.js';
