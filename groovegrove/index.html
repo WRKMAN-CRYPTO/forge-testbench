@@ -18,7 +18,7 @@
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
 import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261019-transfer';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
-import { Grove } from './grove-core.js?v=20261019-triojams';
+import { Grove } from './grove-core.js?v=20261020-pitch-ear';
 import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261019-transfer';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
 import { LiveNoteConductor } from './live-note-conductor.js?v=20261019-disciplines';
@@ -1251,6 +1251,14 @@ function refreshText(){
           (i===0?'No experiments yet. Listening continues...':'');
       });
       ui.journalFoot.text='Overlap measures nearby attacks; it does not measure musical taste.';
+    }
+    // Observational only: the musician's ear never edits what they play.
+    const ear=grove.pitchMemory?.report(journalName);
+    if(ear&&ui.journalFoot){
+      const repeated=ear.newest;
+      const summary='EAR: '+ear.shapes+' remembered shapes · '+ear.recurring+' recurring';
+      const origin=repeated?' · last from '+repeated.from+' at bar '+repeated.lastBar:'';
+      ui.journalFoot.text=summary+origin;
     }
     for(const name of ['Pip','Riff','Murmur']){
       const selector=ui.journalSelectors?.[name];
