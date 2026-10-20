@@ -539,6 +539,3 @@ export class Grove {
     }
   }
 }
-  }
-}
-
