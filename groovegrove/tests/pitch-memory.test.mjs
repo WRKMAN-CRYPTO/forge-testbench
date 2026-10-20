@@ -115,6 +115,9 @@ test('Passive observation does not affect simulation decisions, sound, books, ja
  const saved=new Grove().snapshot();
  const observing=new Grove(saved),control=new Grove(saved);
  control.space.onPitchedNote=null;
+ // The existing listening journal captures its RNG at construction time.
+ // Both worlds must have the same deterministic experiment decisions.
+ observing.understanding.random=()=>.37;control.understanding.random=()=>.37;
  // Disable travel only to isolate sound observations, not musician choices.
  observing.space.decide=()=>{};control.space.decide=()=>{};
  observing.disciplines.decide=()=>{};control.disciplines.decide=()=>{};
