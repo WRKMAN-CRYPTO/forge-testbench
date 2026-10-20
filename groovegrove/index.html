@@ -1110,7 +1110,10 @@ function makeCameraControls(hud){
     const caption=textAt(hud,label,bx+width/2,y+10,landscape?12:10,PALETTE.cream,'bold',.6,.5);
     ui.cameraButtons[value]={g,caption};
   }
-  ui.cameraHint=textAt(hud,'SWIPE THE WOODLAND TO EXPLORE',x+barW/2,y+38,landscape?11:9,PALETTE.muted,'bold',.65,.5);
+  ui.cameraHint=textAt(hud,'SWIPE THE WOODLAND TO EXPLORE',x+barW/2,y+38,landscape?11:10,PALETTE.muted,'bold',.5,.5);
+  ui.cameraHint.style.align='center';
+  ui.cameraHint.style.wordWrap=true;
+  ui.cameraHint.style.wordWrapWidth=barW-8;
 }
 
 function buildCanvas(){
@@ -1176,12 +1179,29 @@ function refreshText(){
     button.caption.alpha=active?1:.63;
     button.g.alpha=active?1:.76;
   }
-  if(ui.cameraHint)ui.cameraHint.text=camera.mode==='free'?'FREE CAMERA · TAP A MUSICIAN TO FOLLOW':
-    camera.mode==='place'?'VIEWING '+PLACES[camera.target].label+' · SWIPE TO EXPLORE':
-    'FOLLOWING '+camera.target.toUpperCase()+
-      (camera.target==='Murmur'&&
-        ((remoteLive&&liveLocations?.Murmur)||grove.space?.people.Murmur)?.ensembleIntent==='joining'
-        ?' · JOINING THE MUSIC':'')+' · SWIPE TO EXPLORE';
+  if(ui.cameraHint){
+    if(camera.mode==='free')ui.cameraHint.text='FREE CAMERA · TAP A MUSICIAN TO FOLLOW';
+    else if(camera.mode==='place')
+      ui.cameraHint.text='VIEWING '+PLACES[camera.target].label+' · SWIPE TO EXPLORE';
+    else{
+      // A tiny live status replaces the retired bottom-panel telemetry.
+      // Prefer the server's per-person location packet; fall back to the last
+      // authoritative world snapshot during brief network interruptions.
+      const name=camera.target;
+      const person=(remoteLive&&liveLocations?.[name])||grove.space?.people[name]||{};
+      const held=(remoteLive&&liveLocations?.[name]?.instrument)||
+        grove.disciplines?.current(name)||'none';
+      const committed=grove.mode==='jam'&&grove.jamParticipants?.includes(name);
+      const state=committed?'JAMMING':
+        person.traveling||person.route?.length?'TRAVELING':
+        person.ensembleIntent==='joining'?'JOINING':
+        held==='none'?'LISTENING':'EXPLORING';
+      const activity=String(person.purpose||person.destination||'following their musical curiosity')
+        .replace(/\s+/g,' ').slice(0,54);
+      ui.cameraHint.text=name.toUpperCase()+' · '+held.toUpperCase()+' · '+state+
+        '\n'+activity;
+    }
+  }
   if(ui.deliveryTray)ui.deliveryTray.visible=deliveryOpen && !journalOpen;
   for(const [category,page] of Object.entries(ui.deliveryPages||{}))
     page.visible=category===deliveryCategory;
