@@ -131,7 +131,7 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
       release:willSustain&&i===length-1?.3:phrased?.16:.08
     };
     if(typeof audio.voice==='function')audio.voice(pitch,at,strength,duration,expression);
-    space.sound('Murmur','voice',bar,strength*4,pitch);
+    space.sound('Murmur','voice',bar,strength*4,pitch,at);
     if(onNote)onNote({agent:'Murmur',time:at,beat:0});
   }
   singer.lastPitch=pitches[pitches.length-1];
