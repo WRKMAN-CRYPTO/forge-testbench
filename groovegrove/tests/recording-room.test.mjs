@@ -36,7 +36,7 @@ test('Only the instrument room allows physical instrument switches',()=>{
 
 test('A completed jam archive contains real notes with original timing',()=>{
  const g=new Grove(),out=sounds();
- g.mode='jam';g.modeBars=5;
+ g.mode='jam';g.modeBars=5;g.jamParticipants=['Pip','Riff'];
  const before=g.snapshot();
  assert.equal(before.archive.recordings.length,0);
  const original=Math.random;Math.random=()=>0;
