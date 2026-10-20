@@ -15,8 +15,7 @@ import {JamArchive} from './jam-archive.js';
  * Listening near one another alone is not an invitation.
  */
 const MUSICIANS=Object.freeze(['Pip','Riff','Murmur']);
-const clamp=(n,a,b)=>Math.min(b,Math.max(a,n));
-export const curiosity=(grove,name)=>name==='Pip'?grove.pip.curiosity:
+const curiosity=(grove,name)=>name==='Pip'?grove.pip.curiosity:
   name==='Riff'?grove.riff.curiosity:grove.vocalist.curiosity;
 function available(grove,name){
  return MUSICIANS.includes(name)&&grove.space.people[name]&&
