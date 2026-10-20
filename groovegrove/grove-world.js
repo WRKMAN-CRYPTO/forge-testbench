@@ -157,9 +157,19 @@ export class GroveWorld {
     const d=distance(a,b);
     return clamp((range-d)/range,0,1);
   }
-  sound(source,kind,bar,velocity=1,pitch=null){
+  hearPitched(source,kind,bar,velocity,pitch,at){
+    if(typeof this.onPitchedNote!=='function'||!this.people[source]||
+       !['guitar','voice','violin'].includes(kind)||!Number.isFinite(pitch))return;
+    this.onPitchedNote({listener:source,source,kind,bar,at,pitch});
+    for(const name of NAMES){
+      if(name===source||this.canHear(name,source,kind)*velocity<.05)continue;
+      this.onPitchedNote({listener:name,source,kind,bar,at,pitch});
+    }
+  }
+  sound(source,kind,bar,velocity=1,pitch=null,at=null){
     const p=this.people[source];if(!p)return;
     p.soundBar=bar;
+    this.hearPitched(source,kind,bar,velocity,pitch,at);
     for(const name of NAMES){
       if(name===source)continue;
       const intensity=this.canHear(name,source,kind)*velocity;

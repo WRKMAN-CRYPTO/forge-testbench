@@ -1,13 +1,14 @@
 /* GrooveGrove shared simulation. Same classes in server + client. */
 import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261019-transfer';
 import {ListeningJournal} from './listening-journal.js';
-import {GroveWorld} from './grove-world.js?v=20261019-transfer';
+import {GroveWorld} from './grove-world.js?v=20261020-pitch-ear';
 import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
-import {tryVocalPhrase} from './voice-music.js?v=20261019-triojams';
-import {MusicalDisciplines} from './grove-disciplines.js?v=20261019-transfer';
+import {tryVocalPhrase} from './voice-music.js?v=20261020-pitch-ear';
+import {MusicalDisciplines} from './grove-disciplines.js?v=20261020-pitch-ear';
 import {restoreVoiceprints} from './voiceprints.js';
-import {tryLearnerVocalPhrase} from './learner-vocals.js';
+import {tryLearnerVocalPhrase} from './learner-vocals.js?v=20261020-pitch-ear';
 import {JamArchive} from './jam-archive.js';
+import {PitchMemory} from './pitch-memory.js';
 
 /*
  * A jam belongs to musicians who consent to play together, never to a fixed
@@ -126,6 +127,8 @@ export class Grove {
     this.voiceJournal=new VoiceJournal(saved?.voiceJournal);
     this.voiceprints=restoreVoiceprints(saved?.voiceprints);
     this.space=new GroveWorld(saved?.space);
+    this.pitchMemory=new PitchMemory(saved?.pitchMemory);
+    this.space.onPitchedNote=note=>this.pitchMemory.enqueue(note);
     this.disciplines=new MusicalDisciplines(saved?.disciplines);
     this.archive=new JamArchive(saved?.archive);
     // An in-progress jam cannot be called a complete recording after restart:
@@ -165,6 +168,7 @@ export class Grove {
     voiceprints:Object.fromEntries(Object.entries(this.voiceprints).map(([name,profile])=>[name,{...profile}])),
     space:this.space.snapshot(),
     disciplines:this.disciplines.snapshot(),archive:this.archive.snapshot(),
+    pitchMemory:this.pitchMemory.snapshot(),
     jamParticipants:[...this.jamParticipants],logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
@@ -279,7 +283,7 @@ export class Grove {
         riffSoundedThisBeat=true;
         audio.guitar(freq,at,volume,duration);
         this.disciplines.record('Riff','guitar',{bar,pitch:freq,duration});
-        this.space.sound('Riff','guitar',bar,volume,freq);
+        this.space.sound('Riff','guitar',bar,volume,freq,at);
         this.understanding.hear({who:'Riff',kind:'guitar',time:at,bar,beat,velocity:volume,offsetMs:riffOffset,extra,pitch:freq});
       },
       kick:(at,volume,extra=false)=>{
@@ -478,6 +482,9 @@ export class Grove {
       if(pipActive)this.onNote({agent:'Pip',time:drumOnset,beat,delta:drumOffset-riffOffset});
       if(riffSoundedThisBeat)this.onNote({agent:'Riff',time:guitarOnset,beat,delta:riffOffset});
     }
+    // Some independently scheduled voice phrases span future beats. Delay
+    // analysis so notes are processed in actual onset order, not call order.
+    this.pitchMemory.flush(t-4);
   }
   finishBar(){
     const findings=this.understanding.finishBar(this.bar);

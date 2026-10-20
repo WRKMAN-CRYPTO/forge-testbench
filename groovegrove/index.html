@@ -18,7 +18,7 @@
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
 import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261019-transfer';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
-import { Grove } from './grove-core.js?v=20261019-triojams';
+import { Grove } from './grove-core.js?v=20261020-pitch-ear';
 import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261019-transfer';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
 import { LiveNoteConductor } from './live-note-conductor.js?v=20261019-disciplines';
@@ -966,7 +966,9 @@ function makeJournalViewer(world){
     field.style.wordWrap=true;field.style.wordWrapWidth=bw-44;
     ui.journalRows.push(field);
   }
-  const foot=textAt(overlay,'Overlap measures nearby attacks; it does not measure musical taste.',bx+20,by+bh-58,landscape?12:10,PALETTE.muted);
+  ui.pitchEarInfo=textAt(overlay,'',bx+20,by+bh-64,10,PALETTE.mint);
+  ui.pitchEarInfo.style.wordWrap=true;ui.pitchEarInfo.style.wordWrapWidth=bw-40;
+  const foot=textAt(overlay,'Overlap measures nearby attacks; it does not measure musical taste.',bx+20,by+bh-44,landscape?10:9,PALETTE.muted);
   ui.journalFoot=foot;
   foot.style.wordWrap=true;foot.style.wordWrapWidth=bw-40;
   textAt(overlay,'Tap outside to return to the music',bx+bw/2,by+bh-25,landscape?12:10,PALETTE.gold,'normal',0,.5);
@@ -1251,6 +1253,14 @@ function refreshText(){
           (i===0?'No experiments yet. Listening continues...':'');
       });
       ui.journalFoot.text='Overlap measures nearby attacks; it does not measure musical taste.';
+    }
+    // Observational only: the musician's ear never edits what they play.
+    const ear=grove.pitchMemory?.report(journalName);
+    if(ui.pitchEarInfo){
+      ui.pitchEarInfo.text=ear?
+        'PITCH EAR · '+ear.shapes+' shapes · '+ear.recurring+' recurring'+
+        (ear.newest?' · last: '+ear.newest.from:''):
+        'PITCH EAR · awaiting audible notes';
     }
     for(const name of ['Pip','Riff','Murmur']){
       const selector=ui.journalSelectors?.[name];

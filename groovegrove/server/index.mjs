@@ -17,7 +17,7 @@ const publicAssets=new Map([
   ['/','index.html'],['/index.html','index.html'],
   ...['grove-core.js','grove-world.js','grove-disciplines.js',
       'music-library.js','listening-journal.js','voice-journal.js',
-      'voice-music.js','voiceprints.js','learner-vocals.js','jam-archive.js',
+      'voice-music.js','voiceprints.js','learner-vocals.js','jam-archive.js','pitch-memory.js',
       'live-note-conductor.js','server-config.js']
      .map(name=>['/'+name,name])
 ]);

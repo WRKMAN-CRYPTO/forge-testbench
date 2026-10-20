@@ -74,7 +74,7 @@ export function tryLearnerVocalPhrase({name,grove,bar,time,audio}){
     audio.voice(pitch,at,.12+Math.random()*.05,duration,expression,{player:name});
     grove.disciplines.record(name,'voice',{bar,pitch,duration,
       articulation:steps.length>1?'exploratory vocal phrase':'uncertain hum'});
-    grove.space.sound(name,'voice',bar,.72,pitch);
+    grove.space.sound(name,'voice',bar,.72,pitch,at);
     if(grove.onNote)grove.onNote({agent:name,time:at,beat:0});
     pitches.push(pitch);
     state.notes++;state.lastPitch=pitch;state.lastNoteBar=bar;
