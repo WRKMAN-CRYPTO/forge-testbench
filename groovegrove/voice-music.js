@@ -20,7 +20,7 @@ const nearestRoot=p=>{
 };
 const readable=v=>VOICES.includes(v)?v:'m';
 export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
-                                audio,journal,onNote,playing=null,transfer=null}){
+                                audio,journal,onNote,playing=null,transfer=null,ensemble=null}){
   if(singer.stage!=='humming'||library.busy('Murmur')||
      bar-singer.lastAttemptBar<2){
     singer.rests++;return false;
@@ -31,16 +31,25 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   const guitar=musician.lastHeardGuitar;
   const drums=musician.lastHeardDrum;
   const violin=musician.lastHeardViolin;
+  const voice=musician.lastHeardVoice;
   const riffNearby=!!(guitar&&bar-guitar.bar<=3&&
     space.canHear('Murmur',guitar.from,'guitar')>.12);
   const pipNearby=!!(drums&&bar-drums.bar<=3&&
     space.canHear('Murmur',drums.from,drums.kind)>.1);
   const violinNearby=!!(violin&&bar-violin.bar<=3&&
     space.canHear('Murmur',violin.from,'violin')>.1);
-  const present=musician.ensembleIntent==='joining'&&!space.traveling('Murmur')&&
-    ((riffNearby&&(playing?.[guitar.from]??true))||
-      (pipNearby&&(playing?.[drums.from]??true))||
-      (violinNearby&&(playing?.[violin.from]??true)));
+  const voiceNearby=!!(voice&&voice.from!=='Murmur'&&bar-voice.bar<=3&&
+    space.canHear('Murmur',voice.from,'voice')>.09);
+  const jamPartners=Array.isArray(ensemble)&&ensemble.includes('Murmur')&&
+    ensemble.some(name=>name!=='Murmur'&&space.distance('Murmur',name)<270&&
+      !space.traveling(name));
+  const present=!space.traveling('Murmur')&&(
+    (jamPartners&&(voiceNearby||riffNearby||pipNearby||violinNearby))||
+    (musician.ensembleIntent==='joining'&&
+      ((riffNearby&&(playing?.[guitar.from]??true))||
+       (pipNearby&&(playing?.[drums.from]??true))||
+       (violinNearby&&(playing?.[violin.from]??true))||
+       (voiceNearby&&(playing?.[voice.from]??true)))));
   // An invitation changes willingness, never guarantees a performance.
   // Away from the group, Murmur still enjoys solitary experimentation.
   const bookIdeas=['vowelShapes','breathPhrasing','melodicContours']
@@ -49,7 +58,7 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   const transferredRhythm=clamp(transfer?.rhythm||0,0,1);
   const transferredMelody=clamp(transfer?.melody||0,0,1);
   const desire=clamp(.19*singer.curiosity+.012*bookIdeas+
-    (present?.28:(riffNearby||pipNearby||violinNearby)?.045:0)+
+    (present?.28:(riffNearby||pipNearby||violinNearby||voiceNearby)?.045:0)+
     (has('partnerListening')&&present?.045:0),0,.66);
   const deliberatePause=has('deliberateSpace')&&bar%4===1 &&
     musician.ensembleIntent==='listening'&&Math.random()<.34;
@@ -79,7 +88,8 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   // Any audible pitched player can inspire the sung note, including Pip
   // on violin. Beats come from whoever is actually playing the drums.
   const pitchedInspiration=[
-    ...(riffNearby?[guitar]:[]),...(violinNearby?[violin]:[])
+    ...(riffNearby?[guitar]:[]),...(violinNearby?[violin]:[]),
+    ...(voiceNearby?[voice]:[])
   ].sort((a,b)=>b.bar-a.bar);
   const rhythmicInspiration=pipNearby?drums:null;
   const response=present&&Math.random()<(has('callResponse')?.93:.83)

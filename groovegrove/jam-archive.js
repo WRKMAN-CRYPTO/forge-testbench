@@ -53,7 +53,7 @@ export class JamArchive{
   if(!this.active)this.active={startBar:bar,firstAt:null,events:[]};
   if(this.active.firstAt==null&&valid(time))this.active.firstAt=time;
  }
- capture(kind,args,bar,space){
+ capture(kind,args,bar,space,members=null){
   const session=this.active;
   if(!session||!KINDS.includes(kind)||session.events.length>=MAX_EVENTS)return;
   const pitched=['guitar','voice','violin'].includes(kind);
@@ -61,7 +61,8 @@ export class JamArchive{
   const meta=pitched?(kind==='voice'||kind==='violin'?args[5]:args[4]):args[2];
   const source=MUSICIANS.includes(meta?.player)?meta.player:
     kind==='voice'?'Murmur':kind==='guitar'?'Riff':'Pip';
-  if(source==='Murmur'&&space&&space.distance('Murmur','Pip')>410&&
+  if(Array.isArray(members)&&members.length>=2&&!members.includes(source))return;
+  if(!Array.isArray(members)&&source==='Murmur'&&space&&space.distance('Murmur','Pip')>410&&
     space.distance('Murmur','Riff')>410)return;
   if(!valid(at)||at<0)return;
   if(session.firstAt==null)session.firstAt=at;
