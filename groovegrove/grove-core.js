@@ -134,7 +134,7 @@ export class Grove {
     // A voluntary jam is a musician-level commitment, not a drum/guitar role.
     // Old saved jam state keeps its legacy pair until that interrupted session ends.
     this.jamParticipants=this.mode==='jam'?
-      [...new Set((Array.isArray(saved?.jamParticipants)?
+      [...new Set((Array.isArray(saved?.jamParticipants)&&saved.jamParticipants.length?
         saved.jamParticipants:['Pip','Riff']).filter(n=>MUSICIANS.includes(n)))]:[];
     for(const name of ['Pip','Riff']){
       const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
