@@ -18,6 +18,8 @@ function withRoll(roll,fn){
 }
 test('All three voices can independently consent to one recorded jam',()=>{
  const grove=allVocal();
+ // Freeze navigation only in this deterministic musical performance test.
+ grove.space.decide=()=>{};grove.disciplines.decide=()=>{};
  withRoll(0,()=>{
    grove.modeBars=4;grove.considerNewActivity(null);
    assert.equal(grove.mode,'jam');
