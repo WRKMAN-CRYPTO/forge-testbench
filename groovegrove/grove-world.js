@@ -157,22 +157,23 @@ export class GroveWorld {
     const d=distance(a,b);
     return clamp((range-d)/range,0,1);
   }
+  hearPitched(source,kind,bar,velocity,pitch,at){
+    if(typeof this.onPitchedNote!=='function'||!this.people[source]||
+       !['guitar','voice','violin'].includes(kind)||!Number.isFinite(pitch))return;
+    this.onPitchedNote({listener:source,source,kind,bar,at,pitch});
+    for(const name of NAMES){
+      if(name===source||this.canHear(name,source,kind)*velocity<.05)continue;
+      this.onPitchedNote({listener:name,source,kind,bar,at,pitch});
+    }
+  }
   sound(source,kind,bar,velocity=1,pitch=null,at=null){
     const p=this.people[source];if(!p)return;
     p.soundBar=bar;
-    // Independent passive ear receives only genuinely scheduled pitched notes.
-    // Drums, room playback and speech captions are not pitched note evidence.
-    if(typeof this.onPitchedNote==='function'&&Number.isFinite(pitch)&&
-       ['guitar','voice','violin'].includes(kind)){
-      this.onPitchedNote({listener:source,source,kind,bar,at,pitch});
-    }
+    this.hearPitched(source,kind,bar,velocity,pitch,at);
     for(const name of NAMES){
       if(name===source)continue;
       const intensity=this.canHear(name,source,kind)*velocity;
       if(intensity<.05)continue;
-      if(typeof this.onPitchedNote==='function'&&Number.isFinite(pitch)&&
-         ['guitar','voice','violin'].includes(kind))
-        this.onPitchedNote({listener:name,source,kind,bar,at,pitch});
       const listener=this.people[name];
       listener.heard++;
       listener.lastHeard={from:source,kind,bar,strength:Math.round(intensity*100)/100,
