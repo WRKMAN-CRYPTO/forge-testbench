@@ -353,7 +353,7 @@ export class MusicalDisciplines {
          (longBow&&(skills.has('vowelShapes')||pitchKnowledge>.5)&&Math.random()<.45)
            ?.0025+Math.random()*.003:0};
        audio.violin(pitch,time,volume,duration,expression,{player:name});
-       grove.space.sound(name,'violin',bar,volume*2.75,pitch);
+       grove.space.sound(name,'violin',bar,volume*2.75,pitch,time);
        this.record(name,'violin',{bar,pitch,duration,articulation});
        if(grove.onNote)grove.onNote({agent:name,time,beat});
        p.bowUntilBeat=index+Math.max(1,Math.ceil(duration/beatDur));
@@ -369,7 +369,7 @@ export class MusicalDisciplines {
          audio.violin(nextPitch,secondAt,volume*.76,secondDuration,
            {...expression,pressure:clamp(pressure*.83,.22,.78)},
            {player:name});
-         grove.space.sound(name,'violin',bar,volume*2,nextPitch);
+         grove.space.sound(name,'violin',bar,volume*2,nextPitch,secondAt);
          this.record(name,'violin',{bar,pitch:nextPitch,duration:secondDuration,
            articulation:'rhythmic second bow stroke'});
          p.bowUntilBeat=Math.max(p.bowUntilBeat,index+1);
@@ -428,7 +428,7 @@ export class MusicalDisciplines {
          const at=time+i*.026;
          const volume=(offbeat?.27:.34)*(i>0?.72:1);
          audio.guitar?.(pitch,at,volume,duration,{player:name});
-         grove.space.sound(name,'guitar',bar,volume,pitch);
+         grove.space.sound(name,'guitar',bar,volume,pitch,at);
          this.record(name,'guitar',{bar,pitch,duration,
            articulation:canChord?'learned chord voicing':hold?'held melodic note':
              offbeat?'syncopated guitar note':'picked guitar note'});
@@ -440,6 +440,9 @@ export class MusicalDisciplines {
          const next=skills.has('walkingBass')?candidate*.5:candidate*2;
          const at=time+beatDur*.48;
          audio.guitar?.(next,at,.19,.2,{player:name});
+         // This genuine extra note used to bypass GroveWorld.sound; observe
+         // its pitch without changing the established hearing/behavior rules.
+         grove.space.hearPitched(name,'guitar',bar,.19,next,at);
          this.record(name,'guitar',{bar,pitch:next,duration:.2,
            articulation:skills.has('walkingBass')?'walking bass step':'answer'});
        }
