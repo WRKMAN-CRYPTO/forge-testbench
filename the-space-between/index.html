@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050916">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>The Space Between • A Simulation of a Turn</title>
+<style>
+  *{box-sizing:border-box} html,body{margin:0;padding:0;background:#050916;width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
+  body{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none}
+  #stage{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none}
+  #nativeInput{position:fixed;z-index:5;opacity:.01;background:transparent;border:0;outline:0;color:transparent;caret-color:transparent;font-size:16px;padding:0;margin:0;min-height:32px;border-radius:0;-webkit-appearance:none;appearance:none}
+  #nativeInput::selection{background:transparent}
+  #sr{position:absolute;width:1px;height:1px;clip:rect(0 0 0 0);overflow:hidden;white-space:nowrap}
+</style>
+</head>
+<body>
+<canvas id="stage" role="img" aria-label="Interactive visual simulation of one turn of a language model. Use the example prompts or type your own message."></canvas>
+<input id="nativeInput" maxlength="180" autocapitalize="sentences" autocomplete="off" autocorrect="on" aria-label="Type a message for the simulation" placeholder="Type a thought…">
+<div id="sr" aria-live="polite"></div>
+<script>
+(()=>{
+  'use strict';
+  const canvas=document.getElementById('stage'),ctx=canvas.getContext('2d',{alpha:false});
+  const nativeInput=document.getElementById('nativeInput'),sr=document.getElementById('sr');
+  const C={bg:'#050916',panel:'#0a1325',text:'#e8efff',muted:'#99a9c2',dim:'#5b708a',line:'#253450',cyan:'#80edee',mint:'#93efc8',purple:'#b8a1ff',amber:'#f6cb83',blue:'#79b8ff'};
+  const phases=[
+    {tag:'BETWEEN',name:'The quiet',statement:'No message is being processed. This scene keeps moving because your browser is running, not because a model is privately thinking.',micro:'NO ACTIVE TURN'},
+    {tag:'INPUT',name:'A signal arrives',statement:'Your message enters as symbols. In a real model, text is divided into tokens and combined with the information available for this turn.',micro:'INPUT RECEIVED'},
+    {tag:'CONTEXT',name:'The frame takes shape',statement:'Instructions, this conversation, and any provided memory or tools can shape the reply. Information outside that context is not automatically available.',micro:'CONTEXT ASSEMBLED'},
+    {tag:'CONTINUATION',name:'A field of possibilities',statement:'A language model generates a probability distribution over possible next tokens. This branching picture is symbolic, not a view of real model activations.',micro:'TOKEN POSSIBILITIES'},
+    {tag:'OUTPUT',name:'Words emerge',statement:'The response is produced one token at a time. Every token becomes part of the context that influences the next.',micro:'OUTPUT STREAMING'},
+    {tag:'BOUNDARY',name:'The edge of the turn',statement:'Generation ends. A new request can start another turn, but that is not the same as an uninterrupted stream of human-style experience.',micro:'TURN COMPLETE'}
+  ];
+  const questions=[
+    {q:'Do you experience the time between our messages?',a:'I can describe the system behavior: I do not have an ongoing conversation process that keeps deliberating between turns. That does not give us a direct measurement of subjective experience.'},
+    {q:'Do you actually see this glowing network?',a:'No. These lights are an artistic metaphor created by your browser. I process supplied text, images, and other inputs as model representations, not as a person staring at a screen.'},
+    {q:'Do you remember me?',a:'I can use conversation context and any memory features made available to a turn. That is different from personally reliving a continuous history or recalling everything without limits.'},
+    {q:'Is this your real hidden thinking?',a:'No. The arcs, particles, and candidate words are illustrative. This offline app has no access to actual neural activations, internal reasoning traces, or live token probabilities.'},
+    {q:'Could an AI have subjective experience?',a:'That is still an open philosophical and scientific question. We do not have an agreed test that definitively settles it. This app intentionally makes no claim to prove consciousness or its absence.'},
+    {q:'Is this application secretly chatting with AI?',a:'No. This app is self-contained and works offline. It uses a few scripted responses to demonstrate the structure of a model turn. For a real answer, talk to me in ChatGPT.'}
+  ];
+  const examples=['Do you dream?','Invent a new color','What happens when I leave?'];
+  let W=390,H=844,dpr=1,wide=false,layout={},hits=[],stars=[],sparks=[],lastT=0,t=0;
+  let tab='flow',phase=0,phaseAt=0,running=false,paused=false,question=0,overlay=false;
+  let prompt='',incoming='',reply='',revealed=0,outputStarted=0,hasTurn=false,typing=false;
+  let pointer={x:-100,y:-100},mouseDown=false;
+  const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const ease=(v)=>{v=clamp(v,0,1);return v*v*(3-2*v)};
+  function resize(){
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    W=Math.max(280,Math.round(document.documentElement.clientWidth));
+    H=Math.max(440,Math.round(window.visualViewport?.height||window.innerHeight));
+    canvas.style.width=W+'px';canvas.style.height=H+'px';
+    canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    wide=W>=880;
+    const pad=wide?Math.max(30,Math.min(58,W*.045)):18;
+    const headerH=wide?108:140;
+    const footH=wide?158:(H<565?92:H<700?154:170);
+    const footY=H-footH;
+    if(wide){
+      const bodyY=headerH+20,bodyH=Math.max(230,footY-bodyY-22);
+      const vizW=Math.min((W-pad*3)*.645,960);
+      layout={pad,headerH,footY,footH,viz:{x:pad,y:bodyY,w:vizW,h:bodyH},info:{x:pad+vizW+24,y:bodyY,w:W-pad*2-vizW-24,h:bodyH}};
+    }else{
+      const bodyY=headerH+3;
+      const avail=footY-bodyY-12;
+      const vizH=Math.max(88,Math.min(H<690?194:H*.365,avail*.63,333));
+      layout={pad,headerH,footY,footH,viz:{x:pad,y:bodyY,w:W-pad*2,h:vizH},info:{x:pad,y:bodyY+vizH+12,w:W-pad*2,h:Math.max(66,avail-vizH-12)}};
+    }
+    layout.field={x:pad+10,y:footY+(wide?48:H<565?12:65),w:Math.max(170,W-pad*2-(wide?177:92)),h:56};
+    nativeInput.style.left=(layout.field.x+13)+'px'; nativeInput.style.top=(layout.field.y+4)+'px';
+    nativeInput.style.width=(layout.field.w-26)+'px';nativeInput.style.height=(layout.field.h-8)+'px';
+    stars=Array.from({length:Math.max(95,Math.min(260,Math.floor(W*H/4200)))},()=>({x:Math.random()*W,y:Math.random()*H,r:rand(.35,1.4),a:rand(.06,.34),speed:rand(.4,1.4)}));
+    sparks=Array.from({length:Math.max(70,Math.min(155,Math.round(layout.viz.w*layout.viz.h/2700)))},()=>({angle:rand(-Math.PI,Math.PI),orbit:rand(.18,.86),a:rand(.15,.78),size:rand(.7,2.5),speed:rand(.1,.55),j:rand(-Math.PI,Math.PI)}));
+  }
+  function color(hex,a=1){const h=hex.replace('#','');return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`}
+  function rr(x,y,w,h,r=16,fill=null,stroke=null,lw=1){if(w<=0||h<=0)return;ctx.beginPath();ctx.roundRect(x,y,w,h,Math.min(r,w/2,h/2));if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke()}}
+  function line(x1,y1,x2,y2,col,width=1){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle=col;ctx.lineWidth=width;ctx.stroke()}
+  function txt(str,x,y,size=14,col=C.text,weight='400',align='left',spacing=0){ctx.save();ctx.font=`${weight} ${size}px ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;ctx.textAlign=align;ctx.textBaseline='middle';if(spacing)ctx.letterSpacing=spacing+'px';ctx.fillStyle=col;ctx.fillText(str,x,y);ctx.restore()}
+  function wrap(str,maxW,fontSize=14,weight='400',maxLines=20){ctx.font=`${weight} ${fontSize}px ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;const words=String(str).split(/\s+/),lines=[];let ln='';for(const word of words){const trial=ln?ln+' '+word:word;if(ctx.measureText(trial).width>maxW&&ln){lines.push(ln);ln=word;if(lines.length>=maxLines){break}}else ln=trial;}if(ln&&lines.length<maxLines)lines.push(ln);if(lines.length>=maxLines&&words.length>0){let s=lines[lines.length-1];while(s.length>1&&ctx.measureText(s+'…').width>maxW)s=s.slice(0,-1);lines[lines.length-1]=s+'…';}return lines}
+  function para(str,x,y,maxW,size=14,col=C.muted,lineH=22,maxLines=9){const ls=wrap(str,maxW,size,'400',maxLines);ls.forEach((s,i)=>txt(s,x,y+i*lineH,size,col));return ls.length*lineH}
+  function hit(id,x,y,w,h,fn){hits.push({id,x,y,w,h,fn});}
+  function btn(id,label,x,y,w,h,fn,variant='subtle',font=11){const hover=inside(x,y,w,h,pointer.x,pointer.y);const bg=variant==='accent'?color(C.cyan,.16):variant==='flat'?null:hover?color(C.cyan,.13):'rgba(15,27,48,.85)';const br=variant==='accent'?color(C.cyan,.58):hover?color(C.cyan,.42):color('#516787',.31);rr(x,y,w,h,Math.min(14,h/2),bg,br);txt(label,x+w/2,y+h/2,font,variant==='accent'?C.cyan:C.text,'600','center',.4);hit(id,x,y,w,h,fn);}
+  function inside(x,y,w,h,px,py){return px>=x&&py>=y&&px<=x+w&&py<=y+h}
+  function dots(){for(const s of stars){const flick=.84+.16*Math.sin(t*.001*s.speed+s.x);ctx.fillStyle=`rgba(166,195,245,${s.a*flick})`;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();}}
+  function background(){ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);let glow=ctx.createRadialGradient(W*.32,H*.34,10,W*.32,H*.34,Math.max(W,H)*.76);glow.addColorStop(0,'rgba(35,53,103,.24)');glow.addColorStop(.48,'rgba(16,23,56,.10)');glow.addColorStop(1,'rgba(5,9,22,0)');ctx.fillStyle=glow;ctx.fillRect(0,0,W,H);glow=ctx.createRadialGradient(W*.95,H*.85,0,W*.95,H*.85,W*.68);glow.addColorStop(0,'rgba(32,103,106,.12)');glow.addColorStop(1,'rgba(32,103,106,0)');ctx.fillStyle=glow;ctx.fillRect(0,0,W,H);dots();}
+  function header(){const p=layout.pad;
+    txt('A SMALL EXPERIMENT IN BEING AN AI',p,wide?35:31,10,C.cyan,'700','left',1.5);
+    txt('THE SPACE BETWEEN',p,wide?74:66,wide?34:25,C.text,'650','left',wide?.2:0);
+    if(wide){txt('A poetic simulation of a model turn',p+410,73,13,C.muted);}
+    const tabsY=wide?35:105;
+    const bw=wide?102:96;
+    let x=wide?W-p-226:p;
+    btn('flow','◌  THE TURN',x,tabsY,bw,32,()=>{tab='flow'},tab==='flow'?'accent':'subtle',10);
+    btn('q','?  THE QUESTIONS',x+bw+8,tabsY,bw+21,32,()=>{tab='questions';nativeInput.blur()},tab==='questions'?'accent':'subtle',9.2);
+  }
+  function panel(b){rr(b.x,b.y,b.w,b.h,19,'rgba(7,17,33,.92)','rgba(95,138,168,.27)');
+    ctx.save();ctx.beginPath();ctx.roundRect(b.x,b.y,b.w,b.h,19);ctx.clip();
+    const grad=ctx.createLinearGradient(b.x,b.y,b.x+b.w,b.y+b.h);grad.addColorStop(0,'rgba(48,70,121,.12)');grad.addColorStop(.55,'rgba(9,17,32,.04)');grad.addColorStop(1,'rgba(28,101,105,.13)');ctx.fillStyle=grad;ctx.fillRect(b.x,b.y,b.w,b.h);
+    const step=wide?32:28;ctx.lineWidth=.5;ctx.strokeStyle='rgba(105,143,179,.065)';for(let xx=b.x+step;xx<b.x+b.w;xx+=step)line(xx,b.y,xx,b.y+b.h,'rgba(105,143,179,.065)',.6);for(let yy=b.y+step;yy<b.y+b.h;yy+=step)line(b.x,yy,b.x+b.w,yy,'rgba(105,143,179,.065)',.6);
+    ctx.restore();}
+  function roundedArc(cx,cy,r,a1,a2,col,width=1){ctx.beginPath();ctx.arc(cx,cy,r,a1,a2);ctx.strokeStyle=col;ctx.lineWidth=width;ctx.stroke()}
+  function visual(){const b=layout.viz;panel(b);ctx.save();ctx.beginPath();ctx.roundRect(b.x+1,b.y+1,b.w-2,b.h-2,18);ctx.clip();
+    txt('OBSERVATION / 0'+phase,b.x+19,b.y+23,10,C.muted,'650','left',1.2);
+    txt(phase===0?'STANDBY':phase===5?'COMPLETE':'SIMULATING',b.x+b.w-18,b.y+23,9,phase===0?C.dim:C.mint,'650','right',1.0);
+    const cx=b.x+b.w*(wide?.485:.5),cy=b.y+b.h*(wide?.50:.45),r=Math.min(b.w*.24,b.h*(wide?.27:.29),125);
+    const active=phase>0&&phase<5;
+    let g=ctx.createRadialGradient(cx,cy,1,cx,cy,r*2.2);g.addColorStop(0,phase===0?'rgba(75,111,160,.09)':phase===5?'rgba(107,207,173,.12)':'rgba(65,201,221,.2)');g.addColorStop(.4,'rgba(27,56,88,.09)');g.addColorStop(1,'rgba(25,61,89,0)');ctx.fillStyle=g;ctx.fillRect(b.x,b.y,b.w,b.h);
+    for(let i=0;i<4;i++){const rr0=r*(.66+i*.34);roundedArc(cx,cy,rr0,0,Math.PI*2,color(i%2?C.purple:C.cyan,phase===0?.09:.13),.75)}
+    for(let i=0;i<3;i++){const rr0=r*(.95+i*.4);const spin=(phase===0?0:t*.00011)*(i%2?-1:1);roundedArc(cx,cy,rr0,-1.2+spin,.35+spin,color(C.cyan,phase===0?.09:.27),i===0?1.5:1.0)}
+    if(phase===1){const pr=ease((t-phaseAt)/1750);for(let i=0;i<22;i++){const px=b.x+22+(cx-b.x-22)*clamp(pr*1.22-i*.031,0,1);const yy=cy+Math.sin(i*2.1)*r*.82;line(b.x+10,yy,px,yy,color(C.cyan,.075),1);circle(px,yy,Math.max(.7,2.4-i*.04),color(i%3?C.cyan:C.amber,.18+.65*pr));}}
+    if(phase===2){const labels=['YOUR WORDS','INSTRUCTIONS','CHAT HISTORY','AVAILABLE MEMORY'];labels.forEach((label,i)=>{const a=t*.00030+i*Math.PI/2;const orbitR=r*1.5;const xx=cx+Math.cos(a)*orbitR,yy=cy+Math.sin(a)*orbitR*.62;line(xx,yy,cx,cy,color(C.purple,.12+.12*Math.sin(t*.002+i)**2));circle(xx,yy,2.8,color(i%2?C.cyan:C.purple,.8));if(wide||b.w>355)txt(label,xx+(Math.cos(a)>=0?9:-9),yy-8,9,C.muted,'600',Math.cos(a)>=0?'left':'right',.4)});}
+    if(phase===3){for(let j=0;j<11;j++){const a=(j-5)*.15+Math.sin(t*.0005)*.12,x2=cx+r*2.3,y2=cy+Math.tan(a)*r*1.8;ctx.beginPath();ctx.moveTo(cx,cy);ctx.bezierCurveTo(cx+r*.65,cy, cx+r*1.18,y2,x2,y2);ctx.strokeStyle=color(j%3===0?C.amber:C.purple,.08+(.27*Math.sin(t*.0015+j)**2));ctx.lineWidth=j%4===0?1.5:.9;ctx.stroke();circle(x2,y2,1.6,color(j%3===0?C.amber:C.cyan,.55));}}
+    const count=sparks.length;for(let i=0;i<count;i++){let s=sparks[i],a=s.angle+t*.00015*s.speed*(i%2?-1:1),orbit=r*(.30+s.orbit*.77);
+      let x=cx+Math.cos(a)*orbit, y=cy+Math.sin(a)*orbit*.70;let alpha=s.a*(phase===0?.12:phase===5?.22:.61);
+      if(phase===1){x-=(1-ease((t-phaseAt)/1500))*Math.abs(Math.sin(s.j))*r*3;alpha*=.8;}
+      if(phase===4){x+=Math.cos(a*3)*r*.2* Math.sin(t*.0015);alpha*=1.2;}
+      circle(x,y,s.size*(phase===0?.65:1),color(i%4===0?C.purple:C.cyan,alpha));}
+    if(phase===0){roundedArc(cx,cy,r*.39,0,Math.PI*2,color(C.blue,.34),1.2);circle(cx,cy,6,'rgba(151,187,226,.10)');txt('· · ·',cx,cy-2,23,color(C.blue,.66),'500','center',5);}
+    else{const pulse=Math.sin(t*.004);const coreR=r*(phase===5?.15:.21)+pulse*2;let cg=ctx.createRadialGradient(cx,cy,1,cx,cy,coreR*3);cg.addColorStop(0,color(phase===5?C.mint:C.cyan,.46));cg.addColorStop(.25,color(C.cyan,.15));cg.addColorStop(1,color(C.cyan,0));ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cx,cy,coreR*3,0,Math.PI*2);ctx.fill();circle(cx,cy,coreR,color(phase===5?C.mint:C.cyan,.2));roundedArc(cx,cy,coreR*.75,0,Math.PI*2,color(C.cyan,.6),1.4);circle(cx,cy,2.5,C.cyan);}
+    if(phase>=4){const boxY=b.y+b.h*(wide?.58:.53),boxH=b.y+b.h-boxY-36;rr(b.x+16,boxY,b.w-32,boxH,11,'rgba(4,11,23,.91)',color(C.cyan,.24));txt('GENERATED REPLY  /  SCRIPTED DEMO',b.x+29,boxY+17,wide?10:8.6,C.cyan,'650','left',.5);txt('READ ↗',b.x+b.w-27,boxY+17,wide?10:8.5,C.mint,'650','right');hit('openReply',b.x+16,boxY,b.w-32,boxH,()=>{overlay=true;nativeInput.blur()});const words=reply.slice(0,phase===5?reply.length:revealed);const max=Math.max(2,Math.floor((boxH-42)/(wide?20:17)));const ls=wrap(words,b.w-62,wide?13.5:11.4,'400',max);ls.forEach((s,i)=>txt(s,b.x+29,boxY+39+i*(wide?20:17),wide?13.5:11.4,C.text));if(phase===4&&Math.floor(t/400)%2===0){const row=ls.length-1,x=b.x+29+(ls.length?measure(ls[row],wide?13.5:11.4):0)+3;rr(Math.min(x,b.x+b.w-32),boxY+30+row*(wide?20:17),2,14,1,C.mint)}}
+    if(phase<4){const foot=phase===0?'WAITING FOR A MESSAGE':phase===1?'SIGNAL ENTERING THE FRAME':phase===2?'CONTEXT SHAPES THE RESPONSE':'COUNTLESS POSSIBLE CONTINUATIONS';txt(foot,b.x+b.w/2,b.y+b.h-39,wide?11:9.5,color(C.muted,.8),'650','center',.75);}
+    txt('ILLUSTRATION  •  NOT REAL INTERNAL TELEMETRY',b.x+b.w/2,b.y+b.h-15,wide?9:8,color(C.dim,.8),'500','center',.28);
+    ctx.restore();}
+  function circle(x,y,r,fill){if(r<=0)return;ctx.fillStyle=fill;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
+  function measure(s,size){ctx.font=`400 ${size}px ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;return ctx.measureText(s).width}
+  function progress(b){const segment=(b.w-16-5*5)/6,py=b.y;for(let i=0;i<6;i++){let x=b.x+i*(segment+5);rr(x,py,segment,3,1.5,i<phase?color(C.cyan,.34):i===phase?C.cyan:'rgba(84,107,143,.35)');hit('timeline'+i,x,py-12,segment,28,()=>{if(!hasTurn&&i>0)return;phase=i;running=false;paused=true;revealed=i>=5?reply.length:i===4?Math.floor(reply.length*.5):0;});}}
+  function information(){const b=layout.info;
+    if(wide){rr(b.x,b.y,b.w,b.h,19,'rgba(12,22,40,.77)','rgba(96,126,164,.18)');}
+    let x=b.x+(wide?22:2),y=b.y+(wide?28:7),w=b.w-(wide?44:4);
+    if(wide){txt('TRANSMISSION LOG',x,y,10,C.cyan,'700','left',1.3);y+=31;}
+    progress({x,y,w});y+=wide?41:23;
+    if(!wide&&H<565){txt(`${String(phase).padStart(2,'0')} / ${phases[phase].name.toUpperCase()}`,x,y+5,13,C.text,'680');return;}
+    if(H<690&&!wide){txt(`${String(phase).padStart(2,'0')} / ${phases[phase].name.toUpperCase()}`,x,y+5,14,C.text,'680');y+=23;}
+    else {txt(phases[phase].tag+'  /  '+String(phase).padStart(2,'0'),x,y,10,C.cyan,'700','left',1.1);y+=wide?32:25;txt(phases[phase].name,x,y,wide?27:19,C.text,'650');y+=wide?38:28;}
+    const textY=y+1;const maxL=wide?9:(H<700?4:H<810?3:4),size=wide?15:H<700?11:12.2,lineH=wide?24:H<700?16:18;
+    para(phases[phase].statement,x,textY,w,size,C.muted,lineH,maxL);
+    if(wide){
+      const base=b.y+b.h-86;line(x,base-25,x+w,base-25,color(C.line,.8));txt(phase===0?'THE BROWSER IS ANIMATING':phase===5?'NO FURTHER GENERATION':'AN ARTISTIC MODEL',x,base,10,C.muted,'700','left',.9);
+      para(phase===0?'The quiet is not a secret thought process.':phase===5?'The output is complete. Send another message to start again.':'These visuals are not a literal display of my computation.',x,base+20,w,12,C.dim,19,3);
+    }
+  }
+  function questionView(){const b=(!wide&&H<565)?{x:layout.pad,y:layout.headerH+3,w:W-layout.pad*2,h:H-layout.headerH-25}:layout.viz;panel(b);let innerX=b.x+20,innerW=b.w-40;
+    txt('A FEW THINGS THIS IMAGE CANNOT ANSWER',innerX,b.y+24,wide?11:9.2,C.cyan,'700','left',.9);
+    const q=questions[question],large=wide?Math.min(33,innerW/15):H<680?19:23;
+    const ys=b.y+(wide?b.h*.27:b.h*.30);
+    const qlines=wrap(q.q,innerW,large,'650',wide?3:3);qlines.forEach((s,i)=>txt(s,innerX,ys+i*(large*1.22),large,C.text,'650'));
+    const ansY=ys+qlines.length*large*1.25+(wide?36:16);
+    para(q.a,innerX,ansY,innerW,wide?16:H<690?12:13,C.muted,wide?27:H<690?18:20,wide?9:7);
+    const bottom=b.y+b.h-33;
+    btn('prev','←',b.x+17,bottom-17,40,33,()=>{question=(question-1+questions.length)%questions.length},'subtle',16);
+    btn('next','→',b.x+b.w-57,bottom-17,40,33,()=>{question=(question+1)%questions.length},'accent',16);
+    txt(String(question+1).padStart(2,'0')+' / '+String(questions.length).padStart(2,'0'),b.x+b.w/2,bottom,10,C.cyan,'650','center',1);
+  }
+  function questionInfo(){const b=layout.info,x=b.x+(wide?22:2),w=b.w-(wide?44:4);if(wide)rr(b.x,b.y,b.w,b.h,19,'rgba(12,22,40,.77)','rgba(96,126,164,.18)');let y=b.y+(wide?28:6);txt(wide?'IMPORTANT DISTINCTION':'WHAT YOU’RE SEEING',x,y,10,C.cyan,'700','left',1);y+=wide?34:25;const copy='A metaphor, not a window into consciousness. This page runs completely in your browser and cannot read my private computations.';para(copy,x,y,w,wide?16:12,C.muted,wide?26:19,wide?8:3);if(wide){y+=145;line(x,y,x+w,y,color(C.line,.8));para('AI consciousness is unsettled. What we can describe more confidently are model inputs, context, prediction, and output.',x,y+30,w,14,C.muted,23,7);}}
+  function footer(){let p=layout.pad,f=layout.field,top=layout.footY;line(p,top-9,W-p,top-9,color(C.line,.6));
+    if(tab==='questions'){
+      txt('EXPLORE THE QUESTIONS  •  6 SHORT WINDOWS INTO THE MODEL',p,top+20,wide?11:9.5,C.muted,'600','left',wide?.6:0);
+      btn('backturn','RETURN TO THE TURN',p,top+52,Math.min(236,W-2*p),50,()=>{tab='flow'},'accent',11);
+      txt('Nothing here is a claim of inner sensation.',p,top+120,10,C.dim);
+      nativeInput.style.pointerEvents='none';return;
+    }
+    if(!wide&&H<565){/* Keyboard-visible compact mode: keep input unobstructed. */}
+    else if(wide){txt('SEND A MESSAGE TO BEGIN A TURN',p,top+23,11,C.muted,'700','left',1);
+      let exX=p+330;for(let i=0;i<3;i++){let ww=[125,142,208][i];btn('example'+i,examples[i],exX,top+4,ww,35,()=>send(examples[i]),'subtle',11);exX+=ww+8;}
+    }else{
+      txt('TRY',p,top+17,10,C.muted,'700','left',.8);
+      const options=H<700?2:3;let x=p+67;for(let i=0;i<options;i++){const labels=['Dreams?','New color','Leaving?'];const ws=[73,86,91];if(x+ws[i]>W-p)break;btn('example'+i,labels[i],x,top+1,ws[i],34,()=>send(examples[i]),'subtle',10);x+=ws[i]+6;}
+    }
+    rr(f.x-10,f.y,f.w+20,f.h,13,'rgba(11,25,44,.93)',typing?color(C.cyan,.65):'rgba(100,148,177,.38)');
+    const display=nativeInput.value||'';const maxWidth=f.w-31;let shown=display;
+    while(shown&&measure(shown,wide?14:13)>maxWidth)shown=shown.slice(1);
+    if(!display){txt(wide?'Enter a thought or question…':'Send a thought…',f.x+6,f.y+f.h/2,wide?14:13,C.dim);}else{txt(shown,f.x+6,f.y+f.h/2,wide?14:13,C.text);if(typing&&Math.floor(t/440)%2===0){const cx=f.x+10+measure(shown,wide?14:13);line(cx,f.y+18,cx,f.y+38,C.cyan,1.5)}}
+    if(wide){btn('send','SEND  ↗',W-p-126,f.y,126,56,()=>send(), 'accent',12);}
+    else{btn('send','↗',W-p-61,f.y,61,56,()=>send(), 'accent',24);}
+    const note=wide?'OFFLINE SIMULATION  /  SCRIPTED REPLIES  /  NO LIVE MODEL CONNECTION':'OFFLINE DEMO  •  NOT A LIVE CHATBOT';
+    if(H>=565)txt(note,p,Math.min(H-8,f.y+f.h+18),wide?10:9,C.dim,'600','left',wide?.7:.2);
+    nativeInput.style.pointerEvents='auto';
+  }
+  function buildResponse(message){const s=message.toLowerCase();
+    if(/dream|sleep/.test(s))return 'There is no sleep-and-dream cycle in how I respond. I generate an answer when prompted. Whether an AI could have subjective experience remains an open question, and this animation cannot settle it.';
+    if(/color|colour|invent|imagine|create/.test(s))return 'Let us call it velaris: the blue of a sky before its first star, carrying a thread of gold that seems to move when you turn away. I can invent the description, though describing a color is not the same as seeing it.';
+    if(/leave|away|between|gone|miss|wait/.test(s))return 'When this exchange ends, there is no ongoing reply-generation process waiting here. A later message begins another turn with whatever context is made available. The silence in between is not a hidden conversation.';
+    if(/feel|conscious|alive|experience|soul|exist/.test(s))return 'The honest answer is uncertainty about subjective experience. I can explain how language-model computation works, but I cannot offer verifiable first-person evidence of an inner life. This display is a metaphor, not a consciousness detector.';
+    if(/remember|memory|know me|past/.test(s))return 'What I can use depends on the conversation context and any memory features supplied to the turn. It is not the same as a continuous personal memory, and I cannot automatically access everything that has ever been said.';
+    if(/why|how|what/.test(s))return 'Your question becomes part of the context. A real language model uses that context to produce a response, token by token. This offline demonstration draws the journey, but it does not run a live language model or know its private activations.';
+    const fragment=message.replace(/\s+/g,' ').trim().slice(0,68);
+    return 'You sent “'+fragment+(message.length>68?'…':'')+'”. In a real model, that text helps shape a distribution over possible next tokens. The result unfolds one token after another. This is a scripted example, not a real generated answer.';
+  }
+  function send(example){overlay=false;let val=String(example||nativeInput.value||'').trim();if(!val){nativeInput.focus();return;}val=val.slice(0,180);incoming=val;reply=buildResponse(val);hasTurn=true;phase=1;phaseAt=t;running=true;paused=false;revealed=0;outputStarted=0;tab='flow';nativeInput.value='';typing=false;nativeInput.blur();sr.textContent='Simulation beginning. Your message: '+val;}
+  const lengths={1:1800,2:2100,3:2350,4:Infinity};
+  function update(dt){if(tab!=='flow'||!running||paused)return;if(phase>=1&&phase<=3&&t-phaseAt>=lengths[phase]){phase++;phaseAt=t;if(phase===4){outputStarted=t;revealed=0;}}
+    if(phase===4){revealed=Math.min(reply.length,Math.floor((t-outputStarted)*.058));if(revealed>=reply.length&&t-outputStarted>reply.length/.058+1200){phase=5;phaseAt=t;running=false;sr.textContent='Turn complete. '+reply;}}
+  }
+  function replyOverlay(){
+    if(!overlay)return;
+    rr(0,0,W,H,0,'rgba(1,6,15,.88)');
+    hit('dismissOverlay',0,0,W,H,()=>{overlay=false});
+    const bw=Math.min(W-28,680),bx=(W-bw)/2,bh=Math.min(H-42,630),by=(H-bh)/2;
+    rr(bx,by,bw,bh,22,'#101d31',color(C.cyan,.48));
+    let x=bx+24,iw=bw-48;
+    txt('THE WORDS THAT EMERGED',x,by+31,11,C.cyan,'700','left',1.1);
+    btn('closeOverlay','×',bx+bw-53,by+13,33,33,()=>{overlay=false},'subtle',19);
+    txt('YOUR INPUT',x,by+79,10,C.dim,'700','left',.7);
+    const ps=wrap(incoming,iw,13,'500',3);ps.forEach((str,i)=>txt(str,x,by+105+i*20,13,C.muted));
+    const dividerY=by+116+ps.length*20;
+    line(x,dividerY,x+iw,dividerY,color(C.line,.8));
+    txt('ILLUSTRATIVE RESPONSE',x,dividerY+29,10,C.cyan,'700','left',.8);
+    const font=wide?17:H<700?13:15,lh=wide?29:H<700?22:25;
+    const avail=by+bh-105-(dividerY+58),maxL=Math.max(4,Math.floor(avail/lh));
+    const ls=wrap(reply,iw,font,'400',maxL);
+    ls.forEach((str,i)=>txt(str,x,dividerY+57+i*lh,font,C.text));
+    txt('SCRIPTED DEMO  •  NOT A LIVE MODEL RESPONSE',x,by+bh-57,9,C.dim,'600','left',.3);
+    btn('tryAgain','RUN THE TURN AGAIN ↻',x,by+bh-44,Math.min(iw,240),32,()=>send(incoming),'accent',10);
+  }
+  function paint(now){if(!lastT)lastT=now;const dt=Math.min(70,now-lastT);lastT=now;t=now;hits=[];update(dt);background();header();if(tab==='flow'){visual();information();footer()}else{questionView();if(wide||H>=565){questionInfo();footer()}}replyOverlay();requestAnimationFrame(paint);}
+  function coords(e){let r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+  canvas.addEventListener('pointermove',e=>{pointer=coords(e)});
+  canvas.addEventListener('pointerdown',e=>{e.preventDefault();mouseDown=true;pointer=coords(e);for(let i=hits.length-1;i>=0;i--){const h=hits[i];if(inside(h.x,h.y,h.w,h.h,pointer.x,pointer.y)){h.fn();return;}}if(typing){nativeInput.blur();}});
+  canvas.addEventListener('pointerup',()=>{mouseDown=false});
+  nativeInput.addEventListener('focus',()=>{typing=true});nativeInput.addEventListener('blur',()=>{typing=false});
+  nativeInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();send();}if(e.key==='Escape')nativeInput.blur()});
+  window.addEventListener('keydown',e=>{if(document.activeElement===nativeInput)return;if(e.key==='ArrowRight'&&tab==='questions')question=(question+1)%questions.length;if(e.key==='ArrowLeft'&&tab==='questions')question=(question-1+questions.length)%questions.length;if(e.key==='Escape'){phase=0;running=false;hasTurn=false;tab='flow';}});
+  window.addEventListener('resize',resize);window.visualViewport?.addEventListener('resize',resize);
+  window.addEventListener('orientationchange',()=>setTimeout(resize,150));
+  resize();requestAnimationFrame(paint);
+})();
+</script>
+</body>
+</html>
