@@ -541,7 +541,8 @@ export class Grove {
         // A jam really happened only when at least two consenting performers
         // made notes. Quiet listening is not a fake recorded performance.
         const audible=members.filter(n=>performed.has(n));
-        const complete=this.modeBars>=6&&audible.length>=2&&Math.random()<.46;
+        const complete=this.modeBars>=6&&
+          (audible.length>=2||this.recordingResumingJam)&&Math.random()<.46;
         const grewQuiet=this.modeBars>=24;
         if(complete||grewQuiet){
           if(complete){
