@@ -246,20 +246,23 @@ export class GroveWorld {
         const roll=Math.random();
         if(roll<.11&&grove.archive?.recordings.length){
           where='recording';why='curious to hear a recorded jam';
-        }else if(roll<.29){where='studio';why='curious about the practice studio';}
-        else if(roll<.68){where='pond';why='listening to quiet and testing melodies';}
+        }else if(roll<.24){where='instrumentRoom';why='curious about the instruments';}
+        else if(roll<.41){where='studio';why='curious about the practice studio';}
+        else if(roll<.70){where='pond';why='listening to quiet and testing melodies';}
         else {where='clearing';why='listening for other musicians';}
       }else if(name==='Pip'){
         const roll=Math.random();
         if(roll<.11&&grove.archive?.recordings.length){where='recording';why='curious about old rhythms';}
-        else if(roll<.42){where='studio';why='experimenting with rhythm';}
-        else if(roll<.71){where='library';why='curious about musical ideas';}
+        else if(roll<.25){where='instrumentRoom';why='curious about other instruments';}
+        else if(roll<.48){where='studio';why='experimenting with rhythm';}
+        else if(roll<.73){where='library';why='curious about musical ideas';}
         else {where='clearing';why='listening for a possible jam';}
       }else{
         const roll=Math.random();
         if(roll<.12&&grove.archive?.recordings.length){where='recording';why='curious to hear an earlier performance';}
-        else if(roll<.47){where='studio';why='exploring harmonies';}
-        else if(roll<.72){where='library';why='studying chord language';}
+        else if(roll<.28){where='instrumentRoom';why='curious about the instruments on the rack';}
+        else if(roll<.51){where='studio';why='exploring harmonies';}
+        else if(roll<.75){where='library';why='studying chord language';}
         else {where='clearing';why='listening for a possible jam';}
       }
       if(name==='Murmur'&&p.ensembleIntent==='joining'&&where!==p.destination)
