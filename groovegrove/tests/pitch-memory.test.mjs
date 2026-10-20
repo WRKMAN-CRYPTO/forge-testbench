@@ -136,6 +136,6 @@ test('Real musician journals can show bounded observed recurring patterns on iPh
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const server=readFileSync(new URL('../server/index.mjs',import.meta.url),'utf8');
  assert.match(html,/grove\.pitchMemory\?\.report\(journalName\)/);
- assert.match(html,/EAR:/);
+ assert.match(html,/PITCH EAR/);
  assert.match(server,/pitch-memory\.js/);
 });
