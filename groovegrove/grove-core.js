@@ -8,6 +8,7 @@ import {MusicalDisciplines} from './grove-disciplines.js?v=20261019-transfer';
 import {restoreVoiceprints} from './voiceprints.js';
 import {tryLearnerVocalPhrase} from './learner-vocals.js';
 import {JamArchive} from './jam-archive.js';
+import {MUSICIANS,available,closeEnough,activeMembers,proposeJam,inviteThird} from './jam-ensemble.js';
 const beatDur=60/98;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const rand=(a,b)=>a+(b-a)*Math.random();
@@ -69,6 +70,11 @@ export class Grove {
     // An in-progress jam cannot be called a complete recording after restart:
     // its earlier note stream was not checkpointed as an open tape.
     this.recordingResumingJam=!!saved&&saved.mode==='jam';
+    // A voluntary jam is a musician-level commitment, not a drum/guitar role.
+    // Old saved jam state keeps its legacy pair until that interrupted session ends.
+    this.jamParticipants=this.mode==='jam'?
+      [...new Set((Array.isArray(saved?.jamParticipants)?
+        saved.jamParticipants:['Pip','Riff']).filter(n=>MUSICIANS.includes(n)))]:[];
     for(const name of ['Pip','Riff']){
       const task=this.library.status(name),book=task&&this.library.copyById(task.copyId);
       if(book)(name==='Pip'?this.pip:this.riff).currentGoal='finishing '+LIBRARY_CATALOG[book.type].title;
@@ -97,7 +103,8 @@ export class Grove {
     riffHeldNotes:this.riffHeldNotes,riffLastHeldNote:this.riffLastHeldNote?{...this.riffLastHeldNote}:null,vocalist:{...this.vocalist,motif:this.vocalist.motif?[...this.vocalist.motif]:null},voiceJournal:this.voiceJournal.snapshot(),
     voiceprints:Object.fromEntries(Object.entries(this.voiceprints).map(([name,profile])=>[name,{...profile}])),
     space:this.space.snapshot(),
-    disciplines:this.disciplines.snapshot(),archive:this.archive.snapshot(),logs:this.logs.slice(0,12)};}
+    disciplines:this.disciplines.snapshot(),archive:this.archive.snapshot(),
+    jamParticipants:[...this.jamParticipants],logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
     if(beat===0 && index>0)this.finishBar();
@@ -115,7 +122,7 @@ export class Grove {
       audio=Object.create(liveOutput);
       for(const kind of ['guitar','violin','voice','kick','snare','hat']){
         audio[kind]=(...args)=>{
-          capture.capture(kind,args,bar,this.space);
+          capture.capture(kind,args,bar,this.space,this.jamParticipants);
           return liveOutput[kind]?.apply(liveOutput,args);
         };
       }
@@ -144,17 +151,20 @@ export class Grove {
     // A practice room can hold two soloists without making them a duo.
     // They exchange turns every two bars. Only a mutual choice creates joint music.
     const pipActive=this.disciplines.current('Pip')==='drums' &&
-      (!solo || bar%4<2 || this.library.busy('Riff')) &&
+      (this.mode==='lesson'||(this.mode==='jam'&&this.jamParticipants.includes('Pip'))||
+        bar%4<2||this.library.busy('Riff')) &&
       !this.library.busy('Pip') && !this.space.traveling('Pip') &&
       this.space.destination('Pip')!=='pond';
     const riffActive=this.disciplines.current('Riff')==='guitar' &&
-      (!solo || bar%4>=2 || this.library.busy('Pip')) &&
+      (this.mode==='lesson'||(this.mode==='jam'&&this.jamParticipants.includes('Riff'))||
+        bar%4>=2||this.library.busy('Pip')) &&
       !this.library.busy('Riff') && !this.space.traveling('Riff') &&
       this.space.destination('Riff')!=='pond';
     if(beat===0 && this.disciplines.current('Murmur')==='voice'){
       const vocal=tryVocalPhrase({
         singer,library:this.library,space:this.space,bar,time:t,beatDur,
         audio,journal:this.voiceJournal,onNote:this.onNote,
+         ensemble:this.mode==='jam'?this.jamParticipants:null,
         transfer:this.disciplines.transfer('Murmur',this),
         playing:Object.fromEntries(['Pip','Riff'].map(name=>[name,
           !this.library.busy(name)&&!this.space.traveling(name)&&
@@ -188,7 +198,8 @@ export class Grove {
     const onLesson=this.mode==='lesson';
     const withinEarshot=this.space.distance('Pip','Riff')<260 &&
       this.space.canHear('Pip','Riff','guitar')>.13;
-    const onJam=this.mode==='jam' && withinEarshot;
+    const onJam=this.mode==='jam' && withinEarshot &&
+      this.jamParticipants.includes('Pip')&&this.jamParticipants.includes('Riff');
     const dynamic=onJam?.9:onLesson?.69:.51;
     const riffRest=this.library.has('Riff','deliberateSpace') && beat===3 && bar%4===1;
     const pipRest=this.library.has('Pip','deliberateSpace') && beat===3 && bar%4===1;
@@ -448,25 +459,44 @@ export class Grove {
         this.pip.currentGoal='trying new patterns';this.riff.currentGoal='looking for a new idea';
       }
     }else if(this.mode==='jam'){
-      const together=this.disciplines.current('Pip')==='drums' &&
-        this.disciplines.current('Riff')==='guitar' && this.space.distance('Pip','Riff')<260 &&
-        !this.space.traveling('Pip')&&!this.space.traveling('Riff')&&!this.library.busy('Pip')&&!this.library.busy('Riff');
-      if(!together){
+      let members=activeMembers(this,this.jamParticipants);
+      if(members.length<2){
+        this.archive.discard();
         this.recordingResumingJam=false;
-        this.archive.discard(); // an interrupted jam is not a completed tape
-        this.mode='solo';this.modeBars=0;
-        this.push('The jam falls quiet as the musicians move apart.');
-      }else if(this.modeBars>=6 && Math.random()<.46){
-        this.jams++;this.familiarity++;
-        const tape=this.recordingResumingJam?null:this.archive.finish(this.bar);
-        if(this.recordingResumingJam)this.archive.discard();
-        this.recordingResumingJam=false;
-        if(tape)this.push('The recording room archived jam '+tape.id+'.');
-        this.exchange(this.riff,this.pip,'That groove was worth remembering.');
-        this.pip.remember('Shared a jam with Riff; familiar grooves feel easier.');
-        this.riff.remember('Pip adds playful offbeat accents.');
-        this.mode='solo';this.modeBars=0;
-        this.pip.currentGoal='practicing';this.riff.currentGoal='experimenting';
+        this.jamParticipants=[];this.mode='solo';this.modeBars=0;
+        this.push('The jam ends as the musicians follow their own paths.');
+      }else{
+        if(this.modeBars%4===0){
+          const invited=inviteThird(this,members);
+          if(invited.length>members.length){
+            const joined=invited.find(n=>!members.includes(n));
+            this.onTalk?.(joined,'♪ Joining the jam');
+            this.push(joined+' voluntarily joins the jam.');
+          }
+          members=invited;
+        }
+        this.jamParticipants=members;
+        const performed=new Set((this.archive.active?.events||[]).map(e=>e.source));
+        // A jam really happened only when at least two consenting performers
+        // made notes. Quiet listening is not a fake recorded performance.
+        const audible=members.filter(n=>performed.has(n));
+        const complete=this.modeBars>=6&&audible.length>=2&&Math.random()<.46;
+        const grewQuiet=this.modeBars>=24;
+        if(complete||grewQuiet){
+          if(complete){
+            this.jams++;this.familiarity++;
+            const tape=this.recordingResumingJam?null:this.archive.finish(this.bar);
+            if(this.recordingResumingJam)this.archive.discard();
+            if(tape)this.push('Recorded a jam by '+tape.participants.join(', ')+'.');
+            else this.push(members.join(', ')+' finish a jam together.');
+            for(const name of members)this.onTalk?.(name,'♪ That was worth hearing together');
+          }else{
+            this.archive.discard();
+            this.push('Their jam fades into listening and independent ideas.');
+          }
+          this.recordingResumingJam=false;
+          this.jamParticipants=[];this.mode='solo';this.modeBars=0;
+        }
       }
     }
     this.library.tick(this);
@@ -478,41 +508,37 @@ export class Grove {
     if(this.onCheckpoint)this.onCheckpoint(this.snapshot());
   }
   considerNewActivity(measuredError){
-    if(this.modeBars<3 || this.disciplines.current('Pip')!=='drums' ||
-       this.disciplines.current('Riff')!=='guitar' || this.library.busy('Pip')||
-       this.library.busy('Riff') || this.space.traveling('Pip') ||
-       this.space.traveling('Riff') || this.space.distance('Pip','Riff')>245)return;
-    // Riff recognizes a timing problem from HEARD onset differences, then chooses whether to help.
-    const needsHelp=measuredError!=null && measuredError>40;
-    const teachUtility=(needsHelp?.65:0)+this.riff.generosity*.26+rand(-.1,.1);
-    const jamUtility=.26+this.familiarity*.08+(measuredError!=null&&measuredError<56?.24:0)+this.pip.curiosity*.16+rand(-.1,.1);
-    const soloUtility=.46+rand(-.08,.16);
-    const candidate=teachUtility>jamUtility&&teachUtility>soloUtility?'lesson':jamUtility>soloUtility?'jam':'solo';
-    if(candidate==='lesson' && needsHelp){
+    if(this.modeBars<3)return;
+    // Timing lessons still require the original teacher/pupil arrangement.
+    const legacyLesson=available(this,'Pip')&&available(this,'Riff')&&
+      this.disciplines.current('Pip')==='drums'&&
+      this.disciplines.current('Riff')==='guitar'&&closeEnough(this,'Pip','Riff');
+    const needsHelp=measuredError!=null&&measuredError>40;
+    if(legacyLesson&&needsHelp&&Math.random()<.08+.16*this.riff.generosity){
       this.exchange(this.riff,this.pip,'Your notes drift a little. Want to follow my pulse?');
-      const pipWillingness=.55+clamp(measuredError/150,0,.34)+(this.familiarity*.025);
-      if(Math.random()<pipWillingness){
+      if(Math.random()<.35+.35*this.pip.curiosity){
         this.exchange(this.pip,this.riff,'Play it steady. I’ll listen.');
         this.mode='lesson';this.modeBars=0;
         this.pip.currentGoal='listening and correcting timing';
         this.riff.currentGoal='demonstrating the pulse';
-      }else this.push('Pip chooses to keep experimenting alone.');
-    }else if(candidate==='jam'){
-      this.exchange(this.pip,this.riff,'Want to see what these rhythms do together?');
-      const riffWillingness=.49+this.riff.curiosity*.24+this.familiarity*.025;
-      if(Math.random()<riffWillingness){
-        this.exchange(this.riff,this.pip,'Let’s find out.');
-        this.mode='jam';this.modeBars=0;
-        this.recordingResumingJam=false;
-        this.archive.begin(this.bar+1);
-        this.pip.currentGoal='improvising with Riff';
-        this.riff.currentGoal='responding to Pip’s rhythm';
-      }else this.push('Riff listens, then returns to practicing chords.');
-    }else if(this.modeBars>6 && Math.random()<.3){
-      this.pip.currentGoal='independent rhythm practice';
-      this.riff.currentGoal='exploring chord shapes';
-      this.push('For now, each musician follows their own curiosity.');
+        return;
+      }
     }
+    const chosen=proposeJam(this);
+    if(chosen){
+      const [lead,...guests]=chosen;
+      this.onTalk?.(lead,'♪ Anyone want to play together?');
+      for(const name of guests)this.onTalk?.(name,'♪ I will join');
+      this.mode='jam';this.modeBars=0;
+      this.jamParticipants=chosen;
+      this.recordingResumingJam=false;
+      this.archive.begin(this.bar+1);
+      this.push(chosen.join(', ')+' choose to make music together.');
+    }else if(this.modeBars>6&&Math.random()<.09){
+      this.push('Each musician follows their own musical curiosity.');
+    }
+  }
+}
   }
 }
 
