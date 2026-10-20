@@ -133,3 +133,12 @@ test('The same live transport accepts Murmur without changing audio scheduling',
   assert.deepEqual(played,['voice']);
   assert.equal(scheduler.stats.invalid,0);
 });
+
+test('Following any musician exposes live instrument and activity without bottom telemetry',()=>{
+  assert.match(html,/liveLocations\?\.\[name\]\?\.instrument/);
+  assert.match(html,/grove\.disciplines\?\.current\(name\)/);
+  assert.match(html,/name\.toUpperCase\(\)\+' · '\+held\.toUpperCase\(\)/);
+  assert.match(html,/String\(person\.purpose\|\|person\.destination/);
+  assert.match(html,/ui\.cameraHint\.style\.wordWrap=true/);
+  assert.doesNotMatch(html,/ui\.panelY|ui\.memoryMetric/);
+});
