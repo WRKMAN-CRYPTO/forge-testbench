@@ -54,7 +54,7 @@ export class MusicalDisciplines {
      if(INSTRUMENTS.includes(current))allocated.add(current);
      this.people[name]={
        current,interest:INSTRUMENTS.includes(old?.interest)||
-         (name==='Murmur'&&old?.interest==='voice')||
+         old?.interest==='voice'||
          (name!=='Murmur'&&old?.interest==='none')?old.interest:null,
        lastSwitch:Number.isSafeInteger(old?.lastSwitch)?old.lastSwitch:-45,
        lastDecision:Number.isSafeInteger(old?.lastDecision)?old.lastDecision:-80,
@@ -132,7 +132,10 @@ export class MusicalDisciplines {
       grove.library?.busy(name)||bar-player.lastSwitch<24)return false;
    player.interest=id;player.lastDecision=bar;
    grove.space.people[name].lastChoice=bar;
-   grove.space.chooseDestination(name,'instrumentRoom','wondering how '+id+' feels to play',bar);
+   // Choosing voice needs no room when no physical instrument is being held.
+   // Picking up or returning physical gear still takes a real visit.
+   if(INSTRUMENTS.includes(player.current)||INSTRUMENTS.includes(id))
+     grove.space.chooseDestination(name,'instrumentRoom','wondering how '+id+' feels to play',bar);
    grove.space.people[name].purpose=returnToVoice?'returning to their voice':
      takeBreak?'taking a break from instruments':'going to try '+id+' in the studio';
    grove.push(name+(returnToVoice?' wants to sing again.':
@@ -142,8 +145,10 @@ export class MusicalDisciplines {
  switchAtStudio(name,grove){
    const p=this.people[name],id=p?.interest;
    if(!id||(id!=='voice'&&id!=='none'&&!this.available(name,id)))return false;
-   if(!grove.space.at(name,'instrumentRoom',92)||grove.space.traveling(name))return false;
    const previous=p.current;
+   const handlesPhysical=INSTRUMENTS.includes(previous)||INSTRUMENTS.includes(id);
+   if(handlesPhysical&&(!grove.space.at(name,'instrumentRoom',92)||
+      grove.space.traveling(name)))return false;
    if(INSTRUMENTS.includes(previous))this.instruments[previous].owner=null;
    if(INSTRUMENTS.includes(id))this.instruments[id].owner=name;
    p.current=id;p.interest=null;p.lastSwitch=grove.bar;
@@ -152,7 +157,9 @@ export class MusicalDisciplines {
    // return to guitar, because the instrument itself has been set down.
    if(name==='Riff'&&previous==='guitar')grove.riffHoldUntilBeat=0;
    grove.space.people[name].lastChoice=grove.bar;
-   grove.space.people[name].purpose='experimenting with '+id+' at the studio';
+   grove.space.people[name].purpose=id==='voice'?'exploring their own voice':
+     id==='none'?'taking a quiet listening break':
+     'experimenting with '+id+' at the studio';
    if(name==='Murmur')grove.space.people.Murmur.ensembleIntent='solo';
    // After borrowing an instrument, head to the existing practice room.
    // This is movement, not a training bonus or a forced musical performance.
@@ -160,7 +167,9 @@ export class MusicalDisciplines {
      grove.space.chooseDestination(name,'studio','trying '+id+' in the practice room',grove.bar);
    p.discoveries.unshift({bar:grove.bar,instrument:id,from:previous});
    p.discoveries.length=Math.min(20,p.discoveries.length);
-   grove.push(name+(id==='voice'?' puts down '+previous+' and returns to singing.':
+   grove.push(name+(id==='voice'?
+     (INSTRUMENTS.includes(previous)?' returns the '+previous+' and chooses to sing.':
+       ' chooses to try their voice.'):
      id==='none'?' puts down '+previous+' to listen.':
      ' sets down '+previous+' and picks up the '+id+'.'));
    return true;
@@ -172,22 +181,28 @@ export class MusicalDisciplines {
      if(p.interest){
        if(INSTRUMENTS.includes(p.interest)&&!this.available(name,p.interest)){
          p.interest=null;person.purpose='the instrument is in use';
-       }else if(person.destination!=='instrumentRoom' && !grove.library.busy(name))
+       }else if((INSTRUMENTS.includes(p.current)||INSTRUMENTS.includes(p.interest))&&
+           person.destination!=='instrumentRoom'&&!grove.library.busy(name))
          grove.space.chooseDestination(name,'instrumentRoom','going to try '+p.interest,bar);
        if(p.interest)this.switchAtStudio(name,grove);
        continue;
      }
      if(grove.library.busy(name)||grove.space.traveling(name)||
         bar-p.lastSwitch<24||bar-p.lastDecision<12)continue;
-     // Instrument choice arises from physically visiting the instrument room, or
-     // following an actually heard violin back to its home.
+     const curiosity=clamp(name==='Murmur'?grove.vocalist.curiosity:
+       (name==='Pip'?grove.pip:grove.riff).curiosity,0,1);
+     // Someone carrying nothing can discover singing anywhere. The decision
+     // remains optional, and it cannot conjure a physical instrument.
+     if(p.current==='none'&&Math.random()<.025+.04*curiosity){
+       if(this.wants(name,'voice',grove))this.switchAtStudio(name,grove);
+       continue;
+     }
+     // Picking up or swapping physical instruments requires the real rack.
      const inStudio=grove.space.at(name,'instrumentRoom',95);
      const heard=person.lastHeardViolin;
      const heardViolin=heard&&bar-heard.bar<4 &&
        grove.space.canHear(name,heard.from,'violin')>.06;
      if(!inStudio && !heardViolin)continue;
-     const curiosity=clamp(name==='Murmur'?grove.vocalist.curiosity:
-       (name==='Pip'?grove.pip:grove.riff).curiosity,0,1);
      if(!inStudio && Math.random()>.08*curiosity)continue;
      // Being engaged in actual practice is a reason to continue, not a
      // level gate. A curious beginner can still change their mind any time.
