@@ -1194,12 +1194,11 @@ function refreshText(){
       const committed=grove.mode==='jam'&&grove.jamParticipants?.includes(name);
       const state=committed?'JAMMING':
         person.traveling||person.route?.length?'TRAVELING':
-        person.ensembleIntent==='joining'?'JOINING':
-        held==='none'?'LISTENING':'EXPLORING';
+        person.ensembleIntent==='joining'?'JOINING':null;
       const activity=String(person.purpose||person.destination||'following their musical curiosity')
         .replace(/\s+/g,' ').slice(0,54);
-      ui.cameraHint.text=name.toUpperCase()+' · '+held.toUpperCase()+' · '+state+
-        '\n'+activity;
+      ui.cameraHint.text=name.toUpperCase()+' · '+held.toUpperCase()+
+        (state?' · '+state:'')+'\n'+activity;
     }
   }
   if(ui.deliveryTray)ui.deliveryTray.visible=deliveryOpen && !journalOpen;
