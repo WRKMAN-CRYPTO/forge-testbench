@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {InstrumentLabAudio, MODELS, STUDIES, midi,ENGINE_URL,waitForAudioResume,SAMPLE_TRIM_DB,gainForDecibels} from '../../groovegrove-instrument-lab/lab-core.js';
+import {InstrumentLabAudio, MODELS, STUDIES, midi,ENGINE_URL,waitForAudioResume,SAMPLE_TRIM_DB,VIOLIN_TRIM_RANGE,gainForDecibels} from '../../groovegrove-instrument-lab/lab-core.js';
 
 const from=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const legacy=from('../../groovegrove-instrument-lab/legacy-sound.js');
@@ -153,21 +153,51 @@ test('iPhone UI can render an unlock failure and retry without waiting forever',
  assert.match(html,/finally\{busy=false;draw\(\);\}/);
 });
 
-test('Only the CC0 sampled violin gets a calibrated six-decibel lift',()=>{
- assert.deepEqual(SAMPLE_TRIM_DB,{guitar:0,violin:6});
+test('Sampled violin alone starts +12 dB with an explicit +6 to +18 dB adjustment range',()=>{
+ assert.deepEqual(SAMPLE_TRIM_DB,{guitar:0,violin:12});
+ assert.deepEqual(VIOLIN_TRIM_RANGE,{min:6,max:18,step:3});
  assert.equal(gainForDecibels(SAMPLE_TRIM_DB.guitar),1);
- assert.ok(Math.abs(gainForDecibels(SAMPLE_TRIM_DB.violin)-1.9952623)<0.0001);
+ assert.ok(Math.abs(gainForDecibels(SAMPLE_TRIM_DB.violin)-3.9810717)<0.0001);
  const lab=new InstrumentLabAudio();
  assert.equal(lab.sampleGains.size,0);
- // Keep gain nodes in the sampled branch, never in the common master
- // or in the frozen original GrooveGrove violin SoundEngine.
+ assert.equal(lab.getSampleTrimDb('violin'),12);
+ assert.equal(lab.getSampleTrimDb('guitar'),0);
+ assert.equal(lab.setSampleTrimDb('violin',15),15);
+ assert.equal(lab.setSampleTrimDb('violin',999),18);
+ assert.equal(lab.setSampleTrimDb('violin',-999),6);
+ assert.equal(lab.setSampleTrimDb('violin',12),12);
+ assert.equal(lab.setSampleTrimDb('guitar',18),0);
+ assert.equal(lab.getSampleTrimDb('guitar'),0);
+ // Only sampled voices are routed into dedicated gain nodes.
  const source=from('../../groovegrove-instrument-lab/lab-core.js');
- assert.match(source,/trim\.gain\.value=gainForDecibels\(SAMPLE_TRIM_DB\[family\]\?\?0\)/);
+ assert.match(source,/trim\.gain\.value=gainForDecibels\(this\.getSampleTrimDb\(family\)\)/);
  assert.match(source,/trim\.connect\(this\.engine\.mix\[family\]\)/);
  assert.match(source,/destination:trim/);
  assert.match(source,/this\.sampleGains\.set\(family,trim\)/);
  assert.match(source,/trim\.disconnect\(\)/);
  assert.doesNotMatch(source,/this\.engine\.mix\.violin\.gain/);
- assert.match(html,/CC0 bowed violin · sampled level \+6 dB/);
- assert.match(html,/MIX 02/);
+ assert.match(html,/CC0 bowed violin · sampled trim \+/);
+ assert.match(html,/MIX 03/);
+ assert.match(html,/id:'trimDown'/);
+ assert.match(html,/id:'trimUp'/);
+ assert.match(html,/lab\.setSampleTrimDb\('violin',gainDb\+control\.delta\)/);
+});
+
+test('Sampled violin gain adjusts an already-loaded audio node smoothly',()=>{
+ const lab=new InstrumentLabAudio();
+ const called=[];
+ const param={
+  value:1,
+  setTargetAtTime(value,time,constant){called.push([value,time,constant]);}
+ };
+ lab.engine.context={state:'running',currentTime:50};
+ lab.sampleGains.set('violin',{gain:param});
+ assert.equal(lab.setSampleTrimDb('violin',15),15);
+ assert.equal(called.length,1);
+ assert.ok(Math.abs(called[0][0]-gainForDecibels(15))<1e-9);
+ assert.deepEqual(called[0].slice(1),[50,.025]);
+ assert.equal(lab.setSampleTrimDb('violin',18),18);
+ assert.equal(called.length,2);
+ // The original GrooveGrove synthesis never passes through this sample node.
+ assert.equal(lab.getSampleTrimDb('guitar'),0);
 });
