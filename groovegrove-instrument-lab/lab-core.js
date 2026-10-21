@@ -9,8 +9,11 @@ const CDN='https://cdn.jsdelivr.net/gh/';
 export const ENGINE_URL='https://esm.sh/smplr@1.1.0';
 // Human audition loudness calibration only. Not a musician volume decision,
 // new playing skill, or a rewrite of an existing jam recording.
-// +6 dB brings the softly recorded VSCO violin forward. Strumstick is 0 dB.
-export const SAMPLE_TRIM_DB=Object.freeze({guitar:0,violin:6});
+// The listener reported original violin ~2x louder despite the first +6 dB.
+// Start at +12 dB and allow human-only sampled violin trim from +6 to +18.
+// No model preferences, agent decisions, recordings or historical events change.
+export const SAMPLE_TRIM_DB=Object.freeze({guitar:0,violin:12});
+export const VIOLIN_TRIM_RANGE=Object.freeze({min:6,max:18,step:3});
 export const gainForDecibels=db=>10**(db/20);
 export const MODELS=Object.freeze({
  guitar:{
@@ -80,12 +83,31 @@ export class InstrumentLabAudio{
   this.engine=new SoundEngine();
   this.sampled=new Map();
   this.sampleGains=new Map();
+  this.sampleTrimDb={...SAMPLE_TRIM_DB};
   this.loading=new Map();
   this.audioReady=false;
   this.rebuildOnNextEnable=false;
   this.resumeTimeoutMs=2800;
  }
  get context(){return this.engine.context;}
+ getSampleTrimDb(family){return this.sampleTrimDb[family]??0;}
+ setSampleTrimDb(family,db){
+  if(family!=='violin'||!Number.isFinite(db))return this.getSampleTrimDb(family);
+  const range=VIOLIN_TRIM_RANGE;
+  // Quantize to the exact user-facing +/- steps: predictable A/B comparisons.
+  const steps=Math.round((Math.max(range.min,Math.min(range.max,db))-range.min)/range.step);
+  const value=range.min+steps*range.step;
+  this.sampleTrimDb.violin=value;
+  const gain=this.sampleGains.get('violin');
+  if(gain){
+   const target=gainForDecibels(value);
+   // Smooth an active note's amplitude if adjusted while auditioning.
+   if(gain.gain?.setTargetAtTime && this.context?.state==='running')
+    gain.gain.setTargetAtTime(target,this.context.currentTime,.025);
+   else gain.gain.value=target;
+  }
+  return value;
+ }
  async enable(){
   // This method is invoked directly inside the pointerdown handler. Nothing
   // asynchronous may run before the unlock oscillator and resume() call.
@@ -136,7 +158,7 @@ export class InstrumentLabAudio{
    // The original/legacy violin still connects directly to that bus and
    // is unaffected. Avoid raising all voices or weakening the master limiter.
    const trim=this.context.createGain();
-   trim.gain.value=gainForDecibels(SAMPLE_TRIM_DB[family]??0);
+   trim.gain.value=gainForDecibels(this.getSampleTrimDb(family));
    trim.connect(this.engine.mix[family]);
    try{
     const sampler=Sampler(this.context,{
