@@ -1295,7 +1295,8 @@ function refreshText(){
     if(ui.pitchEarInfo){
       ui.pitchEarInfo.text=ear?
         'PITCH EAR · WORKING '+ear.working+'/'+ear.workingLimit+
-        ' · LONG TERM '+ear.longTerm+'/'+ear.longTermLimit:
+        ' · LONG TERM '+ear.longTerm+'/'+ear.longTermLimit+
+        ' · REVISITS '+(grove.pitchRecall?.report(journalName)?.revisits||0):
         'PITCH EAR · awaiting audible notes';
     }
     for(const name of ['Pip','Riff','Murmur']){
