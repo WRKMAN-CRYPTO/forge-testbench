@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {InstrumentLabAudio, MODELS, STUDIES, midi,ENGINE_URL,waitForAudioResume} from '../../groovegrove-instrument-lab/lab-core.js';
+import {InstrumentLabAudio, MODELS, STUDIES, midi,ENGINE_URL,waitForAudioResume,SAMPLE_TRIM_DB,gainForDecibels} from '../../groovegrove-instrument-lab/lab-core.js';
 
 const from=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const legacy=from('../../groovegrove-instrument-lab/legacy-sound.js');
@@ -151,4 +151,23 @@ test('iPhone UI can render an unlock failure and retry without waiting forever',
  assert.match(html,/Audio blocked\. Tap ENABLE AUDIO to retry/);
  assert.match(html,/!audioReady \|\| lab\.context\?\.state!=='running'/);
  assert.match(html,/finally\{busy=false;draw\(\);\}/);
+});
+
+test('Only the CC0 sampled violin gets a calibrated six-decibel lift',()=>{
+ assert.deepEqual(SAMPLE_TRIM_DB,{guitar:0,violin:6});
+ assert.equal(gainForDecibels(SAMPLE_TRIM_DB.guitar),1);
+ assert.ok(Math.abs(gainForDecibels(SAMPLE_TRIM_DB.violin)-1.9952623)<0.0001);
+ const lab=new InstrumentLabAudio();
+ assert.equal(lab.sampleGains.size,0);
+ // Keep gain nodes in the sampled branch, never in the common master
+ // or in the frozen original GrooveGrove violin SoundEngine.
+ const source=from('../../groovegrove-instrument-lab/lab-core.js');
+ assert.match(source,/trim\.gain\.value=gainForDecibels\(SAMPLE_TRIM_DB\[family\]\?\?0\)/);
+ assert.match(source,/trim\.connect\(this\.engine\.mix\[family\]\)/);
+ assert.match(source,/destination:trim/);
+ assert.match(source,/this\.sampleGains\.set\(family,trim\)/);
+ assert.match(source,/trim\.disconnect\(\)/);
+ assert.doesNotMatch(source,/this\.engine\.mix\.violin\.gain/);
+ assert.match(html,/CC0 bowed violin · sampled level \+6 dB/);
+ assert.match(html,/MIX 02/);
 });

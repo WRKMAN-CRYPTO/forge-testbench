@@ -7,6 +7,11 @@ import {SoundEngine} from './legacy-sound.js';
 
 const CDN='https://cdn.jsdelivr.net/gh/';
 export const ENGINE_URL='https://esm.sh/smplr@1.1.0';
+// Human audition loudness calibration only. Not a musician volume decision,
+// new playing skill, or a rewrite of an existing jam recording.
+// +6 dB brings the softly recorded VSCO violin forward. Strumstick is 0 dB.
+export const SAMPLE_TRIM_DB=Object.freeze({guitar:0,violin:6});
+export const gainForDecibels=db=>10**(db/20);
 export const MODELS=Object.freeze({
  guitar:{
   family:'guitar',original:'Original Grove Guitar',sample:'VCSL Finger Strumstick',
@@ -74,6 +79,7 @@ export class InstrumentLabAudio{
  constructor(){
   this.engine=new SoundEngine();
   this.sampled=new Map();
+  this.sampleGains=new Map();
   this.loading=new Map();
   this.audioReady=false;
   this.rebuildOnNextEnable=false;
@@ -92,6 +98,8 @@ export class InstrumentLabAudio{
       this.engine.context.state==='closed'){
     this.engine.makeContext();
     // Sampled voices are linked to one AudioContext and cannot survive reset.
+    for(const node of this.sampleGains.values())node.disconnect();
+    this.sampleGains.clear();
     this.sampled.clear();this.loading.clear();
     this.rebuildOnNextEnable=false;
    }
@@ -124,16 +132,28 @@ export class InstrumentLabAudio{
    onProgress('Loading sampler library…');
    const {Sampler}=await import(ENGINE_URL);
    onProgress('Fetching 4 CC0 recordings…');
-   const sampler=Sampler(this.context,{
-    preset:MODELS[family].preset,
-    destination:this.engine.mix[family],
-    volume:72,
-    onLoadProgress:({loaded,total})=>onProgress('Sampled '+loaded+' / '+total+' loaded')
-   });
-   await sampler.ready;
-   this.sampled.set(family,sampler);
-   onProgress('Recorded instrument ready');
-   return sampler;
+   // Dedicated sampled-instrument trim before the usual family mix bus.
+   // The original/legacy violin still connects directly to that bus and
+   // is unaffected. Avoid raising all voices or weakening the master limiter.
+   const trim=this.context.createGain();
+   trim.gain.value=gainForDecibels(SAMPLE_TRIM_DB[family]??0);
+   trim.connect(this.engine.mix[family]);
+   try{
+    const sampler=Sampler(this.context,{
+     preset:MODELS[family].preset,
+     destination:trim,
+     volume:72,
+     onLoadProgress:({loaded,total})=>onProgress('Sampled '+loaded+' / '+total+' loaded')
+    });
+    await sampler.ready;
+    this.sampleGains.set(family,trim);
+    this.sampled.set(family,sampler);
+    onProgress('Recorded instrument ready');
+    return sampler;
+   }catch(error){
+    trim.disconnect();
+    throw error;
+   }
   })();
   this.loading.set(family,work);
   try{return await work;}finally{this.loading.delete(family);}
