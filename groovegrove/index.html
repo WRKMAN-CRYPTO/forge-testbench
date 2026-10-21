@@ -19,6 +19,7 @@ import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.j
 import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261019-transfer';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
 import { Grove } from './grove-core.js?v=20261020-pitch-ear';
+import { musicalHistory } from './musical-history.js';
 import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261019-transfer';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
 import { LiveNoteConductor } from './live-note-conductor.js?v=20261019-disciplines';
@@ -379,7 +380,7 @@ app.canvas.style.touchAction='none';
 const root=new Container();app.stage.addChild(root);
 let sound=new SoundEngine(),grove=null;
 let started=false,startError='',selected='Pip',soundNeedsRefresh=false,audioStartPending=false;
-let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false,deliveryCategory='instruments',journalOpen=false,journalName='Pip';
+let ui={},landscape=false,W=0,H=0,scale=1,lastLayout=-1,deliveryOpen=false,deliveryCategory='instruments',journalOpen=false,journalName='Pip',journalSection='notes';
 let floatingNotes=[],talkBubble=null,speechQueue=[],ambient=[],now=0,visualBeat=-1;
 let tapesOpen=false,tapeSelection=0,tapePlayback=null;
 let noteFlash={Pip:0,Riff:0,Murmur:0};
@@ -959,7 +960,19 @@ function makeJournalViewer(world){
   ui.journalInfo=textAt(overlay,'',bx+20,by+169,landscape?13:11,PALETTE.cream);
   ui.journalInfo.style.wordWrap=true;ui.journalInfo.style.wordWrapWidth=bw-45;
   ui.journalTexture=textAt(overlay,'',bx+20,by+194,landscape?13:11,PALETTE.mint);
-  textAt(overlay,'RECENT MUSICAL EXPERIMENTS',bx+20,by+230,landscape?13:11,PALETTE.gold,'bold',1);
+  ui.journalSectionTitle=textAt(overlay,'RECENT EXPERIMENTS',bx+20,by+230,landscape?13:11,PALETTE.gold,'bold',1);
+  // An actual canvas control, not a new DOM panel: inspect each musician's
+  // saved instrument history without leaving or modifying the notebook.
+  const flipX=bx+bw-123,flipY=by+221,flipW=106,flipH=30;
+  const flip=new Graphics();overlay.addChild(flip);
+  rect(flip,flipX,flipY,flipW,flipH,9,0x244e48,.96);
+  flip.roundRect(flipX,flipY,flipW,flipH,9).stroke({color:PALETTE.gold,width:1,alpha:.68});
+  flip.eventMode='static';flip.cursor='pointer';
+  flip.hitArea=new Rectangle(flipX,flipY,flipW,flipH);
+  flip.on('pointertap',()=>{
+    journalSection=journalSection==='notes'?'history':'notes';refreshText();
+  });
+  ui.journalSectionToggle=textAt(overlay,'HISTORY',flipX+flipW/2,flipY+9,11,PALETTE.gold,'bold',.3,.5);
   ui.journalRows=[];
   for(let i=0;i<4;i++){
     const field=textAt(overlay,'',bx+21,by+254+i*(landscape?23:25),landscape?12:11,PALETTE.cream);
@@ -1212,7 +1225,30 @@ function refreshText(){
   }
   if(ui.journalOverlay)ui.journalOverlay.visible=journalOpen;
   if(ui.journalHeading && grove){
-    if(journalName==='Murmur'){
+    if(ui.journalSectionTitle)
+      ui.journalSectionTitle.text=journalSection==='history'?'RECORDED DISCIPLINES':'RECENT EXPERIMENTS';
+    if(ui.journalSectionToggle)
+      ui.journalSectionToggle.text=journalSection==='history'?'NOTES':'HISTORY';
+    if(journalSection==='history'){
+      const history=musicalHistory(grove,journalName);
+      if(history){
+        ui.journalHeading.text=journalName.toUpperCase()+' · MUSICAL HISTORY';
+        ui.journalInfo.text=history.instrumentsPlayed+' disciplines played · '+
+          history.totalRecordedNotes.toLocaleString()+' recorded note/hit events';
+        ui.journalTexture.text='Currently '+history.current+' · '+history.studies+' books studied';
+        ui.journalRows.forEach((field,i)=>{
+          const item=history.rows[i];
+          if(!item){field.text='';return;}
+          field.text=item.instrument.toUpperCase()+' · '+
+            (item.recorded?item.notes.toLocaleString()+
+              (item.instrument==='drums'?' hits':' notes'):'no recorded notes')+
+            (item.current?' · NOW':'')+
+            (item.firstBar!==null?' · '+(item.firstLabel==='first hum'?'first hum':'first note')+
+              ' bar '+item.firstBar:'');
+        });
+        ui.journalFoot.text='Earliest saved milestones only, measured in grove bars. No dates or earlier performances inferred.';
+      }
+    }else if(journalName==='Murmur'){
       const v=grove.vocalist,report=grove.voiceJournal.report();
       ui.journalHeading.text='MURMUR · VOCAL NOTEBOOK';
       ui.journalInfo.text=v.stage+' · '+report.sharedPhrases+' shared phrases · '+
