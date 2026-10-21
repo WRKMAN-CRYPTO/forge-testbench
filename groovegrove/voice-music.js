@@ -20,7 +20,7 @@ const nearestRoot=p=>{
 };
 const readable=v=>VOICES.includes(v)?v:'m';
 export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
-                                audio,journal,onNote,playing=null,transfer=null,ensemble=null}){
+                                audio,journal,onNote,playing=null,transfer=null,ensemble=null,pitchRecall=null}){
   if(singer.stage!=='humming'||library.busy('Murmur')||
      bar-singer.lastAttemptBar<2){
     singer.rests++;return false;
@@ -83,6 +83,15 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   }else if(length>1){
     steps=length===2?[0,select([-2,2,3])]:[0,select([-2,2]),select([-3,0,3])];
   }
+  // A freely chosen multi-note phrase may borrow a relative contour from
+  // Murmur's own genuine, recurring long-term pitch observations. This never
+  // initiates a performance, lengthens a phrase, or pretends to prefer a shape.
+  const recalled=pitchRecall?.voice('Murmur',steps,bar)||null;
+  if(recalled){
+    steps=recalled.offsets.map(c=>c/100);
+    repeated=false; // A heard contour isn't automatically a repeated own motif.
+    if(useContour){singer.motif=[...steps];singer.motifCreatedAt=bar;}
+  }
   // An answer requires a note Murmur really heard. Drums inspire rhythm;
   // guitar notes supply harmonic pitch reference.
   // Any audible pitched player can inspire the sung note, including Pip
@@ -140,8 +149,11 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   if(!singer.firstSound)singer.firstSound={bar,heard:response||'the grove',pitch:pitches[0],attempt:singer.attempts};
   if(journal)journal.sound({
     bar,pitches,durations,vowel,
-    kind:useContour?'motif':length>1?'phrase':'hum',
+    kind:recalled?'motif':useContour?'motif':length>1?'phrase':'hum',
     response,repeated,ensemble:present
   });
+  // Durable use means notes really reached the scheduled sound bus.
+  if(recalled&&pitches.length===recalled.offsets.length)
+    pitchRecall.record('Murmur',{bar,kind:'voice',key:recalled.key});
   return {sang:true,ensemble:present,response,pitches,durations,bar};
 }

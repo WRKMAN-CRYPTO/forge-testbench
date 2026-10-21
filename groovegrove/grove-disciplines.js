@@ -352,9 +352,12 @@ export class MusicalDisciplines {
        const expression={roughness,pressure,vibrato:
          (longBow&&(skills.has('vowelShapes')||pitchKnowledge>.5)&&Math.random()<.45)
            ?.0025+Math.random()*.003:0};
-       audio.violin(pitch,time,volume,duration,expression,{player:name});
-       grove.space.sound(name,'violin',bar,volume*2.75,pitch,time);
-       this.record(name,'violin',{bar,pitch,duration,articulation});
+       const sounded=grove.pitchRecall.instrument(name,'violin',pitch,bar,185,800,
+         actual=>{
+           audio.violin(actual,time,volume,duration,expression,{player:name});
+           grove.space.sound(name,'violin',bar,volume*2.75,actual,time);
+           this.record(name,'violin',{bar,pitch:actual,duration,articulation});
+         });
        if(grove.onNote)grove.onNote({agent:name,time,beat});
        p.bowUntilBeat=index+Math.max(1,Math.ceil(duration/beatDur));
        // Two short, controlled bow attacks within a beat are a transfer
@@ -365,7 +368,7 @@ export class MusicalDisciplines {
        if(secondAccent){
          const secondAt=time+beatDur*.53;
          const secondDuration=beatDur*(.22+.16*Math.random());
-         const nextPitch=clamp(pitch*(skills.has('melodicContours')?Math.pow(2,2/12):1),185,800);
+         const nextPitch=clamp(sounded*(skills.has('melodicContours')?Math.pow(2,2/12):1),185,800);
          audio.violin(nextPitch,secondAt,volume*.76,secondDuration,
            {...expression,pressure:clamp(pressure*.83,.22,.78)},
            {player:name});
@@ -427,11 +430,18 @@ export class MusicalDisciplines {
        for(const [i,pitch] of voicing.entries()){
          const at=time+i*.026;
          const volume=(offbeat?.27:.34)*(i>0?.72:1);
-         audio.guitar?.(pitch,at,volume,duration,{player:name});
-         grove.space.sound(name,'guitar',bar,volume,pitch,at);
-         this.record(name,'guitar',{bar,pitch,duration,
-           articulation:canChord?'learned chord voicing':hold?'held melodic note':
-             offbeat?'syncopated guitar note':'picked guitar note'});
+         const schedule=actual=>{
+           audio.guitar?.(actual,at,volume,duration,{player:name});
+           grove.space.sound(name,'guitar',bar,volume,actual,at);
+           this.record(name,'guitar',{bar,pitch:actual,duration,
+             articulation:canChord?'learned chord voicing':hold?'held melodic note':
+               offbeat?'syncopated guitar note':'picked guitar note'});
+         };
+         // Preserve freely chosen chords. A single plucked note can instead
+         // take the next step of an old personally heard/played contour.
+         if(!canChord)
+           grove.pitchRecall.instrument(name,'guitar',pitch,bar,90,850,schedule);
+         else schedule(pitch);
        }
        if(hold)p.guitarUntilBeat=index+Math.max(1,Math.ceil(duration/beatDur));
        if(grove.onNote)grove.onNote({agent:name,time,beat});
