@@ -18,7 +18,7 @@ const publicAssets=new Map([
   ...['grove-core.js','grove-world.js','grove-disciplines.js',
       'music-library.js','listening-journal.js','voice-journal.js',
       'voice-music.js','voiceprints.js','learner-vocals.js','jam-archive.js','pitch-memory.js','musical-history.js',
-      'live-note-conductor.js','server-config.js']
+      'live-note-conductor.js','pitch-recall.js','server-config.js']
      .map(name=>['/'+name,name])
 ]);
 const fileMimes={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8'};
