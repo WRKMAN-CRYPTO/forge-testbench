@@ -10,12 +10,16 @@ const prod=from('../index.html');
 const server=from('../server/index.mjs');
 
 test('The original SoundEngine was copied exactly and remains available for historical sound comparison',()=>{
- const start=prod.indexOf('class SoundEngine {');
- const end=prod.indexOf('\n// Agent communication is through a shared note-event bus',start);
- assert.ok(start>0 && end>start);
- const original=prod.slice(start,end).trim();
+ // Freeze this snapshot's fingerprint. Future intentional modifications
+ // to production GrooveGrove must not silently rewrite historic A/B baseline.
  const copy=legacy.slice(legacy.indexOf('export class SoundEngine')).replace(/^export /,'').trim();
- assert.equal(copy,original);
+ let hash=2166136261;
+ for(let i=0;i<copy.length;i++)
+   hash=Math.imul(hash^copy.charCodeAt(i),16777619)>>>0;
+ assert.equal(hash.toString(16),'d64eec23');
+ assert.match(copy,/class SoundEngine \{/);
+ assert.match(copy,/violin\(freq,t,volume=/);
+ assert.match(copy,/guitar\(freq,t,volume=/);
 });
 
 test('Separate instrument models preserve family provenance and license transparency',()=>{
