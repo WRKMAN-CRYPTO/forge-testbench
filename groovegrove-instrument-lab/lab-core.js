@@ -168,6 +168,8 @@ export class InstrumentLabAudio{
      onLoadProgress:({loaded,total})=>onProgress('Sampled '+loaded+' / '+total+' loaded')
     });
     await sampler.ready;
+    // If the listener adjusted the fader during loading, honor that choice.
+    trim.gain.value=gainForDecibels(this.getSampleTrimDb(family));
     this.sampleGains.set(family,trim);
     this.sampled.set(family,sampler);
     onProgress('Recorded instrument ready');
