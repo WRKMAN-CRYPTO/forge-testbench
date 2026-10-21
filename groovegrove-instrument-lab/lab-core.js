@@ -10,9 +10,9 @@ export const ENGINE_URL='https://esm.sh/smplr@1.1.0';
 // Human audition loudness calibration only. Not a musician volume decision,
 // new playing skill, or a rewrite of an existing jam recording.
 // The listener reported original violin ~2x louder despite the first +6 dB.
-// Start at +12 dB and allow human-only sampled violin trim from +6 to +18.
+// Listener-confirmed balance is close enough at +18 dB; retain the human-only +6 to +18 trim.
 // No model preferences, agent decisions, recordings or historical events change.
-export const SAMPLE_TRIM_DB=Object.freeze({guitar:0,violin:12});
+export const SAMPLE_TRIM_DB=Object.freeze({guitar:0,violin:18});
 export const VIOLIN_TRIM_RANGE=Object.freeze({min:6,max:18,step:3});
 export const gainForDecibels=db=>10**(db/20);
 export const MODELS=Object.freeze({

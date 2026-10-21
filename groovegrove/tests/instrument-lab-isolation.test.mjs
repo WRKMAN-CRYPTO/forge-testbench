@@ -153,14 +153,14 @@ test('iPhone UI can render an unlock failure and retry without waiting forever',
  assert.match(html,/finally\{busy=false;draw\(\);\}/);
 });
 
-test('Sampled violin alone starts +12 dB with an explicit +6 to +18 dB adjustment range',()=>{
- assert.deepEqual(SAMPLE_TRIM_DB,{guitar:0,violin:12});
+test('Sampled violin starts at the listener-approved +18 dB while preserving the +6 to +18 dB range',()=>{
+ assert.deepEqual(SAMPLE_TRIM_DB,{guitar:0,violin:18});
  assert.deepEqual(VIOLIN_TRIM_RANGE,{min:6,max:18,step:3});
  assert.equal(gainForDecibels(SAMPLE_TRIM_DB.guitar),1);
- assert.ok(Math.abs(gainForDecibels(SAMPLE_TRIM_DB.violin)-3.9810717)<0.0001);
+ assert.ok(Math.abs(gainForDecibels(SAMPLE_TRIM_DB.violin)-7.9432823)<0.0001);
  const lab=new InstrumentLabAudio();
  assert.equal(lab.sampleGains.size,0);
- assert.equal(lab.getSampleTrimDb('violin'),12);
+ assert.equal(lab.getSampleTrimDb('violin'),18);
  assert.equal(lab.getSampleTrimDb('guitar'),0);
  assert.equal(lab.setSampleTrimDb('violin',15),15);
  assert.equal(lab.setSampleTrimDb('violin',999),18);
@@ -177,7 +177,7 @@ test('Sampled violin alone starts +12 dB with an explicit +6 to +18 dB adjustmen
  assert.match(source,/trim\.disconnect\(\)/);
  assert.doesNotMatch(source,/this\.engine\.mix\.violin\.gain/);
  assert.match(html,/CC0 bowed violin · sampled trim \+/);
- assert.match(html,/MIX 03/);
+ assert.match(html,/MIX 04/);
  assert.match(html,/id:'trimDown'/);
  assert.match(html,/id:'trimUp'/);
  assert.match(html,/lab\.setSampleTrimDb\('violin',gainDb\+control\.delta\)/);
