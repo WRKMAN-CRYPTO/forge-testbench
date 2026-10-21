@@ -1258,8 +1258,8 @@ function refreshText(){
     const ear=grove.pitchMemory?.report(journalName);
     if(ui.pitchEarInfo){
       ui.pitchEarInfo.text=ear?
-        'PITCH EAR · '+ear.shapes+' shapes · '+ear.recurring+' recurring'+
-        (ear.newest?' · last: '+ear.newest.from:''):
+        'PITCH EAR · WORKING '+ear.working+'/'+ear.workingLimit+
+        ' · LONG TERM '+ear.longTerm+'/'+ear.longTermLimit:
         'PITCH EAR · awaiting audible notes';
     }
     for(const name of ['Pip','Riff','Murmur']){

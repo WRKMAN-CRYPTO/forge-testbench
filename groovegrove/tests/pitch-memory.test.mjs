@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PitchMemory} from '../pitch-memory.js';
+import {PitchMemory,WORKING_LIMIT,LONG_TERM_LIMIT} from '../pitch-memory.js';
 import {Grove} from '../grove-core.js';
 import {PLACES} from '../grove-world.js';
 import {readFileSync} from 'node:fs';
@@ -37,7 +37,7 @@ test('The system distinguishes simultaneous harmony from successive pitch change
  ear.flush();
  assert.equal(ear.report('Pip').shapes,1);
  assert.equal(ear.report('Pip').newest,null);
- const p=ear.snapshot().people.Pip.patterns[0];
+ const p=ear.snapshot().people.Pip.working[0];
  assert.equal(p.key,'together:700');
  assert.equal(p.count,1);
  assert.ok(!p.key.startsWith('seq'));
@@ -48,8 +48,8 @@ test('Cross-musician simultaneous sounds can be heard but not imposed as a music
  put(ear,'Pip','Murmur',20,50,220);
  put(ear,'Pip','Riff',20,50.04,330,'guitar');
  ear.flush();
- assert.equal(ear.snapshot().people.Pip.patterns[0].key,'together:700');
- assert.deepEqual(Object.keys(ear.people.Pip).sort(),['heardNotes','patterns','playedNotes']);
+ assert.equal(ear.snapshot().people.Pip.working[0].key,'together:700');
+ assert.deepEqual(Object.keys(ear.people.Pip).sort(),['evictedLongTerm','evictedWorking','heardNotes','patterns','playedNotes','working']);
 });
 
 test('Real audibility and self-playing differ, and no sound travels through too much distance',()=>{
@@ -107,8 +107,9 @@ test('Memory remains bounded even with many unrelated fresh motifs',()=>{
    put(ear,'Pip','Riff',i*3+1,i*10+.55,base*(1+i/150),'guitar');
  }
  ear.flush();
- assert.ok(ear.report('Pip').shapes<=96);
- assert.ok(ear.snapshot().people.Pip.patterns.length<=96);
+ assert.ok(ear.report('Pip').shapes<=WORKING_LIMIT+LONG_TERM_LIMIT);
+ assert.ok(ear.snapshot().people.Pip.patterns.length<=LONG_TERM_LIMIT);
+ assert.ok(ear.snapshot().people.Pip.working.length<=WORKING_LIMIT);
 });
 
 test('Passive observation does not affect simulation decisions, sound, books, jams or existing memories',()=>{
@@ -138,4 +139,90 @@ test('Real musician journals can show bounded observed recurring patterns on iPh
  assert.match(html,/grove\.pitchMemory\?\.report\(journalName\)/);
  assert.match(html,/PITCH EAR/);
  assert.match(server,/pitch-memory\.js/);
+});
+
+test('All 96 authentic v1 pitch patterns migrate without losing observations',()=>{
+ const original=new PitchMemory();
+ for(let i=0;i<96;i++){
+  original.remember('Riff','seq2:'+(i*25),i+1,'Murmur');
+  original.remember('Riff','seq2:'+(i*25),i+200,'Pip');
+ }
+ // Manufacture the exact on-disk v1 schema from recurring records.
+ const v1=original.snapshot();
+ const old={version:1,people:Object.fromEntries(['Pip','Riff','Murmur']
+  .map(n=>[n,{heardNotes:v1.people[n].heardNotes,playedNotes:v1.people[n].playedNotes,
+    patterns:[...v1.people[n].patterns,...v1.people[n].working]}]))};
+ const before=old.people.Riff.patterns;
+ assert.equal(before.length,96);
+ const restored=new PitchMemory(old),p=restored.snapshot().people.Riff;
+ assert.equal(p.patterns.length,96);
+ assert.deepEqual(p.patterns,before);
+ assert.equal(p.working.length,0);
+ assert.equal(restored.report('Riff').recurring,96);
+ assert.equal(restored.report('Riff').longTerm,96);
+});
+
+test('A full legacy long-term catalog accepts brand-new patterns into working memory',()=>{
+ const ear=new PitchMemory();
+ for(let i=0;i<96;i++)ear.people.Riff.patterns.set('seq2:'+i,{
+  key:'seq2:'+i,count:60,firstBar:i,lastBar:i+500,from:'Pip',played:0,heard:60
+ });
+ assert.equal(ear.report('Riff').longTerm,96);
+ ear.remember('Riff','seq3:375:-250',3000,'Murmur');
+ const w=ear.report('Riff');
+ assert.equal(w.working,1);
+ assert.equal(w.longTerm,96);
+ ear.remember('Riff','seq3:375:-250',3200,'Murmur');
+ assert.equal(ear.report('Riff').longTerm,97);
+ assert.equal(ear.report('Riff').working,0);
+ assert.equal(ear.people.Riff.patterns.get('seq3:375:-250').firstBar,3000);
+ assert.equal(ear.people.Riff.patterns.get('seq3:375:-250').lastBar,3200);
+});
+
+test('Both tiers stay bounded and never close the door on new discoveries',()=>{
+ const ear=new PitchMemory(),p=ear.people.Pip;
+ for(let i=0;i<WORKING_LIMIT+19;i++)ear.remember('Pip','seq3:'+i+':-100',i,'Murmur');
+ assert.equal(p.working.size,WORKING_LIMIT);
+ assert.equal(ear.report('Pip').evictedWorking,19);
+ assert.ok(p.working.has('seq3:'+(WORKING_LIMIT+18)+':-100'));
+ for(let i=0;i<LONG_TERM_LIMIT;i++){
+  const key='seq4:'+i+':0:25';
+  ear.remember('Pip',key,1000+i*2,'Riff');
+  ear.remember('Pip',key,1001+i*2,'Riff');
+ }
+ assert.equal(p.patterns.size,LONG_TERM_LIMIT);
+ const remembered=p.patterns.keys().next().value;
+ ear.remember('Pip','seq5:50:25:-75:0',4000,'Murmur');
+ ear.remember('Pip','seq5:50:25:-75:0',4004,'Murmur');
+ assert.equal(p.patterns.size,LONG_TERM_LIMIT);
+ assert.ok(p.patterns.has('seq5:50:25:-75:0'));
+ assert.equal(ear.report('Pip').evictedLongTerm,1);
+ assert.equal(p.patterns.has(remembered),false);
+});
+
+test('Latest note in a single bar does not artificially promote working patterns',()=>{
+ const ear=new PitchMemory();
+ ear.remember('Murmur','seq2:700',41,'Murmur');
+ ear.remember('Murmur','seq2:700',41,'Murmur');
+ assert.equal(ear.report('Murmur').working,1);
+ assert.equal(ear.report('Murmur').longTerm,0);
+ ear.remember('Murmur','seq2:700',42,'Murmur');
+ assert.equal(ear.report('Murmur').longTerm,1);
+ assert.equal(ear.people.Murmur.patterns.get('seq2:700').count,2);
+});
+
+test('New pitch-memory generations persist with real dates and per-musician histories',()=>{
+ const ear=new PitchMemory();
+ ear.remember('Murmur','seq2:700',23,'Riff');
+ ear.remember('Murmur','seq2:700',24,'Riff');
+ ear.remember('Pip','seq3:-50:250',25,'Pip');
+ for(let i=0;i<WORKING_LIMIT+1;i++)
+  ear.remember('Riff','seq4:'+i+':25:-25',30+i,'Murmur');
+ const saved=ear.snapshot(),restored=new PitchMemory(saved);
+ assert.equal(saved.version,2);
+ assert.deepEqual(restored.snapshot(),saved);
+ assert.equal(restored.report('Murmur').newest.firstBar,23);
+ assert.equal(restored.report('Pip').working,1);
+ assert.equal(restored.report('Riff').evictedWorking,1);
+ assert.ok(restored.people.Riff.working.has('seq4:'+(WORKING_LIMIT)+':25:-25'));
 });
