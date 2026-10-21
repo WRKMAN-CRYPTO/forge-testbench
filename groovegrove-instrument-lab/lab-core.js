@@ -63,11 +63,11 @@ export async function waitForAudioResume(ctx,timeoutMs=2800){
  let timer;
  try{
   const attempted=ctx.resume(); // Invoke synchronously while the tap is active.
-  const completed=await Promise.race([
+  await Promise.race([
    Promise.resolve(attempted).then(()=>true),
    new Promise(resolve=>{timer=setTimeout(()=>resolve(false),timeoutMs);})
   ]);
-  return ctx.state==='running'&&(completed||ctx.state==='running');
+  return ctx.state==='running';
  }finally{clearTimeout(timer);}
 }
 export class InstrumentLabAudio{
@@ -77,6 +77,7 @@ export class InstrumentLabAudio{
   this.loading=new Map();
   this.audioReady=false;
   this.rebuildOnNextEnable=false;
+  this.resumeTimeoutMs=2800;
  }
  get context(){return this.engine.context;}
  async enable(){
@@ -102,7 +103,7 @@ export class InstrumentLabAudio{
     gain.gain.value=.000001;
     osc.connect(gain);gain.connect(ctx.destination);
     osc.start(ctx.currentTime);osc.stop(ctx.currentTime+.025);
-    const resumed=await waitForAudioResume(ctx);
+    const resumed=await waitForAudioResume(ctx,this.resumeTimeoutMs);
     if(!resumed)throw Error('iPhone audio did not unlock. Tap ENABLE AUDIO again.');
    }
    if(ctx!==this.context||ctx.state!=='running')
