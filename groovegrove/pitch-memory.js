@@ -5,10 +5,14 @@
  * names, twelve-tone rules, taste score, choices, motor skills or speech.
  * Transposition-invariant relationships are quantized in 25-cent bins solely
  * to tolerate imperfect execution, not to award theoretical knowledge.
+ * Two bounded tiers: always-open recent working memory and durable recurring
+ * relationships. Full long-term storage replaces the stalest relationship;
+ * it never becomes a closed club. Old v1 memories are migrated intact.
  */
 const NAMES=['Pip','Riff','Murmur'];
 const PITCHED=new Set(['voice','guitar','violin']);
-const MAX_PATTERNS=96,MAX_PENDING=1200;
+export const WORKING_LIMIT=160,LONG_TERM_LIMIT=256;
+const MAX_PENDING=1200;
 const valid=n=>Number.isFinite(n);
 const count=n=>Number.isSafeInteger(n)&&n>=0?n:0;
 const bound=(n,a,b)=>Math.min(b,Math.max(a,n));
@@ -23,16 +27,26 @@ const entry=x=>{
    from:NAMES.includes(x.from)?x.from:null,
    played:count(x.played),heard:count(x.heard)};
 };
-const empty=()=>({heardNotes:0,playedNotes:0,patterns:new Map()});
+const empty=()=>({heardNotes:0,playedNotes:0,
+  // patterns is the v1 long-term map; keep the field stable for migrations.
+  patterns:new Map(),working:new Map(),evictedWorking:0,evictedLongTerm:0});
 export class PitchMemory{
  constructor(saved=null){
   this.people={};
   for(const name of NAMES){
    const old=saved?.people?.[name],p=empty();
    p.heardNotes=count(old?.heardNotes);p.playedNotes=count(old?.playedNotes);
-   if(Array.isArray(old?.patterns))for(const raw of old.patterns.slice(0,MAX_PATTERNS)){
+   // Original 96 entries were already recurring and must not be reset.
+   // Treat every existing v1 record as long-term, including one-off entries.
+   if(Array.isArray(old?.patterns))for(const raw of old.patterns.slice(0,LONG_TERM_LIMIT)){
     const rec=entry(raw);if(rec)p.patterns.set(rec.key,rec);
    }
+   if(Array.isArray(old?.working))for(const raw of old.working.slice(0,WORKING_LIMIT)){
+    const rec=entry(raw);
+    if(rec&&!p.patterns.has(rec.key))p.working.set(rec.key,rec);
+   }
+   p.evictedWorking=count(old?.evictedWorking);
+   p.evictedLongTerm=count(old?.evictedLongTerm);
    this.people[name]=p;
   }
   // Transient note queues never enter the persisted record. Safari and the
@@ -55,10 +69,9 @@ export class PitchMemory{
   for(const n of ready)this.observe(n);
  }
  remember(listener,key,bar,source){
-  const p=this.people[listener],m=p.patterns;
-  let rec=m.get(key);
+  const p=this.people[listener],long=p.patterns,short=p.working;
+  let rec=long.get(key);
   if(rec){
-   // One observation of a shape per bar, even for dense repeated chords.
    if(rec.lastBar===bar)return;
    rec.count=Math.min(1000000000,rec.count+1);
    rec.lastBar=bar;rec.from=source;
@@ -66,18 +79,42 @@ export class PitchMemory{
    else rec.heard++;
    return;
   }
-  if(m.size>=MAX_PATTERNS){
-   let victim=null;
-   for(const v of m.values())
-     if(!victim||v.count<victim.count||
-        (v.count===victim.count&&v.lastBar<victim.lastBar))victim=v;
-   // One-off novelty doesn't wipe out well-observed relationships.
-   if(victim.count>1)return;
-   m.delete(victim.key);
+  rec=short.get(key);
+  if(rec){
+   // Only distinct observed bars count as repeated encounters.
+   if(rec.lastBar===bar)return;
+   rec.count=Math.min(1000000000,rec.count+1);
+   rec.lastBar=bar;rec.from=source;
+   if(source===listener)rec.played++;
+   else rec.heard++;
+   // Frequency of observation, NOT an assertion that the musician likes it.
+   if(rec.count>=2){
+    short.delete(key);
+    if(long.size>=LONG_TERM_LIMIT){
+     // No hard lock at capacity. Recency, not a taste or theoretical score,
+     // decides which older record leaves the bounded permanent collection.
+     let stale=null;
+     for(const old of long.values())
+      if(!stale||old.lastBar<stale.lastBar||
+        (old.lastBar===stale.lastBar&&old.count<stale.count))stale=old;
+     if(stale){long.delete(stale.key);p.evictedLongTerm++;}
+    }
+    long.set(key,rec);
+   }
+   return;
+  }
+  // Every new shape gets a chance in working memory, including after the
+  // long-term catalog is full. We never reject novelty at the door.
+  if(short.size>=WORKING_LIMIT){
+   let oldest=null;
+   for(const old of short.values())
+    if(!oldest||old.lastBar<oldest.lastBar||
+      (old.lastBar===oldest.lastBar&&old.firstBar<oldest.firstBar))oldest=old;
+   if(oldest){short.delete(oldest.key);p.evictedWorking++;}
   }
   rec={key,count:1,firstBar:bar,lastBar:bar,from:source,
     played:source===listener?1:0,heard:source===listener?0:1};
-  m.set(key,rec);
+  short.set(key,rec);
  }
  observe(n){
   const p=this.people[n.listener];
@@ -112,10 +149,12 @@ export class PitchMemory{
   }
  }
  snapshot(){
-  return {version:1,people:Object.fromEntries(NAMES.map(name=>{
+  return {version:2,people:Object.fromEntries(NAMES.map(name=>{
    const p=this.people[name];
    return [name,{heardNotes:p.heardNotes,playedNotes:p.playedNotes,
-     patterns:[...p.patterns.values()].map(x=>({...x}))}];
+     patterns:[...p.patterns.values()].map(x=>({...x})),
+     working:[...p.working.values()].map(x=>({...x})),
+     evictedWorking:p.evictedWorking,evictedLongTerm:p.evictedLongTerm}];
   }))};
  }
  report(name){
@@ -124,7 +163,10 @@ export class PitchMemory{
   const recurring=rows.filter(x=>x.count>=2);
   const newest=recurring.sort((a,b)=>b.lastBar-a.lastBar||b.count-a.count)[0]||null;
   return {heardNotes:p.heardNotes,playedNotes:p.playedNotes,
-   shapes:rows.length,recurring:recurring.length,
+   shapes:rows.length+p.working.size,recurring:recurring.length,
+   working:p.working.size,longTerm:p.patterns.size,
+   workingLimit:WORKING_LIMIT,longTermLimit:LONG_TERM_LIMIT,
+   evictedWorking:p.evictedWorking,evictedLongTerm:p.evictedLongTerm,
    newest:newest?{...newest}:null};
  }
 }
