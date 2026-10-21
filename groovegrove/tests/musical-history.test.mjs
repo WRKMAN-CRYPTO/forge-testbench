@@ -42,9 +42,11 @@ test('Murmur voice uses the original authoritative vocal notebook, not borrowed 
     pitches:[220,330,261.63],durations:[.4,.5,.5]});
   // Simulate a preexisting mirrored statistic. Never double-count it.
   g.disciplines.people.Murmur.practice.voice.notes=800;
-  g.disciplines.record('Murmur','drums',{bar:27,duration:0});
-  // The current voice remains authoritative; playing the drums here needs
-  // no fabricated switch or simulated musical choice.
+  // A past genuine drum session recorded with the instrument held.
+  g.disciplines.people.Murmur.current='drums';
+  assert.equal(g.disciplines.record('Murmur','drums',{bar:27,duration:0}),true);
+  g.disciplines.people.Murmur.current='voice';
+  // The musician is now singing; the historic drum notes are still present.
   const h=musicalHistory(g,'Murmur');
   assert.equal(h.totalRecordedNotes,4);
   assert.equal(h.instrumentsPlayed,2);
