@@ -33,7 +33,6 @@ export function parseContour(key){
  // A whole phrase of repeated notes is still valid, if it was observed.
  return offsets;
 }
-const nearby=(a,b)=>Math.min(1,Math.max(0,a))<b;
 const tune=(pitch,step,min,max)=>{
  let n=pitch*Math.pow(2,step/1200);
  if(!Number.isFinite(n)||n<=0)return pitch;
@@ -82,26 +81,33 @@ export class PitchRecall{
  }
  // Called only for an already-scheduled single pitched instrumental onset.
  // Future existing onsets carry successive steps; no additional notes appear.
- instrument(name,kind,pitch,bar,min,max){
+ instrument(name,kind,pitch,bar,min,max,emit){
+  // Caller supplies the existing note scheduling path. No callback means no
+  // actual note, so no memory-use credit or instrument plan advancement.
+  if(typeof emit!=='function')return pitch;
   if(!NAMES.includes(name)||!['guitar','violin'].includes(kind)||
-    !validBar(bar)||!Number.isFinite(pitch)||pitch<min||pitch>max)return pitch;
+    !validBar(bar)||!Number.isFinite(pitch)||pitch<min||pitch>max){
+   emit(pitch);return pitch;
+  }
   let a=this.active[name];
   if(a&&(a.kind!==kind||bar-a.lastBar>6||bar<a.lastBar)){
    this.active[name]=null;a=null;
   }
   if(!a){
    const recent=this.people[name].recent[0];
-   if(recent&&bar-recent.bar<6)return pitch;
-   if(this.random()>=.16)return pitch;
-   const choice=this.choose(name);
-   if(!choice)return pitch;
-   this.active[name]={kind,key:choice.key,offsets:choice.offsets,
+   let choice=null;
+   if((!recent||bar-recent.bar>=6)&&this.random()<.16)
+    choice=this.choose(name);
+   // The first sounding note is always the artist's original chosen pitch.
+   emit(pitch);
+   if(choice)this.active[name]={kind,key:choice.key,offsets:choice.offsets,
      anchor:pitch,index:1,lastBar:bar,credited:false};
-   return pitch; // First note is the musician's own chosen starting pitch.
+   return pitch;
   }
   const result=tune(a.anchor,a.offsets[a.index],min,max);
+  emit(result); // If scheduling throws, neither progress nor credit occurs.
   a.index++;a.lastBar=bar;
-  // Count only after the musician actually schedules a changed, second note.
+  // Only a real second scheduled note is evidence of remembered use.
   if(!a.credited){
    this.record(name,{bar,kind,key:a.key});
    a.credited=true;
