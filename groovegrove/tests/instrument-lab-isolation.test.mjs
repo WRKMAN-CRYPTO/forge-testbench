@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {InstrumentLabAudio, MODELS, STUDIES, midi,ENGINE_URL} from '../../groovegrove-instrument-lab/lab-core.js';
+import {InstrumentLabAudio, MODELS, STUDIES, midi,ENGINE_URL,waitForAudioResume} from '../../groovegrove-instrument-lab/lab-core.js';
 
 const from=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const legacy=from('../../groovegrove-instrument-lab/legacy-sound.js');
@@ -66,7 +66,7 @@ test('Equivalent musical events feed the legacy and recorded models',()=>{
 test('The instrument lab requires an explicit human click and never touches living GrooveGrove state',()=>{
  const src=from('../../groovegrove-instrument-lab/lab-core.js');
  assert.match(src,/async enable\(\)/);
- assert.match(src,/await ctx\.resume\(\)/);
+ assert.match(src,/await waitForAudioResume\(ctx,this\.resumeTimeoutMs\)/);
  assert.match(src,/async ensureSample\(/);
  assert.match(src,/if\(this\.sampled\.has\(family\)\)/);
  assert.match(src,/await sampler\.ready/);
@@ -97,4 +97,58 @@ test('Canvas-only mobile user interface has A/B and three short note sequences',
  assert.doesNotMatch(html,/<(?:input|select|button|textarea)\b/i);
  const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
  assert.doesNotThrow(()=>new Function(script.replace(/^import [^\n]+\n/gm,'')));
+});
+
+test('Never-ending WebKit resume promise expires instead of freezing the canvas',async()=>{
+ const hung={state:'suspended',resume:()=>new Promise(()=>{})};
+ const start=Date.now();
+ assert.equal(await waitForAudioResume(hung,25),false);
+ assert.ok(Date.now()-start<500);
+});
+
+test('An already-running AudioContext never needs a new resume or reset',async()=>{
+ const running={state:'running',resume(){throw Error('Unexpected resume');}};
+ assert.equal(await waitForAudioResume(running,25),true);
+});
+
+test('A settled resume is not sufficient if WebKit audio remains suspended',async()=>{
+ const suspended={state:'suspended',resume:()=>Promise.resolve()};
+ assert.equal(await waitForAudioResume(suspended,25),false);
+});
+
+test('Failed iPhone audio unlock is recoverable with a fresh context on another tap',async()=>{
+ const lab=new InstrumentLabAudio();
+ lab.resumeTimeoutMs=25;
+ let resets=0,confirmation=0,attempts=0;
+ const original={
+  state:'suspended',currentTime:0,destination:{},
+  createOscillator:()=>({connect(){},start(){},stop(){}}),
+  createGain:()=>({gain:{value:0},connect(){}}),
+  resume:()=>{attempts++;return new Promise(()=>{});}
+ };
+ lab.engine={
+  context:original,
+  makeContext(){
+   resets++;
+   this.context={state:'running',currentTime:10};
+  },
+  tone(){confirmation++;}
+ };
+ await assert.rejects(lab.enable(),/did not unlock/);
+ assert.equal(attempts,1);
+ assert.equal(lab.audioReady,false);
+ assert.equal(lab.rebuildOnNextEnable,true);
+ assert.equal(resets,0);
+ await lab.enable();
+ assert.equal(resets,1);
+ assert.equal(lab.audioReady,true);
+ assert.equal(lab.rebuildOnNextEnable,false);
+ assert.equal(confirmation,1);
+});
+
+test('iPhone UI can render an unlock failure and retry without waiting forever',()=>{
+ assert.match(html,/AUDIO FIX 01B/);
+ assert.match(html,/Audio blocked\. Tap ENABLE AUDIO to retry/);
+ assert.match(html,/!audioReady \|\| lab\.context\?\.state!=='running'/);
+ assert.match(html,/finally\{busy=false;draw\(\);\}/);
 });

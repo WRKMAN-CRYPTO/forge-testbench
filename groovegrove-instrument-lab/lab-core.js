@@ -55,27 +55,67 @@ export const STUDIES=Object.freeze({
     note(440,1.38,.88,.23)]
  }
 });
+// Safari sometimes leaves AudioContext.resume() pending forever after an
+// interruption, even with a valid tap. Bound that wait and allow a fresh
+// context on the next user gesture; never strand the canvas in a busy state.
+export async function waitForAudioResume(ctx,timeoutMs=2800){
+ if(ctx.state==='running')return true;
+ let timer;
+ try{
+  const attempted=ctx.resume(); // Invoke synchronously while the tap is active.
+  await Promise.race([
+   Promise.resolve(attempted).then(()=>true),
+   new Promise(resolve=>{timer=setTimeout(()=>resolve(false),timeoutMs);})
+  ]);
+  return ctx.state==='running';
+ }finally{clearTimeout(timer);}
+}
 export class InstrumentLabAudio{
  constructor(){
   this.engine=new SoundEngine();
   this.sampled=new Map();
   this.loading=new Map();
   this.audioReady=false;
+  this.rebuildOnNextEnable=false;
+  this.resumeTimeoutMs=2800;
  }
  get context(){return this.engine.context;}
  async enable(){
-  // Must start within the real user gesture on mobile Safari.
-  if(!this.engine.context)this.engine.makeContext();
-  const ctx=this.context;
-  if(ctx.state!=='running'){
-   const osc=ctx.createOscillator(),gain=ctx.createGain();
-   gain.gain.value=.000001;
-   osc.connect(gain);gain.connect(ctx.destination);
-   osc.start(ctx.currentTime);osc.stop(ctx.currentTime+.025);
-   await ctx.resume();
+  // This method is invoked directly inside the pointerdown handler. Nothing
+  // asynchronous may run before the unlock oscillator and resume() call.
+  this.audioReady=false;
+  try{
+   // Production Grove uses the playback audio session on iOS. Match it here,
+   // without touching the preserved legacy synthesizer baseline.
+   try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch(e){}
+   if(this.rebuildOnNextEnable||!this.engine.context||
+      this.engine.context.state==='closed'){
+    this.engine.makeContext();
+    // Sampled voices are linked to one AudioContext and cannot survive reset.
+    this.sampled.clear();this.loading.clear();
+    this.rebuildOnNextEnable=false;
+   }
+   const ctx=this.context;
+   if(ctx.state!=='running'){
+    // Start an effectively silent oscillator during the actual gesture.
+    // Safari/WebKit may not unlock audio from resume() alone.
+    const osc=ctx.createOscillator(),gain=ctx.createGain();
+    gain.gain.value=.000001;
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);osc.stop(ctx.currentTime+.025);
+    const resumed=await waitForAudioResume(ctx,this.resumeTimeoutMs);
+    if(!resumed)throw Error('iPhone audio did not unlock. Tap ENABLE AUDIO again.');
+   }
+   if(ctx!==this.context||ctx.state!=='running')
+    throw Error('Audio is still '+ctx.state+'. Tap ENABLE AUDIO to retry.');
+   this.audioReady=true;
+   // Audible confirmation uses the untouched legacy synthesis path.
+   this.engine.tone(587.33,ctx.currentTime+.035,.17,.065,'sine',0);
+  }catch(error){
+   this.audioReady=false;
+   this.rebuildOnNextEnable=true;
+   throw error;
   }
-  if(ctx.state!=='running')throw Error('iPhone audio suspended. Tap ENABLE AUDIO again.');
-  this.audioReady=true;
  }
  async ensureSample(family,onProgress=()=>{}){
   if(this.sampled.has(family))return this.sampled.get(family);

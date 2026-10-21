@@ -60,7 +60,7 @@ function draw(){
  }
  hits.length=0;
  label('GROOVEGROVE',23,40,27,palette.ink,850);
- label('INSTRUMENT LAB  /  SOUND ONLY',24,69,12,palette.green,720);
+ label('INSTRUMENT LAB  /  AUDIO FIX 01B',24,69,12,palette.green,720);
  round(364,20,43,42,12,'#29594c','#90ba95');
  label('W',385.5,42,25,palette.gold,900,'center');
  label('No agents, recordings or memories are modified.',24,93,11,palette.sub,450);
@@ -87,11 +87,16 @@ function draw(){
  button('single','NOTE',24,474,118,44,study==='single',()=>{study='single';draw();});
  button('phrase','MELODY',155,474,118,44,study==='phrase',()=>{study='phrase';draw();});
  button('chord','CHORD',286,474,120,44,study==='chord',()=>{study='chord';draw();});
- if(!audioReady){
-  button('enable','ENABLE AUDIO',24,536,382,66,false,async()=>{
+ if(!audioReady || lab.context?.state!=='running'){
+  button('enable',busy?'OPENING AUDIO…':'ENABLE AUDIO',24,536,382,66,false,async()=>{
    if(busy)return;busy=true;status='Opening iPhone audio…';draw();
-   try{await lab.enable();audioReady=true;status='Audio ready. Choose a model and play.';}
-   catch(e){status='Audio could not start: '+(e?.message||e);}
+   try{await lab.enable();audioReady=true;status='Audio ready. Confirmation tone played.';
+    details=MODELS[family].about;}
+   catch(e){
+    audioReady=false;
+    status='Audio blocked. Tap ENABLE AUDIO to retry.';
+    details=String(e?.message||e);
+   }
    finally{busy=false;draw();}
   },'main');
  }else{
