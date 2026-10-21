@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#091b1a">
+<title>GrooveGrove · Instrument Lab</title>
+<style>
+ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#091b1a;touch-action:none}
+ canvas{display:block;width:100vw;height:100dvh;touch-action:none;-webkit-user-select:none;user-select:none}
+</style>
+</head>
+<body>
+<canvas id="instrumentLab" aria-label="GrooveGrove Instrument Lab. Tap Enable Audio, choose violin or guitar, choose Legacy or Sampled, choose a study, and Play." role="application"></canvas>
+<script type="module">
+import {InstrumentLabAudio,MODELS,STUDIES} from './lab-core.js';
+
+const canvas=document.querySelector('canvas');
+const g=canvas.getContext('2d',{alpha:false});
+const lab=new InstrumentLabAudio();
+const screen={w:430,h:800,scale:1,left:0,top:0};
+const palette={back:'#091b1a',panel:'#153430',ink:'#f1ead3',sub:'#b0c6bb',
+gold:'#ddbf80',green:'#94cbb3',lilac:'#cbb1ec',line:'#426963',muted:'#1c3e39'};
+let family='guitar',renderer='legacy',study='phrase',audioReady=false;
+let busy=false,readySamples=new Set(),status='Tap ENABLE AUDIO to start listening.';
+let details='Select a sound model to audition it. No Grove musician is connected.';
+const hits=[];
+const label=(s,x,y,size=14,color=palette.ink,weight=500,align='left')=>{
+ g.font=weight+' '+size+'px ui-rounded, system-ui, -apple-system, sans-serif';
+ g.fillStyle=color;g.textAlign=align;g.textBaseline='middle';g.fillText(s,x,y);
+};
+const round=(x,y,w,h,r,fill,stroke=null)=>{
+ g.beginPath();g.roundRect(x,y,w,h,r);g.fillStyle=fill;g.fill();
+ if(stroke){g.strokeStyle=stroke;g.lineWidth=1.2;g.stroke();}
+};
+const hit=(id,x,y,w,h,fn)=>{hits.push({id,x,y,w,h,fn});};
+const button=(id,text,x,y,w,h,active,fn,kind='default')=>{
+ const fill=active?'#305d51':kind==='main'?'#457e69':'#193f3a';
+ round(x,y,w,h,13,fill,active?'#e6cd8c':'#3d6760');
+ label(text,x+w/2,y+h/2,Math.min(14,w/8.1),active?'#fff4d6':palette.ink,750,'center');
+ hit(id,x,y,w,h,fn);
+};
+const small=(msg,max=46)=>msg.length>max?msg.slice(0,max-1)+'…':msg;
+function resize(){
+ const ratio=Math.min(window.devicePixelRatio||1,2);
+ canvas.width=Math.round(innerWidth*ratio);canvas.height=Math.round(innerHeight*ratio);
+ screen.scale=Math.min(innerWidth/screen.w,innerHeight/screen.h);
+ screen.left=(innerWidth-screen.w*screen.scale)/2;
+ screen.top=(innerHeight-screen.h*screen.scale)/2;
+ draw();
+}
+function draw(){
+ const dpr=canvas.width/innerWidth;
+ g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle=palette.back;g.fillRect(0,0,innerWidth,innerHeight);
+ g.translate(screen.left,screen.top);g.scale(screen.scale,screen.scale);
+ // Subtle grove silhouette that doesn't rely on imagery or a font download.
+ g.fillStyle='#102c29';
+ for(let i=0;i<24;i++){
+  const x=i*19-8;g.beginPath();g.moveTo(x,710);g.lineTo(x+18,650-(i%4)*18);g.lineTo(x+29,710);g.fill();
+ }
+ hits.length=0;
+ label('GROOVEGROVE',23,40,27,palette.ink,850);
+ label('INSTRUMENT LAB  /  SOUND ONLY',24,69,12,palette.green,720);
+ round(364,20,43,42,12,'#29594c','#90ba95');
+ label('W',385.5,42,25,palette.gold,900,'center');
+ label('No agents, recordings or memories are modified.',24,93,11,palette.sub,450);
+ label('CHOOSE AN INSTRUMENT',24,123,13,palette.gold,720);
+ button('guitar','GUITAR',24,144,186,49,family==='guitar',()=>{
+  family='guitar';renderer='legacy';study='phrase';details=MODELS.guitar.about;draw();
+ });
+ button('violin','VIOLIN',221,144,185,49,family==='violin',()=>{
+  family='violin';renderer='legacy';study='phrase';details=MODELS.violin.about;draw();
+ });
+ label('CHOOSE A SOUND MODEL',24,222,13,palette.gold,720);
+ const original=renderer==='legacy',sampled=renderer==='sample';
+ round(24,240,382,85,14,original?'#315748':'#193c37',original?palette.gold:palette.line);
+ label('A  /  ORIGINAL GROVE',40,263,14,palette.ink,800);
+ label('Exact live GrooveGrove '+family+' synthesizer',40,287,12,palette.sub);
+ label('Built in  ·  no sample download',40,307,11,palette.green);
+ hit('legacy',24,240,382,85,()=>{renderer='legacy';details='Original GrooveGrove sound, preserved without changes.';draw();});
+ round(24,337,382,93,14,sampled?'#315748':'#193c37',sampled?palette.gold:palette.line);
+ label('B  /  '+(family==='guitar'?'FINGER STRUMSTICK':'SOLO BOWED VIOLIN'),40,358,14,palette.ink,800);
+ label('Real recorded notes  ·  Versilian CC0',40,382,12,palette.sub);
+ label(readySamples.has(family)?'Downloaded to audio memory  ✓':'Loads only when auditioned',40,409,11,palette.green);
+ hit('sample',24,337,382,93,()=>{renderer='sample';details=MODELS[family].about;draw();});
+ label('SAME NOTES  ·  SAME TIMING',24,456,13,palette.gold,720);
+ button('single','NOTE',24,474,118,44,study==='single',()=>{study='single';draw();});
+ button('phrase','MELODY',155,474,118,44,study==='phrase',()=>{study='phrase';draw();});
+ button('chord','CHORD',286,474,120,44,study==='chord',()=>{study='chord';draw();});
+ if(!audioReady){
+  button('enable','ENABLE AUDIO',24,536,382,66,false,async()=>{
+   if(busy)return;busy=true;status='Opening iPhone audio…';draw();
+   try{await lab.enable();audioReady=true;status='Audio ready. Choose a model and play.';}
+   catch(e){status='Audio could not start: '+(e?.message||e);}
+   finally{busy=false;draw();}
+  },'main');
+ }else{
+  button('play',busy?'LOADING AUDIO…':'▶  PLAY '+(renderer==='legacy'?'ORIGINAL':'SAMPLED'),24,536,382,66,false,async()=>{
+   if(busy)return;
+   busy=true;status=renderer==='sample'?'Loading verified CC0 sample files…':'Scheduling original synthesized notes…';draw();
+   try{
+    const played=await lab.play(family,renderer,study,t=>{status=t;draw();});
+    if(renderer==='sample')readySamples.add(family);
+    status='Played '+played.notes+' scheduled notes via '+(renderer==='sample'?'smplr':'legacy')+'.';
+   }catch(e){
+    status='Audio unavailable: '+(e?.message||String(e));
+   }finally{busy=false;draw();}
+  },'main');
+ }
+ round(24,623,382,62,12,'#102d29',palette.line);
+ label(small(status,53),37,647,11.5,palette.green,700);
+ label(small(details,58),37,667,10,palette.sub);
+ label('CC0 RECORDED SAMPLES: VERSILIAN STUDIOS',24,719,10,palette.gold,720);
+ label('Tap to inspect origin / license',24,741,11,palette.sub);
+ hit('license',24,696,382,59,()=>{window.open(MODELS[family].source,'_blank','noopener,noreferrer');});
+ label('ISOLATED BENCH  ·  NOT LIVE IN GROOVEGROVE',215,780,10,palette.sub,700,'center');
+}
+canvas.addEventListener('pointerdown',e=>{
+ e.preventDefault();
+ const x=(e.clientX-screen.left)/screen.scale,y=(e.clientY-screen.top)/screen.scale;
+ const target=hits.findLast(h=>x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h);
+ if(target)target.fn();
+},{passive:false});
+window.addEventListener('resize',resize);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){status='Audio paused? Tap ENABLE AUDIO if silent.';draw();}});
+details=MODELS[family].about;
+resize();
+</script>
+</body>
+</html>
