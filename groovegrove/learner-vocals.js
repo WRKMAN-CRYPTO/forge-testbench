@@ -46,10 +46,14 @@ export function tryLearnerVocalPhrase({name,grove,bar,time,audio}){
   const borrowed=phraseReady&&remembered.length===3&&Math.random()<.42;
   const motifReady=phraseReady&&Array.isArray(state.motif)&&state.motif.length>1 &&
     Math.random()<.3;
-  const steps=motifReady?[...state.motif]:borrowed?
+  let steps=motifReady?[...state.motif]:borrowed?
     remembered.map(p=>clamp(Math.round(12*Math.log2(p/remembered[0])),-12,12)):
     phraseReady&&Math.random()<.48?
       [0,pick([-3,-2,0,2,3]),pick([-4,-2,0,2,4])]:[0];
+  // A prior long-term contour is another optional phrase idea, not a reason
+  // to start singing. All the established vocal willingness and rests remain.
+  const recalled=grove.pitchRecall?.voice(name,steps,bar)||null;
+  if(recalled)steps=recalled.offsets.map(c=>c/100);
   const center=clamp((borrowed&&!motifReady?remembered[0]:
     inspiration&&Math.random()<.72?inspiration:state.lastPitch||220)*
     imprint.register,150,465);
@@ -80,6 +84,8 @@ export function tryLearnerVocalPhrase({name,grove,bar,time,audio}){
     state.notes++;state.lastPitch=pitch;state.lastNoteBar=bar;
   }
   if(pitches.length>1)state.phrases++;
+  if(recalled&&pitches.length===recalled.offsets.length)
+    grove.pitchRecall.record(name,{bar,kind:'voice',key:recalled.key});
   if(!state.firstSound)state.firstSound={bar,pitch:pitches[0],
     inspiredBy:heard[0]?.from||(personal.length?'own instrumental memory':'curiosity')};
   if(state.notes===1)grove.push(name+' experiments with their voice for the first time.');
