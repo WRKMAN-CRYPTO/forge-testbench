@@ -60,7 +60,7 @@ function draw(){
  }
  hits.length=0;
  label('GROOVEGROVE',23,40,27,palette.ink,850);
- label('INSTRUMENT LAB  /  AUDIO FIX 01B · MIX 02',24,69,12,palette.green,720);
+ label('INSTRUMENT LAB  /  AUDIO FIX 01B · MIX 03',24,69,12,palette.green,720);
  round(364,20,43,42,12,'#29594c','#90ba95');
  label('W',385.5,42,25,palette.gold,900,'center');
  label('No agents, recordings or memories are modified.',24,93,11,palette.sub,450);
@@ -80,9 +80,30 @@ function draw(){
  hit('legacy',24,240,382,85,()=>{renderer='legacy';details='Original GrooveGrove sound, preserved without changes.';draw();});
  round(24,337,382,93,14,sampled?'#315748':'#193c37',sampled?palette.gold:palette.line);
  label('B  /  '+(family==='guitar'?'FINGER STRUMSTICK':'SOLO BOWED VIOLIN'),40,358,14,palette.ink,800);
- label(family==='violin'?'CC0 bowed violin · sampled level +6 dB':'Real recorded notes  ·  Versilian CC0',40,382,12,palette.sub);
+ label(family==='violin'?
+  'CC0 bowed violin · sampled trim +'+lab.getSampleTrimDb('violin')+' dB':
+  'Real recorded notes  ·  Versilian CC0',40,382,12,palette.sub);
  label(readySamples.has(family)?'Downloaded to audio memory  ✓':'Loads only when auditioned',40,409,11,palette.green);
  hit('sample',24,337,382,93,()=>{renderer='sample';details=MODELS[family].about;draw();});
+ if(family==='violin'&&sampled){
+  // A compact pair of genuine canvas touch targets; only affects the
+  // sampled violin's gain node, not the original violin or any musician.
+  for(const control of [
+   {id:'trimDown',symbol:'−',x:302,delta:-3},
+   {id:'trimUp',symbol:'+',x:354,delta:3}
+  ]){
+   const gainDb=lab.getSampleTrimDb('violin');
+   const disabled=control.delta<0?gainDb<=6:gainDb>=18;
+   round(control.x,392,43,34,9,disabled?'#203c38':'#3d7062',disabled?'#426963':palette.gold);
+   label(control.symbol,control.x+21.5,409,21,disabled?'#73958a':palette.ink,800,'center');
+   hit(control.id,control.x,392,43,34,()=>{
+    if(disabled)return;
+    const next=lab.setSampleTrimDb('violin',gainDb+control.delta);
+    details='Sampled violin at +'+next+' dB. Compare with ORIGINAL; lower if distorted.';
+    draw();
+   });
+  }
+ }
  label('SAME NOTES  ·  SAME TIMING',24,456,13,palette.gold,720);
  button('single','NOTE',24,474,118,44,study==='single',()=>{study='single';draw();});
  button('phrase','MELODY',155,474,118,44,study==='phrase',()=>{study='phrase';draw();});
