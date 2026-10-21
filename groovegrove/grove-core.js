@@ -9,6 +9,7 @@ import {restoreVoiceprints} from './voiceprints.js';
 import {tryLearnerVocalPhrase} from './learner-vocals.js?v=20261020-pitch-ear';
 import {JamArchive} from './jam-archive.js';
 import {PitchMemory} from './pitch-memory.js';
+import {PitchRecall} from './pitch-recall.js';
 
 /*
  * A jam belongs to musicians who consent to play together, never to a fixed
@@ -128,6 +129,7 @@ export class Grove {
     this.voiceprints=restoreVoiceprints(saved?.voiceprints);
     this.space=new GroveWorld(saved?.space);
     this.pitchMemory=new PitchMemory(saved?.pitchMemory);
+    this.pitchRecall=new PitchRecall(this.pitchMemory,saved?.pitchRecall);
     this.space.onPitchedNote=note=>this.pitchMemory.enqueue(note);
     this.disciplines=new MusicalDisciplines(saved?.disciplines);
     this.archive=new JamArchive(saved?.archive);
@@ -168,7 +170,7 @@ export class Grove {
     voiceprints:Object.fromEntries(Object.entries(this.voiceprints).map(([name,profile])=>[name,{...profile}])),
     space:this.space.snapshot(),
     disciplines:this.disciplines.snapshot(),archive:this.archive.snapshot(),
-    pitchMemory:this.pitchMemory.snapshot(),
+    pitchMemory:this.pitchMemory.snapshot(),pitchRecall:this.pitchRecall.snapshot(),
     jamParticipants:[...this.jamParticipants],logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
@@ -231,6 +233,7 @@ export class Grove {
         audio,journal:this.voiceJournal,onNote:this.onNote,
          ensemble:this.mode==='jam'?this.jamParticipants:null,
         transfer:this.disciplines.transfer('Murmur',this),
+        pitchRecall:this.pitchRecall,
         playing:Object.fromEntries(['Pip','Riff'].map(name=>[name,
           !this.library.busy(name)&&!this.space.traveling(name)&&
           this.space.destination(name)!=='pond'&&(
@@ -279,12 +282,18 @@ export class Grove {
     const pipChoice=this.understanding.variation('Pip');
     let riffSoundedThisBeat=false;
     const play={
-      guitar:(freq,at,volume,duration,extra=false)=>{
-        riffSoundedThisBeat=true;
-        audio.guitar(freq,at,volume,duration);
-        this.disciplines.record('Riff','guitar',{bar,pitch:freq,duration});
-        this.space.sound('Riff','guitar',bar,volume,freq,at);
-        this.understanding.hear({who:'Riff',kind:'guitar',time:at,bar,beat,velocity:volume,offsetMs:riffOffset,extra,pitch:freq});
+      guitar:(freq,at,volume,duration,extra=false,soloNote=false)=>{
+        const schedule=actual=>{
+          riffSoundedThisBeat=true;
+          audio.guitar(actual,at,volume,duration);
+          this.disciplines.record('Riff','guitar',{bar,pitch:actual,duration});
+          this.space.sound('Riff','guitar',bar,volume,actual,at);
+          this.understanding.hear({who:'Riff',kind:'guitar',time:at,bar,beat,velocity:volume,offsetMs:riffOffset,extra,pitch:actual});
+          return actual;
+        };
+        // Chord tones are not melodic steps; only a freely chosen solo note
+        // may carry a prior personal long-term contour across real onsets.
+        return soloNote?this.pitchRecall.instrument('Riff','guitar',freq,bar,90,850,schedule):schedule(freq);
       },
       kick:(at,volume,extra=false)=>{
         audio.kick(at,volume);
@@ -336,9 +345,9 @@ export class Grove {
             (Math.random()<.62?2:3);
           const duration=holdBeats*beatDur-.075;
           this.riffHoldUntilBeat=index+holdBeats;
-          play.guitar(note,guitarOnset,dynamic*feeling*.93,duration);
+          const playedPitch=play.guitar(note,guitarOnset,dynamic*feeling*.93,duration,false,true);
           this.riffHeldNotes++;
-          this.riffLastHeldNote={bar,beat,pitch:note,
+          this.riffLastHeldNote={bar,beat,pitch:playedPitch,
             seconds:Math.round(duration*100)/100,
             context:singingNearby?'answering Murmur':onJam?'playing together':'solo idea'};
         }else{
@@ -358,7 +367,7 @@ export class Grove {
           ));
         }
       }else if(!alreadyHolding && !(riffChoice==='breath' && beat===3) && !riffRest){
-        play.guitar(voicing[(beat+bar)%3]*2,guitarOnset,dynamic*.72*feeling,.29);
+        play.guitar(voicing[(beat+bar)%3]*2,guitarOnset,dynamic*.72*feeling,.29,false,true);
       }
       if(usesNewChords && beat===0)this.playedKnowledge.Riff++;
       if(!alreadyHolding && !riffRest && onJam && beat===3 && this.library.has('Riff','callResponse')){
