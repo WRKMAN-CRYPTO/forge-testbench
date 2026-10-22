@@ -27,13 +27,18 @@ const OPP=['AURORA','UMBRA'];
 const NAME1=['Moss','Peb','Bri','Nim','Lum','Fae','Thim','Spri','Wisp','Rune','Glim','Pip','Kip','Vex','Mira'];
 const NAME2=['let','ling','bit','kin','fin','nip','bel','wick','moth','paw','thorn','bell','tail','glow','crest'];
 const KEY='soul-crucible-v0.2';
-let souls, fighters, round=1, selected=0, running=true, speed=1, showJournal=false;
+let souls, fighters, round=1, selected=0, running=true, speed=1, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
 let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true;
-function makeSoul(i){let im={};AXES.forEach(a=>im[a.key]=rand(-.18,.18));return {id:i===0?'AURORA':'UMBRA',color:i===0?'#aab8ff':'#ffc79f',im,origin:{...im},lives:0,wins:0,losses:0,record:[],totalDamage:0};}
-function load(){try{const p=JSON.parse(localStorage.getItem(KEY));if(p&&Array.isArray(p.souls)&&p.souls.length===2&&p.souls.every(s=>s.im&&AXES.every(a=>Number.isFinite(s.im[a.key])))){souls=p.souls;round=p.round||1;return;}}catch(e){} souls=[makeSoul(0),makeSoul(1)];round=1;}
+function blankCounts(list){const out={};for(const item of list){const key=typeof item==='string'?item:item.name;out[key]=0;}return out;}
+function freshObserver(){return {decisionCounts:blankCounts(ACTIONS),bodyLives:blankCounts(TYPES),bodyWins:blankCounts(TYPES),bodyLosses:blankCounts(TYPES),openingEvades:0,duelsStarted:0,evades:0,successfulDodges:0,totalDamage:0,totalTaken:0,totalStrikes:0,totalGuards:0,livesObserved:0};}
+function ensureSoul(s){s.im=s.im||{};AXES.forEach(a=>{if(!Number.isFinite(s.im[a.key]))s.im[a.key]=0;});if(!s.origin)s.origin={...s.im};if(!Array.isArray(s.record))s.record=[];if(!Number.isFinite(s.lives))s.lives=0;if(!Number.isFinite(s.wins))s.wins=0;if(!Number.isFinite(s.losses))s.losses=0;if(!Number.isFinite(s.totalDamage))s.totalDamage=0;if(!s.obs){s.obs=freshObserver();s.obsStartedAtLife=s.lives||0;}const o=s.obs;if(!o.decisionCounts)o.decisionCounts=blankCounts(ACTIONS);if(!o.bodyLives)o.bodyLives=blankCounts(TYPES);if(!o.bodyWins)o.bodyWins=blankCounts(TYPES);if(!o.bodyLosses)o.bodyLosses=blankCounts(TYPES);for(const k of ACTIONS)if(!Number.isFinite(o.decisionCounts[k]))o.decisionCounts[k]=0;for(const t of TYPES){for(const map of [o.bodyLives,o.bodyWins,o.bodyLosses])if(!Number.isFinite(map[t.name]))map[t.name]=0;}for(const k of ['openingEvades','duelsStarted','evades','successfulDodges','totalDamage','totalTaken','totalStrikes','totalGuards','livesObserved']) if(!Number.isFinite(o[k]))o[k]=0;return s;}
+function bodyStats(soul,name){ensureSoul(soul);return {lives:soul.obs.bodyLives[name]||0,wins:soul.obs.bodyWins[name]||0,losses:soul.obs.bodyLosses[name]||0};}
+function totalCount(obj){let n=0;for(const k in obj)n+=obj[k]||0;return n;}
+function makeSoul(i){let im={};AXES.forEach(a=>im[a.key]=rand(-.18,.18));return ensureSoul({id:i===0?'AURORA':'UMBRA',color:i===0?'#aab8ff':'#ffc79f',im,origin:{...im},lives:0,wins:0,losses:0,record:[],totalDamage:0,obs:freshObserver()});}
+function load(){try{const p=JSON.parse(localStorage.getItem(KEY));if(p&&Array.isArray(p.souls)&&p.souls.length===2&&p.souls.every(s=>s.im&&AXES.every(a=>Number.isFinite(s.im[a.key])))){souls=p.souls.map(ensureSoul);round=p.round||1;return;}}catch(e){} souls=[makeSoul(0),makeSoul(1)];round=1;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify({souls,round}));}catch(e){}}
-function born(soul,side){const b=pick(TYPES),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},stat:{damage:0,taken:0,strikes:0,guards:0,evades:0},phase:rand(0,TAU),style:rint(0,4),tone:factor};soul.lives++;return f;}
-function begin(){fighters=[born(souls[0],0),born(souls[1],1)];roundTimer=0;countdown=1.0;events.length=0;addEvent('Fresh minds. Fresh bodies. Old feelings.');}
+function born(soul,side){ensureSoul(soul);const b=pick(TYPES),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},phase:rand(0,TAU),style:rint(0,4),tone:factor};soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;return f;}
+function begin(){fighters=[born(souls[0],0),born(souls[1],1)];roundTimer=0;countdown=1.0;for(const f of fighters){f.soul.obs.duelsStarted++;f.openingDuelCounted=false;}events.length=0;addEvent('Fresh minds. Fresh bodies. Old feelings.');}
 function addEvent(msg){events.unshift(msg);if(events.length>5)events.length=5;}
 function imprint(s,k,amt){s.im[k]=clamp(s.im[k]+amt,-1,1);}
 function learn(f,r){const m=f.mind;const idx=m.lastAction; m.q[idx]=clamp(m.q[idx]+m.learning*(r-m.q[idx]*.1),-1.4,1.4);m.experience++;}
@@ -54,13 +59,14 @@ function actionScore(f,o,a){const b=f.body, dist=Math.abs(o.x-f.x), reach=54+b.r
  if(f.lock>0&&['strike','heavy','lunge'].includes(a))body-=2;
  if(a==='guard'&&o.action==='retreat')mind-=.18;
  return {mind,body,soul,total:mind+body+soul+rand(-.18,.18)};}
-function decide(f,o){if(f.stagger>0)return; const options=ACTIONS.map(a=>({a,...actionScore(f,o,a)}));options.sort((a,b)=>b.total-a.total);let opt=options[0];if(Math.random()<.12)opt=options[rint(0,Math.min(2,options.length-1))];f.action=opt.a;f.lastParts={mind:opt.mind,soul:opt.soul,body:opt.body};f.mind.lastAction=ACTIONS.indexOf(opt.a);f.actionTime=.35; if(opt.a==='guard'&&f.stamina>5){f.guard=.46;f.stat.guards++;}
- if(opt.a==='evade'&&f.stamina>12){f.evade=.35;f.hopV=1.5;f.stamina-=13;f.vx= (f.x<o.x?-1:1)*(135+f.body.speed*19);f.stat.evades++;}
- if(['strike','heavy','lunge'].includes(opt.a)&&f.lock<=0&&!f.attack){const heavy=opt.a==='heavy',lunge=opt.a==='lunge';const wind=(heavy?.42:lunge?.30:.19)*(1.16-f.body.speed*.055),recovery=(heavy?.60:lunge?.49:.33)*(1.15-f.body.speed*.05);let cost=heavy?27:lunge?24:12;if(f.stamina>=cost){f.stamina-=cost;f.attack={type:opt.a,time:0,wind,full:wind+recovery,hit:false,impacted:false,reach:54+f.body.reach*17+(lunge?36:0),power:(heavy?1.55:lunge?1.24:1)*f.body.power}; f.stat.strikes++;f.guard=0;if(lunge)f.vx=(f.x<o.x?1:-1)*(185+f.body.speed*18);}}
+function decide(f,o){if(f.stagger>0)return; const options=ACTIONS.map(a=>({a,...actionScore(f,o,a)}));options.sort((a,b)=>b.total-a.total);let opt=options[0];if(Math.random()<.12)opt=options[rint(0,Math.min(2,options.length-1))];f.action=opt.a;f.lastParts={mind:opt.mind,soul:opt.soul,body:opt.body};f.mind.lastAction=ACTIONS.indexOf(opt.a);f.actionTime=.35;f.stat.decisions++;f.soul.obs.decisionCounts[opt.a]=(f.soul.obs.decisionCounts[opt.a]||0)+1;
+ if(opt.a==='guard'&&f.stamina>5){f.guard=.46;f.stat.guards++;f.soul.obs.totalGuards++;}
+ if(opt.a==='evade'&&f.stamina>12){f.evade=.35;f.hopV=1.5;f.stamina-=13;f.vx=(f.x<o.x?-1:1)*(135+f.body.speed*19);f.stat.evades++;f.soul.obs.evades++;if(roundTimer<3&&!f.openingDuelCounted){f.stat.openingEvades++;f.openingDuelCounted=true;f.soul.obs.openingEvades++;}}
+ if(['strike','heavy','lunge'].includes(opt.a)&&f.lock<=0&&!f.attack){const heavy=opt.a==='heavy',lunge=opt.a==='lunge';const wind=(heavy?.42:lunge?.30:.19)*(1.16-f.body.speed*.055),recovery=(heavy?.60:lunge?.49:.33)*(1.15-f.body.speed*.05);let cost=heavy?27:lunge?24:12;if(f.stamina>=cost){f.stamina-=cost;f.attack={type:opt.a,time:0,wind,full:wind+recovery,hit:false,impacted:false,reach:54+f.body.reach*17+(lunge?36:0),power:(heavy?1.55:lunge?1.24:1)*f.body.power}; f.stat.strikes++;f.soul.obs.totalStrikes++;f.guard=0;if(lunge)f.vx=(f.x<o.x?1:-1)*(185+f.body.speed*18);}}
  }
 function impact(f,o){const at=f.attack;if(!at||at.hit)return;at.hit=true;const dist=Math.abs(f.x-o.x),reachable=dist<at.reach+28;let success=false;
- if(reachable){let dodge=o.evade>0.06&&Math.random()<.66;let defending=o.guard>.06; if(dodge){floatText(o.x,'DODGE','#9de6fa');learn(o,.17); imprint(o.soul,'defense',.0005);}
- else{let raw=(6+f.body.power*3.4)*at.power/f.body.power*rand(.83,1.16),blocked=defending?(.60+o.body.defense*.035):0,armor=1/(1+o.body.defense*.073);let dmg=Math.max(1,Math.round(raw*(1-blocked)*armor));o.hp=Math.max(0,o.hp-dmg);o.stat.taken+=dmg;f.stat.damage+=dmg;f.soul.totalDamage+=dmg;success=true;
+ if(reachable){let dodge=o.evade>0.06&&Math.random()<.66;let defending=o.guard>.06; if(dodge){floatText(o.x,'DODGE','#9de6fa');o.stat.dodges++;o.soul.obs.successfulDodges++;learn(o,.17); imprint(o.soul,'defense',.0005);}
+ else{let raw=(6+f.body.power*3.4)*at.power/f.body.power*rand(.83,1.16),blocked=defending?(.60+o.body.defense*.035):0,armor=1/(1+o.body.defense*.073);let dmg=Math.max(1,Math.round(raw*(1-blocked)*armor));o.hp=Math.max(0,o.hp-dmg);o.stat.taken+=dmg;f.stat.damage+=dmg;f.soul.totalDamage+=dmg;f.soul.obs.totalDamage+=dmg;o.soul.obs.totalTaken+=dmg;success=true;
  o.hitFlash=.18;let push=(22+f.body.power*13)*(1-blocked*.7)*(2.7/(o.body.mass+1.4));o.vx+=(f.x<o.x?1:-1)*push;
  if(at.type==='heavy'&&f.body.power>=o.body.poise&&Math.random()<.5)o.stagger=.14;
  spawnHit(o.x,arena?arena.ground-37:200,defending?'#8bcbf9':'#fcd6a6');floatText(o.x,defending?`${dmg} BLOCK`:`-${dmg}`,defending?'#9fe4fa':'#ffe3bd');
@@ -71,7 +77,7 @@ function impact(f,o){const at=f.attack;if(!at||at.hit)return;at.hit=true;const d
 function spawnHit(px,py,c){for(let i=0;i<10;i++)particles.push({x:arena.x+(px/1000)*arena.w,y:py,vx:rand(-100,100),vy:rand(-110,18),life:rand(.24,.5),max:.5,c,r:rand(2,5)});}
 function floatText(x,txt,c){floats.push({x,y:arena?arena.ground-90:155,txt,c,life:.85});}
 function death(loser,winner){if(bannerTimer>0)return;
- loser.soul.losses++;winner.soul.wins++;
+ loser.soul.losses++;winner.soul.wins++;winner.soul.obs.bodyWins[winner.body.name]++;loser.soul.obs.bodyLosses[loser.body.name]++;
  imprint(loser.soul,'pain',-.006);imprint(loser.soul,'contact',-.002);imprint(winner.soul,'pressure',.003);
  // Losing does not have a universally scripted emotional meaning.
  // An existing disposition and bounded noise can turn a loss into caution or determination.
@@ -81,7 +87,7 @@ function death(loser,winner){if(bannerTimer>0)return;
  addEvent(`${loser.soul.id} lost life ${loser.soul.lives}. Emotional impressions remain.`);
  winner.hp=Math.min(winner.maxHp, winner.hp+Math.round(winner.maxHp*.32));winner.stamina=100;winner.attack=null;winner.guard=0;winner.evade=0;winner.vx=0;winner.lock=0;
  bannerTimer=1.8;round++;save();}
-function nextLife(){const dead=fighters.findIndex(f=>f.hp<=0),survive=dead===0?1:0;if(dead<0)return;fighters[dead]=born(souls[dead],dead);fighters[survive].x=survive===0?205:795;fighters[survive].vx=0;fighters[dead].x=dead===0?205:795;countdown=.85;roundTimer=0;save();}
+function nextLife(){const dead=fighters.findIndex(f=>f.hp<=0),survive=dead===0?1:0;if(dead<0)return;fighters[dead]=born(souls[dead],dead);fighters[survive].x=survive===0?205:795;fighters[survive].vx=0;fighters[dead].x=dead===0?205:795;countdown=.85;roundTimer=0;for(const f of fighters){f.openingDuelCounted=false;f.soul.obs.duelsStarted++;}save();}
 function step(dt){t+=dt; for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=190*dt;if(p.life<=0)particles.splice(i,1)}for(let i=floats.length-1;i>=0;i--){let p=floats[i];p.life-=dt;p.y-=27*dt;if(p.life<=0)floats.splice(i,1)}
  if(bannerTimer>0){bannerTimer-=dt;if(bannerTimer<=0){bannerTimer=0;nextLife();}return;}if(countdown>0){countdown=Math.max(0,countdown-dt);return;}roundTimer+=dt;
  for(let i=0;i<2;i++){const f=fighters[i],o=fighters[1-i],b=f.body;f.phase+=dt*(3.4+b.speed*.58);f.decisionT-=dt;f.guard=Math.max(0,f.guard-dt);f.evade=Math.max(0,f.evade-dt);f.hitFlash=Math.max(0,f.hitFlash-dt);f.stagger=Math.max(0,f.stagger-dt);f.lock=Math.max(0,f.lock-dt);f.stamina=clamp(f.stamina+dt*(9+b.speed*1.35),0,100);
@@ -159,29 +165,142 @@ function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighte
  g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
  if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
  g.restore();}
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v0.2',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');text(`×${speed} • ${running?'LIVE':'PAUSED'}`,w-24,y+40,compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
-function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id}  ·  ${f.name}`,xx+8,yy+11,compact?10:12,f.soul.color,'left','800');text(f.body.name,xx+bw-7,yy+11,compact?9:11,'#ddddf0','right','600');rr(xx+8,yy+22,bw-16,8,4,'#161e38');rr(xx+8,yy+22,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+33,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+33,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v0.4',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');text(`×${speed} • ${running?'LIVE':'PAUSED'}`,w-24,y+40,compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');text(f.body.name,xx+8,yy+20,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
 function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
-function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(speed===1?'1× SPEED':'3× SPEED',xx+bw+11,yy,bw,40,speed===3);btn(showJournal?'◉ SOUL LOG':'◎ SOUL LOG',xx+2*(bw+11),yy,bw,40,showJournal);}
-function drawInspector(){const A=arena;if(A.portrait){let x=A.x,y=A.y+A.h+61,wi=A.w,remaining=h-y-12;if(remaining<78)return;rr(x,y,wi,remaining,16,'#ffffff0b','#ffffff22');
- const soul=souls[selected],f=fighters[selected];text(`${selected===0?'◀':'▶'} ${soul.id}  •  INCARNATION ${soul.lives}`,x+14,y+22,Math.min(15,w/26),soul.color,'left','800');text(`${f.body.name}  |  ${soul.wins} W / ${soul.losses} L`,x+14,y+43,11,'#d0cbe2');
- const canGraph=remaining>166;if(canGraph&&!showJournal){const barStart=y+68,barX=x+Math.min(117,wi*.33),barW=wi-(barX-x)-18;for(let i=0;i<AXES.length;i++){let a=AXES[i],val=soul.im[a.key],cy=barStart+i*24;if(cy>y+remaining-27)break;text(a.title,x+14,cy,11,'#c9c7db');rr(barX,cy-6,barW,12,4,'#343b53');line(barX+barW/2,cy-7,barX+barW/2,cy+7,'#e0ddf577');let len=Math.abs(val)*(barW/2-2),start=val>0?barX+barW/2:barX+barW/2-len;rr(start,cy-4,len,8,3,val>0?'#9cdbce':'#dcb2dd');text(`${val>=0?'+':''}${val.toFixed(2)}`,barX+barW/2,cy+11,9,'#dedbee','center');}}
- else if(showJournal){text('PAST INCARNATIONS  ·  OBSERVER RECORD',x+14,y+68,10,'#b2b5d8','left','800');for(let i=0;i<Math.min(4,soul.record.length);i++){let r=soul.record[i];text(`Life ${r.life}  ${r.body}  ·  ${r.result}`,x+14,y+93+i*23,11,'#f2dfd5');}if(!soul.record.length)text('No previous deaths recorded.',x+14,y+94,11,'#acabc4');}
- else {text(`Last action: ${f.action.toUpperCase()}`,x+14,y+70,11,'#d9d2ea');text(`Mind ${f.lastParts.mind.toFixed(2)} · Soul ${f.lastParts.soul.toFixed(2)} · Body ${f.lastParts.body.toFixed(2)}`,x+14,y+93,10,'#c3bdd9');}
- text('Tap a creature to inspect • Tap ✧ in header to reset',x+14,y+remaining-18,9,'#8f94b0');
- }else{const soul=souls[selected],f=fighters[selected],x=A.x+8,y=A.y+A.h-82;rr(x,y,Math.min(316,A.w*.46),68,12,'#141b31cf','#ffffff2c');text(`${soul.id} · LIFE ${soul.lives} · ${f.body.name}`,x+10,y+16,11,soul.color,'left','800');text(`Mind ${f.lastParts.mind.toFixed(2)}  Soul ${f.lastParts.soul.toFixed(2)}  Body ${f.lastParts.body.toFixed(2)}`,x+10,y+37,10,'#e5e0f3');text(`${f.action.toUpperCase()}  •  ${soul.wins} wins  ${soul.losses} losses`,x+10,y+55,10,'#b8bdd9');}}
-function draw(){drawBg();layout();drawHeader();drawArena();drawFighterBars();drawButtons();drawInspector();if(w>520&&!arena.portrait){text('TAP CREATURE TO INSPECT • INDEPENDENT SOUL / MIND / BODY',w/2,h-60,9,'#b9b1d4','center','700');}}
+function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(speed===1?'1× SPEED':'3× SPEED',xx+bw+11,yy,bw,40,speed===3);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
+function fit(str,x,y,maxWidth,size=11,color='#f5f0ff',align='left',weight='600'){
+ let tx=String(str);g.font=`${weight} ${size}px system-ui,-apple-system,sans-serif`;
+ if(g.measureText(tx).width>maxWidth){while(tx.length>1&&g.measureText(tx+'…').width>maxWidth)tx=tx.slice(0,-1);tx+='…';}
+ text(tx,x,y,size,color,align,weight);
+}
+function sectionLabel(label,x,y,tag=''){text(label,x,y,11,'#cbd3fa','left','800');if(tag)text(tag,w-18,y,9,'#96a2c6','right','650');}
+function tinyIcon(x,y,icon,c='#b9d9ea'){rr(x-12,y-12,24,24,8,c+'24',c+'66');text(icon,x,y+1,14,c,'center','800');}
+function littleBar(x,y,bw,v,col){rr(x,y,bw,7,4,'#303958');rr(x,y,Math.max(0,bw*clamp(v,0,1)),7,4,col);}
+function percent(n,d){return d>0?Math.round(100*n/d):0;}
+function drawRing(x,y,r,p,col){g.beginPath();g.arc(x,y,r,-Math.PI/2,-Math.PI/2+TAU, false);g.strokeStyle='#38435f';g.lineWidth=5;g.stroke();g.beginPath();g.arc(x,y,r,-Math.PI/2,-Math.PI/2+TAU*clamp(p,0,1),false);g.strokeStyle=col;g.lineCap='round';g.stroke();}
+function compareSignals(idx){const a=souls[idx],b=souls[1-idx],ao=ensureSoul(a).obs,bo=ensureSoul(b).obs;
+ const al=Math.max(1,ao.duelsStarted),bl=Math.max(1,bo.duelsStarted),ac=totalCount(ao.decisionCounts),bc=totalCount(bo.decisionCounts);
+ if(ao.duelsStarted<8||bo.duelsStarted<8||ac<40||bc<40)return {icon:'◌',title:'Still gathering evidence',line:`${ao.duelsStarted} vs ${bo.duelsStarted} observed duels`,note:'Old duels are not included in new counters.',kind:'collect'};
+ const fields=[
+  {icon:'↶',name:'Opening hops',diff:ao.openingEvades/al-bo.openingEvades/bl,va:percent(ao.openingEvades,al),vb:percent(bo.openingEvades,bl),unit:'% of duels'},
+  ...['evade','retreat','guard','lunge','strike','heavy'].map(k=>({icon:k==='evade'?'↝':k==='guard'?'◇':'✦',name:k[0].toUpperCase()+k.slice(1)+' choices',diff:(ao.decisionCounts[k]||0)/ac-(bo.decisionCounts[k]||0)/bc,va:percent(ao.decisionCounts[k]||0,ac),vb:percent(bo.decisionCounts[k]||0,bc),unit:'% of decisions'}))
+ ];
+ // Display the largest absolute measurable behavioral difference, even if the opposite soul has more.
+ fields.sort((u,v)=>v.diff-u.diff);const f=fields[0];
+ if(f.diff<.045)return {icon:'≈',title:'No strong contrast yet',line:'Observed action mixes are similar',note:'Different bodies may still explain small changes.',kind:'neutral'};
+ return {icon:f.icon,title:`MORE ${f.name.toLowerCase()}`,line:`${a.id} ${f.va}%  ·  ${b.id} ${f.vb}%`,note:`${f.unit}  •  correlation, not soul causation`,kind:'contrast'};
+}
+function drawDuelSnapshot(){const A=arena,s=souls[selected],o=ensureSoul(s).obs,f=fighters[selected];
+ if(A.portrait){const x=A.x,y=A.y+A.h+61,ww=A.w,hh=h-y-10;if(hh<72)return;
+  rr(x,y,ww,hh,16,'#1b223a','#5660869c');
+  text(`${selected===0?'◀':'▶'}  ${s.id}  ·  LIFE ${s.lives}`,x+15,y+24,Math.min(15,w/26),s.color,'left','800');
+  text(`${f.body.name}  ·  ${s.wins} W / ${s.losses} L`,x+15,y+47,11,'#c5d2eb');
+  const base=y+62, tileW=(ww-42)/3;
+  if(hh>136){
+   for(const [i,label,val,color] of [[0,'WIN RATE',percent(s.wins,s.wins+s.losses)+'%',s.color],[1,'EARLY HOPS',`${o.openingEvades}/${o.duelsStarted}`,'#ffc4d2'],[2,'DODGES',`${o.successfulDodges}/${o.evades}`,'#99e9d9']]){
+    const tx=x+12+i*(tileW+9);rr(tx,base,tileW,55,11,'#10182d','#56628177');text(label,tx+8,base+13,8,'#98a7cb','left','800');text(val,tx+8,base+37,17,color,'left','800');
+   }
+  }
+  if(hh>205){const sy=base+76;sectionLabel('CURRENT SOUL IMPRESSIONS',x+15,sy);for(let i=0;i<5;i++){
+   const a=AXES[i],v=s.im[a.key],cy=sy+24+i*23;
+   text(a.title,x+15,cy,10,'#c2c9df');const xx=x+114,bw=ww-131;rr(xx,cy-5,bw,9,4,'#343e5b');line(xx+bw/2,cy-6,xx+bw/2,cy+6,'#94a9cc8c');let length=Math.abs(v)*bw*.48;rr(v<0?xx+bw/2-length:xx+bw/2,cy-3,length,5,3,v<0?'#e6abd8':'#84d9c9');
+  }}
+  if(hh>151)fit('Tap OBSERVE for anomaly comparisons & body records',x+15,y+hh-19,ww-28,9,'#a1aed0');
+ }else{
+  const x=A.x+8,y=A.y+A.h-90,ww=Math.min(345,A.w*.49);
+  rr(x,y,ww,78,12,'#141b31e6','#ffffff36');
+  text(`${s.id} · LIFE ${s.lives} · ${f.body.name}`,x+10,y+17,11,s.color,'left','800');
+  text(`${s.wins} W / ${s.losses} L · ${percent(s.wins,s.wins+s.losses)}% wins`,x+10,y+36,10,'#eff0fb');
+  text(`Early hops ${o.openingEvades}/${o.duelsStarted} · Dodges ${o.successfulDodges}/${o.evades}`,x+10,y+56,10,'#addbd7');
+ }
+}
+function drawSoulCard(s,x,y,cw){const o=ensureSoul(s).obs;rr(x,y,cw,116,14,'#1d2742',s.color+'70');
+ text(s.id,x+13,y+18,13,s.color,'left','850');
+ const r=Math.min(23,cw*.13);drawRing(x+cw-r-14,y+44,r,s.wins/Math.max(1,s.wins+s.losses),s.color);
+ text(percent(s.wins,s.wins+s.losses)+'%',x+cw-r-14,y+44,11,s.color,'center','800');
+ text(`${s.wins}W  ${s.losses}L`,x+12,y+44,13,'#fbf1df','left','800');
+ text(`LIFE ${s.lives}`,x+12,y+66,10,'#c3cae6','left','700');
+ text(`${o.livesObserved} monitored`,x+12,y+85,10,'#b2bcd8');
+ littleBar(x+12,y+103,cw-24,s.wins/Math.max(1,s.wins+s.losses),s.color);
+}
+function drawAnomalyCard(s,idx,x,y,ww){const report=compareSignals(idx);rr(x,y,ww,89,13,'#212c46',s.color+'58');tinyIcon(x+24,y+25,report.icon,s.color);text(s.id+'  ·  '+report.title.toUpperCase(),x+45,y+17,10,s.color,'left','800');
+ fit(report.line,x+45,y+40,ww-60,12,'#f0eff8');fit(report.note,x+14,y+70,ww-28,10,'#aebbd7');}
+function drawSoulTab(){const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=151;
+ sectionLabel('THE TWO CONTINUITIES',x,y,'OLD SOULS • NEW BODIES');y+=18;
+ drawSoulCard(souls[0],x,y,cw);drawSoulCard(souls[1],x+cw+gap,y,cw);y+=132;
+ sectionLabel('✧  ANOMALY WATCH',x,y,'OBSERVED ≠ EXPLAINED');y+=18;
+ drawAnomalyCard(souls[0],0,x,y,ww);y+=99;drawAnomalyCard(souls[1],1,x,y,ww);y+=111;
+ sectionLabel('SOUL IMPRINTS',x,y,'CURRENT VALUES   −1 TO +1');y+=24;
+ for(const a of AXES){text(a.title.toUpperCase(),x,y,10,'#c5ceeb','left','700');const bx=x+105,bw=w-bx-15;rr(bx,y-5,bw,9,4,'#303e58');line(bx+bw/2,y-6,bx+bw/2,y+6,'#abb3d277');for(let i=0;i<2;i++){let v=souls[i].im[a.key],len=Math.abs(v)*bw*.47;rr(v<0?bx+bw/2-len:bx+bw/2,y-3+i*4,len,3,2,souls[i].color);}y+=28;}
+ text('AURORA',x+2,y+7,9,souls[0].color,'left','800');text('●',x+54,y+7,9,souls[0].color);text('UMBRA',x+85,y+7,9,souls[1].color,'left','800');text('●',x+132,y+7,9,souls[1].color);y+=30;
+ text('NEW COUNTERS START HERE · OLD RECORDS STAY',x,y,9,'#99a8c4');return y+28;}
+function drawActionsTab(){const x=14,ww=w-28;let y=151;
+ sectionLabel('DECISION DISTRIBUTION',x,y,'COUNTS SINCE MONITORING');y+=22;
+ const first=souls[0].obs,second=souls[1].obs,aN=totalCount(first.decisionCounts),bN=totalCount(second.decisionCounts);
+ for(let i=0;i<2;i++){let s=souls[i],o=s.obs,tot=totalCount(o.decisionCounts);rr(x,y,ww,66,13,'#202a45',s.color+'45');text(s.id,x+12,y+17,12,s.color,'left','800');text(`${tot} decisions`,x+ww-12,y+17,10,'#b6c1de','right');
+  let pos=x+12,constW=ww-24;for(const a of ACTIONS){let frac=(o.decisionCounts[a]||0)/Math.max(1,tot),seg=constW*frac;if(seg>0){rr(pos,y+32,seg,13,0,actionColor(a));pos+=seg;}}
+  text(`OPEN HOPS  ${o.openingEvades} / ${o.duelsStarted} duels`,x+12,y+56,9,'#b7c6dd');y+=76;
+ }
+ y+=6;sectionLabel('ACTION BY ACTION',x,y,'AURORA / UMBRA');y+=20;
+ for(const a of ACTIONS){const v0=first.decisionCounts[a]||0,v1=second.decisionCounts[a]||0,p0=v0/Math.max(1,aN),p1=v1/Math.max(1,bN);
+  text(a.toUpperCase(),x,y+10,11,'#e2e1f3','left','700');const bx=x+108,bw=ww-156;rr(bx,y+3,bw,5,2,'#2a3350');rr(bx,y+12,bw,5,2,'#2a3350');rr(bx,y+3,bw*p0,5,2,souls[0].color);rr(bx,y+12,bw*p1,5,2,souls[1].color);text(`${percent(v0,aN)} / ${percent(v1,bN)}%`,x+ww,y+9,10,'#c4cedf','right','750');y+=31;
+ }
+ y+=10;rr(x,y,ww,60,12,'#243148','#6a7c9c88');tinyIcon(x+24,y+26,'↶','#b7dfdf');fit('An early hop is an evade within a duel’s first 3 seconds.',x+44,y+17,ww-53,10,'#ecf1fc');fit('A difference is evidence to inspect, not a cause.',x+44,y+39,ww-53,10,'#abbdd7');
+ return y+80;
+}
+function actionColor(a){return ({approach:'#83c7c4',retreat:'#c8a0de',observe:'#8aa0bb',strike:'#ffce8c',heavy:'#ec9aa4',guard:'#b9aef4',evade:'#99e0e1',lunge:'#d7cb83'})[a];}
+function drawBodiesTab(){const x=14,ww=w-28;let y=151;
+ sectionLabel('BODIES CHANGE. THE SOUL REMAINS.',x,y);y+=21;
+ text('Each bar shows observed wins / completed fights in that body.',x,y,10,'#aebad5');y+=26;
+ for(const t of TYPES){rr(x,y,ww,67,13,'#1c2943','#52658777');text(t.name.toUpperCase(),x+11,y+16,10,'#e4e6f6','left','800');for(let i=0;i<2;i++){const s=souls[i],r=bodyStats(s,t.name),n=r.wins+r.losses,by=y+32+i*16;g.fillStyle=s.color;g.fillRect(x+12,by-4,5,5);let bx=x+104,bw=ww-169;littleBar(bx,by-4,bw,n?r.wins/n:0,s.color);text(n?`${r.wins}W / ${r.losses}L`:'NO DATA',x+ww-10,by,9,'#c9d4e8','right','700');}y+=74;}
+ y+=4;fit('Active bodies have unfinished records; old body results cannot be recovered.',x,y,ww,9,'#a6b5ce');return y+34;
+}
+function drawLivesTab(){const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=151;
+ sectionLabel('INCARNATION ARCHIVE',x,y,'LATEST DEFEATS');y+=24;
+ for(let i=0;i<2;i++){const s=souls[i],bx=x+i*(cw+gap);rr(bx,y,cw,40,11,'#202b45',s.color+'6d');text(s.id,bx+11,y+17,12,s.color,'left','800');text(`${s.losses} losses`,bx+11,y+31,10,'#abb9d3');}y+=51;
+ for(let j=0;j<12;j++){for(let i=0;i<2;i++){const s=souls[i],r=s.record[j],bx=x+i*(cw+gap);rr(bx,y,cw,46,9,j%2?'#222a42':'#1c263d','#4d5c7a55');if(r){text(`LIFE ${r.life}`,bx+8,y+12,9,s.color,'left','800');fit(r.body,bx+8,y+29,cw-17,10,'#e5e7f3');text(`${r.damage||0} damage`,bx+cw-8,y+12,9,'#a0aeca','right');}else{text('NO ENTRY',bx+8,y+22,10,'#717f9a');}}y+=51;}
+ y+=10;text('The winner continues in its current mind and body.',x,y,10,'#b3c0d9');return y+35;
+}
+function drawObserver(){const bg=g.createLinearGradient(0,0,w,h);bg.addColorStop(0,'#111a31');bg.addColorStop(1,'#202644');g.fillStyle=bg;g.fillRect(0,0,w,h);
+ for(let i=0;i<45;i++){g.fillStyle='#c8dafa22';g.fillRect((i*97.13+33)%w,(i*61.2+22)%h,1.4,1.4);}
+ rr(11,11,w-22,55,14,'#222b49','#7884a34d');text('✧  OBSERVER ATLAS',25,30,16,'#f7eafe','left','850');
+ text(`DUEL ${round}  ·  ${running?'LIVE':'PAUSED'}`,25,51,10,running?'#9adcc5':'#d8acbd','left','800');
+ rr(w-70,22,46,32,10,'#3d4862','#a7a8c280');text('✕',w-47,38,17,'#f8eaf7','center','750');
+ const labels=['SOULS','ACTIONS','BODIES','LIVES'],x0=13,gap=6,tabw=(w-26-3*gap)/4,taby=80;
+ for(let i=0;i<4;i++){const xx=x0+i*(tabw+gap);rr(xx,taby,tabw,42,11,i===observerTab?'#455276':'#222c46',i===observerTab?'#abaee299':'#4a5875');text(labels[i],xx+tabw/2,taby+21,Math.min(11,Math.max(8,w/39)),i===observerTab?'#fff1d5':'#bac8e3','center','850');}
+ const top=138,bottom=h-12;g.save();g.beginPath();g.rect(0,top,w,Math.max(5,bottom-top));g.clip();g.translate(0,-observerScroll);let contentBottom=0;
+ if(observerTab===0)contentBottom=drawSoulTab();else if(observerTab===1)contentBottom=drawActionsTab();else if(observerTab===2)contentBottom=drawBodiesTab();else contentBottom=drawLivesTab();g.restore();
+ observerMaxScroll=Math.max(0,contentBottom-bottom+15);observerScroll=clamp(observerScroll,0,observerMaxScroll);
+ if(observerMaxScroll>0){rr(w-6,top,3,bottom-top,2,'#55608066');const thumb=(bottom-top)*Math.max(.10,(bottom-top)/(bottom-top+observerMaxScroll));rr(w-6,top+(bottom-top-thumb)*(observerScroll/observerMaxScroll),3,thumb,2,'#bed6eb');}
+}
+function draw(){drawBg();layout();if(observerOpen){drawObserver();return;}drawHeader();drawArena();drawFighterBars();drawButtons();drawDuelSnapshot();if(w>520&&!arena.portrait)text('TAP CREATURE TO INSPECT • OPEN OBSERVE TO EXPLORE PATTERNS',w/2,h-60,9,'#b9b1d4','center','700');}
 function resize(){const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);g.setTransform(dpr,0,0,dpr,0,0);layout();}
 function frame(ms){if(!w)resize();const elapsed=last?Math.min(.055,(ms-last)/1000):0;last=ms;if(running){accum=Math.min(.25,accum+elapsed*speed);let iter=0;while(accum>=1/60&&iter++<12){step(1/60);accum-=1/60;}}draw();requestAnimationFrame(frame);}
 function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*w/rect.width,y=(e.clientY-rect.top)*h/rect.height;
- if(x>=10&&x<=43&&y>=11&&y<=53){if(confirm('Reset souls and all incarnation history?')){localStorage.removeItem(KEY);load();begin();selected=0;save();}return;}for(let i=0;i<buttons.length;i++){let b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;}else if(i===1)speed=speed===1?3:1;else if(i===2)showJournal=!showJournal;return;}}
+ if(observerOpen){if(y<69&&x>w-89){observerOpen=false;return;}
+  if(y>=78&&y<127){const gap=6,tw=(w-26-gap*3)/4;const i=Math.floor((x-13)/(tw+gap));if(i>=0&&i<4){observerTab=i;observerScroll=0;}return;}return;
+ }
+ if(x>=10&&x<=43&&y>=11&&y<=53){if(confirm('Reset souls and all incarnation history?')){localStorage.removeItem(KEY);load();begin();selected=0;save();}return;}
+ for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;}else if(i===1)speed=speed===1?3:1;else if(i===2){observerOpen=true;observerTab=0;observerScroll=0;}return;}}
  if(y>=arena.y&&y<arena.y+arena.h){const wx=((x-arena.x)/arena.w)*1000;selected=Math.abs(wx-fighters[0].x)<Math.abs(wx-fighters[1].x)?0:1;return;}
- if(arena.portrait&&y>arena.y+arena.h+57){selected=1-selected;return;}
+ if(arena.portrait&&y>arena.y+arena.h+57)selected=1-selected;
 }
-canvas.addEventListener('pointerdown',pointer);window.addEventListener('resize',resize);window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();running=!running;}if(e.key==='Digit1')selected=0;if(e.key==='Digit2')selected=1;if(e.key==='KeyS')speed=speed===1?3:1;if(e.key==='KeyL')showJournal=!showJournal;if(e.key==='KeyR'&&e.shiftKey){if(confirm('Reset all souls and incarnation history?')){localStorage.removeItem(KEY);load();begin();}}});document.addEventListener('visibilitychange',()=>{if(document.hidden){running=false;last=0;}});
+function xy(e){const rect=canvas.getBoundingClientRect();return {x:e.clientX-rect.left,y:e.clientY-rect.top};}
+canvas.addEventListener('pointerdown',e=>{const p=xy(e);observerTouch=observerOpen&&p.y>132?{y:p.y,scroll:observerScroll,moved:false}:null;});
+canvas.addEventListener('pointermove',e=>{if(!observerOpen||!observerTouch)return;const p=xy(e);if(Math.abs(p.y-observerTouch.y)>6)observerTouch.moved=true;if(observerTouch.moved){e.preventDefault();observerScroll=clamp(observerTouch.scroll+observerTouch.y-p.y,0,observerMaxScroll);}});
+canvas.addEventListener('pointerup',e=>{const wasMoving=observerTouch?.moved;observerTouch=null;if(!wasMoving)pointer(e);});
+canvas.addEventListener('pointercancel',()=>observerTouch=null);
+window.addEventListener('resize',resize);window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();running=!running;}
+ if(e.key==='Digit1')selected=0;if(e.key==='Digit2')selected=1;if(e.key==='KeyS')speed=speed===1?3:1;
+ if(e.key==='KeyL'||e.key==='Escape'){observerOpen=!observerOpen;observerScroll=0;}
+ if(e.key==='ArrowDown'&&observerOpen){observerScroll=clamp(observerScroll+80,0,observerMaxScroll);e.preventDefault();}
+ if(e.key==='ArrowUp'&&observerOpen){observerScroll=clamp(observerScroll-80,0,observerMaxScroll);e.preventDefault();}
+ if(e.key==='KeyR'&&e.shiftKey){if(confirm('Reset all souls and incarnation history?')){localStorage.removeItem(KEY);load();begin();}}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){running=false;last=0;save();}});
 load();begin();resize();requestAnimationFrame(frame);
 // Tiny explicit debug surface for browser automation / development without influencing combat.
-window.__soulCrucible={state:()=>({round,running,speed,souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,action:f.action,impressions:f.soul.im}))}),reset:()=>{localStorage.removeItem(KEY);load();begin();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);}};
+window.__soulCrucible={state:()=>({round,running,speed,souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,action:f.action,impressions:f.soul.im})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
 })();
 </script>
 </body></html>
