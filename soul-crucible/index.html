@@ -34,8 +34,23 @@ function cycleSpeed(){speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];accu
 let souls, fighters, round=1, selected=0, running=true, speed=1, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
 let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true, timedOut=false, speedSampleWall=0, speedSampleSim=0, actualSpeed=0;
 function blankCounts(list){const out={};for(const item of list){const key=typeof item==='string'?item:item.name;out[key]=0;}return out;}
-function freshObserver(){return {decisionCounts:blankCounts(ACTIONS),bodyLives:blankCounts(TYPES),bodyWins:blankCounts(TYPES),bodyLosses:blankCounts(TYPES),openingEvades:0,duelsStarted:0,timeoutDuels:0,evades:0,successfulDodges:0,totalDamage:0,totalTaken:0,totalStrikes:0,totalGuards:0,livesObserved:0};}
-function ensureSoul(s){s.im=s.im||{};AXES.forEach(a=>{if(!Number.isFinite(s.im[a.key]))s.im[a.key]=0;});if(!s.origin)s.origin={...s.im};if(!Array.isArray(s.record))s.record=[];if(!Number.isFinite(s.lives))s.lives=0;if(!Number.isFinite(s.wins))s.wins=0;if(!Number.isFinite(s.losses))s.losses=0;if(!Number.isFinite(s.totalDamage))s.totalDamage=0;if(!s.obs){s.obs=freshObserver();s.obsStartedAtLife=s.lives||0;}const o=s.obs;if(!o.decisionCounts)o.decisionCounts=blankCounts(ACTIONS);if(!o.bodyLives)o.bodyLives=blankCounts(TYPES);if(!o.bodyWins)o.bodyWins=blankCounts(TYPES);if(!o.bodyLosses)o.bodyLosses=blankCounts(TYPES);for(const k of ACTIONS)if(!Number.isFinite(o.decisionCounts[k]))o.decisionCounts[k]=0;for(const t of TYPES){for(const map of [o.bodyLives,o.bodyWins,o.bodyLosses])if(!Number.isFinite(map[t.name]))map[t.name]=0;}for(const k of ['openingEvades','duelsStarted','timeoutDuels','evades','successfulDodges','totalDamage','totalTaken','totalStrikes','totalGuards','livesObserved']) if(!Number.isFinite(o[k]))o[k]=0;ensureDepth(s);return s;}
+function freshObserver(){return {decisionCounts:blankCounts(ACTIONS),bodyLives:blankCounts(TYPES),bodyWins:blankCounts(TYPES),bodyLosses:blankCounts(TYPES),openingEvades:0,duelsStarted:0,timeoutDuels:0,evades:0,successfulDodges:0,totalDamage:0,totalTaken:0,totalStrikes:0,totalGuards:0,livesObserved:0,openingSwings:0,openingAirSwings:0,openingMisses:0,airSwingParts:{mind:0,body:0,soul:0},openingWhiffParts:{mind:0,body:0,soul:0},openingSwingBodies:{}};}
+// Observation-only statistics: never feed this data into action selection or rewards.
+function makeOpeningBodyRows(){const rows={};for(const b of TYPES)rows[b.name]={swings:0,air:0,misses:0};return rows;}
+function ensureOpeningStats(o){for(const k of ['openingSwings','openingAirSwings','openingMisses'])if(!Number.isFinite(o[k]))o[k]=0;
+ if(!o.openingSwingBodies)o.openingSwingBodies=makeOpeningBodyRows();
+ for(const b of TYPES){if(!o.openingSwingBodies[b.name])o.openingSwingBodies[b.name]={swings:0,air:0,misses:0};for(const k of ['swings','air','misses'])if(!Number.isFinite(o.openingSwingBodies[b.name][k]))o.openingSwingBodies[b.name][k]=0;}
+ if(!o.airSwingParts)o.airSwingParts={mind:0,body:0,soul:0};if(!o.openingWhiffParts)o.openingWhiffParts={mind:0,body:0,soul:0};for(const k of ['mind','body','soul']){if(!Number.isFinite(o.airSwingParts[k]))o.airSwingParts[k]=0;if(!Number.isFinite(o.openingWhiffParts[k]))o.openingWhiffParts[k]=0;}
+ return o;}
+function recordOpeningSwing(f,o,attack){const stats=ensureOpeningStats(f.soul.obs);if(roundTimer>=3||attack.type==='lunge')return;
+ // Match impact()'s reach rule; at launch the attack cannot connect at this distance.
+ const air=Math.abs(f.x-o.x)>=attack.reach+28;attack.openingSwing=true;attack.openingParts={...f.lastParts};
+ stats.openingSwings++;const row=stats.openingSwingBodies[f.body.name];row.swings++;
+ if(air){stats.openingAirSwings++;row.air++;
+  for(const k of ['mind','body','soul'])stats.airSwingParts[k]+=f.lastParts[k];
+ }}
+
+function ensureSoul(s){s.im=s.im||{};AXES.forEach(a=>{if(!Number.isFinite(s.im[a.key]))s.im[a.key]=0;});if(!s.origin)s.origin={...s.im};if(!Array.isArray(s.record))s.record=[];if(!Number.isFinite(s.lives))s.lives=0;if(!Number.isFinite(s.wins))s.wins=0;if(!Number.isFinite(s.losses))s.losses=0;if(!Number.isFinite(s.totalDamage))s.totalDamage=0;if(!s.obs){s.obs=freshObserver();s.obsStartedAtLife=s.lives||0;}const o=s.obs;if(!o.decisionCounts)o.decisionCounts=blankCounts(ACTIONS);if(!o.bodyLives)o.bodyLives=blankCounts(TYPES);if(!o.bodyWins)o.bodyWins=blankCounts(TYPES);if(!o.bodyLosses)o.bodyLosses=blankCounts(TYPES);for(const k of ACTIONS)if(!Number.isFinite(o.decisionCounts[k]))o.decisionCounts[k]=0;for(const t of TYPES){for(const map of [o.bodyLives,o.bodyWins,o.bodyLosses])if(!Number.isFinite(map[t.name]))map[t.name]=0;}for(const k of ['openingEvades','duelsStarted','timeoutDuels','evades','successfulDodges','totalDamage','totalTaken','totalStrikes','totalGuards','livesObserved']) if(!Number.isFinite(o[k]))o[k]=0;ensureOpeningStats(o);ensureDepth(s);return s;}
 function bodyStats(soul,name){ensureSoul(soul);return {lives:soul.obs.bodyLives[name]||0,wins:soul.obs.bodyWins[name]||0,losses:soul.obs.bodyLosses[name]||0};}
 function totalCount(obj){let n=0;for(const k in obj)n+=obj[k]||0;return n;}
 // Soul depth: affective continuity, not episodes, tactics, names or opponent identities.
@@ -107,9 +122,9 @@ function actionScore(f,o,a){const b=f.body, dist=Math.abs(o.x-f.x), reach=54+b.r
 function decide(f,o){if(f.stagger>0)return; const options=ACTIONS.map(a=>({a,...actionScore(f,o,a)}));options.sort((a,b)=>b.total-a.total);let opt=options[0];if(Math.random()<.12)opt=options[rint(0,Math.min(2,options.length-1))];f.action=opt.a;f.lastParts={mind:opt.mind,soul:opt.soul,body:opt.body};f.mind.lastAction=ACTIONS.indexOf(opt.a);f.actionTime=.35;f.stat.decisions++;f.soul.obs.decisionCounts[opt.a]=(f.soul.obs.decisionCounts[opt.a]||0)+1;
  if(opt.a==='guard'&&f.stamina>5){f.guard=.46;f.stat.guards++;f.soul.obs.totalGuards++;}
  if(opt.a==='evade'&&f.stamina>12){f.evade=.35;f.evadeResolved=false;f.evadeConnected=false;f.hopV=1.5;f.stamina-=13;f.vx=(f.x<o.x?-1:1)*(135+f.body.speed*19);f.stat.evades++;f.soul.obs.evades++;if(roundTimer<3&&!f.openingDuelCounted){f.stat.openingEvades++;f.openingDuelCounted=true;f.soul.obs.openingEvades++;}}
- if(['strike','heavy','lunge'].includes(opt.a)&&f.lock<=0&&!f.attack){const heavy=opt.a==='heavy',lunge=opt.a==='lunge';const wind=(heavy?.42:lunge?.30:.19)*(1.16-f.body.speed*.055),recovery=(heavy?.60:lunge?.49:.33)*(1.15-f.body.speed*.05);let cost=heavy?27:lunge?24:12;if(f.stamina>=cost){f.stamina-=cost;f.attack={type:opt.a,time:0,wind,full:wind+recovery,hit:false,impacted:false,reach:54+f.body.reach*17+(lunge?36:0),power:(heavy?1.55:lunge?1.24:1)*f.body.power}; f.stat.strikes++;f.soul.obs.totalStrikes++;f.guard=0;if(lunge)f.vx=(f.x<o.x?1:-1)*(185+f.body.speed*18);}}
+ if(['strike','heavy','lunge'].includes(opt.a)&&f.lock<=0&&!f.attack){const heavy=opt.a==='heavy',lunge=opt.a==='lunge';const wind=(heavy?.42:lunge?.30:.19)*(1.16-f.body.speed*.055),recovery=(heavy?.60:lunge?.49:.33)*(1.15-f.body.speed*.05);let cost=heavy?27:lunge?24:12;if(f.stamina>=cost){f.stamina-=cost;f.attack={type:opt.a,time:0,wind,full:wind+recovery,hit:false,impacted:false,reach:54+f.body.reach*17+(lunge?36:0),power:(heavy?1.55:lunge?1.24:1)*f.body.power}; recordOpeningSwing(f,o,f.attack);f.stat.strikes++;f.soul.obs.totalStrikes++;f.guard=0;if(lunge)f.vx=(f.x<o.x?1:-1)*(185+f.body.speed*18);}}
  }
-function impact(f,o){const at=f.attack;if(!at||at.hit)return;at.hit=true;const dist=Math.abs(f.x-o.x),reachable=dist<at.reach+28;let success=false;
+function impact(f,o){const at=f.attack;if(!at||at.hit)return;at.hit=true;const dist=Math.abs(f.x-o.x),reachable=dist<at.reach+28;let success=false;if(at.openingSwing&&!reachable){const oStats=f.soul.obs;oStats.openingMisses++;oStats.openingSwingBodies[f.body.name].misses++;for(const k of ['mind','body','soul'])oStats.openingWhiffParts[k]+=at.openingParts[k];}
  if(reachable){let dodge=o.evade>0.06&&Math.random()<.66;let defending=o.guard>.06; if(dodge){floatText(o.x,'DODGE','#9de6fa');o.stat.dodges++;o.soul.obs.successfulDodges++;o.evadeConnected=true;learn(o,.17);feel(o,{defense:1,pressure:.4,pain:.2},.56,1.0,'Relief in motion');}
  else{let raw=(6+f.body.power*3.4)*at.power/f.body.power*rand(.83,1.16),blocked=defending?(.60+o.body.defense*.035):0,armor=1/(1+o.body.defense*.073);let dmg=Math.max(1,Math.round(raw*(1-blocked)*armor));o.hp=Math.max(0,o.hp-dmg);o.stat.taken+=dmg;f.stat.damage+=dmg;f.soul.totalDamage+=dmg;f.soul.obs.totalDamage+=dmg;o.soul.obs.totalTaken+=dmg;success=true;
  o.hitFlash=.18;let push=(22+f.body.power*13)*(1-blocked*.7)*(2.7/(o.body.mass+1.4));o.vx+=(f.x<o.x?1:-1)*push;
@@ -217,7 +232,7 @@ function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighte
  g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
  if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
  g.restore();}
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v0.7',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');text(`×${speed} • ${running?'LIVE':'PAUSED'}`,w-24,y+40,compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v0.8',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');text(`×${speed} • ${running?'LIVE':'PAUSED'}`,w-24,y+40,compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');text(f.body.name,xx+8,yy+20,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
 function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
 function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(`${speed}× SPEED`,xx+bw+11,yy,bw,40,speed>1);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
@@ -311,8 +326,41 @@ function drawActionsTab(){const x=14,ww=w-28;let y=151;
   text(a.toUpperCase(),x,y+10,11,'#e2e1f3','left','700');const bx=x+108,bw=ww-156;rr(bx,y+3,bw,5,2,'#2a3350');rr(bx,y+12,bw,5,2,'#2a3350');rr(bx,y+3,bw*p0,5,2,souls[0].color);rr(bx,y+12,bw*p1,5,2,souls[1].color);text(`${percent(v0,aN)} / ${percent(v1,bN)}%`,x+ww,y+9,10,'#c4cedf','right','750');y+=31;
  }
  y+=10;rr(x,y,ww,60,12,'#243148','#6a7c9c88');tinyIcon(x+24,y+26,'↶','#b7dfdf');fit('Early hops: evade during first 3 seconds. Timeout: 65s without KO.',x+44,y+17,ww-53,10,'#ecf1fc');fit('A difference is evidence to inspect, not a cause.',x+44,y+39,ww-53,10,'#abbdd7');
- return y+80;
+ return drawOpeningWhiffs(y+80);
 }
+
+function ratio(n,d){return d?Math.round(n*100/d):0;}
+function drawOpeningWhiffs(startY){const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=startY;
+ // This section follows the original action graph and appears when scrolling below it.
+ sectionLabel('OPENING WHIFF WATCH',x,y,'NEW COUNTS · FIRST 3 SECONDS');y+=25;
+ for(let i=0;i<2;i++){const s=souls[i],o=ensureOpeningStats(s.obs),xx=x+i*(cw+gap);rr(xx,y,cw,114,13,'#202b44',s.color+'77');
+  text(s.id,xx+11,y+19,12,s.color,'left','800');
+  text(`${ratio(o.openingMisses,o.openingSwings)}%`,xx+11,y+48,22,'#f6e4ce','left','800');
+  fit('missed at impact',xx+11,y+64,cw-22,9,'#bfd0e5');
+  fit(`${o.openingMisses} / ${o.openingSwings} swings`,xx+11,y+83,cw-22,10,s.color);
+  fit(`${o.openingAirSwings} started out of range`,xx+11,y+100,cw-22,9,'#a8b9d0');
+ }y+=126;
+ rr(x,y,ww,64,12,'#222f49','#7182a466');
+ tinyIcon(x+22,y+29,'◎','#c6d6f4');
+ fit('Only STRIKE and HEAVY; LUNGE closes distance.',x+43,y+21,ww-53,10,'#ecf1fc');
+ fit('Miss = out of range at impact; launch gap is also tracked.',x+43,y+44,ww-53,9,'#b2c5de');y+=82;
+ sectionLabel('SAME BODY · DIFFERENT SOUL',x,y,'MISSES / OPENING SWINGS');y+=24;
+ for(const body of TYPES){rr(x,y,ww,67,11,'#202b44','#65728d65');text(body.name.toUpperCase(),x+11,y+15,10,'#eee8f6','left','800');
+  for(let i=0;i<2;i++){const s=souls[i],row=ensureOpeningStats(s.obs).openingSwingBodies[body.name],by=y+30+i*16,bx=x+92,bw=ww-175;
+    g.fillStyle=s.color;g.fillRect(x+11,by-5,6,6);littleBar(bx,by-5,bw,ratio(row.misses,row.swings)/100,s.color);
+    text(`${row.misses}/${row.swings}`,x+ww-11,by,10,'#dce5f3','right','700');}y+=74;
+ }
+ y+=6;sectionLabel('SIGNED SCORE COMPONENTS',x,y,'AVERAGE ON MISSED SWINGS');y+=26;
+ for(const k of ['mind','body','soul']){text(k.toUpperCase(),x,y+11,11,'#dce4f1','left','800');
+  for(let i=0;i<2;i++){const s=souls[i],o=ensureOpeningStats(s.obs),v=o.openingMisses?o.openingWhiffParts[k]/o.openingMisses:0,xx=x+116+i*(ww-116)/2;
+   text(o.openingMisses?(v>=0?'+':'')+v.toFixed(2):'—',xx,y+11,12,s.color,'left','800');}y+=29;
+ }
+ rr(x,y+7,ww,66,12,'#25314b','#7284a36b');
+ fit("Scores show the selected action's mind, body, and soul terms.",x+11,y+26,ww-22,10,'#e0eaf7');
+ fit('Positive ≠ cause. Randomness and alternatives still matter.',x+11,y+47,ww-22,9,'#bbcbe1');
+ return y+94;
+}
+
 function actionColor(a){return ({approach:'#83c7c4',retreat:'#c8a0de',observe:'#8aa0bb',strike:'#ffce8c',heavy:'#ec9aa4',guard:'#b9aef4',evade:'#99e0e1',lunge:'#d7cb83'})[a];}
 function drawBodiesTab(){const x=14,ww=w-28;let y=151;
  sectionLabel('BODIES CHANGE. THE SOUL REMAINS.',x,y);y+=21;
