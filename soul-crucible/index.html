@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><meta name="theme-color" content="#10162a">
+<title>Soul Crucible • Duel Prototype</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10162a;overscroll-behavior:none}canvas{width:100%;height:100%;display:block;touch-action:none}noscript{color:white;font:16px system-ui}
+</style>
+</head>
+<body><canvas id="game" aria-label="Soul Crucible autonomous side-view duel simulator. Tap arena creatures or soul labels to inspect. Tap Pause or Speed to control."></canvas><noscript>Enable JavaScript to play Soul Crucible.</noscript>
+<script>
+(()=>{'use strict';
+const canvas=document.getElementById('game'),g=canvas.getContext('2d',{alpha:false});
+const TAU=Math.PI*2, clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), rand=(a=0,b=1)=>a+Math.random()*(b-a), pick=a=>a[Math.floor(rand(0,a.length))], rint=(a,b)=>Math.floor(rand(a,b+1));
+const TYPES=[
+{name:'Skirmisher',family:'Sproutling',hp:2,speed:5,reach:2,power:2,defense:2,mass:1.8,poise:2,color:'#69d6a4'},
+{name:'Bruiser',family:'Tufflet',hp:4,speed:2,reach:2,power:4,defense:4,mass:4.1,poise:4,color:'#e5aa74'},
+{name:'Duelist',family:'Longling',hp:3,speed:3,reach:5,power:3,defense:2,mass:2.1,poise:2,color:'#c0acf6'},
+{name:'Pouncer',family:'Bristlehop',hp:3,speed:5,reach:3,power:4,defense:1,mass:2.1,poise:2,color:'#f5b87b'},
+{name:'Wall',family:'Pebblit',hp:5,speed:1,reach:2,power:3,defense:5,mass:5,poise:5,color:'#a9bf9f'},
+{name:'Trickster',family:'Ribbonel',hp:2,speed:4,reach:3,power:2,defense:2,mass:1.6,poise:1,color:'#90d9ee'},
+{name:'Glass Fang',family:'Mistril',hp:1,speed:4,reach:4,power:5,defense:1,mass:1.4,poise:1,color:'#f49cc5'}
+];
+const AXES=[{key:'closeness',title:'Closeness',desc:'Comfort approaching danger'},{key:'contact',title:'Contact',desc:'Feeling after trading blows'},{key:'pressure',title:'Pressure',desc:'Feeling about commitment'},{key:'defense',title:'Defense',desc:'Feeling about protection'},{key:'pain',title:'Pain',desc:'Emotional response to injury'}];
+const ACTIONS=['approach','retreat','observe','strike','heavy','guard','evade','lunge'];
+const OPP=['AURORA','UMBRA'];
+const NAME1=['Moss','Peb','Bri','Nim','Lum','Fae','Thim','Spri','Wisp','Rune','Glim','Pip','Kip','Vex','Mira'];
+const NAME2=['let','ling','bit','kin','fin','nip','bel','wick','moth','paw','thorn','bell','tail','glow','crest'];
+const KEY='soul-crucible-v0.2';
+let souls, fighters, round=1, selected=0, running=true, speed=1, showJournal=false;
+let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true;
+function makeSoul(i){let im={};AXES.forEach(a=>im[a.key]=rand(-.18,.18));return {id:i===0?'AURORA':'UMBRA',color:i===0?'#aab8ff':'#ffc79f',im,origin:{...im},lives:0,wins:0,losses:0,record:[],totalDamage:0};}
+function load(){try{const p=JSON.parse(localStorage.getItem(KEY));if(p&&Array.isArray(p.souls)&&p.souls.length===2&&p.souls.every(s=>s.im&&AXES.every(a=>Number.isFinite(s.im[a.key])))){souls=p.souls;round=p.round||1;return;}}catch(e){} souls=[makeSoul(0),makeSoul(1)];round=1;}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({souls,round}));}catch(e){}}
+function born(soul,side){const b=pick(TYPES),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},stat:{damage:0,taken:0,strikes:0,guards:0,evades:0},phase:rand(0,TAU),style:rint(0,4),tone:factor};soul.lives++;return f;}
+function begin(){fighters=[born(souls[0],0),born(souls[1],1)];roundTimer=0;countdown=1.0;events.length=0;addEvent('Fresh minds. Fresh bodies. Old feelings.');}
+function addEvent(msg){events.unshift(msg);if(events.length>5)events.length=5;}
+function imprint(s,k,amt){s.im[k]=clamp(s.im[k]+amt,-1,1);}
+function learn(f,r){const m=f.mind;const idx=m.lastAction; m.q[idx]=clamp(m.q[idx]+m.learning*(r-m.q[idx]*.1),-1.4,1.4);m.experience++;}
+function actionScore(f,o,a){const b=f.body, dist=Math.abs(o.x-f.x), reach=54+b.reach*17, danger=!!o.attack&&o.attack.time<o.attack.wind+.10&&dist<reach+52, hurt=f.hp/f.maxHp, tired=f.stamina<23;
+ let mind=0,body=0,soul=0;const I=f.soul.im;
+ switch(a){
+ case 'approach': mind=.16+(dist>reach*1.1?1.0:.1)+(o.guard?.25:0);body=.1+b.speed*.045;soul=I.closeness*.85+I.pressure*.22;break;
+ case 'retreat':mind=.13+(dist<reach*1.13?.45:0)+(hurt<.35?.35:0)+(danger?.35:0);body=b.speed*.055;soul=-I.closeness*.48-I.pain*.54-I.pressure*.20;break;
+ case 'observe':mind=.16+(dist>reach*1.9?.1:0);body=.1;soul=-I.pressure*.15;break;
+ case 'strike':mind=dist<=reach+18?.91:-1.15;body=b.power*.06+(b.speed*.045);soul=I.contact*.68+I.pressure*.27;break;
+ case 'heavy':mind=dist<=reach+10?.75:-1.1;body=b.power*.10-(b.speed*.01);soul=I.pressure*.6+I.contact*.32;break;
+ case 'guard':mind=.22+(danger?.9:0)+(dist<reach+25?.16:0);body=b.defense*.055;soul=I.defense*.78-I.pain*.32;break;
+ case 'evade':mind=.12+(danger?.9:0)+(dist<reach+40?.20:0);body=b.speed*.08;soul=-I.pain*.35+I.defense*.24-I.closeness*.13;break;
+ case 'lunge':mind=(dist>=reach*.6&&dist<=reach+120)?.79:-.9;body=b.speed*.06+b.power*.045;soul=I.pressure*.76+I.closeness*.32;break;
+ }
+ mind+=f.mind.q[ACTIONS.indexOf(a)]*.70; if(tired&&['lunge','heavy','evade'].includes(a))body-=.9;
+ if(f.stamina<12&&['heavy','lunge'].includes(a))body-=2;
+ if(f.lock>0&&['strike','heavy','lunge'].includes(a))body-=2;
+ if(a==='guard'&&o.action==='retreat')mind-=.18;
+ return {mind,body,soul,total:mind+body+soul+rand(-.18,.18)};}
+function decide(f,o){if(f.stagger>0)return; const options=ACTIONS.map(a=>({a,...actionScore(f,o,a)}));options.sort((a,b)=>b.total-a.total);let opt=options[0];if(Math.random()<.12)opt=options[rint(0,Math.min(2,options.length-1))];f.action=opt.a;f.lastParts={mind:opt.mind,soul:opt.soul,body:opt.body};f.mind.lastAction=ACTIONS.indexOf(opt.a);f.actionTime=.35; if(opt.a==='guard'&&f.stamina>5){f.guard=.46;f.stat.guards++;}
+ if(opt.a==='evade'&&f.stamina>12){f.evade=.35;f.hopV=1.5;f.stamina-=13;f.vx= (f.x<o.x?-1:1)*(135+f.body.speed*19);f.stat.evades++;}
+ if(['strike','heavy','lunge'].includes(opt.a)&&f.lock<=0&&!f.attack){const heavy=opt.a==='heavy',lunge=opt.a==='lunge';const wind=(heavy?.42:lunge?.30:.19)*(1.16-f.body.speed*.055),recovery=(heavy?.60:lunge?.49:.33)*(1.15-f.body.speed*.05);let cost=heavy?27:lunge?24:12;if(f.stamina>=cost){f.stamina-=cost;f.attack={type:opt.a,time:0,wind,full:wind+recovery,hit:false,impacted:false,reach:54+f.body.reach*17+(lunge?36:0),power:(heavy?1.55:lunge?1.24:1)*f.body.power}; f.stat.strikes++;f.guard=0;if(lunge)f.vx=(f.x<o.x?1:-1)*(185+f.body.speed*18);}}
+ }
+function impact(f,o){const at=f.attack;if(!at||at.hit)return;at.hit=true;const dist=Math.abs(f.x-o.x),reachable=dist<at.reach+28;let success=false;
+ if(reachable){let dodge=o.evade>0.06&&Math.random()<.66;let defending=o.guard>.06; if(dodge){floatText(o.x,'DODGE','#9de6fa');learn(o,.17); imprint(o.soul,'defense',.0005);}
+ else{let raw=(6+f.body.power*3.4)*at.power/f.body.power*rand(.83,1.16),blocked=defending?(.60+o.body.defense*.035):0,armor=1/(1+o.body.defense*.073);let dmg=Math.max(1,Math.round(raw*(1-blocked)*armor));o.hp=Math.max(0,o.hp-dmg);o.stat.taken+=dmg;f.stat.damage+=dmg;f.soul.totalDamage+=dmg;success=true;
+ o.hitFlash=.18;let push=(22+f.body.power*13)*(1-blocked*.7)*(2.7/(o.body.mass+1.4));o.vx+=(f.x<o.x?1:-1)*push;
+ if(at.type==='heavy'&&f.body.power>=o.body.poise&&Math.random()<.5)o.stagger=.14;
+ spawnHit(o.x,arena?arena.ground-37:200,defending?'#8bcbf9':'#fcd6a6');floatText(o.x,defending?`${dmg} BLOCK`:`-${dmg}`,defending?'#9fe4fa':'#ffe3bd');
+ learn(f,clamp(dmg/35,-.5,1));learn(o,-clamp(dmg/42,0,1)); imprint(f.soul,'contact',dmg*.00015);imprint(f.soul,'pressure',dmg*.00007);imprint(o.soul,'pain',-dmg*.00012);imprint(o.soul,'defense',dmg*.000064); if(defending){learn(o,.20);imprint(o.soul,'defense',.0006);} }
+ }
+ if(!success){learn(f,-.045);if(!reachable)floatText(f.x,'MISS','#aeb6ce');}
+ }
+function spawnHit(px,py,c){for(let i=0;i<10;i++)particles.push({x:arena.x+(px/1000)*arena.w,y:py,vx:rand(-100,100),vy:rand(-110,18),life:rand(.24,.5),max:.5,c,r:rand(2,5)});}
+function floatText(x,txt,c){floats.push({x,y:arena?arena.ground-90:155,txt,c,life:.85});}
+function death(loser,winner){if(bannerTimer>0)return;
+ loser.soul.losses++;winner.soul.wins++;
+ imprint(loser.soul,'pain',-.006);imprint(loser.soul,'contact',-.002);imprint(winner.soul,'pressure',.003);
+ // Losing does not have a universally scripted emotional meaning.
+ // An existing disposition and bounded noise can turn a loss into caution or determination.
+ imprint(loser.soul,'pressure',(.008*loser.soul.im.pressure)+rand(-.005,.005));
+ let entry={life:loser.soul.lives,body:loser.body.name,result:'Defeat',damage:Math.round(loser.stat.damage),date:round};loser.soul.record.unshift(entry);loser.soul.record=loser.soul.record.slice(0,12);
+ winner.soul.record[0]&&0;banner=`${winner.name} survives • ${loser.soul.id} reincarnates`;
+ addEvent(`${loser.soul.id} lost life ${loser.soul.lives}. Emotional impressions remain.`);
+ winner.hp=Math.min(winner.maxHp, winner.hp+Math.round(winner.maxHp*.32));winner.stamina=100;winner.attack=null;winner.guard=0;winner.evade=0;winner.vx=0;winner.lock=0;
+ bannerTimer=1.8;round++;save();}
+function nextLife(){const dead=fighters.findIndex(f=>f.hp<=0),survive=dead===0?1:0;if(dead<0)return;fighters[dead]=born(souls[dead],dead);fighters[survive].x=survive===0?205:795;fighters[survive].vx=0;fighters[dead].x=dead===0?205:795;countdown=.85;roundTimer=0;save();}
+function step(dt){t+=dt; for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=190*dt;if(p.life<=0)particles.splice(i,1)}for(let i=floats.length-1;i>=0;i--){let p=floats[i];p.life-=dt;p.y-=27*dt;if(p.life<=0)floats.splice(i,1)}
+ if(bannerTimer>0){bannerTimer-=dt;if(bannerTimer<=0){bannerTimer=0;nextLife();}return;}if(countdown>0){countdown=Math.max(0,countdown-dt);return;}roundTimer+=dt;
+ for(let i=0;i<2;i++){const f=fighters[i],o=fighters[1-i],b=f.body;f.phase+=dt*(3.4+b.speed*.58);f.decisionT-=dt;f.guard=Math.max(0,f.guard-dt);f.evade=Math.max(0,f.evade-dt);f.hitFlash=Math.max(0,f.hitFlash-dt);f.stagger=Math.max(0,f.stagger-dt);f.lock=Math.max(0,f.lock-dt);f.stamina=clamp(f.stamina+dt*(9+b.speed*1.35),0,100);
+ if(f.decisionT<=0){f.decisionT=rand(.28,.47);decide(f,o);}
+ let move=0;if(f.stagger<=0){if(f.action==='approach')move=f.x<o.x?1:-1;else if(f.action==='retreat')move=f.x<o.x?-1:1;else if(f.action==='lunge'&&f.attack)move=f.x<o.x?1:-1;}
+ if(f.evade>0)move=0;let targetV=move*(75+b.speed*32)*(f.guard>0?.4:1);if(f.attack&&f.attack.type!=='lunge')targetV*=.32;
+ f.vx+=(targetV-f.vx)*Math.min(1,dt*(f.evade>0?1.9:5.8));f.x=clamp(f.x+f.vx*dt,62,938);
+ if(f.hopV>0||f.hop>0){f.hop+=f.hopV*dt*38;f.hopV-=dt*11;if(f.hop<0){f.hop=0;f.hopV=0;}}
+ if(f.attack){const a=f.attack;a.time+=dt;if(!a.hit&&a.time>=a.wind)impact(f,o);if(a.time>=a.full){f.attack=null;f.lock=.07;}}
+ }
+ const a=fighters[0],b=fighters[1],dx=b.x-a.x;if(Math.abs(dx)<63){const push=(63-Math.abs(dx))/2;a.x=clamp(a.x-push,62,938);b.x=clamp(b.x+push,62,938);} if(a.hp<=0||b.hp<=0){death(a.hp<=0?a:b,a.hp<=0?b:a);} else if(roundTimer>65){ // Arena pressure prevents endless stalemates.
+   for(const f of fighters){f.hp=Math.max(0,f.hp-1.2*dt);}
+ }
+}
+function rr(x,y,ww,hh,r,fill,stroke){g.beginPath();g.roundRect(x,y,ww,hh,r);if(fill){g.fillStyle=fill;g.fill()}if(stroke){g.strokeStyle=stroke;g.lineWidth=1;g.stroke()}}
+function text(str,x,y,size=14,col='#eff1ff',align='left',weight='500'){g.font=`${weight} ${size}px system-ui,-apple-system,sans-serif`;g.fillStyle=col;g.textAlign=align;g.textBaseline='middle';g.fillText(str,x,y)}
+function line(x1,y1,x2,y2,col,width=1){g.strokeStyle=col;g.lineWidth=width;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke()}
+function glow(x,y,r,color,alpha=1){let grad=g.createRadialGradient(x,y,0,x,y,r);grad.addColorStop(0,color);grad.addColorStop(1,'transparent');g.globalAlpha=alpha;g.fillStyle=grad;g.fillRect(x-r,y-r,r*2,r*2);g.globalAlpha=1;}
+function drawBg(){g.fillStyle='#10162a';g.fillRect(0,0,w,h);const bg=g.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#10172c');bg.addColorStop(.64,'#1c213e');bg.addColorStop(1,'#141728');g.fillStyle=bg;g.fillRect(0,0,w,h);
+ for(let i=0;i<65;i++){let xx=(i*97.13+39)%w,yy=(i*41.8+24)%h;g.globalAlpha=.18+.2*(1+Math.sin(t*.45+i))/2;g.fillStyle='#dddbff';g.fillRect(xx,yy,1.4,1.4)}g.globalAlpha=1;
+}
+function layout(){const portrait=h>w*.95;const sidePad=clamp(w*.025,8,20);let x=sidePad,width=w-sidePad*2,y=portrait?117:69,hh=portrait?Math.min(345,h*.40):Math.max(180,h-132);arena={x,y,w:width,h:hh,ground:y+hh-39,portrait};}
+function drawArena(){const A=arena,{x,y,w:aw,h:ah,ground}=A;g.save();g.beginPath();g.roundRect(x,y,aw,ah,17);g.clip();let sky=g.createLinearGradient(0,y,0,y+ah);sky.addColorStop(0,'#222b55');sky.addColorStop(.55,'#36416b');sky.addColorStop(1,'#424267');g.fillStyle=sky;g.fillRect(x,y,aw,ah);
+ glow(x+aw*.5,y+ah*.14,aw*.35,'#acb1f4',.18);
+ g.fillStyle='#e5d6c4';g.beginPath();g.arc(x+aw*.5,y+ah*.23,Math.min(20,aw*.06),0,TAU);g.fill();
+ for(let i=0;i<17;i++){let sx=x+((i*73.2+13)%aw),sy=y+((i*43.1+16)%(ah*.6));g.fillStyle=i%2?'#9fb4df':'#c7bbe9';g.globalAlpha=.35;g.fillRect(sx,sy,1.5,1.5)}g.globalAlpha=1;
+ // Monument silhouettes and arches.
+ for(let i=0;i<6;i++){const bx=x+(i/5)*aw-21;g.fillStyle='#283152';g.beginPath();g.moveTo(bx,y+ah*.70);g.lineTo(bx+14,y+ah*.3+Math.sin(i*3)*16);g.lineTo(bx+31,y+ah*.70);g.fill();}
+ g.fillStyle='#2c314f';for(let i=0;i<7;i++){let xx=x+aw*(i/6)-15;g.fillRect(xx,y+ah*.59,27,ah*.31);g.beginPath();g.arc(xx+13,y+ah*.59,13,Math.PI,0);g.fill();}
+ for(let i=0;i<4;i++){let xx=x+aw*(i/3);glow(xx,y+ah*.58,21,'#83f1c9',.12);}
+ g.fillStyle='#51516a';g.fillRect(x,ground,aw,ah);
+ const floor=g.createLinearGradient(0,ground,0,y+ah);floor.addColorStop(0,'#52516a');floor.addColorStop(1,'#292c44');g.fillStyle=floor;g.fillRect(x,ground,aw,ah);line(x,ground,x+aw,ground,'#c7c1cc',2);
+ for(let i=0;i<16;i++){let xx=x+(i/15)*aw;line(xx,ground+6,xx-13,ground+ah*.17,'#85829955',1)}
+ // Rune circle floor
+ g.strokeStyle='#8ad1c45a';g.lineWidth=1.5;g.beginPath();g.ellipse(x+aw*.5,ground+17,aw*.13,8,0,0,TAU);g.stroke();
+ const s=Math.max(.43,Math.min(.94,aw/840));for(let i=0;i<2;i++)drawCritter(fighters[i],x+(fighters[i].x/1000)*aw,ground,s,i===0?1:-1);
+ for(const p of particles){g.globalAlpha=clamp(p.life/p.max,0,1);g.fillStyle=p.c;g.beginPath();g.arc(p.x,p.y,p.r,0,TAU);g.fill();}g.globalAlpha=1;
+ for(const f of floats){g.globalAlpha=clamp(f.life/.7,0,1);text(f.txt,x+(f.x/1000)*aw,f.y,Math.max(10,Math.min(15,aw*.023)),f.c,'center','800')}g.globalAlpha=1;
+ if(countdown>0){rr(x+aw*.5-95,y+ah*.30,190,42,18,'#141930d9','#b8b1e088');text('PREPARE TO DUEL',x+aw*.5,y+ah*.3+21,14,'#f3e5ff','center','800');}
+ if(bannerTimer>0){rr(x+Math.max(3,aw*.06),y+ah*.35,aw-Math.max(3,aw*.06)*2,60,14,'#14182ee9','#c8b3db');let short=aw<500?banner.replace(' survives • ',' wins • '):banner;text(short,x+aw*.5,y+ah*.35+30,aw<410?12:15,'#ffedce','center','800');}
+ g.restore();rr(x,y,aw,ah,17,null,'#727b9e66');}
+function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighters[1-f.side].x?1:-1,hop=f.hop||0;const walk=Math.sin(f.phase)*Math.min(1,Math.abs(f.vx)/160);const bd=f.hitFlash>0?'#fff4df':b.color;
+ g.save();g.translate(px,ground-hop*s);g.scale(s*dir,s);const hs=f.body.name==='Wall'?1.28:f.body.name==='Glass Fang'?.8:1;
+ g.fillStyle='#12182766';g.beginPath();g.ellipse(0,7,64*hs,11,0,0,TAU);g.fill();
+ if(f.guard>0){g.lineWidth=6;g.strokeStyle='#93e6f4b5';g.beginPath();g.ellipse(1,-53,60*hs,57,0,0,TAU);g.stroke();}
+ if(f.evade>0){glow(0,-65,78,'#b3f6ff',.15);}
+ // tail
+ g.save();g.lineCap='round';g.strokeStyle=bd;g.lineWidth=(b.name==='Wall'?21:12);g.beginPath();g.moveTo(-24,-52);g.quadraticCurveTo(-85,-70+walk*11,-78,-100+Math.sin(t*4+f.phase)*7);g.stroke();g.restore();
+ const shape=b.name;
+ // rear leg feet
+ g.fillStyle='#2d365b';for(let k=-1;k<=1;k+=2){g.beginPath();g.ellipse(-24+k*25+walk*9*k,-10,19*hs,14,-.2,0,TAU);g.fill();}
+ if(shape==='Duelist'||shape==='Trickster'){
+ g.fillStyle=bd;g.beginPath();g.ellipse(0,-56,37,54,-.12,0,TAU);g.fill();
+ }else if(shape==='Wall'||shape==='Bruiser'){
+ g.fillStyle=bd;g.beginPath();g.ellipse(0,-54,53*hs,47*hs,.05,0,TAU);g.fill();
+ }else{g.fillStyle=bd;g.beginPath();g.ellipse(0,-51,44*hs,42*hs,-.12,0,TAU);g.fill();}
+ // gradient belly and shoulder patch
+ g.fillStyle='#fff6dc4a';g.beginPath();g.ellipse(17,-41,21,23,.2,0,TAU);g.fill();
+ if(shape==='Wall'||shape==='Bruiser'){g.fillStyle='#394e63';g.beginPath();g.ellipse(-17,-70,27,23,-.5,0,TAU);g.fill();}
+ // mystical crest and ears
+ g.fillStyle=bd;
+ function ear(ex,rot){g.save();g.translate(ex,-88);g.rotate(rot);g.beginPath();g.moveTo(-12,8);g.quadraticCurveTo(-22,-27,-10,-57);g.quadraticCurveTo(12,-47,14,6);g.fill();g.fillStyle='#ffd8ed77';g.beginPath();g.moveTo(-3,1);g.quadraticCurveTo(-10,-23,-6,-42);g.quadraticCurveTo(5,-30,6,1);g.fill();g.restore();}
+ ear(-17,-.19);ear(23,.18);
+ if(shape==='Bruiser'||shape==='Wall'){g.fillStyle='#f1d8b5';for(const xx of [-28,21]){g.beginPath();g.moveTo(xx,-101);g.lineTo(xx+7,-129);g.lineTo(xx+17,-101);g.fill();}}
+ if(shape==='Glass Fang'){g.fillStyle='#fff0f0';for(let i=0;i<3;i++){let xx=-28+i*25;g.beginPath();g.moveTo(xx,-83);g.lineTo(xx+12,-124-8*(i===1));g.lineTo(xx+23,-83);g.fill();}}
+ // head
+ g.fillStyle=bd;g.beginPath();g.ellipse(23,-74,35,32,-.04,0,TAU);g.fill();
+ g.fillStyle='#ffffffc9';g.beginPath();g.ellipse(34,-79,9,12,0,0,TAU);g.fill();g.fillStyle='#293249';g.beginPath();g.ellipse(37+(f.attack?2:0),-78,4.5,8,0,0,TAU);g.fill();g.fillStyle='#fff';g.beginPath();g.arc(39,-81,2,0,TAU);g.fill();
+ g.fillStyle='#3e375d';g.beginPath();g.ellipse(52,-62,5,3,0,0,TAU);g.fill();
+ // arm animated windup
+ const swing=f.attack? clamp((f.attack.time-f.attack.wind+.07)/.22,0,1):0;
+ const armX=shape==='Duelist'?59:38, armY=-45-(f.attack?swing*18:walk*2);
+ g.strokeStyle=bd;g.lineWidth=shape==='Bruiser'?23:shape==='Glass Fang'?10:16;g.lineCap='round';g.beginPath();g.moveTo(23,-51);g.lineTo(armX+(f.attack?swing*30:0),armY);g.stroke();g.fillStyle='#f8e3c5a3';g.beginPath();g.arc(armX+(f.attack?swing*30:0),armY,shape==='Bruiser'?11:7,0,TAU);g.fill();
+ // soul-like visible magic insignia, *not* a mechanically deterministic soul color
+ g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
+ if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
+ g.restore();}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v0.2',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');text(`×${speed} • ${running?'LIVE':'PAUSED'}`,w-24,y+40,compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id}  ·  ${f.name}`,xx+8,yy+11,compact?10:12,f.soul.color,'left','800');text(f.body.name,xx+bw-7,yy+11,compact?9:11,'#ddddf0','right','600');rr(xx+8,yy+22,bw-16,8,4,'#161e38');rr(xx+8,yy+22,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+33,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+33,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
+function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
+function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(speed===1?'1× SPEED':'3× SPEED',xx+bw+11,yy,bw,40,speed===3);btn(showJournal?'◉ SOUL LOG':'◎ SOUL LOG',xx+2*(bw+11),yy,bw,40,showJournal);}
+function drawInspector(){const A=arena;if(A.portrait){let x=A.x,y=A.y+A.h+61,wi=A.w,remaining=h-y-12;if(remaining<78)return;rr(x,y,wi,remaining,16,'#ffffff0b','#ffffff22');
+ const soul=souls[selected],f=fighters[selected];text(`${selected===0?'◀':'▶'} ${soul.id}  •  INCARNATION ${soul.lives}`,x+14,y+22,Math.min(15,w/26),soul.color,'left','800');text(`${f.body.name}  |  ${soul.wins} W / ${soul.losses} L`,x+14,y+43,11,'#d0cbe2');
+ const canGraph=remaining>166;if(canGraph&&!showJournal){const barStart=y+68,barX=x+Math.min(117,wi*.33),barW=wi-(barX-x)-18;for(let i=0;i<AXES.length;i++){let a=AXES[i],val=soul.im[a.key],cy=barStart+i*24;if(cy>y+remaining-27)break;text(a.title,x+14,cy,11,'#c9c7db');rr(barX,cy-6,barW,12,4,'#343b53');line(barX+barW/2,cy-7,barX+barW/2,cy+7,'#e0ddf577');let len=Math.abs(val)*(barW/2-2),start=val>0?barX+barW/2:barX+barW/2-len;rr(start,cy-4,len,8,3,val>0?'#9cdbce':'#dcb2dd');text(`${val>=0?'+':''}${val.toFixed(2)}`,barX+barW/2,cy+11,9,'#dedbee','center');}}
+ else if(showJournal){text('PAST INCARNATIONS  ·  OBSERVER RECORD',x+14,y+68,10,'#b2b5d8','left','800');for(let i=0;i<Math.min(4,soul.record.length);i++){let r=soul.record[i];text(`Life ${r.life}  ${r.body}  ·  ${r.result}`,x+14,y+93+i*23,11,'#f2dfd5');}if(!soul.record.length)text('No previous deaths recorded.',x+14,y+94,11,'#acabc4');}
+ else {text(`Last action: ${f.action.toUpperCase()}`,x+14,y+70,11,'#d9d2ea');text(`Mind ${f.lastParts.mind.toFixed(2)} · Soul ${f.lastParts.soul.toFixed(2)} · Body ${f.lastParts.body.toFixed(2)}`,x+14,y+93,10,'#c3bdd9');}
+ text('Tap a creature to inspect • Tap ✧ in header to reset',x+14,y+remaining-18,9,'#8f94b0');
+ }else{const soul=souls[selected],f=fighters[selected],x=A.x+8,y=A.y+A.h-82;rr(x,y,Math.min(316,A.w*.46),68,12,'#141b31cf','#ffffff2c');text(`${soul.id} · LIFE ${soul.lives} · ${f.body.name}`,x+10,y+16,11,soul.color,'left','800');text(`Mind ${f.lastParts.mind.toFixed(2)}  Soul ${f.lastParts.soul.toFixed(2)}  Body ${f.lastParts.body.toFixed(2)}`,x+10,y+37,10,'#e5e0f3');text(`${f.action.toUpperCase()}  •  ${soul.wins} wins  ${soul.losses} losses`,x+10,y+55,10,'#b8bdd9');}}
+function draw(){drawBg();layout();drawHeader();drawArena();drawFighterBars();drawButtons();drawInspector();if(w>520&&!arena.portrait){text('TAP CREATURE TO INSPECT • INDEPENDENT SOUL / MIND / BODY',w/2,h-60,9,'#b9b1d4','center','700');}}
+function resize(){const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);g.setTransform(dpr,0,0,dpr,0,0);layout();}
+function frame(ms){if(!w)resize();const elapsed=last?Math.min(.055,(ms-last)/1000):0;last=ms;if(running){accum=Math.min(.25,accum+elapsed*speed);let iter=0;while(accum>=1/60&&iter++<12){step(1/60);accum-=1/60;}}draw();requestAnimationFrame(frame);}
+function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*w/rect.width,y=(e.clientY-rect.top)*h/rect.height;
+ if(x>=10&&x<=43&&y>=11&&y<=53){if(confirm('Reset souls and all incarnation history?')){localStorage.removeItem(KEY);load();begin();selected=0;save();}return;}for(let i=0;i<buttons.length;i++){let b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;}else if(i===1)speed=speed===1?3:1;else if(i===2)showJournal=!showJournal;return;}}
+ if(y>=arena.y&&y<arena.y+arena.h){const wx=((x-arena.x)/arena.w)*1000;selected=Math.abs(wx-fighters[0].x)<Math.abs(wx-fighters[1].x)?0:1;return;}
+ if(arena.portrait&&y>arena.y+arena.h+57){selected=1-selected;return;}
+}
+canvas.addEventListener('pointerdown',pointer);window.addEventListener('resize',resize);window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();running=!running;}if(e.key==='Digit1')selected=0;if(e.key==='Digit2')selected=1;if(e.key==='KeyS')speed=speed===1?3:1;if(e.key==='KeyL')showJournal=!showJournal;if(e.key==='KeyR'&&e.shiftKey){if(confirm('Reset all souls and incarnation history?')){localStorage.removeItem(KEY);load();begin();}}});document.addEventListener('visibilitychange',()=>{if(document.hidden){running=false;last=0;}});
+load();begin();resize();requestAnimationFrame(frame);
+// Tiny explicit debug surface for browser automation / development without influencing combat.
+window.__soulCrucible={state:()=>({round,running,speed,souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,action:f.action,impressions:f.soul.im}))}),reset:()=>{localStorage.removeItem(KEY);load();begin();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);}};
+})();
+</script>
+</body></html>
