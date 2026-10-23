@@ -157,6 +157,7 @@ function assureWorld(){if(!world)world=createWorld();for(const k of ['nursery','
  for(const k of ['bank','familyStats','soulOrigins'])if(!world[k]||typeof world[k]!=='object')world[k]={};if(!world.globalStreaks){world.globalStreaks=blankStreakRecords();if(Array.isArray(souls))for(const type of TYPES)for(const soul of souls){const row=soul.obs?.streakRecords?.[type.name];if(row){world.globalStreaks[type.name].best=Math.max(world.globalStreaks[type.name].best,row.best||0);world.globalStreaks[type.name].reached5+=(row.reached5||0);}}}
  for(const k of ['nextSoul','nextBody','births','rebirths','novelSouls'])if(!Number.isFinite(world[k]))world[k]= k.startsWith('next')?1:0;
  if(!Number.isFinite(world.since))world.since=round;
+ if(!Array.isArray(world.genomePool))world.genomePool=[];
  // Prospective lineage census. Existing history is not backfilled with invented outcomes.
  if(!world.lineageCensus||typeof world.lineageCensus!=='object')world.lineageCensus={since:round,born:{},died:{},budded:{},wins:{},maxStreak:{},lives:{}};
  return world;
@@ -177,7 +178,11 @@ function makeBodySeed(origin=null){const type=origin?.origin?TYPES.find(t=>t.nam
  const b=type||pick(TYPES);return {id:origin?.id||uniqueBodyId(),parentId:origin?.parentId||null,origin:b.name,generation:origin?.generation||0,dna:origin?.dna||baseDNA()};
 }
 function queueOffspring(f){assureWorld();if(f.budded||f.winStreak!==5)return null;
- f.budded=true;const soul=assignSoul();const id=uniqueBodyId(),dna=mutateDNA(f.genome),seed={id,parentId:f.bodyId,origin:f.origin,generation:f.generation+1,dna,soulId:soul.id};
+ f.budded=true;
+ // A G1+ reproducer earns one permanent, immutable genome entry. Its future copies
+ // receive new body IDs, fresh minds and independently assigned souls.
+ if(f.generation>=1)world.genomePool.push({bodyId:f.bodyId,origin:f.origin,generation:f.generation,dna:{...f.genome},registeredAt:round});
+ const soul=assignSoul();const id=uniqueBodyId(),dna=mutateDNA(f.genome),seed={id,parentId:f.bodyId,origin:f.origin,generation:f.generation+1,dna,soulId:soul.id};
  world.nursery.push(seed);world.births++;const census=world.lineageCensus;census.born[seed.generation]=(census.born[seed.generation]||0)+1;census.budded[f.generation]=(census.budded[f.generation]||0)+1;
  const fam=world.familyStats[seed.origin]||(world.familyStats[seed.origin]={births:0,maxGeneration:0});fam.births++;fam.maxGeneration=Math.max(fam.maxGeneration,seed.generation);
  world.history.unshift({id,parentId:seed.parentId,soulId:soul.id,origin:seed.origin,generation:seed.generation,duel:round});if(world.history.length>500)world.history.length=500;
@@ -185,7 +190,12 @@ function queueOffspring(f){assureWorld();if(f.budded||f.winStreak!==5)return nul
  return seed;
 }
 function retireSoul(f){assureWorld();world.waiting.push({id:f.soul.id,readyAt:round+REINCARNATION_WAIT});}
-function recruitSeed(){assureWorld();if(world.nursery.length)return world.nursery.shift();return makeBodySeed();}
+function recruitSeed(){assureWorld();if(world.nursery.length)return world.nursery.shift();
+ // Uniform selection across seven ancestral genomes and each earned persistent genotype.
+ const n=TYPES.length+world.genomePool.length,slot=Math.floor(Math.random()*n);
+ if(slot<TYPES.length)return makeBodySeed({origin:TYPES[slot].name});
+ const saved=world.genomePool[slot-TYPES.length];return makeBodySeed({origin:saved.origin,generation:saved.generation,dna:{...saved.dna},parentId:saved.bodyId});
+}
 function getRecruitSoul(seed){return seed.soulId?soulById(seed.soulId)||createNewSoul():assignSoul();}
 function packFighter(f){if(!f)return null;const {soul,body,...rest}=f;return {...rest,soulId:soul.id};}
 function restoreFighter(p){if(!p||!p.soulId)return null;const soul=soulById(p.soulId);if(!soul)return null;
@@ -345,7 +355,7 @@ function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighte
  g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
  if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
  g.restore();}
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.5',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.6',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');fit(`${f.body.name} · ${f.winStreak} IN A ROW`,xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
 function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
 function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(`${speed}× SPEED`,xx+bw+11,yy,bw,40,speed>1);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
@@ -531,6 +541,8 @@ function drawGenesTab(){assureWorld();const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;le
  for(const key of GENETIC_TRAITS){text(key.toUpperCase(),x,y+8,10,'#d6e0f7','left','800');const xx=x+104,bw=Math.max(40,ww-173),v0=fighters[0].genome[key],v1=fighters[1].genome[key];littleBar(xx,y,bw,v0/2.7,fighters[0].soul.color);littleBar(xx,y+11,bw,v1/2.7,fighters[1].soul.color);fit(v0.toFixed(2)+'/'+v1.toFixed(2),x+ww,y+9,66,9,'#c3d3ee','right');y+=30;}
  y+=19;sectionLabel('ANCESTRAL BLOODLINES',x,y,'BIRTHS • MOST EVOLVED');y+=24;
  for(const type of TYPES){const z=world.familyStats[type.name]||{births:0,maxGeneration:0},g=world.globalStreaks[type.name];rr(x,y,ww,49,11,'#202b45','#52668666');fit(type.name.toUpperCase(),x+10,y+17,ww*.52,10,'#e9e9f5','left','800');fit(z.births+' buds • G'+z.maxGeneration,x+ww-10,y+17,ww*.55,10,'#a2dcc7','right');fit('Best '+g.best+' consecutive wins · '+g.reached5+' qualified',x+10,y+37,ww-20,9,'#a9bad9');y+=56;}
+ y+=13;sectionLabel('GENETIC RESP AWN POOL'.replace('RESP AWN','RESPAWN'),x,y,'EQUAL CHANCE PER DESIGN');y+=24;
+ rr(x,y,ww,54,10,'#202b46','#53648266');fit(TYPES.length+' ancestral designs  +  '+world.genomePool.length+' earned genomes',x+10,y+17,ww-20,10,'#d6e9dd');fit('Eligible G1+ parents register once when budding. Pool began at v1.6.',x+10,y+39,ww-20,9,'#aabedc');y+=65;
  y+=13;sectionLabel('LINEAGE AUTOPSY',x,y,'PROSPECTIVE CENSUS');y+=24;
  const census=world.lineageCensus,gens=new Set([...Object.keys(census.born),...Object.keys(census.died),...Object.keys(census.budded),...Object.keys(census.wins),...Object.keys(census.lives)]);
  const sorted=[...gens].map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
@@ -613,7 +625,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){running=fa
 window.addEventListener('pagehide',()=>save(true));
 load();begin();save();resize();requestAnimationFrame(frame);
 // Tiny explicit debug surface for browser automation / development without influencing combat.
-window.__soulCrucible={state:()=>({round,running,speed,headless,actualSpeed,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
+window.__soulCrucible={state:()=>({round,running,speed,headless,actualSpeed,genomePoolSize:world?.genomePool?.length||0,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
 })();
 </script>
 </body></html>
