@@ -34,6 +34,10 @@ function toggleHeadless(){headless=!headless;headlessStartRound=round;accum=0;la
 
 let souls, fighters, world, restoreFighters=null, round=1, selected=0, running=true, speed=1, headless=false, headlessStartRound=0, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
 let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true, timedOut=false, speedSampleWall=0, speedSampleSim=0, actualSpeed=0, lastSaveAt=0, lastRenderAt=0;
+// Observation only: sampled timings never feed decisions, physics, genetics or random draws.
+const perf={frames:0,ticks:0,stepMs:0,drawMs:0,saveMs:0,saveCount:0,decisionMs:0,decisionSamples:0,decisions:0,lifecycleMs:0,lifecycleCount:0,elapsedMs:0,lastReport:0,report:{},lastRound:1,duelsPerSecond:0};
+function profiledDecide(f,o){perf.decisions++;if((perf.decisions&127)!==0){decide(f,o);return;}const st=performance.now();decide(f,o);perf.decisionMs+=performance.now()-st;perf.decisionSamples++;}
+function perfReport(ms){if(!perf.lastReport)perf.lastReport=ms;const interval=ms-perf.lastReport;if(interval<1800)return;perf.duelsPerSecond=(round-perf.lastRound)*1000/interval;perf.lastRound=round;perf.report={ticksPerSecond:Math.round(perf.ticks*1000/interval),stepMsPerSecond:+(perf.stepMs*1000/interval).toFixed(1),drawMsPerSecond:+(perf.drawMs*1000/interval).toFixed(1),saveMsPerSecond:+(perf.saveMs*1000/interval).toFixed(1),saves:perf.saveCount,avgDecisionUs:perf.decisionSamples?Math.round(perf.decisionMs/perf.decisionSamples*1000):0,avgLifecycleMs:perf.lifecycleCount?+(perf.lifecycleMs/perf.lifecycleCount).toFixed(2):0,decisionsPerSecond:Math.round(perf.decisions*1000/interval),framesPerSecond:Math.round(perf.frames*1000/interval),duelsPerSecond:+perf.duelsPerSecond.toFixed(2)};perf.frames=perf.ticks=perf.stepMs=perf.drawMs=perf.saveMs=perf.saveCount=perf.decisionMs=perf.decisionSamples=perf.decisions=perf.lifecycleMs=perf.lifecycleCount=0;perf.lastReport=ms;}
 function blankCounts(list){const out={};for(const item of list){const key=typeof item==='string'?item:item.name;out[key]=0;}return out;}
 function freshObserver(){return {decisionCounts:blankCounts(ACTIONS),bodyLives:blankCounts(TYPES),bodyWins:blankCounts(TYPES),bodyLosses:blankCounts(TYPES),openingEvades:0,duelsStarted:0,timeoutDuels:0,evades:0,successfulDodges:0,totalDamage:0,totalTaken:0,totalStrikes:0,totalGuards:0,livesObserved:0,openingSwings:0,openingAirSwings:0,openingMisses:0,airSwingParts:{mind:0,body:0,soul:0},openingWhiffParts:{mind:0,body:0,soul:0},openingSwingBodies:{}};}
 // Observation-only statistics: never feed this data into action selection or rewards.
@@ -192,7 +196,7 @@ function load(){try{const p=JSON.parse(localStorage.getItem(KEY));if(p&&Array.is
   restoreFighters=Array.isArray(p.activeFighters)&&p.activeFighters.length===2?p.activeFighters:null;
   return;
  }}catch(e){} souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;}
-function save(force=false){try{const now=performance.now();if(!force&&speed>=300&&running&&now-lastSaveAt<1800)return;assureWorld();localStorage.setItem(KEY,JSON.stringify({souls,round,world,activeFighters:fighters?.map(packFighter)}));lastSaveAt=now;}catch(e){}}
+function save(force=false){try{const now=performance.now();if(!force&&speed>=300&&running&&now-lastSaveAt<1800)return;assureWorld();localStorage.setItem(KEY,JSON.stringify({souls,round,world,activeFighters:fighters?.map(packFighter)}));lastSaveAt=now;perf.saveMs+=performance.now()-now;perf.saveCount++;}catch(e){}}
 
 function born(soul,side,proposedSeed=null){ensureSoul(soul);const seed=makeBodySeed(proposedSeed),
  b=bodyFromDNA(TYPES.find(t=>t.name===seed.origin)||TYPES[0],seed.dna,seed.generation),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,bodyId:seed.id,parentId:seed.parentId,origin:seed.origin,generation:seed.generation,genome:{...b.dna},budded:false,mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},winStreak:0,stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},evadeResolved:false,evadeConnected:false,phase:rand(0,TAU),style:rint(0,4),tone:factor};soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;return f;}
@@ -242,7 +246,7 @@ function impact(f,o){const at=f.attack;if(!at||at.hit)return;at.hit=true;const d
  }
 function spawnHit(px,py,c){if(speed>=FAST_FX_THRESHOLD)return;for(let i=0;i<10;i++)particles.push({x:arena.x+(px/1000)*arena.w,y:py,vx:rand(-100,100),vy:rand(-110,18),life:rand(.24,.5),max:.5,c,r:rand(2,5)});}
 function floatText(x,txt,c){if(speed>=FAST_FX_THRESHOLD)return;floats.push({x,y:arena?arena.ground-90:155,txt,c,life:.85});}
-function death(loser,winner){if(bannerTimer>0)return;
+function death(loser,winner){if(bannerTimer>0)return;const lifecycleStart=performance.now();
  loser.soul.losses++;winner.soul.wins++;winner.soul.obs.bodyWins[winner.body.name]++;loser.soul.obs.bodyLosses[loser.body.name]++;recordSurvivalStreak(winner);queueOffspring(winner);
  // Death changes a soul through bodily experience, not a canned lesson.
  // A costly last stand can be interpreted differently from a helpless defeat.
@@ -254,7 +258,7 @@ function death(loser,winner){if(bannerTimer>0)return;
  winner.soul.record[0]&&0;banner=`${winner.name} survives • ${loser.soul.id} reincarnates`;
  addEvent(`${loser.soul.id} lost life ${loser.soul.lives}. Emotional impressions remain.`);
  winner.hp=Math.min(winner.maxHp, winner.hp+Math.round(winner.maxHp*.32*winner.body.recovery));winner.stamina=100;winner.attack=null;winner.guard=0;winner.evade=0;winner.vx=0;winner.lock=0;
- bannerTimer=1.8;round++;save();}
+ bannerTimer=1.8;round++;save();perf.lifecycleMs+=performance.now()-lifecycleStart;perf.lifecycleCount++;}
 function nextLife(){const dead=fighters.findIndex(f=>f.hp<=0),survive=dead===0?1:0;if(dead<0)return;
  const recruit=recruitSeed(),soul=getRecruitSoul(recruit);fighters[dead]=born(soul,dead,recruit);
  fighters[survive].x=survive===0?205:795;fighters[survive].vx=0;fighters[dead].x=dead===0?205:795;countdown=.85;roundTimer=0;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;f.soul.obs.duelsStarted++;}save();}
@@ -263,7 +267,7 @@ function step(dt){t+=dt; for(let i=particles.length-1;i>=0;i--){let p=particles[
  if(bannerTimer>0){bannerTimer-=dt;if(bannerTimer<=0){bannerTimer=0;nextLife();}return;}if(countdown>0){countdown=Math.max(0,countdown-dt);return;}roundTimer+=dt;
  for(let i=0;i<2;i++){const f=fighters[i],o=fighters[1-i],b=f.body;f.phase+=dt*(3.4+b.speed*.58);f.decisionT-=dt;f.guard=Math.max(0,f.guard-dt);f.evade=Math.max(0,f.evade-dt);f.hitFlash=Math.max(0,f.hitFlash-dt);f.stagger=Math.max(0,f.stagger-dt);f.lock=Math.max(0,f.lock-dt);f.stamina=clamp(f.stamina+dt*(9+b.speed*1.35)*b.recovery,0,100);
  if(f.evade<=0&&!f.evadeResolved&&f.stat.evades>0){f.evadeResolved=true;if(!f.evadeConnected){learn(f,-.085);feel(f,{defense:.70,pressure:.32,pain:.13},-.24,.65,'Energy spent in silence');}}
- if(f.decisionT<=0){f.decisionT=rand(.28,.47);decide(f,o);}
+ if(f.decisionT<=0){f.decisionT=rand(.28,.47);profiledDecide(f,o);}
  let move=0;if(f.stagger<=0){if(f.action==='approach')move=f.x<o.x?1:-1;else if(f.action==='retreat')move=f.x<o.x?-1:1;else if(f.action==='lunge'&&f.attack)move=f.x<o.x?1:-1;}
  if(f.evade>0)move=0;let targetV=move*(75+b.speed*32)*(f.guard>0?.4:1);if(f.attack&&f.attack.type!=='lunge')targetV*=.32;
  f.vx+=(targetV-f.vx)*Math.min(1,dt*(f.evade>0?1.9:5.8));f.x=clamp(f.x+f.vx*dt,62,938);
@@ -338,7 +342,7 @@ function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighte
  g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
  if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
  g.restore();}
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.2',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.3',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');fit(`${f.body.name} · ${f.winStreak} IN A ROW`,xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
 function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
 function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(`${speed}× SPEED`,xx+bw+11,yy,bw,40,speed>1);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
@@ -347,8 +351,12 @@ function drawHeadless(){
  text('✧  SOUL CRUCIBLE',cx,top,Math.min(19,w/19),'#e8deff','center','850');
  text('HEADLESS • EVOLUTION LAB',cx,top+27,11,'#9caed2','center','800');
  const stats=[['DUELS COMPLETED',String(Math.max(0,round-1))],['SINCE TURBO',String(Math.max(0,round-headlessStartRound))],['SPEED TARGET',speed+'×'],['ACTUAL SPEED',running?(actualSpeed?actualSpeed+'×':'MEASURING…'):'PAUSED'],['TOTAL BIRTHS',String(world?.births||0)],['HIGHEST GENERATION','G'+Math.max(0,...Object.values(world?.familyStats||{}).map(x=>x.maxGeneration||0))],['NURSERY',String(world?.nursery?.length||0)]];
- const available=Math.max(150,h-top-118),stepH=Math.min(47,available/stats.length);
+ const available=Math.max(150,h-top-230),stepH=Math.min(47,available/stats.length);
  for(let i=0;i<stats.length;i++){const yy=top+53+i*stepH;rr(left,yy,wide,stepH-5,9,'#202b46','#52608044');text(stats[i][0],left+11,yy+(stepH-5)/2,Math.min(10,w/39),'#aebed8','left','700');fit(stats[i][1],left+wide-11,yy+(stepH-5)/2,wide*.48,Math.min(15,w/23),'#f8e4c1','right','850');}
+ const p=perf.report,baseY=top+53+stats.length*stepH+5;
+ text('ENGINE PROFILER  •  LAST ~2 SECONDS',left+4,baseY+10,10,'#b9c9e9','left','850');
+ const rows=[`STEPS/s  ${p.ticksPerSecond??'…'}   •   DUELS/s  ${p.duelsPerSecond??'…'}`,`CPU ms/s  SIM ${p.stepMsPerSecond??'…'}  DRAW ${p.drawMsPerSecond??'…'}  SAVE ${p.saveMsPerSecond??'…'}`,`DECISIONS/s  ${p.decisionsPerSecond??'…'}   •   AVG ${p.avgDecisionUs??'…'} µs`,`LIFECYCLE  ${p.avgLifecycleMs??'…'} ms/duel   •   UI ${p.framesPerSecond??'…'} fps`];
+ for(let i=0;i<rows.length;i++)fit(rows[i],left+4,baseY+30+i*20,wide-8,Math.min(11,w/37),'#d5e0f2','left','650');
  buttons=[];const by=h-54,gap=7,bw=(wide-2*gap)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',left,by,bw,40,!running);btn(speed+'× SPEED',left+bw+gap,by,bw,40,true);btn('◀ ARENA',left+2*(bw+gap),by,bw,40,true);
 }
 function fit(str,x,y,maxWidth,size=11,color='#f5f0ff',align='left',weight='600'){
@@ -557,11 +565,13 @@ function frame(ms){
    step(FIXED_DT);accum-=FIXED_DT;ticks++;
    if((ticks&31)===0&&performance.now()-begin>budgetMs)break;
   }
+  perf.frames++;perf.ticks+=ticks;perf.stepMs+=performance.now()-begin;
   speedSampleWall+=elapsed;speedSampleSim+=ticks*FIXED_DT;
   if(speedSampleWall>=1.2){actualSpeed=Math.round(speedSampleSim/speedSampleWall);speedSampleWall=0;speedSampleSim=0;}
  }
  // Draw at most ~15fps at extreme speeds, leaving time for simulation and touch events.
- if(!running||ms-lastRenderAt>=(headless?400:speed>=300?65:0)){draw();lastRenderAt=ms;}
+ if(!running||ms-lastRenderAt>=(headless?400:speed>=300?65:0)){const renderStart=performance.now();draw();perf.drawMs+=performance.now()-renderStart;lastRenderAt=ms;}
+ perfReport(ms);
  requestAnimationFrame(frame);
 }
 function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*w/rect.width,y=(e.clientY-rect.top)*h/rect.height;
@@ -590,7 +600,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){running=fa
 window.addEventListener('pagehide',()=>save(true));
 load();begin();save();resize();requestAnimationFrame(frame);
 // Tiny explicit debug surface for browser automation / development without influencing combat.
-window.__soulCrucible={state:()=>({round,running,speed,headless,actualSpeed,backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
+window.__soulCrucible={state:()=>({round,running,speed,headless,actualSpeed,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
 })();
 </script>
 </body></html>
