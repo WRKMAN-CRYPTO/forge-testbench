@@ -541,7 +541,7 @@ function drawObserver(){const bg=g.createLinearGradient(0,0,w,h);bg.addColorStop
  observerMaxScroll=Math.max(0,contentBottom-bottom+15);observerScroll=clamp(observerScroll,0,observerMaxScroll);
  if(observerMaxScroll>0){rr(w-6,top,3,bottom-top,2,'#55608066');const thumb=(bottom-top)*Math.max(.10,(bottom-top)/(bottom-top+observerMaxScroll));rr(w-6,top+(bottom-top-thumb)*(observerScroll/observerMaxScroll),3,thumb,2,'#bed6eb');}
 }
-function draw(){if(headless){drawHeadless();return;}drawBg();layout();if(observerOpen){drawObserver();return;}drawHeader();drawArena();drawFighterBars();drawButtons();drawDuelSnapshot();if(w>520&&!arena.portrait)text('TAP CREATURE TO INSPECT • OPEN OBSERVE TO EXPLORE PATTERNS',w/2,h-60,9,'#b9b1d4','center','700');}
+function draw(){if(headless){drawHeadless();return;}drawBg();layout();if(observerOpen){drawObserver();return;}drawHeader();drawArena();drawFighterBars();drawButtons();drawDuelSnapshot();rr(w/2-73,h-104,146,35,10,'#292c50','#a3a4d35c');text('⚡ HEADLESS TURBO',w/2,h-86,11,'#e8e2ff','center','800');}
 function resize(){const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);g.setTransform(dpr,0,0,dpr,0,0);layout();}
 function frame(ms){
  if(!w)resize();const elapsed=last?Math.min(.10,(ms-last)/1000):0;last=ms;
