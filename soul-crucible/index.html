@@ -30,8 +30,9 @@ const KEY='soul-crucible-v0.2'; // Keep the same storage key: preserve decades o
 const SPEEDS=[1,3,10,30,100,300,1000,3000,10000],FIXED_DT=1/60,FAST_FX_THRESHOLD=30;
 // The simulation always advances in fixed physics steps. Only the desired number of steps changes.
 function cycleSpeed(){speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];accum=0;if(speed>=FAST_FX_THRESHOLD){particles.length=0;floats.length=0;}speedSampleWall=0;speedSampleSim=0;actualSpeed=0;}
+function toggleHeadless(){headless=!headless;headlessStartRound=round;accum=0;lastRenderAt=0;speedSampleWall=0;speedSampleSim=0;actualSpeed=0;particles.length=0;floats.length=0;save(true);}
 
-let souls, fighters, world, restoreFighters=null, round=1, selected=0, running=true, speed=1, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
+let souls, fighters, world, restoreFighters=null, round=1, selected=0, running=true, speed=1, headless=false, headlessStartRound=0, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
 let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true, timedOut=false, speedSampleWall=0, speedSampleSim=0, actualSpeed=0, lastSaveAt=0, lastRenderAt=0;
 function blankCounts(list){const out={};for(const item of list){const key=typeof item==='string'?item:item.name;out[key]=0;}return out;}
 function freshObserver(){return {decisionCounts:blankCounts(ACTIONS),bodyLives:blankCounts(TYPES),bodyWins:blankCounts(TYPES),bodyLosses:blankCounts(TYPES),openingEvades:0,duelsStarted:0,timeoutDuels:0,evades:0,successfulDodges:0,totalDamage:0,totalTaken:0,totalStrikes:0,totalGuards:0,livesObserved:0,openingSwings:0,openingAirSwings:0,openingMisses:0,airSwingParts:{mind:0,body:0,soul:0},openingWhiffParts:{mind:0,body:0,soul:0},openingSwingBodies:{}};}
@@ -337,10 +338,19 @@ function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighte
  g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
  if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
  g.restore();}
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.1',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.2',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');fit(`${f.body.name} · ${f.winStreak} IN A ROW`,xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
 function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
 function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(`${speed}× SPEED`,xx+bw+11,yy,bw,40,speed>1);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
+function drawHeadless(){
+ g.fillStyle='#11182b';g.fillRect(0,0,w,h);const cx=w/2,wide=Math.min(w-30,520),left=cx-wide/2,top=Math.max(18,h*.12);
+ text('✧  SOUL CRUCIBLE',cx,top,Math.min(19,w/19),'#e8deff','center','850');
+ text('HEADLESS • EVOLUTION LAB',cx,top+27,11,'#9caed2','center','800');
+ const stats=[['DUELS COMPLETED',String(Math.max(0,round-1))],['SINCE TURBO',String(Math.max(0,round-headlessStartRound))],['SPEED TARGET',speed+'×'],['ACTUAL SPEED',running?(actualSpeed?actualSpeed+'×':'MEASURING…'):'PAUSED'],['TOTAL BIRTHS',String(world?.births||0)],['HIGHEST GENERATION','G'+Math.max(0,...Object.values(world?.familyStats||{}).map(x=>x.maxGeneration||0))],['NURSERY',String(world?.nursery?.length||0)]];
+ const available=Math.max(150,h-top-118),stepH=Math.min(47,available/stats.length);
+ for(let i=0;i<stats.length;i++){const yy=top+53+i*stepH;rr(left,yy,wide,stepH-5,9,'#202b46','#52608044');text(stats[i][0],left+11,yy+(stepH-5)/2,Math.min(10,w/39),'#aebed8','left','700');fit(stats[i][1],left+wide-11,yy+(stepH-5)/2,wide*.48,Math.min(15,w/23),'#f8e4c1','right','850');}
+ buttons=[];const by=h-54,gap=7,bw=(wide-2*gap)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',left,by,bw,40,!running);btn(speed+'× SPEED',left+bw+gap,by,bw,40,true);btn('◀ ARENA',left+2*(bw+gap),by,bw,40,true);
+}
 function fit(str,x,y,maxWidth,size=11,color='#f5f0ff',align='left',weight='600'){
  let tx=String(str);g.font=`${weight} ${size}px system-ui,-apple-system,sans-serif`;
  if(g.measureText(tx).width>maxWidth){while(tx.length>1&&g.measureText(tx+'…').width>maxWidth)tx=tx.slice(0,-1);tx+='…';}
@@ -531,7 +541,7 @@ function drawObserver(){const bg=g.createLinearGradient(0,0,w,h);bg.addColorStop
  observerMaxScroll=Math.max(0,contentBottom-bottom+15);observerScroll=clamp(observerScroll,0,observerMaxScroll);
  if(observerMaxScroll>0){rr(w-6,top,3,bottom-top,2,'#55608066');const thumb=(bottom-top)*Math.max(.10,(bottom-top)/(bottom-top+observerMaxScroll));rr(w-6,top+(bottom-top-thumb)*(observerScroll/observerMaxScroll),3,thumb,2,'#bed6eb');}
 }
-function draw(){drawBg();layout();if(observerOpen){drawObserver();return;}drawHeader();drawArena();drawFighterBars();drawButtons();drawDuelSnapshot();if(w>520&&!arena.portrait)text('TAP CREATURE TO INSPECT • OPEN OBSERVE TO EXPLORE PATTERNS',w/2,h-60,9,'#b9b1d4','center','700');}
+function draw(){if(headless){drawHeadless();return;}drawBg();layout();if(observerOpen){drawObserver();return;}drawHeader();drawArena();drawFighterBars();drawButtons();drawDuelSnapshot();if(w>520&&!arena.portrait)text('TAP CREATURE TO INSPECT • OPEN OBSERVE TO EXPLORE PATTERNS',w/2,h-60,9,'#b9b1d4','center','700');}
 function resize(){const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);g.setTransform(dpr,0,0,dpr,0,0);layout();}
 function frame(ms){
  if(!w)resize();const elapsed=last?Math.min(.10,(ms-last)/1000):0;last=ms;
@@ -542,7 +552,7 @@ function frame(ms){
   const begin=performance.now();let ticks=0;
   // Keep the same 60Hz simulation and combat rules at every speed.
   // At extreme speeds devote a slightly larger, bounded slice to simulation.
-  const budgetMs=speed>=300?17:12, maxTicks=speed>=300?1200:480;
+  const budgetMs=headless?32:(speed>=300?17:12), maxTicks=headless?2400:(speed>=300?1200:480);
   while(accum>=FIXED_DT&&ticks<maxTicks){
    step(FIXED_DT);accum-=FIXED_DT;ticks++;
    if((ticks&31)===0&&performance.now()-begin>budgetMs)break;
@@ -551,16 +561,18 @@ function frame(ms){
   if(speedSampleWall>=1.2){actualSpeed=Math.round(speedSampleSim/speedSampleWall);speedSampleWall=0;speedSampleSim=0;}
  }
  // Draw at most ~15fps at extreme speeds, leaving time for simulation and touch events.
- if(speed<300||!running||ms-lastRenderAt>=65){draw();lastRenderAt=ms;}
+ if(!running||ms-lastRenderAt>=(headless?400:speed>=300?65:0)){draw();lastRenderAt=ms;}
  requestAnimationFrame(frame);
 }
 function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*w/rect.width,y=(e.clientY-rect.top)*h/rect.height;
+ if(headless){for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;accum=0;if(!running)save(true);}else if(i===1)cycleSpeed();else if(i===2)toggleHeadless();return;}}return;}
  if(observerOpen){if(y<69&&x>w-89){observerOpen=false;return;}
   if(y>=78&&y<127){const gap=6,tw=(w-26-gap*4)/5;const i=Math.floor((x-13)/(tw+gap));if(i>=0&&i<5){observerTab=i;observerScroll=0;}return;}return;
  }
  if(x>=10&&x<=43&&y>=11&&y<=53){if(confirm('Reset souls and all incarnation history?')){localStorage.removeItem(KEY);load();begin();selected=0;save();}return;}
  for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;accum=0;if(!running)save(true);}else if(i===1)cycleSpeed();else if(i===2){observerOpen=true;observerTab=0;observerScroll=0;}return;}}
  if(y>=arena.y&&y<arena.y+arena.h){const wx=((x-arena.x)/arena.w)*1000;selected=Math.abs(wx-fighters[0].x)<Math.abs(wx-fighters[1].x)?0:1;return;}
+ if(y>=h-108&&y<h-57){toggleHeadless();return;}
  if(arena.portrait&&y>arena.y+arena.h+57)selected=1-selected;
 }
 function xy(e){const rect=canvas.getBoundingClientRect();return {x:e.clientX-rect.left,y:e.clientY-rect.top};}
@@ -578,7 +590,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){running=fa
 window.addEventListener('pagehide',()=>save(true));
 load();begin();save();resize();requestAnimationFrame(frame);
 // Tiny explicit debug surface for browser automation / development without influencing combat.
-window.__soulCrucible={state:()=>({round,running,speed,actualSpeed,backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
+window.__soulCrucible={state:()=>({round,running,speed,headless,actualSpeed,backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
 })();
 </script>
 </body></html>
