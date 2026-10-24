@@ -1,0 +1,108 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#10182e"><title>Soul Crucible · Ambiguity Chamber</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10182e;touch-action:none}canvas{display:block;width:100%;height:100%;touch-action:none}</style></head><body><canvas id="c"></canvas><script>
+'use strict';
+// Isolated reproduction of Soul Crucible's feel() learning math, copied from the production model.
+// No reads/writes to production localStorage, no gameplay or production save changes.
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const AXES=['closeness','contact','pressure','defense','pain'];
+const colors=['#b4c2ff','#ffcb9d','#efabd1','#91e2d1'];
+const names=['AURORA','UMBRA','S1','S2'];
+const phases=[{name:'TRIAL A',valence:0},{name:'TRIAL B',valence:0},{name:'TRIAL C',valence:0}];
+let axis=3,mode=0,seed=7419,noise=true,phaseLength=1000,rateScale=1,subjects=[],samples=[],step=0,running=false,done=false,last=0,buttons=[],W=0,H=0,DPR=1,scroll=0,maxScroll=0,drag=null;
+function rngFactory(n){return ()=>{n|=0;n=n+0x6D2B79F5|0;let t=Math.imul(n^n>>>15,1|n);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
+let random=rngFactory(seed);let sequence=[],trialEnds=[];
+function reset(){
+ random=rngFactory(seed);step=0;done=false;running=false;samples=[];sequence=[];trialEnds=[];for(let trial=0;trial<3;trial++){let vals=Array.from({length:phaseLength},(_,i)=>i<600?-.8:.8);for(let i=vals.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[vals[i],vals[j]]=[vals[j],vals[i]];}sequence.push(...vals);}random=rngFactory(seed+991);
+ // The four subjects begin with different, explicit emotional priors, rather than claiming to copy saved production souls.
+ const priors=[-.9,-.45,.45,.9];
+ subjects=priors.map((p,i)=>({name:names[i],color:colors[i],im:p,lens:clamp(p*.49,-.9,.9),echo:0,plasticity:[.8,1,1,1.2][i],hp:100,stamina:100,crossedAt:null,firstReversal:null,changes:0,prior:p}));
+ capture();draw();
+}
+function phaseAt(n){return phases[Math.min(2,Math.floor(n/phaseLength))];}
+function runStep(){
+ if(step>=phaseLength*3){running=false;done=true;return;}
+ const phase=phaseAt(step),valence=sequence[step];
+ // Production feel() formula, reduced to one isolated axis, with inherited echo averaged across five axes.
+ // Other four axes are zero. This preserves the actual averaging divisor in the model.
+ const strength=1,signal=1,bodyStrain=0;
+ const jitter=noise?(random()*.46-.23):0;
+ for(const s of subjects){
+  const inherited=s.echo/5;
+  const baseline=clamp(valence+inherited*.18-bodyStrain*.25,-1,1);
+  const felt=clamp(baseline+s.lens*.95+s.echo*.24+jitter,-1,1);
+  const rate=clamp(.040*strength*Math.abs(signal)*s.plasticity*rateScale,.0005,.10);
+  const before=s.im;
+  s.im=clamp(s.im+rate*(felt-s.im),-1,1);
+  s.echo=clamp(s.echo*.89+felt*rate*.75,-.78,.78);
+  s.lens=clamp(s.lens+rate*.09*(felt-s.lens),-.90,.90);
+  if(step>=phaseLength&&step<phaseLength*2&&s.crossedAt===null&&s.im>0)s.crossedAt=step-phaseLength+1;
+  if(step>=phaseLength*2&&s.firstReversal===null&&s.im<0)s.firstReversal=step-phaseLength*2+1;
+  if(Math.sign(before)!==Math.sign(s.im))s.changes++;
+ }
+ step++;
+ if(step%5===0||step===phaseLength||step===phaseLength*2||step===phaseLength*3)capture();
+ if(step%phaseLength===0){trialEnds.push(subjects.map(s=>s.im));}if(step>=phaseLength*3){running=false;done=true;}
+}
+function capture(){samples.push({step,values:subjects.map(s=>s.im),lenses:subjects.map(s=>s.lens)});}
+function advance(n){for(let i=0;i<n&&step<phaseLength*3;i++)runStep();draw();}
+function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=Math.round(W*DPR);c.height=Math.round(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);draw();}
+function rect(x,y,w,h,fill,stroke='',r=10){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
+function txt(s,x,y,size=13,color='#e8eaf9',weight='600',align='left'){ctx.font=weight+' '+size+'px system-ui, sans-serif';ctx.textAlign=align;ctx.fillStyle=color;ctx.fillText(s,x,y);}
+function btn(label,x,y,w,h,action,active=false){rect(x,y,w,h,active?'#49577e':'#26334f',active?'#b5b9e8':'#6e7b9b',10);txt(label,x+w/2,y+h/2+5,12,active?'#fff2d6':'#e6e8fb','750','center');buttons.push({x,y,w,h,action});}
+function draw(){
+ if(!W||!H)return;buttons=[];ctx.fillStyle='#111a31';ctx.fillRect(0,0,W,H);ctx.save();ctx.translate(0,-scroll);
+ const narrow=W<430,pad=18,inner=W-pad*2;
+ txt('✧  SOUL CRUCIBLE',pad,38,20,'#ebd7ff','850');
+ txt('AMBIGUITY CHAMBER  ·  ISOLATED EXPERIMENT',pad,58,10,'#aabbd9','700');
+ txt('Can identical experiences produce different beliefs?',pad,82,13,'#e5eafa','600');
+ let y=99;
+ rect(pad,y,inner,61,'#24304b','#576587');
+ txt('REAL PRODUCTION FEEL() LEARNING FORMULA',pad+12,y+20,10,'#a7e3d1','800');
+ txt('Same 60/40 experiences. No world access.',pad+12,y+41,11,'#d9e1f3');y+=74;
+ txt('EMOTIONAL ATTRIBUTE',pad,y+11,11,'#abbad7','750');y+=20;
+ const aw=(inner-12)/5;
+ for(let i=0;i<5;i++)btn(['NEAR','HIT','PUSH','GUARD','PAIN'][i],pad+i*(aw+3),y,aw,34,()=>{axis=i;reset();},axis===i);
+ y+=47;
+ txt('EXPERIMENT: '+(done?'COMPLETE':running?'RUNNING':'PAUSED'),pad,y+11,11,'#a8e4c9','800');
+ txt(step.toLocaleString()+' / '+(phaseLength*3).toLocaleString(),pad+inner,y+11,11,'#f0d5a3','700','right');y+=21;
+ const chartH=Math.max(165,Math.min(275,H*.32)),chartY=y;
+ rect(pad,chartY,inner,chartH,'#1d2843','#59698a');
+ const L=pad+32,R=pad+inner-12,T=chartY+17,B=chartY+chartH-27, cw=R-L,ch=B-T;
+ ctx.lineWidth=1;
+ for(const v of [-1,0,1]){const yy=T+(1-v)/2*ch;ctx.strokeStyle=v===0?'#7784a9':'#384562';ctx.beginPath();ctx.moveTo(L,yy);ctx.lineTo(R,yy);ctx.stroke();txt(String(v),pad+6,yy+4,10,'#a5b7d0');}
+ for(let k=1;k<3;k++){const x=L+cw*k/3;ctx.setLineDash([5,5]);ctx.strokeStyle='#7c829c';ctx.beginPath();ctx.moveTo(x,T);ctx.lineTo(x,B);ctx.stroke();ctx.setLineDash([]);}
+ const xStep=n=>L+cw*n/(phaseLength*3);
+ for(let i=0;i<4;i++){ctx.strokeStyle=colors[i];ctx.lineWidth=2.2;ctx.beginPath();samples.forEach((r,j)=>{const x=xStep(r.step),yy=T+(1-r.values[i])/2*ch;j?ctx.lineTo(x,yy):ctx.moveTo(x,yy);});ctx.stroke();}
+ txt('TRIAL A',L+cw/6,B+19,9,'#e3a9af','700','center');txt('TRIAL B',L+cw/2,B+19,9,'#9be2c8','700','center');txt('TRIAL C',L+cw*5/6,B+19,9,'#e3a9af','700','center');
+ y+=chartH+10;
+ const colW=(inner-8)/2;
+ subjects.forEach((s,i)=>{const x=pad+(i%2)*(colW+8),yy=y+Math.floor(i/2)*77;rect(x,yy,colW,69,'#24304a',s.color+'88');txt(s.name,x+10,yy+18,12,s.color,'800');txt('imprint '+(s.im>=0?'+':'')+s.im.toFixed(3),x+10,yy+37,13,'#eff1ff','700');txt('lens '+(s.lens>=0?'+':'')+s.lens.toFixed(3)+'  ·  P '+s.plasticity.toFixed(1),x+10,yy+54,10,'#b4c3db');});
+ y+=165;
+ const bw=(inner-16)/3;
+ btn(running?'Ⅱ PAUSE':'▶ RUN',pad,y,bw,44,()=>{running=!running;done=false;},running);
+ btn('+150',pad+bw+8,y,bw,44,()=>{running=false;advance(150);});
+ btn('↻ RESET',pad+(bw+8)*2,y,bw,44,()=>reset());y+=57;
+ txt('EXPERIMENT SETTINGS',pad,y+10,11,'#aabbd7','800');y+=21;
+ const half=(inner-8)/2;
+ btn('NOISE '+(noise?'ON':'OFF'),pad,y,half,35,()=>{noise=!noise;reset();},noise);
+ btn('NEW SEED',pad+half+8,y,half,35,()=>{seed=(seed+101)|0;reset();});y+=49;
+ txt('Each trial: 600 negative, 400 positive. Shared order.',pad,y+4,10,'#a7b9d5');y+=22;
+ const rows=[
+  'Three independent shuffled trials; same 60/40 balance.',
+  'All four souls see the same order within each trial.',
+  'Different initial priors and plasticity; no live saves.'
+ ];
+ rows.forEach(t=>{txt(t,pad,y,10,'#cbd5e8');y+=19;});
+ y+=8;
+ for(let k=0;k<trialEnds.length;k++){const v=trialEnds[k],spread=Math.max(...v)-Math.min(...v);txt('Trial '+('ABC'[k])+' end: spread '+spread.toFixed(3)+'  ·  '+v.map(n=>n.toFixed(2)).join(' / '),pad,y,10,'#cbd5e8');y+=19;}const spread=Math.max(...subjects.map(s=>s.im))-Math.min(...subjects.map(s=>s.im));txt('Current spread: '+spread.toFixed(3),pad,y,11,'#a8e4c9','800');y+=19;
+ txt('Isolated model: one axis, no combat or reincarnation.',pad,y+12,10,'#9cabc5');
+ txt('Production saves are never accessed.',pad,y+28,10,'#9cabc5');maxScroll=Math.max(0,y+70-H);ctx.restore();
+}
+c.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,lastY:e.clientY,moved:false};c.setPointerCapture(e.pointerId);});
+c.addEventListener('pointermove',e=>{if(!drag)return;const dy=e.clientY-drag.lastY;drag.lastY=e.clientY;if(Math.abs(e.clientY-drag.y)>9)drag.moved=true;if(drag.moved){scroll=clamp(scroll-dy,0,maxScroll);draw();}});
+c.addEventListener('pointerup',e=>{if(!drag)return;if(!drag.moved){const yy=e.clientY+scroll;for(const b of buttons)if(e.clientX>=b.x&&e.clientX<=b.x+b.w&&yy>=b.y&&yy<=b.y+b.h){b.action();break;}}drag=null;draw();});
+c.addEventListener('pointercancel',()=>{drag=null;});
+c.addEventListener('wheel',e=>{e.preventDefault();scroll=clamp(scroll+e.deltaY,0,maxScroll);draw();},{passive:false});
+function frame(t){if(running){for(let i=0;i<80&&step<phaseLength*3;i++)runStep();draw();}requestAnimationFrame(frame);}
+window.addEventListener('resize',resize);resize();reset();requestAnimationFrame(frame);
+</script></body></html>
