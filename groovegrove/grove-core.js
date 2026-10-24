@@ -365,6 +365,9 @@ export class Grove {
           (this.library.has('Riff','partnerListening')?.02:0)+
           (this.library.has('Riff','melodicContours')?.035:0);
         const longSingle=Math.random()<singleChance;
+        const secondReply=!!voiceHeard&&singingNearby&&
+          this.library.has('Riff','secondAnswer')&&
+          this.canContinueReply('Riff',voiceHeard,bar)&&Math.random()<.28;
         if(longSingle){
           const tones=[voicing[1],voicing[2],voicing[0]*2];
           const singerPitch=voiceHeard?.pitch;
@@ -385,7 +388,7 @@ export class Grove {
             seconds:Math.round(duration*100)/100,
             context:singingNearby?'answering Murmur':onJam?'playing together':'solo idea'};
           if(singingNearby&&voiceHeard?.from==='Murmur')
-            this.noteMusicalReply('Riff','Murmur',bar,'guitar');
+            this.noteMusicalReply('Riff','Murmur',bar,'guitar',secondReply);
         }else{
           const holdingChance=.19+
             (this.library.has('Riff','openChords')?.13:0)+
@@ -442,8 +445,12 @@ export class Grove {
       if(riffSoundedThisBeat)this.riff.ownOnsets.push({bar,beat,time:guitarOnset});
     }
     if(pipActive){
+      const pipHeard=this.space.people.Pip.lastHeard;
+      const secondAnswer=beat===3&&this.library.has('Pip','secondAnswer')&&
+        this.canContinueReply('Pip',pipHeard,bar)&&Math.random()<.28;
       if(beat===0||beat===2)play.kick(drumOnset,beat===0?.9:.68);
-      else play.snare(drumOnset,.7);
+      else play.snare(drumOnset,secondAnswer?.59:.7);
+      if(secondAnswer)this.noteMusicalReply('Pip',pipHeard.from,bar,'drums',true);
       play.hat(drumOnset+.017,.6);
       if(!(pipChoice==='breath' && beat===3) && !pipRest)play.hat(drumOnset+beatDur*.5+.017,.32);
       if(!pipRest && onJam && beat===3 && this.pip.curiosity>.7 && bar%4===0)play.snare(drumOnset+beatDur*.74,.28,true);
