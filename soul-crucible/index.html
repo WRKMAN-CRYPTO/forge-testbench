@@ -33,7 +33,7 @@ function cycleSpeed(){speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];accu
 function toggleHeadless(){headless=!headless;headlessStartRound=round;accum=0;lastRenderAt=0;speedSampleWall=0;speedSampleSim=0;actualSpeed=0;particles.length=0;floats.length=0;save(true);}
 
 let souls, fighters, world, restoreFighters=null, round=1, selected=0, running=true, speed=1, headless=false, headlessStartRound=0, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
-let saveStatus='unknown',saveMessage='',lastSavedRound=0,saveBytes=0,saveFailures=0;
+let saveStatus='unknown',saveMessage='',lastSavedRound=0,saveBytes=0,saveFailures=0,storageMode='opening',savePending=null,saveInFlight=false,saveGeneration=0,saveDatabase=null;
 let currentTournamentStep=-1,tournament=false,arenaCount=4,arenaSlots=[],activeArena=0,restoreArenaSlots=null,tournamentButtons=[];
 let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true, timedOut=false, speedSampleWall=0, speedSampleSim=0, actualSpeed=0, lastSaveAt=0, lastRenderAt=0;
 // Observation only: sampled timings never feed decisions, physics, genetics or random draws.
@@ -249,46 +249,126 @@ function restoreFighter(p){if(!p||!p.soulId)return null;const soul=soulById(p.so
 }
 
 function makeSoul(i){let im={};AXES.forEach(a=>im[a.key]=rand(-.18,.18));return ensureSoul({id:i===0?'AURORA':'UMBRA',color:i===0?'#aab8ff':'#ffc79f',im,origin:{...im},lives:0,wins:0,losses:0,record:[],totalDamage:0,obs:freshObserver()});}
-function load(){try{const p=JSON.parse(localStorage.getItem(KEY));if(p&&Array.isArray(p.souls)&&p.souls.length===2&&p.souls.every(s=>s.im&&AXES.every(a=>Number.isFinite(s.im[a.key])))){
-  round=p.round||1;souls=p.souls.map(ensureSoul);world=p.world&&p.world.version===1?p.world:createWorld();assureWorld();
-  restoreFighters=Array.isArray(p.activeFighters)&&p.activeFighters.length===2?p.activeFighters:null;
-   restoreArenaSlots=Array.isArray(p.tournamentSlots)?p.tournamentSlots:null;tournament=!!p.tournament&&!!restoreArenaSlots;arenaCount=[2,4,8,16].includes(p.arenaCount)?p.arenaCount:4;activeArena=Number.isInteger(p.activeArena)?Math.max(0,p.activeArena):0;lastSavedRound=round;saveStatus='saved';
-  return;
- }}catch(e){} souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];}
-// Durable snapshots exclude transient graphics and keep the complete soul/genome state.
+// IndexedDB stores complete checkpoints as structured objects, without localStorage's tiny string quota.
+// Keep the original localStorage checkpoint untouched until a newer IndexedDB transaction commits.
+const DB_NAME='soul-crucible-checkpoints',DB_STORE='snapshots',DB_VERSION=1;
+function openCheckpointDB(){
+ return new Promise((resolve,reject)=>{
+  if(!('indexedDB' in window)){reject(Error('IndexedDB unavailable'));return;}
+  let request;try{request=indexedDB.open(DB_NAME,DB_VERSION);}catch(e){reject(e);return;}
+  request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(DB_STORE))db.createObjectStore(DB_STORE);};
+  request.onsuccess=()=>{const db=request.result;db.onversionchange=()=>db.close();resolve(db);};
+  request.onerror=()=>reject(request.error||Error('Cannot open IndexedDB'));
+  request.onblocked=()=>reject(Error('IndexedDB blocked by another tab'));
+ });
+}
+function readCheckpoint(db){return new Promise((resolve,reject)=>{
+ try{const tx=db.transaction(DB_STORE,'readonly'),req=tx.objectStore(DB_STORE).get('latest');
+ req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error||Error('Read failed'));tx.onabort=()=>reject(tx.error||Error('Read aborted'));
+ }catch(e){reject(e);}
+});}
+function writeCheckpoint(db,payload){return new Promise((resolve,reject)=>{
+ try{const tx=db.transaction(DB_STORE,'readwrite');
+ tx.objectStore(DB_STORE).put(payload,'latest');
+ tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error||Error('Checkpoint transaction aborted'));
+ tx.onerror=()=>{}; // onabort supplies the definitive transaction failure
+ }catch(e){reject(e);}
+});}
+function eraseCheckpoint(db){return new Promise((resolve,reject)=>{
+ try{const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).delete('latest');
+ tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('Erase aborted'));
+ }catch(e){reject(e);}
+});}
+function validCheckpoint(p){return !!(p&&Array.isArray(p.souls)&&p.souls.length===2&&p.souls.every(s=>s.im&&AXES.every(a=>Number.isFinite(s.im[a.key]))));}
+function restoreCheckpoint(p){
+ round=p.round||1;souls=p.souls.map(ensureSoul);world=p.world&&p.world.version===1?p.world:createWorld();assureWorld();
+ restoreFighters=Array.isArray(p.activeFighters)&&p.activeFighters.length===2?p.activeFighters:null;
+ restoreArenaSlots=Array.isArray(p.tournamentSlots)?p.tournamentSlots:null;tournament=!!p.tournament&&!!restoreArenaSlots;
+ arenaCount=[2,4,8,16].includes(p.arenaCount)?p.arenaCount:4;activeArena=Number.isInteger(p.activeArena)?Math.max(0,p.activeArena):0;
+ lastSavedRound=round;saveStatus='saved';
+}
+async function load(){
+ let legacy=null,stored=null;
+ try{legacy=JSON.parse(localStorage.getItem(KEY));}catch(e){console.warn('Legacy checkpoint unreadable',e);}
+ try{saveDatabase=await openCheckpointDB();stored=await readCheckpoint(saveDatabase);storageMode='indexeddb';}
+ catch(e){storageMode='localstorage';console.warn('IndexedDB unavailable',e);}
+ const legacyOK=validCheckpoint(legacy),storedOK=validCheckpoint(stored);
+ // A legacy checkpoint can be newer during an interrupted migration.
+ const best=legacyOK&&(!storedOK||(legacy.round||0)>(stored.round||0))?legacy:(storedOK?stored:null);
+ if(best){restoreCheckpoint(best);return;}
+ souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];
+}
+// Snapshot every arena's living minds and body states, but never visual effects.
 function packedArena(slot){return {fighters:slot.fighters.map(packFighter),t:slot.t,roundTimer:slot.roundTimer,banner:slot.banner,bannerTimer:slot.bannerTimer,countdown:slot.countdown,timedOut:slot.timedOut};}
+function checkpointPayload(){
+ assureWorld();
+ if(tournament&&arenaSlots.length&&currentTournamentStep>=0)arenaSlots[currentTournamentStep]=snapshotArena();
+ return {souls,round,world,activeFighters:fighters?.map(packFighter),tournament,arenaCount,activeArena,tournamentSlots:tournament?arenaSlots.map(packedArena):null};
+}
+function compactCheckpoint(p){
+ // Trim only archival observer trails in a copy; preserve every active soul, genome,
+ // living mind, nursery body, combat tally and current tournament state.
+ const lean=JSON.parse(JSON.stringify(p));
+ lean.world.history=lean.world.history?.slice(0,100)||[];
+ for(const soul of [...lean.souls,...Object.values(lean.world.bank||{})]){
+  if(Array.isArray(soul.record))soul.record=soul.record.slice(-16);
+  if(Array.isArray(soul.depth?.trail))soul.depth.trail=soul.depth.trail.slice(-16);
+ }
+ return lean;
+}
 function save(force=false){
- const now=performance.now();if(!force&&speed>=300&&running&&now-lastSaveAt<1800)return;
+ const now=performance.now();
+ // Keep saves bounded even during hundreds of duels per second.
+ if(!force&&running&&now-lastSaveAt<2000)return;
+ if(storageMode==='opening')return;
+ let payload;
+ try{payload=checkpointPayload();}catch(e){saveError(e);return;}
+ lastSaveAt=now;
+ // One in-flight write and one latest pending checkpoint: never race old snapshots over new.
+ savePending={payload,generation:saveGeneration};
+ if(!saveInFlight)void flushSaves();
+}
+function saveError(e){saveStatus='failed';saveFailures++;saveMessage=(e?.name||'Save error')+': '+(e?.message||'storage write failed');running=false;accum=0;console.error('Soul Crucible checkpoint failed',e);}
+async function flushSaves(){
+ if(saveInFlight)return;saveInFlight=true;
  try{
-  assureWorld();
-  if(tournament&&arenaSlots.length&&currentTournamentStep>=0)arenaSlots[currentTournamentStep]=snapshotArena();
-  // Do not serialize every arena's particles, floating numbers or event messages.
-  const payload={souls,round,world,activeFighters:fighters?.map(packFighter),tournament,arenaCount,activeArena,tournamentSlots:tournament?arenaSlots.map(packedArena):null};
-  let json=JSON.stringify(payload);
-  try{localStorage.setItem(KEY,json);}
-  catch(firstError){
-   // Quota fallback: trim only archival observer trails in a COPY, not living minds,
-   // genomes, nursery, active bodies or accumulated combat statistics.
-   if(firstError?.name!=='QuotaExceededError'&&firstError?.code!==22)throw firstError;
-   const lean=JSON.parse(json);
-   lean.world.history=lean.world.history?.slice(0,100)||[];
-   for(const soul of [...lean.souls,...Object.values(lean.world.bank||{})]){
-    if(Array.isArray(soul.record))soul.record=soul.record.slice(-16);
-    if(Array.isArray(soul.depth?.trail))soul.depth.trail=soul.depth.trail.slice(-16);
-   }
-   json=JSON.stringify(lean);
-   localStorage.setItem(KEY,json);
+  while(savePending){
+   const job=savePending;savePending=null;
+   if(job.generation!==saveGeneration)continue;
+   const started=performance.now();
+   let payload=job.payload;
+   try{
+    if(storageMode==='indexeddb'){
+     try{await writeCheckpoint(saveDatabase,payload);}
+     catch(e){if(e?.name!=='QuotaExceededError'&&e?.code!==22)throw e;payload=compactCheckpoint(payload);await writeCheckpoint(saveDatabase,payload);}
+     // A successful committed transaction is the authority, not an optimistic enqueue.
+     // Remove the legacy copy only after the first verified durable IndexedDB commit.
+     try{if(localStorage.getItem(KEY)!==null)localStorage.removeItem(KEY);}catch(e){}
+    }else{
+     let json=JSON.stringify(payload);
+     try{localStorage.setItem(KEY,json);}
+     catch(e){if(e?.name!=='QuotaExceededError'&&e?.code!==22)throw e;json=JSON.stringify(compactCheckpoint(payload));localStorage.setItem(KEY,json);}
+     if(localStorage.getItem(KEY)!==json)throw Error('Checkpoint verification failed');
+    }
+    if(job.generation!==saveGeneration)continue;
+    lastSavedRound=payload.round;saveStatus='saved';saveMessage='';
+    saveBytes=storageMode==='indexeddb'?0:JSON.stringify(payload).length*2;
+    perf.saveMs+=performance.now()-started;perf.saveCount++;
+   }catch(e){if(job.generation===saveGeneration){saveError(e);savePending=null;}break;}
   }
-  const stored=localStorage.getItem(KEY);
-  // Read-back verification detects missing or rejected writes before reporting success.
-  if(!stored||stored.length!==json.length||stored.slice(0,120)!==json.slice(0,120)||stored.slice(-120)!==json.slice(-120))throw Error('Checkpoint verification failed');
-  lastSavedRound=round;saveBytes=json.length*2;saveStatus='saved';saveMessage='';lastSaveAt=now;
-  perf.saveMs+=performance.now()-now;perf.saveCount++;
- }catch(e){saveStatus='failed';saveFailures++;saveMessage=(e?.name||'Save error')+': '+(e?.message||'storage write failed');running=false;accum=0;console.error('Soul Crucible checkpoint failed',e);}
+ }finally{saveInFlight=false;if(savePending)void flushSaves();}
+}
+async function resetCheckpoint(){
+ running=false;saveGeneration++;savePending=null;
+ while(saveInFlight)await new Promise(resolve=>setTimeout(resolve,25));
+ if(saveDatabase)await eraseCheckpoint(saveDatabase);
+ localStorage.removeItem(KEY);
+ souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];fighters=null;saveStatus='unknown';saveMessage='';
+ begin();running=true;save(true);
 }
 function drawSaveStatus(){
  if(saveStatus==='unknown')return;
- const msg=saveStatus==='failed'?'SAVE FAILED • SIMULATION PAUSED':('SAVED DUEL '+Math.max(0,lastSavedRound-1));
+ const msg=saveStatus==='failed'?'SAVE FAILED • SIMULATION PAUSED':('SAVED DUEL '+Math.max(0,lastSavedRound-1)+' • '+(storageMode==='indexeddb'?'DB':'LOCAL'));
  const yy=headless?Math.max(9,h-115):Math.max(8,h-28);
  const bw=Math.min(w-24,340);
  rr((w-bw)/2,yy,bw,24,8,saveStatus==='failed'?'#783340':'#233e40',saveStatus==='failed'?'#ffb5b5':'#88dfbd');
@@ -900,12 +980,12 @@ window.addEventListener('resize',resize);window.addEventListener('keydown',e=>{i
  if(e.key==='KeyL'||e.key==='Escape'){observerOpen=!observerOpen;observerScroll=0;}
  if(e.key==='ArrowDown'&&observerOpen){observerScroll=clamp(observerScroll+80,0,observerMaxScroll);e.preventDefault();}
  if(e.key==='ArrowUp'&&observerOpen){observerScroll=clamp(observerScroll-80,0,observerMaxScroll);e.preventDefault();}
- if(e.key==='KeyR'&&e.shiftKey){if(confirm('Reset all souls and incarnation history?')){localStorage.removeItem(KEY);load();begin();}}});
+ if(e.key==='KeyR'&&e.shiftKey){if(confirm('Reset all souls and incarnation history?'))void resetCheckpoint();}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){running=false;last=0;save(true);}});
 window.addEventListener('pagehide',()=>save(true));
-load();begin();save();resize();requestAnimationFrame(frame);
+resize();void load().then(()=>{begin();save(true);requestAnimationFrame(frame);}).catch(e=>{saveError(e);});
 // Tiny explicit debug surface for browser automation / development without influencing combat.
-window.__soulCrucible={state:()=>({saveStatus,saveMessage,lastSavedRound,saveBytes,saveFailures,round,running,speed,headless,tournament,arenaCount,arenaSlots:arenaSlots.length,actualSpeed,genomePoolSize:world?.genomePool?.length||0,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo,reflection:f.soul.depth?.reflection})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
+window.__soulCrucible={state:()=>({saveStatus,saveMessage,lastSavedRound,saveBytes,saveFailures,storageMode,round,running,speed,headless,tournament,arenaCount,arenaSlots:arenaSlots.length,actualSpeed,genomePoolSize:world?.genomePool?.length||0,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo,reflection:f.soul.depth?.reflection})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>resetCheckpoint(),advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
 })();
 </script>
 </body></html>
