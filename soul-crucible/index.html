@@ -103,6 +103,7 @@ function ensureDepth(s){
 // by emotional history, a lifetime's physiology, and each soul's mutable lens.
 function feel(f,cues,valence,strength,tone){
  const s=f.soul,d=ensureDepth(s);
+ const divergence=ensureDivergence(s);divergence.events[tone]||(divergence.events[tone]={n:0});divergence.events[tone].n++;
  const bodyStrain=(1-f.hp/Math.max(1,f.maxHp))*.20+(1-f.stamina/100)*.12;
  const inherited=AXES.reduce((a,x)=>a+d.echo[x.key],0)/AXES.length;
  const baseline=clamp(valence+inherited*.18-bodyStrain*.25,-1,1);
@@ -113,6 +114,7 @@ function feel(f,cues,valence,strength,tone){
   const before=s.im[k];
   s.im[k]=clamp(s.im[k]+rate*(felt-s.im[k]),-1,1); // Both positive AND negative updates.
   logFeeling(s,k,tone,felt,before,s.im[k]);
+  logDivergence(s,tone,k,felt);
   d.echo[k]=clamp(d.echo[k]*.89+felt*rate*.75,-.78,.78);
   d.lens[k]=clamp(d.lens[k]+rate*.09*(felt-d.lens[k]),-.90,.90); // The initial core can change.
  }
@@ -493,6 +495,73 @@ function logFeeling(s,k,tone,felt,before,after){
   row.delta+=delta;row.absDelta+=Math.abs(delta);
  }
 }
+// Soul Divergence Monitor: cumulative per-soul experience composition and felt targets.
+// All counters are observational. No RNG, action scores, learning, or combat changes.
+function ensureDivergence(s){
+ const o=s.obs||(s.obs=freshObserver());
+ if(!o.divergence)o.divergence={since:round,events:{},feelings:{},samples:0};
+ const d=o.divergence;
+ if(!d.events)d.events={};if(!d.feelings)d.feelings={};
+ if(!Number.isFinite(d.samples))d.samples=0;
+ return d;
+}
+function logDivergence(s,event,axis,felt){
+ const d=ensureDivergence(s),e=d.events[event]||(d.events[event]={n:0});
+ // Event incidence counts once per feeling call, not once per affected attribute.
+ if(!d.feelings[event])d.feelings[event]={};
+ const a=d.feelings[event][axis]||(d.feelings[event][axis]={n:0,sum:0,sumSq:0});
+ a.n++;a.sum+=felt;a.sumSq+=felt*felt;
+ // Event incidence is incremented on the first axis of each event.
+ if(!d._eventOpen)d._eventOpen=null;
+}
+function divergenceDistance(a,b){
+ return Math.sqrt(AXES.reduce((sum,k)=>sum+Math.pow((a.im[k.key]||0)-(b.im[k.key]||0),2),0)/AXES.length);
+}
+function drawDivergenceMonitor(startY){
+ const x=14,ww=w-28,all=[...souls,...Object.values(world?.bank||{})].filter(s=>s&&s.id),ordered=all.slice().sort((a,b)=>a.id.localeCompare(b.id));let y=startY+12;
+ sectionLabel('SOUL DIVERGENCE MONITOR',x,y,'OBSERVATION ONLY · SINCE INSTALL');y+=26;
+ rr(x,y,ww,66,11,'#25314b','#7182a377');
+ fit('Experience = event frequency. Interpretation = mean felt target.',x+10,y+20,ww-20,9,'#e3eaf8');
+ fit('Same event type does not guarantee identical circumstances.',x+10,y+40,ww-20,9,'#b7c9e0');
+ fit('Counters begin now. Historical feelings are not reconstructed.',x+10,y+57,ww-20,9,'#b7c9e0');y+=80;
+ const totalEvents=s=>Object.values(ensureDivergence(s).events).reduce((n,r)=>n+(r.n||0),0);
+ for(const s of ordered){
+  const d=ensureDivergence(s),total=totalEvents(s);
+  rr(x,y,ww,43,10,'#202b46',(s.color||'#b5c6e8')+'77');
+  fit(s.id+' · '+total.toLocaleString()+' experiences',x+10,y+17,ww-20,11,s.color||'#b5c6e8','left','800');
+  fit('Measured since duel '+d.since,x+10,y+34,ww-20,9,'#b9c9df');y+=49;
+  for(const ev of FEEL_EVENTS){
+   const count=d.events[ev]?.n||0;
+   rr(x,y,ww,25,7,'#1e2942','#52638144');
+   fit(ev,x+8,y+16,ww*.57,9,'#e1e7f3');
+   fit(total?((count/total)*100).toFixed(1)+'% · '+count.toLocaleString():'Awaiting data',x+ww-8,y+16,ww*.43,9,'#b8d5e0','right');y+=29;
+  }
+  y+=12;
+ }
+ sectionLabel('SAME EVENT · DIFFERENT FEELING',x,y,'MEAN FELT TARGET · -1 TO +1');y+=23;
+ for(const ev of FEEL_EVENTS){
+  rr(x,y,ww,27,8,'#27334d','#65728d66');fit(ev.toUpperCase(),x+10,y+18,ww-20,10,'#e7e4f7','left','800');y+=32;
+  for(const axis of AXES){
+   const values=ordered.map(s=>{const r=ensureDivergence(s).feelings[ev]?.[axis.key];return r&&r.n?{id:s.id,color:s.color||'#b5c6e8',mean:r.sum/r.n,n:r.n}:null;}).filter(Boolean);
+   if(!values.length)continue;
+   rr(x,y,ww,20+values.length*18,8,'#1e2942','#52638144');
+   fit(axis.title,x+9,y+14,ww-18,9,'#bfcfe4');let yy=y+29;
+   for(const v of values){fit(v.id,x+10,yy,ww*.27,9,v.color);fit((v.mean>=0?'+':'')+v.mean.toFixed(3)+' · n='+v.n.toLocaleString(),x+ww-9,yy,ww*.68,9,'#e0e8f3','right');yy+=18;}
+   y+=27+values.length*18;
+  }
+  y+=9;
+ }
+ sectionLabel('PERSONALITY DISTANCE',x,y,'ROOT MEAN SQUARE · CURRENT IMPRINTS');y+=23;
+ for(let i=0;i<ordered.length;i++)for(let j=i+1;j<ordered.length;j++){
+  const a=ordered[i],b=ordered[j],distance=divergenceDistance(a,b);
+  rr(x,y,ww,28,8,'#202b46','#52638155');
+  fit(a.id+' / '+b.id,x+9,y+18,ww*.60,10,'#e4e7f5');
+  fit(distance.toFixed(3),x+ww-10,y+18,ww*.3,11,'#b7e2d3','right','800');y+=33;
+ }
+ rr(x,y+8,ww,45,9,'#25314b','#7182a366');
+ fit('Compare after more duels. Distance is not proof of cause.',x+10,y+26,ww-20,9,'#d3e0ed');
+ return y+67;
+}
 function drawEmotionLedger(startY){
  const x=14,ww=w-28;let y=startY+15;
  sectionLabel('EMOTIONAL CAUSALITY LEDGER',x,y,'OBSERVATION ONLY · SINCE INSTALL');y+=27;
@@ -570,7 +639,7 @@ function drawActionsTab(){const x=14,ww=w-28;let y=151;
  if(!observed.some(s=>s.obs.soulCharacter?.decisions)){fit('Awaiting new decisions to reveal emotional character.',x+10,y+16,ww-20,10,'#c3d3e6');y+=30;}
  rr(x,y,ww,48,9,'#202b46','#52638155');fit('Historical imprints are preserved; these action measurements start now.',x+10,y+18,ww-20,9,'#d4dfed');fit('No added randomness, actions, instincts, or changes to selection.',x+10,y+36,ww-20,9,'#aebed6');y+=57;
  y+=10;rr(x,y,ww,60,12,'#243148','#6a7c9c88');tinyIcon(x+24,y+26,'↶','#b7dfdf');fit('Early hops: evade during first 3 seconds. Timeout: 65s without KO.',x+44,y+17,ww-53,10,'#ecf1fc');fit('A difference is evidence to inspect, not a cause.',x+44,y+39,ww-53,10,'#abbdd7');
- return drawEmotionLedger(drawOpeningWhiffs(y+80));
+ return drawDivergenceMonitor(drawEmotionLedger(drawOpeningWhiffs(y+80)));
 }
 
 function ratio(n,d){return d?Math.round(n*100/d):0;}
