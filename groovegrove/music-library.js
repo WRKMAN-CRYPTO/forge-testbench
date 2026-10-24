@@ -14,10 +14,14 @@ export const LIBRARY_CATALOG=Object.freeze({
   'listening-musician':Object.freeze({id:'listening-musician',title:'The Listening Musician',subtitle:'Answering a partner’s phrase',color:0xa8d9f0,skill:'partnerListening',topic:'theory',reader:null,readBars:6}),
   'shape-of-sound':Object.freeze({id:'shape-of-sound',title:'The Shape of Sound',subtitle:'Vowels and resonance',color:0xe4b7d7,skill:'vowelShapes',topic:'voice',reader:'Murmur',readBars:5}),
   'breath-between-notes':Object.freeze({id:'breath-between-notes',title:'The Breath Between Notes',subtitle:'Breathing and phrasing',color:0xb2d9e1,skill:'breathPhrasing',topic:'voice',reader:'Murmur',readBars:5}),
-  'melodies-without-words':Object.freeze({id:'melodies-without-words',title:'Melodies Without Words',subtitle:'Motifs and melodic contours',color:0xeecda0,skill:'melodicContours',topic:'voice',reader:'Murmur',readBars:7})
+  'melodies-without-words':Object.freeze({id:'melodies-without-words',title:'Melodies Without Words',subtitle:'Motifs and melodic contours',color:0xeecda0,skill:'melodicContours',topic:'voice',reader:'Murmur',readBars:7}),
+  'the-second-answer':Object.freeze({id:'the-second-answer',title:'The Second Answer',subtitle:'Continuing musical replies',color:0xc8cbf4,skill:'secondAnswer',topic:'theory',reader:null,readBars:9}),
+  'motifs-in-motion':Object.freeze({id:'motifs-in-motion',title:'Motifs in Motion',subtitle:'Turning remembered contours around',color:0xe5b88c,skill:'motifMotion',topic:'harmony',reader:null,readBars:10}),
+  'the-bows-voice':Object.freeze({id:'the-bows-voice',title:'The Bow\'s Voice',subtitle:'Exploring bow pressure and expression',color:0x9ed6d1,skill:'bowVoice',topic:'violin',reader:null,readBars:10})
 });
 export const BOOK_IDS=Object.keys(LIBRARY_CATALOG);
-export const SHELF_CAPACITY=15;
+export const SHELF_CAPACITY=18;
+export const EXPANSION_BOOK_IDS=Object.freeze(['the-second-answer','motifs-in-motion','the-bows-voice']);
 const AGENTS=['Pip','Riff','Murmur'];
 const safeNumber=(value,fallback=0)=>Number.isFinite(value)?value:fallback;
 
@@ -75,15 +79,25 @@ export class MusicLibrary{
   donate(type){
     if(!LIBRARY_CATALOG[type])return {ok:false,reason:'Unknown book'};
     if(this.books.some(b=>b.type===type))return {ok:false,reason:'One copy already in the grove'};
-    // First three original works belong to the original cabinet. New volumes
-    // are delivered to Shelf II rather than taking its older sibling's spaces.
+    // Original slots 0..14 never move. The newest three volumes belong to
+    // their own fourth, three-slot cabinet at 15..17.
     const index=BOOK_IDS.indexOf(type);
-    const shelfStart=index<3?0:index<8?6:12;
-    const shelfSize=shelfStart===12?3:6;
+    const shelfStart=index<3?0:index<8?6:index<11?12:15;
+    const shelfSize=shelfStart>=12?3:6;
     const slot=Array.from({length:shelfSize},(_,i)=>shelfStart+i).find(i=>!this.books.some(b=>b.slot===i));
     if(slot===undefined)return {ok:false,reason:'Every shelf slot is occupied'};
     const book={copyId:'book-'+this.nextCopy++,type,slot,state:'shelf',owner:null,progress:0};
     this.books.push(book);return {ok:true,book};
+  }
+  installExpansion(){
+    // One-time, idempotent delivery into an existing inhabited Grove.
+    // Never replace, renumber or unseat an older physical copy.
+    const arrivals=[];
+    for(const id of EXPANSION_BOOK_IDS){
+      const result=this.donate(id);
+      if(result.ok)arrivals.push(id);
+    }
+    return arrivals;
   }
   has(name,skill){return this.known[name]?.includes(skill)===true;}
   status(name){return this.activity[name];}
@@ -112,7 +126,9 @@ export class MusicLibrary{
       // What seems interesting depends on the instrument they currently hold.
       const instrument=grove.disciplines?.current(name);
       const topic=def.topic;
-      const relevant=topic==='voice'
+      const relevant=topic==='violin'
+        ?(instrument==='violin'?.44:instrument==='voice'?.23:.17)
+        :topic==='voice'
         ?(instrument==='voice'?.39:instrument==='violin'?.26:.13)
         :topic==='rhythm'
         ?(instrument==='drums'?.37:instrument==='violin'?.30:.23)

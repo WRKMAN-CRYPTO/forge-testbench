@@ -321,16 +321,25 @@ export class MusicalDisciplines {
        const longBowChance=clamp(.46+pitchKnowledge*.32+(phraseSkill?.16:0)-
          rhythmic*.29-(offbeat?.35:0),.07,.86);
        const longBow=!offbeat&&Math.random()<longBowChance;
-       const articulation=longBow?'sustained phrase':
+       let articulation=longBow?'sustained phrase':
          offbeat?'offbeat bow accent':rhythmic>.5?'rhythmic bow pulse':'short bow attempt';
        const available=harmonyNotes.map(n=>clamp(n*(Math.random()<.2?2:1),185,800));
-       const candidate=partner&&(listenSkill||melodic>.38)&&Math.random()<.66?
+       const followsPartner=!!partner&&(listenSkill||melodic>.38)&&Math.random()<.66;
+       const candidate=followsPartner?
          clamp(partner.pitch,185,800):available[Math.floor(Math.random()*available.length)];
+       // A second musical answer is possible only after a peer really replied,
+       // while the player was independently about to make a bow stroke.
+       const secondAnswer=!!partner&&skills.has('secondAnswer')&&
+         grove.canContinueReply(name,partner,bar)&&Math.random()<.28;
        let intended=candidate;
        if((contourSkill||melodic>.56)&&Number.isFinite(stats.lastPitch)&&
           Math.random()<.46){
          const step=[-3,-2,0,2,3][Math.floor(Math.random()*5)];
          intended=clamp(stats.lastPitch*Math.pow(2,step/12),185,800);
+       }
+       if(secondAnswer){
+         const movement=[-2,0,2][Math.floor(Math.random()*3)];
+         intended=clamp(partner.pitch*Math.pow(2,movement/12),185,800);
        }
        // Violin-specific pitch and bow skill only follows *violin practice*.
        // Prior guitar/singing helps hear targets, not magically fret a violin.
@@ -346,8 +355,16 @@ export class MusicalDisciplines {
        let roughness=clamp(.38/(1+bowSkill*.22)+Math.random()*.12,.015,.55);
        if(vowelSkill)roughness*=.92; // vowel shaping informs tonal color
        const precision=clamp(1-transfer.timingMs/80,0,1);
-       const pressure=clamp(.58+(Math.random()-.5)*(.36-.15*precision)+
+       let pressure=clamp(.58+(Math.random()-.5)*(.36-.15*precision)+
          (offbeat?.07:0),.25,.9);
+       // A book offers expressive experiments, not a free bowing level.
+       // The real bow sound changes only when a note was already chosen.
+       if(skills.has('bowVoice')&&Math.random()<.32){
+         const gentle=Math.random()<.5;
+         pressure=clamp(pressure*(gentle?.76:1.18),.2,.95);
+         roughness=clamp(roughness*(gentle?.75:1.15),.012,.6);
+         articulation=gentle?'exploring a gentle bow':'exploring a weighted bow';
+       }
        const volume=.24*(offbeat?.83:1)*(longBow?.95:1);
        const expression={roughness,pressure,vibrato:
          (longBow&&(skills.has('vowelShapes')||pitchKnowledge>.5)&&Math.random()<.45)
@@ -357,7 +374,9 @@ export class MusicalDisciplines {
            audio.violin(actual,time,volume,duration,expression,{player:name});
            grove.space.sound(name,'violin',bar,volume*2.75,actual,time);
            this.record(name,'violin',{bar,pitch:actual,duration,articulation});
-         });
+         },skills.has('motifMotion'));
+       if(partner&&(followsPartner||secondAnswer))
+         grove.noteMusicalReply(name,partner.from,bar,'violin',secondAnswer);
        if(grove.onNote)grove.onNote({agent:name,time,beat});
        p.bowUntilBeat=index+Math.max(1,Math.ceil(duration/beatDur));
        // Two short, controlled bow attacks within a beat are a transfer
@@ -415,18 +434,23 @@ export class MusicalDisciplines {
        const melodySkill=skills.has('melodicContours');
        const longPhrase=skills.has('breathPhrasing')||melodic>.47;
        const canChord=chordKnown && Math.random()<.48+.2*melodic && !offbeat;
-       const root=partner&&skills.has('partnerListening')&&
-         Math.random()<.58?partner.pitch:null;
+       const rooted=!!partner&&skills.has('partnerListening')&&Math.random()<.58;
+       const root=rooted?partner.pitch:null;
+       const secondAnswer=!!partner&&skills.has('secondAnswer')&&
+         grove.canContinueReply(name,partner,bar)&&Math.random()<.28;
        const candidate=root!=null?
          harmonyNotes.reduce((best,n)=>Math.abs(Math.log2(n/root))<
            Math.abs(Math.log2(best/root))?n:best,harmonyNotes[0]):
          harmonyNotes[Math.floor(Math.random()*harmonyNotes.length)];
+       const answerTone=secondAnswer?harmonyNotes.reduce((best,n)=>
+         Math.abs(Math.log2(n/partner.pitch))<Math.abs(Math.log2(best/partner.pitch))?
+           n:best,harmonyNotes[0]):candidate;
        const holdChance=.07+.20*melodic+(longPhrase?.14:0);
        const hold=!offbeat&&Math.random()<holdChance;
        const length=hold?beatDur*(1.8+Math.random()*.65):.34+
          (Math.random()-.5)*.13;
        const duration=clamp(length,.14,1.55);
-       const voicing=canChord?[candidate,harmonyNotes[1],harmonyNotes[2]]:[candidate];
+       const voicing=canChord?[answerTone,harmonyNotes[1],harmonyNotes[2]]:[answerTone];
        for(const [i,pitch] of voicing.entries()){
          const at=time+i*.026;
          const volume=(offbeat?.27:.34)*(i>0?.72:1);
@@ -440,9 +464,12 @@ export class MusicalDisciplines {
          // Preserve freely chosen chords. A single plucked note can instead
          // take the next step of an old personally heard/played contour.
          if(!canChord)
-           grove.pitchRecall.instrument(name,'guitar',pitch,bar,90,850,schedule);
+           grove.pitchRecall.instrument(name,'guitar',pitch,bar,90,850,schedule,
+             skills.has('motifMotion'));
          else schedule(pitch);
        }
+       if(partner&&(rooted||secondAnswer))
+         grove.noteMusicalReply(name,partner.from,bar,'guitar',secondAnswer);
        if(hold)p.guitarUntilBeat=index+Math.max(1,Math.ceil(duration/beatDur));
        if(grove.onNote)grove.onNote({agent:name,time,beat});
        if((skills.has('walkingBass')||skills.has('callResponse'))&&

@@ -57,7 +57,7 @@ export class PitchRecall{
  }
  // Only one's own promoted long-term memory, never a combined group library.
  // Equal opportunity for eligible entries, not an invented taste hierarchy.
- choose(name,length=null){
+ choose(name,length=null,allowTransform=false){
   if(!NAMES.includes(name))return null;
   const long=this.ear?.people?.[name]?.patterns;
   if(!(long instanceof Map)||!long.size)return null;
@@ -68,20 +68,28 @@ export class PitchRecall{
    seen++;
    if(this.random()<1/seen)picked={key:row.key,offsets};
   }
-  return picked;
+  if(!picked||!allowTransform||this.random()>=.32)return picked;
+  // Rework an actual memory rather than inventing a note sequence. Neither
+  // inversion nor retrograde claims a new learned memory or improved motor skill.
+  const original=picked.offsets;
+  const variant=this.random()<.5?'inversion':'retrograde';
+  const offsets=variant==='inversion'?original.map(v=>v===0?0:-v):
+    [...original].reverse().map(v=>v-original.at(-1));
+  if(offsets.some(v=>Math.abs(v)>1200))return picked;
+  return {...picked,offsets,variant};
  }
  // Called only AFTER normal willingness and a multi-note vocal phrase exists.
- voice(name,steps,bar){
+ voice(name,steps,bar,allowTransform=false){
   if(!NAMES.includes(name)||!validBar(bar)||!Array.isArray(steps)||
     steps.length<2||steps.length>5)return null;
   const latest=this.people[name].recent[0];
   if(latest&&bar-latest.bar<6)return null;
   if(this.random()>=.25)return null;
-  return this.choose(name,steps.length);
+  return this.choose(name,steps.length,allowTransform);
  }
  // Called only for an already-scheduled single pitched instrumental onset.
  // Future existing onsets carry successive steps; no additional notes appear.
- instrument(name,kind,pitch,bar,min,max,emit){
+ instrument(name,kind,pitch,bar,min,max,emit,allowTransform=false){
   // Caller supplies the existing note scheduling path. No callback means no
   // actual note, so no memory-use credit or instrument plan advancement.
   if(typeof emit!=='function')return pitch;
@@ -97,7 +105,7 @@ export class PitchRecall{
    const recent=this.people[name].recent[0];
    let choice=null;
    if((!recent||bar-recent.bar>=6)&&this.random()<.16)
-    choice=this.choose(name);
+    choice=this.choose(name,null,allowTransform);
    // The first sounding note is always the artist's original chosen pitch.
    emit(pitch);
    if(choice)this.active[name]={kind,key:choice.key,offsets:choice.offsets,

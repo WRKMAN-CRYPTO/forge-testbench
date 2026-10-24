@@ -1,12 +1,12 @@
 /* GrooveGrove shared simulation. Same classes in server + client. */
-import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261019-transfer';
+import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261024-new-volumes';
 import {ListeningJournal} from './listening-journal.js';
 import {GroveWorld} from './grove-world.js?v=20261020-pitch-ear';
 import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
-import {tryVocalPhrase} from './voice-music.js?v=20261020-pitch-ear';
-import {MusicalDisciplines} from './grove-disciplines.js?v=20261020-pitch-ear';
+import {tryVocalPhrase} from './voice-music.js?v=20261024-library-expansion';
+import {MusicalDisciplines} from './grove-disciplines.js?v=20261024-library-expansion';
 import {restoreVoiceprints} from './voiceprints.js';
-import {tryLearnerVocalPhrase} from './learner-vocals.js?v=20261020-pitch-ear';
+import {tryLearnerVocalPhrase} from './learner-vocals.js?v=20261024-library-expansion';
 import {JamArchive} from './jam-archive.js';
 import {PitchMemory} from './pitch-memory.js';
 import {PitchRecall} from './pitch-recall.js';
@@ -124,6 +124,21 @@ export class Grove {
     this.riffLastHeldNote=saved?.riffLastHeldNote&&Number.isFinite(saved.riffLastHeldNote.pitch)?
       {...saved.riffLastHeldNote}:null;
     this.library=new MusicLibrary(saved?.library);
+    // Explicit fourth-shelf edition: deliver one physical copy of each new
+    // work once to an existing world. Old books and activity remain untouched.
+    if(Array.isArray(saved?.library?.books)&&saved.library.books.length>0)
+      this.library.installExpansion();
+    const lastReply=saved?.musicalReplies?.last;
+    this.musicalReplies={
+      last:lastReply&&MUSICIANS.includes(lastReply.from)&&
+        MUSICIANS.includes(lastReply.to)&&lastReply.from!==lastReply.to&&
+        Number.isSafeInteger(lastReply.bar)&&lastReply.bar>=0?
+          {from:lastReply.from,to:lastReply.to,bar:lastReply.bar,kind:lastReply.kind}:null,
+      continuations:Object.fromEntries(MUSICIANS.map(name=>[name,
+        Number.isSafeInteger(saved?.musicalReplies?.continuations?.[name])&&
+        saved.musicalReplies.continuations[name]>=0?
+          saved.musicalReplies.continuations[name]:0]))
+    };
     this.understanding=new ListeningJournal(saved?.understanding);
     this.voiceJournal=new VoiceJournal(saved?.voiceJournal);
     this.voiceprints=restoreVoiceprints(saved?.voiceprints);
@@ -159,6 +174,22 @@ export class Grove {
     else if(saved){this.push('Their memories survived the last visit.');}
   }
   push(message){this.logs.unshift({message,bar:this.bar});this.logs=this.logs.slice(0,12);this.highlight=message;}
+  canContinueReply(name,heard,bar){
+    const last=this.musicalReplies.last;
+    // Both replies must follow actually audible notes, not proximity or a jam
+    // invitation alone. The artist still has to decide to perform again.
+    return !!(last&&MUSICIANS.includes(name)&&heard&&
+      last.to===name&&last.from===heard.from &&
+      bar>last.bar&&bar-last.bar<=6 &&
+      Number.isSafeInteger(heard.bar)&&heard.bar>=last.bar&&heard.bar<=bar);
+  }
+  noteMusicalReply(from,to,bar,kind,continued=false){
+    if(!MUSICIANS.includes(from)||!MUSICIANS.includes(to)||from===to||
+       !Number.isSafeInteger(bar)||bar<0)return false;
+    this.musicalReplies.last={from,to,bar,kind};
+    if(continued)this.musicalReplies.continuations[from]++;
+    return true;
+  }
   exchange(from,to,message){
     this.push(from.name+' → '+to.name+': '+message);
     if(this.onTalk)this.onTalk(from.name,message);
@@ -171,6 +202,8 @@ export class Grove {
     space:this.space.snapshot(),
     disciplines:this.disciplines.snapshot(),archive:this.archive.snapshot(),
     pitchMemory:this.pitchMemory.snapshot(),pitchRecall:this.pitchRecall.snapshot(),
+    musicalReplies:{last:this.musicalReplies.last?{...this.musicalReplies.last}:null,
+      continuations:{...this.musicalReplies.continuations}},
     jamParticipants:[...this.jamParticipants],logs:this.logs.slice(0,12)};}
   onBeatEvent(index,t,audio){
     const beat=index%4,bar=Math.floor(index/4);
@@ -234,6 +267,7 @@ export class Grove {
          ensemble:this.mode==='jam'?this.jamParticipants:null,
         transfer:this.disciplines.transfer('Murmur',this),
         pitchRecall:this.pitchRecall,
+        replyMemory:this,
         playing:Object.fromEntries(['Pip','Riff'].map(name=>[name,
           !this.library.busy(name)&&!this.space.traveling(name)&&
           this.space.destination(name)!=='pond'&&(
@@ -293,7 +327,8 @@ export class Grove {
         };
         // Chord tones are not melodic steps; only a freely chosen solo note
         // may carry a prior personal long-term contour across real onsets.
-        return soloNote?this.pitchRecall.instrument('Riff','guitar',freq,bar,90,850,schedule):schedule(freq);
+        return soloNote?this.pitchRecall.instrument('Riff','guitar',freq,bar,90,850,schedule,
+          this.library.has('Riff','motifMotion')):schedule(freq);
       },
       kick:(at,volume,extra=false)=>{
         audio.kick(at,volume);
@@ -331,6 +366,9 @@ export class Grove {
           (this.library.has('Riff','partnerListening')?.02:0)+
           (this.library.has('Riff','melodicContours')?.035:0);
         const longSingle=Math.random()<singleChance;
+        const secondReply=!!voiceHeard&&singingNearby&&
+          this.library.has('Riff','secondAnswer')&&
+          this.canContinueReply('Riff',voiceHeard,bar)&&Math.random()<.28;
         if(longSingle){
           const tones=[voicing[1],voicing[2],voicing[0]*2];
           const singerPitch=voiceHeard?.pitch;
@@ -350,6 +388,8 @@ export class Grove {
           this.riffLastHeldNote={bar,beat,pitch:playedPitch,
             seconds:Math.round(duration*100)/100,
             context:singingNearby?'answering Murmur':onJam?'playing together':'solo idea'};
+          if(singingNearby&&voiceHeard?.from==='Murmur')
+            this.noteMusicalReply('Riff','Murmur',bar,'guitar',secondReply);
         }else{
           const holdingChance=.19+
             (this.library.has('Riff','openChords')?.13:0)+
@@ -406,8 +446,12 @@ export class Grove {
       if(riffSoundedThisBeat)this.riff.ownOnsets.push({bar,beat,time:guitarOnset});
     }
     if(pipActive){
+      const pipHeard=this.space.people.Pip.lastHeard;
+      const secondAnswer=beat===3&&this.library.has('Pip','secondAnswer')&&
+        this.canContinueReply('Pip',pipHeard,bar)&&Math.random()<.28;
       if(beat===0||beat===2)play.kick(drumOnset,beat===0?.9:.68);
-      else play.snare(drumOnset,.7);
+      else play.snare(drumOnset,secondAnswer?.59:.7);
+      if(secondAnswer)this.noteMusicalReply('Pip',pipHeard.from,bar,'drums',true);
       play.hat(drumOnset+.017,.6);
       if(!(pipChoice==='breath' && beat===3) && !pipRest)play.hat(drumOnset+beatDur*.5+.017,.32);
       if(!pipRest && onJam && beat===3 && this.pip.curiosity>.7 && bar%4===0)play.snare(drumOnset+beatDur*.74,.28,true);
@@ -473,12 +517,14 @@ export class Grove {
         const pitch=pitches[(bar+1)%pitches.length]*2;
         play.guitar(pitch,guitarOnset+beatDur*.48,.22,.27,true);
         this.voiceJournal.partnerReply({bar,partner:'Riff',kind:'guitar',pitch});
+        this.noteMusicalReply('Riff','Murmur',bar,'guitar');
         if(this.voiceJournal.partnerReplies.Riff===1)
           this.push('Riff answers a melody he actually heard from Murmur.');
       }
       if(pipCanAnswer && Math.random()<(this.library.has('Pip','callResponse')?.46:.31)){
         play.snare(drumOnset+beatDur*.62,.2,true);
         this.voiceJournal.partnerReply({bar,partner:'Pip',kind:'snare',pitch:null});
+        this.noteMusicalReply('Pip','Murmur',bar,'drums');
         if(this.voiceJournal.partnerReplies.Pip===1)
           this.push('Pip answers Murmur with a small rhythmic accent.');
       }

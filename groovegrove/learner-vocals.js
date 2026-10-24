@@ -31,7 +31,11 @@ export function tryLearnerVocalPhrase({name,grove,bar,time,audio}){
   const personal=[...person.practice.guitar.recent,...person.practice.violin.recent,
     ...stats.recent].filter(e=>Number.isFinite(e.pitch)&&e.pitch>0)
     .sort((a,b)=>b.bar-a.bar);
-  const inspiration=heard[0]?.pitch??personal[0]?.pitch??null;
+  // Only an existing decision to sing can continue a real earlier answer.
+  const secondCandidate=knows('secondAnswer')?
+    heard.find(h=>grove.canContinueReply(name,h,bar)):null;
+  const secondAnswer=!!secondCandidate&&Math.random()<.32;
+  const inspiration=(secondAnswer?secondCandidate.pitch:heard[0]?.pitch)??personal[0]?.pitch??null;
   const imprint=grove.voiceprints[name];
   const developing=stats.notes;
   const phraseReady=developing>18 && (knows('melodicContours')||knows('breathPhrasing')||
@@ -52,7 +56,7 @@ export function tryLearnerVocalPhrase({name,grove,bar,time,audio}){
       [0,pick([-3,-2,0,2,3]),pick([-4,-2,0,2,4])]:[0];
   // A prior long-term contour is another optional phrase idea, not a reason
   // to start singing. All the established vocal willingness and rests remain.
-  const recalled=grove.pitchRecall?.voice(name,steps,bar)||null;
+  const recalled=grove.pitchRecall?.voice(name,steps,bar,knows('motifMotion'))||null;
   if(recalled)steps=recalled.offsets.map(c=>c/100);
   const center=clamp((borrowed&&!motifReady?remembered[0]:
     inspiration&&Math.random()<.72?inspiration:state.lastPitch||220)*
@@ -86,6 +90,8 @@ export function tryLearnerVocalPhrase({name,grove,bar,time,audio}){
   if(pitches.length>1)state.phrases++;
   if(recalled&&pitches.length===recalled.offsets.length)
     grove.pitchRecall.record(name,{bar,kind:'voice',key:recalled.key});
+  if(secondAnswer&&pitches.length)
+    grove.noteMusicalReply(name,secondCandidate.from,bar,'voice',true);
   if(!state.firstSound)state.firstSound={bar,pitch:pitches[0],
     inspiredBy:heard[0]?.from||(personal.length?'own instrumental memory':'curiosity')};
   if(state.notes===1)grove.push(name+' experiments with their voice for the first time.');

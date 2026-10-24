@@ -20,7 +20,7 @@ const nearestRoot=p=>{
 };
 const readable=v=>VOICES.includes(v)?v:'m';
 export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
-                                audio,journal,onNote,playing=null,transfer=null,ensemble=null,pitchRecall=null}){
+                                audio,journal,onNote,playing=null,transfer=null,ensemble=null,pitchRecall=null,replyMemory=null}){
   if(singer.stage!=='humming'||library.busy('Murmur')||
      bar-singer.lastAttemptBar<2){
     singer.rests++;return false;
@@ -86,7 +86,7 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   // A freely chosen multi-note phrase may borrow a relative contour from
   // Murmur's own genuine, recurring long-term pitch observations. This never
   // initiates a performance, lengthens a phrase, or pretends to prefer a shape.
-  const recalled=pitchRecall?.voice('Murmur',steps,bar)||null;
+  const recalled=pitchRecall?.voice('Murmur',steps,bar,has('motifMotion'))||null;
   if(recalled){
     steps=recalled.offsets.map(c=>c/100);
     repeated=false; // A heard contour isn't automatically a repeated own motif.
@@ -101,13 +101,19 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
     ...(voiceNearby?[voice]:[])
   ].sort((a,b)=>b.bar-a.bar);
   const rhythmicInspiration=pipNearby?drums:null;
-  const response=present&&Math.random()<(has('callResponse')?.93:.83)
+  // Continuing a previously heard reply is OPTIONAL and cannot initiate a
+  // vocal performance. It depends on a real prior reply from this same peer.
+  const secondCandidate=has('secondAnswer')&&present?
+    pitchedInspiration.find(h=>replyMemory?.canContinueReply('Murmur',h,bar)):null;
+  const secondAnswer=!!secondCandidate&&Math.random()<.32;
+  const response=secondAnswer?secondCandidate.from:
+    present&&Math.random()<(has('callResponse')?.93:.83)
     ?pitchedInspiration.length&&Math.random()<.72?
       pitchedInspiration[0].from:rhythmicInspiration?.from||pitchedInspiration[0]?.from||null
     :pitchedInspiration.length&&Math.random()<.36?pitchedInspiration[0].from:null;
   const heardPitch=pitchedInspiration.find(h=>h.from===response);
   const root=heardPitch?.pitch&&
-    (has('partnerListening')||transferredMelody>.25||Math.random()<.42)
+    (secondAnswer||has('partnerListening')||transferredMelody>.25||Math.random()<.42)
       ?nearestRoot(heardPitch.pitch):nearestRoot(singer.lastPitch);
   const pitches=[],durations=[];
   const gap=phrased?(length>2?.55:.73):.44;
@@ -155,5 +161,7 @@ export function tryVocalPhrase({singer,library,space,bar,time,beatDur=60/98,
   // Durable use means notes really reached the scheduled sound bus.
   if(recalled&&pitches.length===recalled.offsets.length)
     pitchRecall.record('Murmur',{bar,kind:'voice',key:recalled.key});
+  if(response&&pitches.length)replyMemory?.noteMusicalReply(
+    'Murmur',response,bar,'voice',secondAnswer);
   return {sang:true,ensemble:present,response,pitches,durations,bar};
 }

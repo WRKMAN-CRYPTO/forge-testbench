@@ -17,9 +17,9 @@
   No LLM, network inference, external sound files, or predetermined band-forming script.
 */
 import { Application, Container, Graphics, Text, Rectangle } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs';
-import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261019-transfer';
+import { MusicLibrary, LIBRARY_CATALOG, BOOK_IDS } from './music-library.js?v=20261024-new-volumes';
 import { ListeningJournal, VARIATIONS } from './listening-journal.js';
-import { Grove } from './grove-core.js?v=20261021-pitch-recall-refresh01';
+import { Grove } from './grove-core.js?v=20261024-library-expansion';
 import { musicalHistory } from './musical-history.js';
 import { PLACES, WORLD_SIZE } from './grove-world.js?v=20261019-transfer';
 import { GROVE_SERVER_URL } from './server-config.js?v=20261018-live';
@@ -735,7 +735,7 @@ function makeLibraryNook(world){
     }
   }
   textAt(world,'THE LIBRARY',x+w/2,y-26,13,PALETTE.gold,'bold',2,.5);
-  ui.shelfCounter=textAt(world,'LIBRARY  0 / 15',x+8,y+8,9,PALETTE.cream,'bold',.6);
+  ui.shelfCounter=textAt(world,'LIBRARY  0 / 18',x+8,y+8,9,PALETTE.cream,'bold',.6);
   textAt(world,'SHELF II  ·  NEW IDEAS',x+8,y+unitH+gap+(landscape?8:3),landscape?9:7,PALETTE.cream,'bold',.6);
   ui.shelfStatus=textAt(world,'Tap shelf to deliver books',x+w/2,y+h+(landscape?12:5),landscape?10:9,PALETTE.muted,'normal',0,.5);
   ui.shelfStatus.style.wordWrap=true;
@@ -764,6 +764,24 @@ function makeLibraryNook(world){
   voiceHit.hitArea=new Rectangle(vx-6,vy-8,vw+12,vh+16);
   voiceHit.on('pointertap',()=>{deliveryCategory='voice';deliveryOpen=!deliveryOpen;refreshText();});
   world.addChild(voiceHit);
+  // Fourth cabinet, physically separate and wholly left of the old shelves.
+  // Slots 15..17 are the ONLY new positions; 0..14 retain their coordinates.
+  const nx=x-172,ny=y+3,nw=150,nh=136;
+  ui.newShelfBounds={x:nx,y:ny,w:nw,h:nh};
+  const newWood=new Graphics();world.addChild(newWood);
+  rect(newWood,nx-6,ny-8,nw+12,nh+16,11,0x072425,.58);
+  rect(newWood,nx,ny,nw,nh,8,0x485d4b);
+  rect(newWood,nx+5,ny+5,nw-10,nh-10,5,0x69836a);
+  rect(newWood,nx+10,ny+39,nw-20,68,5,0x1b3730);
+  for(let i=1;i<3;i++)line(newWood,nx+10+i*43,ny+39,nx+10+i*43,ny+107,0xd6c39a,2,.62);
+  line(newWood,nx+9,ny+110,nx+nw-9,ny+110,0xe0b889,4,.82);
+  textAt(world,'THE NEW VOLUMES',nx+nw/2,ny+12,10,PALETTE.cream,'bold',.5,.5);
+  textAt(world,'SHELF IV',nx+nw/2,ny+115,10,PALETTE.muted,'bold',.6,.5);
+  const newHit=new Graphics();rect(newHit,nx-6,ny-8,nw+12,nh+16,8,0xffffff,.001);
+  newHit.eventMode='static';newHit.cursor='pointer';
+  newHit.hitArea=new Rectangle(nx-6,ny-8,nw+12,nh+16);
+  newHit.on('pointertap',()=>{deliveryCategory='new';deliveryOpen=!deliveryOpen;refreshText();});
+  world.addChild(newHit);
   // Keep musicians' existing reading positions, never shift into the HUD.
   ui.readPads=landscape?{
     Pip:{x:x-32,y:y+unitH+89},Riff:{x:x+125,y:y+unitH+89}
@@ -793,17 +811,18 @@ function makeDeliveryTray(world){
   textAt(layer,'Every book is a physical copy. Reading is always a choice.',x+18,y+47,wide?13:10,PALETTE.mint);
   ui.deliveryBookLabels={};ui.deliveryPages={};ui.deliveryTabCaptions={};
   const sets=[
-    {id:'instruments',label:'THE MUSIC SHELVES',ids:BOOK_IDS.filter(id=>LIBRARY_CATALOG[id].topic!=='voice')},
-    {id:'voice',label:'VOICE COLLECTION',ids:BOOK_IDS.filter(id=>LIBRARY_CATALOG[id].topic==='voice')}
+    {id:'instruments',label:'MUSIC SHELVES',ids:BOOK_IDS.slice(0,8)},
+    {id:'voice',label:'VOICE COLLECTION',ids:BOOK_IDS.slice(8,11)},
+    {id:'new',label:'NEW VOLUMES',ids:BOOK_IDS.slice(11)}
   ];
-  const tabW=(bw-48)/2,tabY=y+79;
+  const tabGap=8,tabW=(bw-36-2*tabGap)/3,tabY=y+79;
   sets.forEach((set,index)=>{
-    const tx=x+18+index*(tabW+12),tab=new Graphics();layer.addChild(tab);
-    rect(tab,tx,tabY,tabW,36,11,index===1?0x4d4251:0x214a40,.9);
+    const tx=x+18+index*(tabW+tabGap),tab=new Graphics();layer.addChild(tab);
+    rect(tab,tx,tabY,tabW,36,11,index===1?0x4d4251:index===2?0x4d5d43:0x214a40,.9);
     tab.roundRect(tx,tabY,tabW,36,11).stroke({color:PALETTE.gold,width:1,alpha:.53});
     tab.eventMode='static';tab.cursor='pointer';tab.hitArea=new Rectangle(tx,tabY,tabW,36);
     tab.on('pointertap',()=>{deliveryCategory=set.id;refreshText();});
-    const label=textAt(layer,set.label,tx+tabW/2,tabY+11,wide?12:10,PALETTE.cream,'bold',.25,.5);
+    const label=textAt(layer,set.label,tx+tabW/2,tabY+11,wide?11:9,PALETTE.cream,'bold',.25,.5);
     ui.deliveryTabCaptions[set.id]={tab,label};
     const page=new Container();layer.addChild(page);
     ui.deliveryPages[set.id]=page;
@@ -819,7 +838,7 @@ function makeDeliveryTray(world){
       line(cover,cx+16,cy+15,cx+16,cy+ch-16,0x193e37,2,.6);
       circle(cover,cx+23,cy+ch*.5,6,0x163632,.75);
       const tx=cx+46,tw=cw-55;
-      textAt(page,set.id==='voice'?'VOICE':'MUSIC',cx+cw-8,cy+6,8,PALETTE.gold,'bold',.45,1);
+      textAt(page,set.id==='voice'?'VOICE':set.id==='new'?'NEW':'MUSIC',cx+cw-8,cy+6,8,PALETTE.gold,'bold',.45,1);
       const title=textAt(page,def.title,tx,cy+20,wide?14:12,PALETTE.cream,'bold');
       title.style.wordWrap=true;title.style.wordWrapWidth=tw;
       const subtitle=textAt(page,def.subtitle,tx,cy+64,wide?11:10,PALETTE.muted);
@@ -836,9 +855,11 @@ function makeDeliveryTray(world){
       });
       ui.deliveryBookLabels[id]=textAt(page,'ON SHELF',cx+cw-8,cy+ch-15,wide?10:9,PALETTE.gold,'bold',.45,1);
     });
-    if(set.id==='voice'){
-      const note=textAt(page,'Vowels · breath · melodies, all without words.\nAnyone may read these. Singing is still a personal choice.',
-        x+22,y+381,wide?15:12,PALETTE.mint);
+    if(set.id==='voice'||set.id==='new'){
+      const note=textAt(page,set.id==='voice'
+        ?'Vowels · breath · melodies, all without words.\nAnyone may read these. Singing is still a personal choice.'
+        :'New possibilities, not instant mastery.\nEvery musician can choose whether to borrow a book.',
+        x+22,y+487,wide?14:12,PALETTE.mint);
       note.style.wordWrap=true;note.style.wordWrapWidth=bw-44;
     }
   });
@@ -881,13 +902,14 @@ function renderPhysicalBooks(){
   for(const book of grove.library.books){
     const def=LIBRARY_CATALOG[book.type];
     if(book.state==='shelf'){
-      const voice=book.slot>=12;
-      const px=voice?ui.voiceShelfBounds.x+14+(book.slot-12)*46:x+17+(book.slot%3)*55;
-      const second=book.slot>=6&&!voice,small=second&&!landscape;
-      const py=voice?ui.voiceShelfBounds.y+55:second
+      const novel=book.slot>=15,voice=book.slot>=12&&!novel;
+      const px=novel?ui.newShelfBounds.x+11+(book.slot-15)*43:
+        voice?ui.voiceShelfBounds.x+14+(book.slot-12)*46:x+17+(book.slot%3)*55;
+      const second=book.slot>=6&&book.slot<12,small=second&&!landscape;
+      const py=novel?ui.newShelfBounds.y+55:voice?ui.voiceShelfBounds.y+55:second
         ?y+ui.shelfBounds.unitH+ui.shelfBounds.gap+(small?17:31)+Math.floor((book.slot-6)/3)*(small?22:41)
         :y+31+Math.floor(book.slot/3)*41;
-      const bh=small?18:voice?39:25;
+      const bh=small?18:novel?39:voice?39:25;
       rect(g,px,py,43,bh,3,def.color);
       rect(g,px+4,py+3,7,bh-6,2,0x21443b,.62);
       line(g,px+16,py+(small?6:8),px+37,py+(small?6:8),0x123b30,2,.55);
@@ -1189,7 +1211,7 @@ function refreshText(){
   if(ui.audioLabel)ui.audioLabel.text=!started?'▶ AUDIO':soundNeedsRefresh?'↻ REPAIR':'↻ AUDIO';
   if(ui.audioWidget)ui.audioWidget.visible=!deliveryOpen && !journalOpen && !tapesOpen;
   refreshTapeViewer();
-  if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 15';
+  if(ui.shelfCounter)ui.shelfCounter.text='LIBRARY  '+grove.library.books.length+' / 18';
   for(const [name,button] of Object.entries(ui.cameraButtons||{})){
     const active=camera.mode==='follow'?camera.target===name:camera.mode==='place'&&camera.target===name;
     button.caption.alpha=active?1:.63;
