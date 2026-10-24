@@ -126,7 +126,8 @@ export class Grove {
     this.library=new MusicLibrary(saved?.library);
     // Explicit fourth-shelf edition: deliver one physical copy of each new
     // work once to an existing world. Old books and activity remain untouched.
-    if(saved?.library)this.library.installExpansion();
+    if(Array.isArray(saved?.library?.books)&&saved.library.books.length>0)
+      this.library.installExpansion();
     const lastReply=saved?.musicalReplies?.last;
     this.musicalReplies={
       last:lastReply&&MUSICIANS.includes(lastReply.from)&&
