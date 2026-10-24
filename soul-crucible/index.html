@@ -110,7 +110,9 @@ function feel(f,cues,valence,strength,tone){
   if(!signal)continue;
   const felt=clamp(baseline + d.lens[k]*.95 + d.echo[k]*.24 + rand(-.23,.23),-1,1);
   const rate=clamp(.040*strength*Math.abs(signal)*d.plasticity,.0005,.10);
+  const before=s.im[k];
   s.im[k]=clamp(s.im[k]+rate*(felt-s.im[k]),-1,1); // Both positive AND negative updates.
+  logFeeling(s,k,tone,felt,before,s.im[k]);
   d.echo[k]=clamp(d.echo[k]*.89+felt*rate*.75,-.78,.78);
   d.lens[k]=clamp(d.lens[k]+rate*.09*(felt-d.lens[k]),-.90,.90); // The initial core can change.
  }
@@ -468,6 +470,70 @@ function drawSoulTab(){const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=151;
   for(let j=0;j<trace.length;j++){const impression=trace[j].im,drift=AXES.reduce((acc,axis)=>acc+Math.abs(impression[axis.key]-d.baseline[axis.key]),0)/(AXES.length*2),px=chartX+(j/(trace.length-1))*chartW,py=y+chartH-6-drift*(chartH-16);if(j===0)g.moveTo(px,py);else g.lineTo(px,py);}g.stroke();}
  line(chartX,y+chartH-6,chartX+chartW,y+chartH-6,'#8d9dc655');fit('Emotional distance from upgrade baseline',x+12,y+chartH+11,ww-24,9,'#aebcdb');y+=chartH+39;
  fit('Imprints guide instincts · lenses interpret sensations · echoes fade',x,y,ww,9,'#aec2dd');y+=19;text('OLD WINS & LIVES PRESERVED · NEW FEELINGS BEGIN HERE',x,y,9,'#99a8c4');return y+28;}
+
+// Observational only. No RNG, no score changes, and no modifications to emotional learning.
+const FEEL_EVENTS=['Force answered','Impact endured','Relief in motion','Shelter held','Effort unanswered','Energy spent in silence','Life extinguished','Still standing'];
+function newEmotionRow(){return {n:0,positive:0,negative:0,neutral:0,up:0,down:0,delta:0,absDelta:0,targetSum:0};}
+function ensureEmotionLedger(s){
+ const o=s.obs||(s.obs=freshObserver());
+ if(!o.emotionLedger)o.emotionLedger={since:round,events:{},axes:{}};
+ const l=o.emotionLedger;
+ for(const a of AXES)if(!l.axes[a.key])l.axes[a.key]=newEmotionRow();
+ return l;
+}
+function logFeeling(s,k,tone,felt,before,after){
+ const l=ensureEmotionLedger(s),name=FEEL_EVENTS.includes(tone)?tone:'Other';
+ if(!l.events[name])l.events[name]={};
+ if(!l.events[name][k])l.events[name][k]=newEmotionRow();
+ const delta=after-before;
+ for(const row of [l.axes[k],l.events[name][k]]){
+  row.n++;row.targetSum+=felt;
+  if(felt>0.01)row.positive++;else if(felt<-.01)row.negative++;else row.neutral++;
+  if(delta>1e-9)row.up++;else if(delta< -1e-9)row.down++;
+  row.delta+=delta;row.absDelta+=Math.abs(delta);
+ }
+}
+function drawEmotionLedger(startY){
+ const x=14,ww=w-28;let y=startY+15;
+ sectionLabel('EMOTIONAL CAUSALITY LEDGER',x,y,'OBSERVATION ONLY · SINCE INSTALL');y+=27;
+ rr(x,y,ww,70,12,'#25314b','#7182a377');
+ fit('Positive / negative = felt emotional target, not outcome.',x+11,y+20,ww-22,10,'#e4ecfb');
+ fit('↑ / ↓ = actual attribute changes. Events can oppose each other.',x+11,y+41,ww-22,10,'#b7c9e0');
+ fit('Counters start now; earlier lives are not reconstructed.',x+11,y+59,ww-22,9,'#b7c9e0');y+=85;
+ const all=[...souls,...Object.values(world?.bank||{})].filter(s=>s&&s.id);
+ for(const s of all){
+  const l=ensureEmotionLedger(s),color=s.color||'#b5c6e8';
+  rr(x,y,ww,39,11,'#202b46',color+'77');
+  text(s.id,x+11,y+17,12,color,'left','850');
+  const total=Object.values(l.axes).reduce((a,r)=>a+r.n,0);
+  fit(`${total.toLocaleString()} attribute updates · duel ${l.since}`,x+11,y+32,ww-22,9,'#b8c7e1');y+=47;
+  for(const a of AXES){
+   const row=l.axes[a.key]||newEmotionRow();
+   rr(x,y,ww,63,10,'#202a44','#596a8766');
+   text(a.title.toUpperCase(),x+10,y+16,10,'#e7e6f5','left','800');
+   text(`+${row.positive} / −${row.negative} targets`,x+ww-10,y+16,10,'#b9e3d7','right','700');
+   const n=Math.max(1,row.positive+row.negative),bx=x+10,bw=ww-20;
+   rr(bx,y+25,bw,7,3,'#4a536d');
+   rr(bx,y+25,bw*row.positive/n,7,3,'#8bd6bd');
+   text(`↑${row.up}  ↓${row.down}   net ${row.delta>=0?'+':''}${row.delta.toFixed(2)}`,x+10,y+48,10,'#becce6','left','700');
+   text(`now ${Number(s.im[a.key]||0).toFixed(2)}`,x+ww-10,y+48,10,color,'right','800');
+   y+=70;
+  }
+  sectionLabel('EVENT SOURCES',x,y,'POSITIVE / NEGATIVE TARGETS');y+=24;
+  for(const name of FEEL_EVENTS){
+   const rows=l.events[name];if(!rows)continue;
+   const pos=Object.values(rows).reduce((a,r)=>a+r.positive,0),neg=Object.values(rows).reduce((a,r)=>a+r.negative,0);
+   rr(x,y,ww,37,9,'#1e2942','#596a8755');
+   fit(name,x+9,y+14,ww*.52,10,'#e5e8f5');
+   text(`+${pos}  /  −${neg}`,x+ww-9,y+14,10,'#bed9df','right','750');
+   const signed=Object.entries(rows).map(([k,r])=>`${k.slice(0,3)}:${r.positive}/${r.negative}`).join('  ');
+   fit(signed,x+9,y+29,ww-18,9,'#aebfda');y+=43;
+  }
+  y+=18;
+ }
+ return y+20;
+}
+
 function drawActionsTab(){const x=14,ww=w-28;let y=151;
  sectionLabel('DECISION DISTRIBUTION',x,y,'COUNTS SINCE MONITORING');y+=22;
  const first=souls[0].obs,second=souls[1].obs,aN=totalCount(first.decisionCounts),bN=totalCount(second.decisionCounts);
@@ -504,7 +570,7 @@ function drawActionsTab(){const x=14,ww=w-28;let y=151;
  if(!observed.some(s=>s.obs.soulCharacter?.decisions)){fit('Awaiting new decisions to reveal emotional character.',x+10,y+16,ww-20,10,'#c3d3e6');y+=30;}
  rr(x,y,ww,48,9,'#202b46','#52638155');fit('Historical imprints are preserved; these action measurements start now.',x+10,y+18,ww-20,9,'#d4dfed');fit('No added randomness, actions, instincts, or changes to selection.',x+10,y+36,ww-20,9,'#aebed6');y+=57;
  y+=10;rr(x,y,ww,60,12,'#243148','#6a7c9c88');tinyIcon(x+24,y+26,'↶','#b7dfdf');fit('Early hops: evade during first 3 seconds. Timeout: 65s without KO.',x+44,y+17,ww-53,10,'#ecf1fc');fit('A difference is evidence to inspect, not a cause.',x+44,y+39,ww-53,10,'#abbdd7');
- return drawOpeningWhiffs(y+80);
+ return drawEmotionLedger(drawOpeningWhiffs(y+80));
 }
 
 function ratio(n,d){return d?Math.round(n*100/d):0;}
