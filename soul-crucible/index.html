@@ -238,10 +238,22 @@ function actionScore(f,o,a){const b=f.body, dist=Math.abs(o.x-f.x), reach=54+b.r
  if(f.lock>0&&['strike','heavy','lunge'].includes(a))body-=2;
  if(a==='guard'&&o.action==='retreat')mind-=.18;
  return {mind,body,soul,total:mind+body+soul+rand(-.18,.18)};}
+function blankSoulCharacter(){return {since:round,decisions:0,actions:Object.fromEntries(ACTIONS.map(a=>[a,{n:0,sum:0,positive:0,negative:0,promoted:0,suppressed:0,flipsIn:0,flipsOut:0}])),axes:Object.fromEntries(AXES.map(a=>[a.key,{sum:0,min:Infinity,max:-Infinity}])),changedFrom:Object.fromEntries(ACTIONS.map(a=>[a,blankCounts(ACTIONS)])),situations:{near:{n:0,changes:0},far:{n:0,changes:0},hurt:{n:0,changes:0},healthy:{n:0,changes:0}}};}
+function ensureSoulCharacter(o){if(!o.soulCharacter)o.soulCharacter=blankSoulCharacter();return o.soulCharacter;}
+function recordSoulCharacter(f,o,options,baseline,chosen){const c=ensureSoulCharacter(f.soul.obs),d=ensureDepth(f.soul);c.decisions++;
+ for(const a of AXES){const k=a.key,v=clamp(f.soul.im[k]*.70+d.lens[k]*.43+d.echo[k]*.70,-1.3,1.3),r=c.axes[k];r.sum+=v;r.min=Math.min(r.min,v);r.max=Math.max(r.max,v);}
+ for(const opt of options){const row=c.actions[opt.a];row.n++;row.sum+=opt.soul;if(opt.soul>0)row.positive++;if(opt.soul<0)row.negative++;
+  if(opt.soul>0&&opt.total-opt.soul<baseline.total-baseline.soul&&opt.total>=baseline.total)row.promoted++;
+  if(opt.soul<0&&opt.total-opt.soul>=chosen.total-chosen.soul&&opt.total<chosen.total)row.suppressed++;
+ }
+ if(baseline.a!==chosen.a){c.actions[chosen.a].flipsIn++;c.actions[baseline.a].flipsOut++;c.changedFrom[baseline.a][chosen.a]++;}
+ const dist=Math.abs(o.x-f.x),near=dist<54+f.body.reach*17+35;for(const k of [near?'near':'far',f.hp/f.maxHp<.5?'hurt':'healthy']){c.situations[k].n++;if(baseline.a!==chosen.a)c.situations[k].changes++;}
+}
 function decide(f,o){if(f.stagger>0)return; const options=ACTIONS.map(a=>({a,...actionScore(f,o,a)}));options.sort((a,b)=>b.total-a.total);
  // Passive counterfactual using the SAME scored options and noise: no extra RNG calls.
  // 'No soul' subtracts the soul term, without rerunning mind, body or learning.
  const si=f.soul.obs.soulInfluence;const baseline=options.reduce((best,v)=>(v.total-v.soul>best.total-best.soul?v:best),options[0]);const soulPick=options.reduce((best,v)=>(v.soul>best.soul?v:best),options[0]);const changed=baseline.a!==options[0].a;
+ recordSoulCharacter(f,o,options,baseline,options[0]);
  si.decisions++;if(changed){si.changed++;si.byAction[options[0].a]++;}if(soulPick.a===options[0].a)si.aligned++;if(soulPick.a!==baseline.a&&soulPick.total-soulPick.soul<baseline.total-baseline.soul)si.conflicted++;si.soulStrength+=Math.abs(options[0].soul);si.chosenSoul+=options[0].soul;
  const dist=Math.abs(o.x-f.x),near=dist<54+f.body.reach*17+35,ctx=si.contexts;for(const k of [near?'near':'far',f.hp/f.maxHp<.5?'hurt':'healthy']){ctx[k].n++;if(changed)ctx[k].changed++;}
  let opt=options[0];if(Math.random()<.12){const picked=options[rint(0,Math.min(2,options.length-1))];if(picked!==options[0])si.randomOverride++;opt=picked;}f.action=opt.a;f.lastParts={mind:opt.mind,soul:opt.soul,body:opt.body};f.mind.lastAction=ACTIONS.indexOf(opt.a);f.actionTime=.35;f.stat.decisions++;f.soul.obs.decisionCounts[opt.a]=(f.soul.obs.decisionCounts[opt.a]||0)+1;
@@ -361,7 +373,7 @@ function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighte
  g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
  if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
  g.restore();}
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.7',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.8',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');fit(`${f.body.name} · ${f.winStreak} IN A ROW`,xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
 function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
 function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(`${speed}× SPEED`,xx+bw+11,yy,bw,40,speed>1);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
@@ -477,6 +489,20 @@ function drawActionsTab(){const x=14,ww=w-28;let y=151;
  }
  if(!observed.some(s=>s.obs.soulInfluence?.decisions)){fit('Waiting for new decisions. Historical choices cannot be reconstructed.',x+10,y+18,ww-20,10,'#aebdd7');y+=30;}
  rr(x,y,ww,54,10,'#202b46','#586b8c77');fit('Counterfactual: remove soul score from existing action scores.',x+10,y+17,ww-20,9,'#d3e2ed');fit('Includes original random noise; choice changes are estimates, not causal proof.',x+10,y+37,ww-20,9,'#afc2dc');y+=65;
+ y+=10;sectionLabel('SOUL CHARACTER LAB',x,y,'ATTRIBUTES → ACTIONS');y+=23;
+ fit('Each soul term is measured for all 8 candidate actions, before random selection.',x,y,ww,9,'#b9c9e0');y+=20;
+ for(const s of observed){const c=s.obs.soulCharacter;if(!c||!c.decisions)continue;
+  rr(x,y,ww,44,11,'#202b46',s.color+'66');fit(s.id+' • '+c.decisions.toLocaleString()+' decisions',x+10,y+17,ww-20,11,s.color,'left','800');fit('Soul score contribution: signed; positive encourages, negative discourages.',x+10,y+34,ww-20,9,'#bac9de');y+=51;
+  sectionLabel('EMOTIONAL SIGNATURE',x,y,'EFFECTIVE AVERAGE · -1.3 TO +1.3');y+=20;
+  for(const axis of AXES){const z=c.axes[axis.key],v=z.sum/c.decisions;rr(x,y,ww,28,7,'#1d2942','#52638155');fit(axis.title,x+8,y+18,ww*.37,10,'#dce4f6');const bx=x+ww*.43,bw=ww*.38;rr(bx,y+11,bw,6,3,'#33405e');line(bx+bw/2,y+9,bx+bw/2,y+20,'#d2d7e077');rr(v<0?bx+bw/2-Math.abs(v)*bw/2.6:bx+bw/2,y+11,Math.abs(v)*bw/2.6,6,2,s.color);fit((v>=0?'+':'')+v.toFixed(3),x+ww-7,y+18,ww*.15,10,'#d5e2ef','right');y+=32;}
+  y+=7;sectionLabel('WHAT THE SOUL ENCOURAGES',x,y,'MEAN SCORE / CHANGED CHOICES');y+=20;
+  for(const act of ACTIONS){const row=c.actions[act],avg=row.sum/Math.max(1,row.n);rr(x,y,ww,38,8,'#202b46','#586b8a44');fit(act.toUpperCase(),x+8,y+14,ww*.29,10,'#e0e6f3','left','800');fit((avg>=0?'+':'')+avg.toFixed(3),x+ww*.36,y+14,ww*.2,10,avg>=0?'#a8e5cd':'#efb4bb');fit('IN '+row.flipsIn+'  OUT '+row.flipsOut,x+ww-8,y+14,ww*.43,9,'#b6c9e3','right');fit('Positive '+ratio(row.positive,row.n)+'% · Negative '+ratio(row.negative,row.n)+'%',x+8,y+30,ww-16,9,'#aabbd4');y+=43;}
+  const moves=[];for(const from of ACTIONS)for(const to of ACTIONS){const n=c.changedFrom[from][to];if(n)moves.push({from,to,n});}moves.sort((a,b)=>b.n-a.n);
+  rr(x,y,ww,57,9,'#1d2942','#52638155');fit('MOST COMMON SOUL-DRIVEN SWITCHES',x+10,y+17,ww-20,9,'#e4d7fb','left','800');
+  fit(moves.slice(0,2).map(v=>v.from+' → '+v.to+' ('+v.n+')').join('  •  ')||'None observed',x+10,y+37,ww-20,9,'#d0e4e6');y+=68;
+ }
+ if(!observed.some(s=>s.obs.soulCharacter?.decisions)){fit('Awaiting new decisions to reveal emotional character.',x+10,y+16,ww-20,10,'#c3d3e6');y+=30;}
+ rr(x,y,ww,48,9,'#202b46','#52638155');fit('Historical imprints are preserved; these action measurements start now.',x+10,y+18,ww-20,9,'#d4dfed');fit('No added randomness, actions, instincts, or changes to selection.',x+10,y+36,ww-20,9,'#aebed6');y+=57;
  y+=10;rr(x,y,ww,60,12,'#243148','#6a7c9c88');tinyIcon(x+24,y+26,'↶','#b7dfdf');fit('Early hops: evade during first 3 seconds. Timeout: 65s without KO.',x+44,y+17,ww-53,10,'#ecf1fc');fit('A difference is evidence to inspect, not a cause.',x+44,y+39,ww-53,10,'#abbdd7');
  return drawOpeningWhiffs(y+80);
 }
