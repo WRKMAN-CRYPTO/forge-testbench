@@ -87,7 +87,7 @@ function totalCount(obj){let n=0;for(const k in obj)n+=obj[k]||0;return n;}
 // Everything the soul can use is a small, abstract emotional response to sensation.
 function soulDepth(s){
  const lens={},echo={};AXES.forEach(a=>{const k=a.key;lens[k]=clamp(s.im[k]*.19+(s.origin?.[k]||0)*.30+rand(-.12,.12),-.5,.5);echo[k]=0;});
- return {version:1,fromLife:s.lives,baseline:{...s.im},lens,echo,plasticity:rand(.80,1.20),feelings:0,last:{tone:'Unfamiliar quiet',valence:0},trail:[]};
+ return {version:1,fromLife:s.lives,baseline:{...s.im},lens,echo,plasticity:rand(.80,1.20),feelings:0,last:{tone:'Unfamiliar quiet',valence:0},trail:[],reflection:{count:0,last:null,wrong:0}};
 }
 function ensureDepth(s){
  if(!s.depth||s.depth.version!==1)s.depth=soulDepth(s);
@@ -97,6 +97,7 @@ function ensureDepth(s){
  if(!Number.isFinite(d.fromLife))d.fromLife=s.lives;
  if(!Number.isFinite(d.feelings))d.feelings=0;
  if(!Number.isFinite(d.plasticity))d.plasticity=1;
+ if(!d.reflection)d.reflection={count:0,last:null,wrong:0};
  return d;
 }
 // Experience-driven appraisal: even the same sensation is colored differently
@@ -119,7 +120,33 @@ function feel(f,cues,valence,strength,tone){
   d.lens[k]=clamp(d.lens[k]+rate*.09*(felt-d.lens[k]),-.90,.90); // The initial core can change.
  }
  const shade=baseline>.38?'Bright pull':baseline>.05?'Faint ease':baseline<-.38?'Deep unease':baseline<-.05?'Restless tension':'Uncertain calm';
+ // Remember only the emotional weight and abstract sensations of salient moments.
+ // No opponent, tactic, event name, or episodic memory is stored here.
+ if(!Array.isArray(f.mind.affectiveMoments))f.mind.affectiveMoments=[];
+ const weight=Math.abs(baseline)*strength;
+ if(weight>.17){const moment={cues:Object.fromEntries(AXES.filter(a=>cues[a.key]).map(a=>[a.key,Math.abs(cues[a.key])])),valence:baseline,weight};const moments=f.mind.affectiveMoments;moments.push(moment);if(moments.length>18)moments.shift();}
  d.feelings++;d.last={tone:shade,valence:baseline}; // The soul retains a feeling, never a named event.
+}
+// A deathbed review interprets fragments of affect, not a factual replay.
+// Misinterpretation is possible, and strong prior feelings bias the reading.
+// Each life contributes a small, bounded revision; ordinary experience can undo it.
+function reflectAtDeath(f){
+ const s=f.soul,d=ensureDepth(s),moments=f.mind.affectiveMoments||[];
+ if(!moments.length)return;
+ const sampled=moments.slice(-12),interpretations={};let wrong=0;
+ for(const a of AXES){const k=a.key;let weighted=0,denom=0;
+  for(const m of sampled){const cue=m.cues[k]||0;if(!cue)continue;weighted+=m.valence*cue*m.weight;denom+=cue*m.weight;}
+  if(denom<.01)continue;
+  const evidence=clamp(weighted/denom,-1,1);
+  const belief=clamp(evidence*.65+s.im[k]*.35+rand(-.38,.38),-1,1);
+  if(Math.abs(evidence)>.16&&Math.sign(belief)!==Math.sign(evidence))wrong++;
+  const influence=clamp(.035+.055*Math.abs(belief),.035,.09);
+  s.im[k]=clamp(s.im[k]+(belief-s.im[k])*influence,-1,1);
+  d.lens[k]=clamp(d.lens[k]+(belief-d.lens[k])*influence*.45,-.90,.90);
+  interpretations[k]=+belief.toFixed(3);
+ }
+ d.reflection.count++;d.reflection.wrong+=wrong;
+ d.reflection.last={life:s.lives,axes:interpretations,misread:wrong};
 }
 function traceSoul(s){const d=ensureDepth(s);d.trail.push({life:s.lives,im:{...s.im},lens:{...d.lens}});if(d.trail.length>44)d.trail.shift();
  for(const a of AXES)d.echo[a.key]*=.52; // Residue survives, but short-lived arousal fades between lives.
@@ -215,7 +242,7 @@ function load(){try{const p=JSON.parse(localStorage.getItem(KEY));if(p&&Array.is
 function save(force=false){try{const now=performance.now();if(!force&&speed>=300&&running&&now-lastSaveAt<1800)return;assureWorld();localStorage.setItem(KEY,JSON.stringify({souls,round,world,activeFighters:fighters?.map(packFighter)}));lastSaveAt=now;perf.saveMs+=performance.now()-now;perf.saveCount++;}catch(e){}}
 
 function born(soul,side,proposedSeed=null){ensureSoul(soul);const seed=makeBodySeed(proposedSeed),
- b=bodyFromDNA(TYPES.find(t=>t.name===seed.origin)||TYPES[0],seed.dna,seed.generation),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,bodyId:seed.id,parentId:seed.parentId,origin:seed.origin,generation:seed.generation,genome:{...b.dna},budded:false,mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},winStreak:0,stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},evadeResolved:false,evadeConnected:false,phase:rand(0,TAU),style:rint(0,4),tone:factor};soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;if(world?.lineageCensus){const c=world.lineageCensus;c.lives[f.generation]=(c.lives[f.generation]||0)+1;}return f;}
+ b=bodyFromDNA(TYPES.find(t=>t.name===seed.origin)||TYPES[0],seed.dna,seed.generation),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,bodyId:seed.id,parentId:seed.parentId,origin:seed.origin,generation:seed.generation,genome:{...b.dna},budded:false,mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0,affectiveMoments:[]},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},winStreak:0,stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},evadeResolved:false,evadeConnected:false,phase:rand(0,TAU),style:rint(0,4),tone:factor};soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;if(world?.lineageCensus){const c=world.lineageCensus;c.lives[f.generation]=(c.lives[f.generation]||0)+1;}return f;}
 function begin(){if(restoreFighters){const pair=restoreFighters.map(restoreFighter);if(pair.every(Boolean)){fighters=pair;restoreFighters=null;roundTimer=0;countdown=.70;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;}events.length=0;addEvent('Bloodlines restored. Souls remain their own.');if(fighters.some(f=>f.hp<=0))nextLife();return;}restoreFighters=null;}
  fighters=[born(souls[0],0),born(souls[1],1)];roundTimer=0;countdown=1.0;timedOut=false;for(const f of fighters){f.soul.obs.duelsStarted++;f.openingDuelCounted=false;}events.length=0;addEvent('Fresh minds. Fresh bodies. Old feelings.');}
 function addEvent(msg){events.unshift(msg);if(events.length>5)events.length=5;}
@@ -288,7 +315,7 @@ function death(loser,winner){if(bannerTimer>0)return;const lifecycleStart=perfor
  const struggle=clamp(loser.stat.damage/Math.max(1,loser.stat.taken),0,2);
  feel(loser,{pain:1,pressure:.85,defense:.48,contact:.46,closeness:.30},clamp(-.53+struggle*.39,-.80,.35),1.7,'Life extinguished');
  feel(winner,{pressure:.65,contact:.48,defense:.27},clamp(.30-winner.stat.taken/520,-.1,.48),1.0,'Still standing');
- traceSoul(loser.soul);retireSoul(loser);
+ reflectAtDeath(loser);traceSoul(loser.soul);retireSoul(loser);
  let entry={life:loser.soul.lives,body:loser.body.name,result:'Defeat',damage:Math.round(loser.stat.damage),streak:loser.winStreak,date:round};loser.soul.record.unshift(entry);loser.soul.record=loser.soul.record.slice(0,12);
  winner.soul.record[0]&&0;banner=`${winner.name} survives • ${loser.soul.id} reincarnates`;
  addEvent(`${loser.soul.id} lost life ${loser.soul.lives}. Emotional impressions remain.`);
@@ -802,7 +829,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){running=fa
 window.addEventListener('pagehide',()=>save(true));
 load();begin();save();resize();requestAnimationFrame(frame);
 // Tiny explicit debug surface for browser automation / development without influencing combat.
-window.__soulCrucible={state:()=>({round,running,speed,headless,actualSpeed,genomePoolSize:world?.genomePool?.length||0,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
+window.__soulCrucible={state:()=>({round,running,speed,headless,actualSpeed,genomePoolSize:world?.genomePool?.length||0,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo,reflection:f.soul.depth?.reflection})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
 })();
 </script>
 </body></html>
