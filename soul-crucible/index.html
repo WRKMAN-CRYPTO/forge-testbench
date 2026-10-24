@@ -221,11 +221,21 @@ function queueOffspring(f){assureWorld();if(f.budded||f.winStreak!==5)return nul
  return seed;
 }
 function retireSoul(f){assureWorld();world.waiting.push({id:f.soul.id,readyAt:round+REINCARNATION_WAIT});}
-function recruitSeed(){assureWorld();if(world.nursery.length)return world.nursery.shift();
- // Uniform selection across seven ancestral genomes and each earned persistent genotype.
- const n=TYPES.length+world.genomePool.length,slot=Math.floor(Math.random()*n);
- if(slot<TYPES.length)return makeBodySeed({origin:TYPES[slot].name});
- const saved=world.genomePool[slot-TYPES.length];return makeBodySeed({origin:saved.origin,generation:saved.generation,dna:{...saved.dna},parentId:saved.bodyId});
+function recruitSeed(){assureWorld();
+ // Select an ancestral G0 bloodline first, then sample uniformly within it.
+ // This prevents populous genome pools from crowding out other bloodlines.
+ const origin=pick(TYPES).name;
+ const earned=world.genomePool.filter(g=>g.origin===origin);
+ const pending=world.nursery.filter(g=>g.origin===origin);
+ const slot=Math.floor(Math.random()*(1+earned.length+pending.length));
+ if(slot===0)return makeBodySeed({origin});
+ if(slot<=earned.length){
+  const saved=earned[slot-1];
+  return makeBodySeed({origin:saved.origin,generation:saved.generation,dna:{...saved.dna},parentId:saved.bodyId});
+ }
+ const seed=pending[slot-1-earned.length];
+ const idx=world.nursery.indexOf(seed);if(idx>=0)world.nursery.splice(idx,1);
+ return seed;
 }
 function getRecruitSoul(seed){return seed.soulId?soulById(seed.soulId)||createNewSoul():assignSoul();}
 function packFighter(f){if(!f)return null;const {soul,body,...rest}=f;return {...rest,soulId:soul.id};}
