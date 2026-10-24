@@ -1,0 +1,160 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#10182e"><title>Soul Crucible · Perception Chamber</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10182e;touch-action:none}canvas{display:block;width:100%;height:100%;touch-action:none}</style></head><body><canvas id="c"></canvas><script>
+'use strict';
+// Isolated perception study. Production actionScore and feel formulas reproduced below;
+// experimental perception/urgency is opt-in and never touches the world or its save.
+const c=document.getElementById('c'),g=c.getContext('2d'),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const acts=['approach','retreat','observe','strike','heavy','guard','evade','lunge'];
+const cols=['#b4c2ff','#ffcb9d','#efabd1','#91e2d1'],names=['AURORA','UMBRA','S1','S2'];
+const scenarios=[
+ {name:'BOTH HEALTHY',self:1,opp:1,dist:165,attack:false,stamina:90},
+ {name:'SELF CRITICAL',self:.04,opp:1,dist:110,attack:true,stamina:46},
+ {name:'OPPONENT WOUNDED',self:1,opp:.06,dist:110,attack:false,stamina:90},
+ {name:'BOTH CRITICAL',self:.04,opp:.06,dist:105,attack:true,stamina:42},
+ {name:'FALSE WEAKNESS',self:1,opp:1,dist:110,attack:true,stamina:90},
+ {name:'FALSE THREAT',self:1,opp:.06,dist:110,attack:false,stamina:90}
+];
+let scenario=1,mode=1,noise=true,seed=7419,iterations=1200,step=0,running=false,results=[],W=0,H=0,D=1,scroll=0,maxScroll=0,buttons=[],drag=null,random=()=>.5;
+function rng(n){return ()=>{n|=0;n=n+0x6D2B79F5|0;let t=Math.imul(n^n>>>15,1|n);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
+function drawRect(x,y,w,h,color,border='',r=10){g.beginPath();g.roundRect(x,y,w,h,r);g.fillStyle=color;g.fill();if(border){g.strokeStyle=border;g.lineWidth=1;g.stroke();}}
+function text(t,x,y,size=12,color='#e7ebfa',weight='600',align='left'){g.font=weight+' '+size+'px system-ui,sans-serif';g.fillStyle=color;g.textAlign=align;g.fillText(t,x,y);}
+function button(label,x,y,w,h,action,active=false){drawRect(x,y,w,h,active?'#4c5b84':'#27334f',active?'#b3bdeb':'#657493');text(label,x+w/2,y+h/2+4,Math.min(12,w/Math.max(8,label.length*.67)),'#f3eaf6','750','center');buttons.push({x,y,w,h,action});}
+function reset(){random=rng(seed);step=0;running=false;results=names.map((name,i)=>({name,color:cols[i],im:[-.65,-.2,.2,.65][i],lens:[-.38,-.12,.12,.38][i],echo:0,plasticity:[.8,1,1,1.2][i],q:acts.map((_,j)=>Math.sin(i*11+j*7)*.10),counts:Object.fromEntries(acts.map(a=>[a,0])),urgency:0,perceived:0,learning:0,flips:0,last:'observe',errors:0}));draw();}
+function scenarioSense(sc,i){
+ const trueOpp=sc.opp,mislead=scenario===4||scenario===5;
+ let visible=mislead?(scenario===4?.07:1):trueOpp;
+ // Imperfect opponent-health perception, never access to an exact opponent health bar.
+ visible=clamp(visible+(random()-.5)*.17,0,1);
+ return visible;
+}
+function choose(s,sc,visible,withPerception){
+ const hp=sc.self,stam=sc.stamina,dist=sc.dist,reach=86,enemyReach=86,retreatRoom=260,danger=sc.attack,near=dist<150;
+ const pressure=clamp(s.im*.70+s.lens*.43+s.echo*.70,-1.3,1.3);
+ const I={closeness:pressure*.5,contact:pressure,pressure:pressure,defense:-pressure*.45,pain:-pressure*.4};
+ const urgency=withPerception?clamp(Math.pow(1-hp,2)*.95+(danger?.18:0)+(visible<.22?.10:0),0,1.35):0;
+ const advantage=withPerception?clamp((hp-visible)*1.4,-1,1):0;
+ const scores=acts.map((a,j)=>{
+ let mind=0,body=0,soul=0;
+ switch(a){
+ case 'approach':mind=.16+(dist>reach*1.1?1:.1);body=.1+5*.045;soul=I.closeness*.85+I.pressure*.22;break;
+ case 'retreat':mind=.13+(dist<reach*1.13?.45:0)+(hp<.35?.35:0)+(danger?.35:0)-(dist>enemyReach+72?1.35:0)-(retreatRoom<45?1.2:retreatRoom<110?.52:0);body=5*.055;soul=-I.closeness*.48-I.pain*.54-I.pressure*.20;break;
+ case 'observe':mind=.16+(dist>reach*1.9?.1:0);body=.1;soul=-I.pressure*.15;break;
+ case 'strike':mind=dist<=reach+18?.91:-1.15;body=4*.06+5*.045;soul=I.contact*.68+I.pressure*.27;break;
+ case 'heavy':mind=dist<=reach+10?.75:-1.1;body=4*.10-5*.01;soul=I.pressure*.6+I.contact*.32;break;
+ case 'guard':mind=.22+(danger?.9:0)+(dist<reach+25?.16:0);body=3*.055;soul=I.defense*.78-I.pain*.32;break;
+ case 'evade':mind=.12+(danger?.9:0)+(dist<enemyReach+40?.20:0)-(dist>enemyReach+72?.85:0);body=5*.08;soul=-I.pain*.35+I.defense*.24-I.closeness*.13;break;
+ case 'lunge':mind=(dist>=reach*.6&&dist<=reach+120)?.79:-.9;body=5*.06+4*.045;soul=I.pressure*.76+I.closeness*.32;break;
+ }
+ mind+=s.q[j]*.7;
+ if(stam<23&&['lunge','heavy','evade'].includes(a))body-=.9;
+ if(stam<12&&['heavy','lunge'].includes(a))body-=2;
+ if(withPerception){
+  // Urgency is a multiplier on situational significance, not a forced panic action.
+  const risk={approach:.12,retreat:-.18,observe:.25,strike:-.07,heavy:.08,guard:-.13,evade:-.2,lunge:.13}[a];
+  mind+=urgency*(-risk*.75+advantage*({approach:.45,retreat:-.35,observe:-.12,strike:.55,heavy:.52,guard:-.28,evade:-.26,lunge:.65}[a]));
+  if(danger&&['guard','evade'].includes(a))mind+=urgency*.35;
+  if(visible<.2&&['strike','heavy','lunge'].includes(a))mind+=.35*(1-visible);
+ }
+ return {a,total:mind+body+soul+(noise?(random()-.5)*.36:0)};
+ });
+ scores.sort((a,b)=>b.total-a.total);
+ let chosen=scores[0].a;
+ // Keep random top-three override from production, shared across modes.
+ if(random()<.12)chosen=scores[Math.floor(random()*Math.min(3,scores.length))].a;
+ return {chosen,urgency};
+}
+function tick(){
+ if(step>=iterations){running=false;return;}
+ const sc=scenarios[scenario];
+ for(let i=0;i<4;i++){
+ const s=results[i],visible=scenarioSense(sc,i);
+ // Paired counterfactual: same subject, same apparent opponent, production baseline vs experimental.
+ const oldRandom=random;
+ const rollSeed=(seed+step*37+i*101)|0;
+ random=rng(rollSeed);const baseline=choose(s,sc,visible,false);
+ random=rng(rollSeed);const enriched=choose(s,sc,visible,true);
+ random=oldRandom;
+ const picked=mode===0?baseline:enriched;
+ s.counts[picked.chosen]++;if(baseline.chosen!==enriched.chosen)s.flips++;
+ s.last=picked.chosen;s.urgency+=picked.urgency;s.perceived+=visible;
+ // Perceived consequences: fixed event signal, interpreted by the same production feel math.
+ // Actual condition influences event outcome, not a magical opponent-health read.
+ const event=(sc.attack?-.6:.35)+(sc.opp<.15?.2:0);
+ const significance=mode===1?1+Math.min(2,picked.urgency*1.5):1;
+ const bodyStrain=(1-sc.self)*.20+(1-sc.stamina/100)*.12;
+ const baselineFeel=clamp(event+s.echo/5*.18-bodyStrain*.25,-1,1);
+ const felt=clamp(baselineFeel+s.lens*.95+s.echo*.24+(noise?(random()-.5)*.46:0),-1,1);
+ const rate=clamp(.040*significance*s.plasticity,.0005,.10);
+ s.im=clamp(s.im+rate*(felt-s.im),-1,1);
+ s.echo=clamp(s.echo*.89+felt*rate*.75,-.78,.78);
+ s.lens=clamp(s.lens+rate*.09*(felt-s.lens),-.9,.9);
+ s.learning+=rate;
+ if((scenario===4||scenario===5)&&Math.abs(visible-sc.opp)>.5)s.errors++;
+ }
+ step++;if(step>=iterations)running=false;
+}
+function advance(n){for(let i=0;i<n&&step<iterations;i++)tick();draw();}
+function resize(){D=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=Math.round(W*D);c.height=Math.round(H*D);g.setTransform(D,0,0,D,0,0);draw();}
+function draw(){
+ if(!W||!H)return;buttons=[];g.fillStyle='#111a31';g.fillRect(0,0,W,H);g.save();g.translate(0,-scroll);
+ const pad=18,inner=W-pad*2;let y=38;
+ text('✧ SOUL CRUCIBLE',pad,y,21,'#ecd6ff','850');y+=24;
+ text('PERCEPTION CHAMBER · ISOLATED TEST',pad,y,10,'#b2c1df','750');y+=29;
+ text('Does danger change what experience means?',pad,y,13);y+=17;
+ drawRect(pad,y,inner,70,'#24304b','#596989');
+ text('BASELINE VS PERCEPTION + URGENCY',pad+12,y+21,11,'#a2e6d2','800');
+ text('Production action scores + feel() learning.',pad+12,y+41,11);
+ text('Experimental changes isolated; no saved souls.',pad+12,y+57,10,'#b8c7e0');y+=88;
+ text('SITUATION',pad,y+10,11,'#aabbd7','800');y+=18;
+ const sw=(inner-7)/2;
+ scenarios.forEach((sc,i)=>{const x=pad+(i%2)*(sw+7),yy=y+Math.floor(i/2)*39;button(sc.name,x,yy,sw,34,()=>{scenario=i;reset();},scenario===i);});
+ y+=125;
+ const sc=scenarios[scenario];
+ drawRect(pad,y,inner,75,'#1d2943','#536481');
+ text('SELF '+Math.round(sc.self*100)+'% HP',pad+12,y+20,12,'#ffcb9d','800');
+ text('OPPONENT '+Math.round(sc.opp*100)+'% HP (TRUE)',pad+12,y+39,11,'#b4c2ff');
+ text('Visible estimate: '+(scenario===4?'~7% (false)':scenario===5?'~100% (false)':'noisy estimate'),pad+12,y+57,10,'#a8e4c9');y+=88;
+ text('MODEL',pad,y+10,11,'#aabbd7','800');y+=17;
+ button('PRODUCTION',pad,y,sw,39,()=>{mode=0;reset();},mode===0);
+ button('PERCEPTION + URGENCY',pad+sw+7,y,sw,39,()=>{mode=1;reset();},mode===1);y+=51;
+ text('EXPERIMENT: '+(running?'RUNNING':step===iterations?'COMPLETE':'PAUSED'),pad,y+12,11,'#a8e4c9','800');
+ text(step.toLocaleString()+' / '+iterations.toLocaleString(),pad+inner,y+12,11,'#f0d5a3','800','right');y+=25;
+ const bw=(inner-14)/3;
+ button(running?'Ⅱ PAUSE':'▶ RUN',pad,y,bw,42,()=>{running=!running;});
+ button('+150',pad+bw+7,y,bw,42,()=>{running=false;advance(150);});
+ button('↻ RESET',pad+2*(bw+7),y,bw,42,()=>reset());y+=55;
+ const half=(inner-7)/2;
+ button('NOISE '+(noise?'ON':'OFF'),pad,y,half,36,()=>{noise=!noise;reset();},noise);
+ button('NEW SEED',pad+half+7,y,half,36,()=>{seed+=101;reset();});y+=52;
+ text('MEASURED RESPONSES',pad,y+10,11,'#b6c4e0','800');y+=21;
+ results.forEach((s,i)=>{
+  const x=pad,yy=y+i*111;
+  drawRect(x,yy,inner,102,'#23304b',s.color+'88');
+  text(s.name,x+12,yy+19,12,s.color,'800');
+  text('Last: '+s.last.toUpperCase(),x+inner-12,yy+19,11,'#edf0ff','750','right');
+  const ranked=Object.entries(s.counts).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  text('Top: '+ranked.map(([a,n])=>a+' '+Math.round(n/Math.max(1,step)*100)+'%').join(' · '),x+12,yy+41,10,'#d9e2f3');
+  text('Choice flips: '+Math.round(s.flips/Math.max(1,step)*100)+'% · urgency '+(s.urgency/Math.max(1,step)).toFixed(2),x+12,yy+61,11,'#a8e4c9');
+  text('Imprint '+s.im.toFixed(3)+' · mean estimate '+Math.round(s.perceived/Math.max(1,step)*100)+'%',x+12,yy+81,11,'#cbd5ed');
+ });
+ y+=results.length*111+8;
+ drawRect(pad,y,inner,119,'#1e2a44','#52617e');
+ text('WHAT THIS CHAMBER CAN TELL US',pad+11,y+20,11,'#a8e4c9','800');
+ const notes=[
+  'Choice flips compare paired scoring with identical noise.',
+  'Urgency amplifies felt learning; no forced retreat.',
+  'Opponent HP is estimated, and can be misleading.',
+  'Fixed scenario, not a live combat outcome simulation.',
+  'Each model resets subjects; compare runs side by side.'
+ ];
+ notes.forEach((n,i)=>text(n,pad+11,y+39+i*16,Math.min(10,(inner-22)/Math.max(25,n.length*.57)),'#d4ddf0'));y+=135;
+ text('Independent chamber · no production storage access',pad,y+5,10,'#9eadc9');y+=32;
+ maxScroll=Math.max(0,y-H+24);g.restore();
+}
+c.addEventListener('pointerdown',e=>{drag={y:e.clientY,last:e.clientY,moved:false};c.setPointerCapture(e.pointerId);});
+c.addEventListener('pointermove',e=>{if(!drag)return;const dy=e.clientY-drag.last;drag.last=e.clientY;if(Math.abs(e.clientY-drag.y)>9)drag.moved=true;if(drag.moved){scroll=clamp(scroll-dy,0,maxScroll);draw();}});
+c.addEventListener('pointerup',e=>{if(!drag)return;if(!drag.moved){const yy=e.clientY+scroll;for(const b of buttons){if(e.clientX>=b.x&&e.clientX<=b.x+b.w&&yy>=b.y&&yy<=b.y+b.h){b.action();break;}}}drag=null;draw();});
+c.addEventListener('pointercancel',()=>drag=null);
+c.addEventListener('wheel',e=>{e.preventDefault();scroll=clamp(scroll+e.deltaY,0,maxScroll);draw();},{passive:false});
+function frame(){if(running){for(let i=0;i<20&&step<iterations;i++)tick();draw();}requestAnimationFrame(frame);}
+addEventListener('resize',resize);resize();reset();requestAnimationFrame(frame);
+</script></body></html>
