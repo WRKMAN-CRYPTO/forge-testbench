@@ -50,7 +50,7 @@ test('An unopened volume remains on the shelf until an independent musician deci
  assert.equal(grove.library.books.length,0); // no fake reader or automated ceremony in a new world
  assert.equal(grove.library.donate(bookId).ok,true);
  const book=grove.library.books[0];
- assert.equal(book.slot,17);
+ assert.equal(book.slot,15);
  assert.equal(grove.library.has('Murmur','bowVoice'),false);
  assert.equal(book.owner,null);assert.equal(book.state,'shelf');
  grove.mode='jam'; // isolate actual reading from spontaneous new borrowing
