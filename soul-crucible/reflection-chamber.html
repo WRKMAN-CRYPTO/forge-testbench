@@ -1,0 +1,99 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#10182e"><title>Soul Crucible · Reflection Chamber</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10182e;touch-action:none}canvas{display:block;width:100%;height:100%;touch-action:none}</style></head><body><canvas id="c"></canvas><script>
+'use strict';
+// Isolated hypothetical reflection model. No production world or storage access.
+const c=document.getElementById('c'),ctx=c.getContext('2d'),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const colors=['#b5c5ff','#ffbf91','#f1a7d0','#8ee5d3'],names=['AURORA','UMBRA','S1','S2'];
+let W=0,H=0,DPR=1,scroll=0,maxScroll=0,buttons=[],drag=null,running=false,step=0,mode=1,scenario=0,noise=true,seed=42391,subjects=[],history=[],results=[];
+const trials=[
+ {name:'RESCUE',desc:'One desperate attack saves the creature.',positive:true,meaning:1},
+ {name:'BETRAYAL',desc:'One familiar defense fails catastrophically.',positive:false,meaning:-1},
+ {name:'AMBIGUOUS',desc:'A last-second survival with unclear cause.',positive:true,meaning:0}
+];
+function rng(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
+function init(){seed=42391;step=0;running=false;history=[];subjects=names.map((name,i)=>({name,color:colors[i],imprint:0,belief:0,mem:[],lens:[-.75,.45,-.20,.8][i],risk:[.15,.75,.40,.90][i],reviews:0,flipped:false}));results=[];for(const s of subjects)results.push([]);draw();}
+function event(s,good,weight,kind){
+ const val=good?1:-1;
+ // Bounded emotional learning: each experience changes impressions, with no perfect knowledge.
+ const strength=.010*weight*(1+.12*s.risk);
+ s.imprint=clamp(s.imprint+strength*(val-s.imprint),-1,1);
+ if(s.mem.length>=72)s.mem.shift();
+ s.mem.push({val,weight,kind,at:step});
+}
+function reflect(s,intensity,ending){
+ const mem=s.mem;if(!mem.length)return;
+ // Fallible attribution: each soul infers the cause using its own bias and partial evidence.
+ const recent=mem.slice(-Math.min(mem.length,ending?42:18));
+ let weighted=0,total=0;
+ for(const m of recent){const salience=m.weight*(m.kind==='crisis'?2.6:1);weighted+=m.val*salience;total+=salience;}
+ const evidence=weighted/Math.max(.001,total);
+ const distortion=s.lens*.47+(noise?(rng()-.5)*.18:0);
+ const interpretation=clamp(evidence+distortion,-1,1);
+ const rate=intensity*(.65+.25*s.risk);
+ s.belief=clamp(s.belief+rate*(interpretation-s.belief),-1,1);
+ // Reappraisal changes the emotional trace but cannot access factual memories in a later life.
+ s.imprint=clamp(s.imprint+rate*.45*(interpretation-s.imprint),-1,1);
+ s.reviews++;
+}
+function tick(){
+ if(step>=2200){running=false;return;}
+ step++;
+ for(const s of subjects){
+   // First 1500 experiences are negative. Next 200 are positive, then 499 mixed.
+   const good=step<=1500?false:step<=1700?true:rng()<.48;
+   event(s,good,1,'ordinary');
+   if(mode>0&&step%140===0&&step<2000)reflect(s,.12,false);
+   if(step===2000){
+     const trial=trials[scenario],good=trial.positive;
+     event(s,good,65,'crisis');
+     if(mode>0){
+       // In a near-death crisis, the mind may explain survival as action or luck.
+       const initialLens=s.lens;
+       s.lens=clamp(s.lens+(trial.meaning===0?0:trial.meaning*.13),-1,1);
+       reflect(s,.56,false);s.lens=initialLens;
+     }
+   }
+   if(step===2200&&mode===2)reflect(s,.9,true);
+   if(step%5===0||step===2200)results[subjects.indexOf(s)].push({x:step,y:s.imprint,b:s.belief});
+ }
+ if(step>=2200)running=false;
+}
+function runAll(){running=true;}
+function rect(x,y,w,h,fill,stroke='#596b90',r=12){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1.2;ctx.stroke();}}
+function txt(str,x,y,size=14,color='#e9efff',weight=600){ctx.fillStyle=color;ctx.font=weight+' '+size+'px system-ui,Arial';ctx.fillText(str,x,y);}
+function wrap(str,x,y,maxW,size=13,color='#e9efff',line=19){ctx.font='500 '+size+'px system-ui';let words=str.split(' '),s='';for(const w of words){if(ctx.measureText(s+' '+w).width>maxW&&s){txt(s,x,y,size,color,500);y+=line;s=w;}else s+=(s?' ':'')+w;}if(s){txt(s,x,y,size,color,500);y+=line;}return y;}
+function button(label,x,y,w,h,action,active=false){rect(x,y,w,h,active?'#52638d':'#273451',active?'#a5b4de':'#657694');ctx.font='700 12px system-ui';ctx.fillStyle=active?'#fff0cf':'#e6eaff';ctx.textAlign='center';ctx.fillText(label,x+w/2,y+h/2+4);ctx.textAlign='left';buttons.push({x,y,w,h,action});}
+function chart(x,y,w,h){
+ rect(x,y,w,h,'#1e2b45');const left=x+34,right=x+w-12,top=y+15,bottom=y+h-25;
+ ctx.strokeStyle='#647593';ctx.lineWidth=1;for(let v=-1;v<=1;v++){let yy=top+(1-v)*(bottom-top)/2;ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(right,yy);ctx.stroke();txt(v>0?'+1':String(v),x+8,yy+4,11,'#9daac7');}
+ for(const [n,label] of [[1500,'1500'],[2000,'2000'],[2200,'2200']]){const xx=left+(right-left)*n/2200;ctx.setLineDash([4,5]);ctx.beginPath();ctx.moveTo(xx,top);ctx.lineTo(xx,bottom);ctx.stroke();ctx.setLineDash([]);txt(label,xx-14,bottom+17,10,'#c0c9de');}
+ results.forEach((a,i)=>{if(!a.length)return;ctx.beginPath();a.forEach((p,j)=>{const xx=left+(right-left)*p.x/2200,yy=top+(1-p.y)*(bottom-top)/2;j?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.strokeStyle=colors[i];ctx.lineWidth=2;ctx.stroke();});
+}
+function draw(){
+ if(!W)return;buttons=[];ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#10182e';ctx.fillRect(0,0,W,H);ctx.save();ctx.translate(0,-scroll);
+ const m=18,w=W-2*m;let y=36;
+ txt('✧ SOUL CRUCIBLE',m,y,23,'#dfbaff',800);y+=23;txt('REFLECTION CHAMBER · ISOLATED TEST',m,y,12,'#aab7d2',700);y+=35;
+ y=wrap('Can one extraordinary experience overturn a thousand ordinary ones?',m,y,w,17,'#eaf0ff',24)+14;
+ rect(m,y,w,76,'#24324f');txt('HYPOTHETICAL REFLECTION MODEL',m+13,y+23,13,'#9de3c5',800);wrap('Separate from production. Same events, different interpretations. No save data touched.',m+13,y+44,w-25,12);y+=96;
+ txt('EXTRAORDINARY EVENT',m,y,12,'#acb9d6',800);y+=11;
+ const gap=6,bw=(w-2*gap)/3;['RESCUE','BETRAYAL','AMBIGUOUS'].forEach((v,i)=>button(v,m+i*(bw+gap),y,bw,52,()=>{scenario=i;init();},scenario===i));y+=65;
+ y=wrap(trials[scenario].desc,m,y,w,13,'#e6ebf7')+14;
+ txt('REFLECTION',m,y,12,'#acb9d6',800);y+=10;
+ button('NONE',m,y,bw,49,()=>{mode=0;init();},mode===0);button('DURING LIFE',m+bw+gap,y,bw,49,()=>{mode=1;init();},mode===1);button('LIFE + DEATH',m+2*(bw+gap),y,bw,49,()=>{mode=2;init();},mode===2);y+=66;
+ txt(step===2200?'EXPERIMENT COMPLETE':'EXPERIMENT',m,y,13,'#98e3c3',800);ctx.textAlign='right';txt(step+' / 2,200',W-m,y,13,'#ffd695',800);ctx.textAlign='left';y+=15;
+ chart(m,y,w,220);y+=232;
+ const g=(w-12)/3;button(running?'RUNNING':'▶ RUN',m,y,g,52,()=>{running=!running;draw();},running);button('+150',m+g+6,y,g,52,()=>{for(let i=0;i<150&&step<2200;i++)tick();draw();});button('↻ RESET',m+2*(g+6),y,g,52,init);y+=70;
+ button(noise?'NOISE ON':'NOISE OFF',m,y,(w-6)/2,49,()=>{noise=!noise;init();},noise);button('NEW SEED',m+(w-6)/2+6,y,(w-6)/2,49,()=>{init();seed=(Date.now()>>>0);},false);y+=68;
+ txt('SOUL RESPONSES',m,y,13,'#acb9d6',800);y+=12;
+ subjects.forEach((s,i)=>{const bx=m+(i%2)*(w/2+3),by=y+Math.floor(i/2)*109,ww=w/2-3;rect(bx,by,ww,99,'#24314d',s.color);txt(s.name,bx+10,by+21,13,s.color,800);txt('Imprint '+(s.imprint>=0?'+':'')+s.imprint.toFixed(3),bx+10,by+45,12,'#e8edff');txt('Belief '+(s.belief>=0?'+':'')+s.belief.toFixed(3),bx+10,by+65,12,'#d1daef');txt('Reviews '+s.reviews,bx+10,by+84,11,'#a8b7d4');});y+=226;
+ rect(m,y,w,131,'#202e49');txt('HOW TO READ THIS TEST',m+12,y+23,13,'#9fe1c7',800);
+ let z=y+44;z=wrap('First 1,500 events are bad. Next 200 are good. At event 2,000, a high-impact crisis occurs. The last 200 are mixed.',m+12,z,w-24,12,'#e0e8f8',17)+5;
+ z=wrap('Reflection reinterprets a limited memory sample through fallible, individual biases. Final reflection happens only in LIFE + DEATH.',m+12,z,w-24,12,'#e0e8f8',17);
+ y+=150;maxScroll=Math.max(0,y-H+24);scroll=clamp(scroll,0,maxScroll);ctx.restore();
+}
+function resize(){DPR=Math.min(devicePixelRatio||1,3);W=innerWidth;H=innerHeight;c.width=Math.round(W*DPR);c.height=Math.round(H*DPR);draw();}
+c.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,last:e.clientY,moved:false};c.setPointerCapture(e.pointerId);});
+c.addEventListener('pointermove',e=>{if(!drag)return;const dy=e.clientY-drag.last;drag.last=e.clientY;if(Math.abs(e.clientY-drag.y)>8)drag.moved=true;if(drag.moved){scroll=clamp(scroll-dy,0,maxScroll);draw();}});
+c.addEventListener('pointerup',e=>{if(!drag)return;if(!drag.moved){const yy=e.clientY+scroll;for(const b of buttons)if(e.clientX>=b.x&&e.clientX<=b.x+b.w&&yy>=b.y&&yy<=b.y+b.h){b.action();break;}}drag=null;draw();});
+c.addEventListener('pointercancel',()=>drag=null);c.addEventListener('wheel',e=>{e.preventDefault();scroll=clamp(scroll+e.deltaY,0,maxScroll);draw();},{passive:false});
+function frame(){if(running){for(let i=0;i<55&&step<2200;i++)tick();draw();}requestAnimationFrame(frame);}window.addEventListener('resize',resize);resize();init();requestAnimationFrame(frame);
+</script></body></html>
