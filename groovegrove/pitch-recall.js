@@ -73,7 +73,7 @@ export class PitchRecall{
   // inversion nor retrograde claims a new learned memory or improved motor skill.
   const original=picked.offsets;
   const variant=this.random()<.5?'inversion':'retrograde';
-  const offsets=variant==='inversion'?original.map(v=>-v):
+  const offsets=variant==='inversion'?original.map(v=>v===0?0:-v):
     [...original].reverse().map(v=>v-original.at(-1));
   if(offsets.some(v=>Math.abs(v)>1200))return picked;
   return {...picked,offsets,variant};
