@@ -1,12 +1,12 @@
 /* GrooveGrove shared simulation. Same classes in server + client. */
-import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261019-transfer';
+import {MusicLibrary,LIBRARY_CATALOG} from './music-library.js?v=20261024-new-volumes';
 import {ListeningJournal} from './listening-journal.js';
 import {GroveWorld} from './grove-world.js?v=20261020-pitch-ear';
 import {VoiceJournal} from './voice-journal.js?v=20261018-sustain';
-import {tryVocalPhrase} from './voice-music.js?v=20261020-pitch-ear';
-import {MusicalDisciplines} from './grove-disciplines.js?v=20261020-pitch-ear';
+import {tryVocalPhrase} from './voice-music.js?v=20261024-library-expansion';
+import {MusicalDisciplines} from './grove-disciplines.js?v=20261024-library-expansion';
 import {restoreVoiceprints} from './voiceprints.js';
-import {tryLearnerVocalPhrase} from './learner-vocals.js?v=20261020-pitch-ear';
+import {tryLearnerVocalPhrase} from './learner-vocals.js?v=20261024-library-expansion';
 import {JamArchive} from './jam-archive.js';
 import {PitchMemory} from './pitch-memory.js';
 import {PitchRecall} from './pitch-recall.js';
