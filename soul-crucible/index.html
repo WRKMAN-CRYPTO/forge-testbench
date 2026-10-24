@@ -33,6 +33,7 @@ function cycleSpeed(){speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];accu
 function toggleHeadless(){headless=!headless;headlessStartRound=round;accum=0;lastRenderAt=0;speedSampleWall=0;speedSampleSim=0;actualSpeed=0;particles.length=0;floats.length=0;save(true);}
 
 let souls, fighters, world, restoreFighters=null, round=1, selected=0, running=true, speed=1, headless=false, headlessStartRound=0, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
+let tournament=false,arenaCount=4,arenaSlots=[],activeArena=0,restoreArenaSlots=null,tournamentButtons=[];
 let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true, timedOut=false, speedSampleWall=0, speedSampleSim=0, actualSpeed=0, lastSaveAt=0, lastRenderAt=0;
 // Observation only: sampled timings never feed decisions, physics, genetics or random draws.
 const perf={frames:0,ticks:0,stepMs:0,drawMs:0,saveMs:0,saveCount:0,decisionMs:0,decisionSamples:0,decisions:0,lifecycleMs:0,lifecycleCount:0,elapsedMs:0,lastReport:0,report:{},lastRound:1,duelsPerSecond:0};
@@ -225,6 +226,8 @@ function retireSoul(f){assureWorld();world.waiting.push({id:f.soul.id,readyAt:ro
 function genomeRecord(id){assureWorld();const key=String(id);return world.genomeStats[key]||(world.genomeStats[key]={wins:0,losses:0});}
 function genomeWeight(id){const s=genomeRecord(id),n=s.wins+s.losses;const estimate=(s.wins+5)/(n+10);return .30+Math.pow(estimate*2,3);}
 function recruitSeed(){assureWorld();
+ // In tournament mode, give actual waiting offspring their opportunity first.
+ if(tournament&&world.nursery.length){const origins=[...new Set(world.nursery.map(s=>s.origin))],origin=pick(origins),candidates=world.nursery.filter(s=>s.origin===origin);let total=0;const weights=candidates.map(s=>{const v=genomeWeight(s.genomeId||s.id);total+=v;return v;});let needle=Math.random()*total,index=candidates.length-1;for(let i=0;i<candidates.length;i++){needle-=weights[i];if(needle<0){index=i;break;}}const seed=candidates[index];world.nursery.splice(world.nursery.indexOf(seed),1);return seed;}
  // Equal chance for each ancestral design; smoothed fitness selects within it.
  const origin=pick(TYPES).name;
  const earned=world.genomePool.filter(g=>g.origin===origin);
@@ -248,14 +251,27 @@ function makeSoul(i){let im={};AXES.forEach(a=>im[a.key]=rand(-.18,.18));return 
 function load(){try{const p=JSON.parse(localStorage.getItem(KEY));if(p&&Array.isArray(p.souls)&&p.souls.length===2&&p.souls.every(s=>s.im&&AXES.every(a=>Number.isFinite(s.im[a.key])))){
   round=p.round||1;souls=p.souls.map(ensureSoul);world=p.world&&p.world.version===1?p.world:createWorld();assureWorld();
   restoreFighters=Array.isArray(p.activeFighters)&&p.activeFighters.length===2?p.activeFighters:null;
+   restoreArenaSlots=Array.isArray(p.tournamentSlots)?p.tournamentSlots:null;tournament=!!p.tournament&&!!restoreArenaSlots;arenaCount=[2,4,8,16].includes(p.arenaCount)?p.arenaCount:4;activeArena=0;
   return;
- }}catch(e){} souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;}
-function save(force=false){try{const now=performance.now();if(!force&&speed>=300&&running&&now-lastSaveAt<1800)return;assureWorld();localStorage.setItem(KEY,JSON.stringify({souls,round,world,activeFighters:fighters?.map(packFighter)}));lastSaveAt=now;perf.saveMs+=performance.now()-now;perf.saveCount++;}catch(e){}}
+ }}catch(e){} souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];}
+function save(force=false){try{const now=performance.now();if(!force&&speed>=300&&running&&now-lastSaveAt<1800)return;assureWorld();localStorage.setItem(KEY,JSON.stringify({souls,round,world,activeFighters:fighters?.map(packFighter),tournament,arenaCount,tournamentSlots:tournament?arenaSlots.map(s=>({...s,fighters:s.fighters.map(packFighter)})):null}));lastSaveAt=now;perf.saveMs+=performance.now()-now;perf.saveCount++;}catch(e){}}
 
 function born(soul,side,proposedSeed=null){ensureSoul(soul);const seed=makeBodySeed(proposedSeed),
  b=bodyFromDNA(TYPES.find(t=>t.name===seed.origin)||TYPES[0],seed.dna,seed.generation),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,bodyId:seed.id,parentId:seed.parentId,origin:seed.origin,generation:seed.generation,genome:{...b.dna},genomeId:seed.genomeId||(seed.generation===0?'G0:'+seed.origin:seed.id),budded:false,mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0,affectiveMoments:[]},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},winStreak:0,stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},evadeResolved:false,evadeConnected:false,phase:rand(0,TAU),style:rint(0,4),tone:factor};soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;if(world?.lineageCensus){const c=world.lineageCensus;c.lives[f.generation]=(c.lives[f.generation]||0)+1;}return f;}
-function begin(){if(restoreFighters){const pair=restoreFighters.map(restoreFighter);if(pair.every(Boolean)){fighters=pair;restoreFighters=null;roundTimer=0;countdown=.70;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;}events.length=0;addEvent('Bloodlines restored. Souls remain their own.');if(fighters.some(f=>f.hp<=0))nextLife();return;}restoreFighters=null;}
+function begin(){if(restoreFighters){const pair=restoreFighters.map(restoreFighter);if(pair.every(Boolean)){fighters=pair;restoreFighters=null;roundTimer=0;countdown=.70;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;}events.length=0;addEvent('Bloodlines restored. Souls remain their own.');if(fighters.some(f=>f.hp<=0))nextLife();if(tournament&&restoreArenaSlots)restoreTournament();return;}restoreFighters=null;}
  fighters=[born(souls[0],0),born(souls[1],1)];roundTimer=0;countdown=1.0;timedOut=false;for(const f of fighters){f.soul.obs.duelsStarted++;f.openingDuelCounted=false;}events.length=0;addEvent('Fresh minds. Fresh bodies. Old feelings.');}
+// Tournament contexts isolate duel-local state while sharing souls, genomes and census.
+function snapshotArena(){return {fighters,t,roundTimer,banner,bannerTimer,countdown,timedOut,particles,floats,events};}
+function loadArena(s){fighters=s.fighters;t=s.t;roundTimer=s.roundTimer;banner=s.banner;bannerTimer=s.bannerTimer;countdown=s.countdown;timedOut=s.timedOut;particles=s.particles;floats=s.floats;events=s.events;}
+function runInArena(index,fn){const previous=snapshotArena();loadArena(arenaSlots[index]);try{fn();}finally{arenaSlots[index]=snapshotArena();loadArena(previous);}}
+function newArenaSlot(){const pair=[];for(let side=0;side<2;side++){const seed=recruitSeed();pair.push(born(getRecruitSoul(seed),side,seed));}for(const f of pair){f.openingDuelCounted=false;f.soul.obs.duelsStarted++;}return {fighters:pair,t:0,roundTimer:0,banner:'',bannerTimer:0,countdown:.8,timedOut:false,particles:[],floats:[],events:[]};}
+function restoreTournament(){const slots=restoreArenaSlots;restoreArenaSlots=null;arenaSlots=[];if(!slots?.length){tournament=false;return;}for(const s of slots){const pair=s.fighters?.map(restoreFighter);if(pair?.length===2&&pair.every(Boolean))arenaSlots.push({...s,fighters:pair,particles:[],floats:[],events:[]});}if(!arenaSlots.length){tournament=false;return;}arenaCount=arenaSlots.length;activeArena=0;loadArena(arenaSlots[0]);}
+function enterTournament(){if(tournament)return;arenaSlots=[snapshotArena()];tournament=true;for(let i=1;i<arenaCount;i++)arenaSlots.push(newArenaSlot());activeArena=0;loadArena(arenaSlots[0]);save(true);}
+function leaveTournament(){if(!tournament)return;loadArena(arenaSlots[activeArena]||arenaSlots[0]);arenaSlots=[];tournament=false;save(true);}
+function changeArenaCount(){if(!tournament)return;const sizes=[2,4,8,16];const target=sizes[(sizes.indexOf(arenaCount)+1)%sizes.length];if(target>arenaSlots.length){while(arenaSlots.length<target)arenaSlots.push(newArenaSlot());}else{ // Retire removed arenas safely: living bodies keep their souls in a reserved queue.
+ while(arenaSlots.length>target){const slot=arenaSlots.pop();for(const f of slot.fighters){world.nursery.push({id:f.bodyId,parentId:f.parentId,origin:f.origin,generation:f.generation,dna:{...f.genome},soulId:f.soul.id,genomeId:f.genomeId});}}
+ }arenaCount=target;activeArena=Math.min(activeArena,target-1);loadArena(arenaSlots[activeArena]);save(true);}
+function tournamentStep(dt){const focus=activeArena;for(let i=0;i<arenaSlots.length;i++){loadArena(arenaSlots[i]);step(dt);arenaSlots[i]=snapshotArena();}loadArena(arenaSlots[focus]);}
 function addEvent(msg){events.unshift(msg);if(events.length>5)events.length=5;}
 function imprint(s,k,amt){s.im[k]=clamp(s.im[k]+amt,-1,1);}
 function learn(f,r){const m=f.mind;const idx=m.lastAction; m.q[idx]=clamp(m.q[idx]+m.learning*(r-m.q[idx]*.1),-1.4,1.4);m.experience++;}
@@ -791,7 +807,13 @@ function drawObserver(){const bg=g.createLinearGradient(0,0,w,h);bg.addColorStop
  observerMaxScroll=Math.max(0,contentBottom-bottom+15);observerScroll=clamp(observerScroll,0,observerMaxScroll);
  if(observerMaxScroll>0){rr(w-6,top,3,bottom-top,2,'#55608066');const thumb=(bottom-top)*Math.max(.10,(bottom-top)/(bottom-top+observerMaxScroll));rr(w-6,top+(bottom-top-thumb)*(observerScroll/observerMaxScroll),3,thumb,2,'#bed6eb');}
 }
-function draw(){if(headless){drawHeadless();return;}drawBg();layout();if(observerOpen){drawObserver();return;}drawHeader();drawArena();drawFighterBars();drawButtons();drawDuelSnapshot();rr(w/2-73,h-104,146,35,10,'#292c50','#a3a4d35c');text('⚡ HEADLESS TURBO',w/2,h-86,11,'#e8e2ff','center','800');}
+function draw(){if(tournament&&!observerOpen&&!headless){drawTournament();return;}if(headless){drawHeadless();return;}drawBg();layout();if(observerOpen){drawObserver();return;}drawHeader();drawArena();drawFighterBars();drawButtons();drawDuelSnapshot();rr(w/2-73,h-104,146,35,10,'#292c50','#a3a4d35c');text('⚡ HEADLESS TURBO',w/2,h-86,11,'#e8e2ff','center','800');}
+function drawTournament(){drawBg();tournamentButtons=[];const pad=12;rr(pad,12,w-pad*2,56,13,'#202b48','#6c779b');text('✧  CRUCIBLE TOURNAMENT',pad+13,31,Math.min(16,w/23),'#f0e3ff','left','850');text(arenaCount+' ARENAS  ·  DUEL '+round,pad+13,53,10,'#a6e5ca','left','750');
+ const cols=w>620?4:2,gap=9,cellW=(w-24-(cols-1)*gap)/cols,rows=Math.ceil(arenaSlots.length/cols),top=83,footer=120,cellH=Math.max(58,Math.min(145,(h-top-footer-(rows-1)*gap)/rows));
+ for(let i=0;i<arenaSlots.length;i++){const s=arenaSlots[i],x=12+(i%cols)*(cellW+gap),y=top+Math.floor(i/cols)*(cellH+gap),f=s.fighters;rr(x,y,cellW,cellH,12,i===activeArena?'#34436a':'#222e4c',i===activeArena?'#d9c3ff':'#667797');text('ARENA '+(i+1),x+9,y+14,10,'#e3dafa','left','800');text(f[0].soul.id+'  vs  '+f[1].soul.id,x+9,y+32,Math.min(10,cellW/15),'#d4ddf5');const barY=y+cellH-29;for(let k=0;k<2;k++){const bw=(cellW-28)/2,bx=x+9+k*(bw+10);rr(bx,barY,bw,8,3,'#111a31');rr(bx,barY,bw*clamp(f[k].hp/f[k].maxHp,0,1),8,3,k?'#f2adba':'#a4e3cb');text(f[k].body.name+' G'+f[k].generation,bx,barY+17,Math.min(9,bw/9),'#d5d9ec');}tournamentButtons.push({x,y,w:cellW,h:cellH,type:'arena',index:i});}
+ const fy=h-110;rr(12,fy,w-24,36,11,'#202c48','#637499');text('Nursery '+world.nursery.length+'  ·  Births '+world.births+'  ·  Selected '+(activeArena+1),w/2,fy+18,Math.min(11,w/32),'#d5e4ff','center','750');
+ const bw=(w-42)/3,by=h-60;for(const [i,label] of ['◀ DUEL',''+arenaCount+' ARENAS','✦ OBSERVE'].entries()){const x=12+i*(bw+9);rr(x,by,bw,43,11,'#333d62','#929ac3');text(label,x+bw/2,by+22,Math.min(11,bw/10),'#f5eaff','center','850');tournamentButtons.push({x,y:by,w:bw,h:43,type:['exit','count','observe'][i]});}
+}
 function resize(){const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);g.setTransform(dpr,0,0,dpr,0,0);layout();}
 function frame(ms){
  if(!w)resize();const elapsed=last?Math.min(.10,(ms-last)/1000):0;last=ms;
@@ -804,7 +826,7 @@ function frame(ms){
   // At extreme speeds devote a slightly larger, bounded slice to simulation.
   const budgetMs=headless?12:(speed>=300?17:12), maxTicks=headless?48000:(speed>=300?1200:480);
   while(accum>=FIXED_DT&&ticks<maxTicks){
-   step(FIXED_DT);accum-=FIXED_DT;ticks++;
+   if(tournament)tournamentStep(FIXED_DT);else step(FIXED_DT);accum-=FIXED_DT;ticks++;
    if((ticks&31)===0&&performance.now()-begin>budgetMs)break;
   }
   perf.frames++;perf.ticks+=ticks;perf.stepMs+=performance.now()-begin;
@@ -817,6 +839,7 @@ function frame(ms){
  requestAnimationFrame(frame);
 }
 function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*w/rect.width,y=(e.clientY-rect.top)*h/rect.height;
+ if(tournament&&!observerOpen&&!headless){for(const b of tournamentButtons){if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(b.type==='arena'){activeArena=b.index;loadArena(arenaSlots[activeArena]);}else if(b.type==='exit')leaveTournament();else if(b.type==='count')changeArenaCount();else if(b.type==='observe'){observerOpen=true;observerTab=4;observerScroll=0;}return;}}return;}
  if(headless){for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;accum=0;if(!running)save(true);}else if(i===1)cycleSpeed();else if(i===2)toggleHeadless();return;}}return;}
  if(observerOpen){if(y<69&&x>w-89){observerOpen=false;return;}
   if(y>=78&&y<127){const gap=6,tw=(w-26-gap*4)/5;const i=Math.floor((x-13)/(tw+gap));if(i>=0&&i<5){observerTab=i;observerScroll=0;}return;}return;
@@ -824,7 +847,7 @@ function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect()
  if(x>=10&&x<=43&&y>=11&&y<=53){if(confirm('Reset souls and all incarnation history?')){localStorage.removeItem(KEY);load();begin();selected=0;save();}return;}
  for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;accum=0;if(!running)save(true);}else if(i===1)cycleSpeed();else if(i===2){observerOpen=true;observerTab=0;observerScroll=0;}return;}}
  if(y>=arena.y&&y<arena.y+arena.h){const wx=((x-arena.x)/arena.w)*1000;selected=Math.abs(wx-fighters[0].x)<Math.abs(wx-fighters[1].x)?0:1;return;}
- if(y>=h-108&&y<h-57){toggleHeadless();return;}
+ if(y>=h-108&&y<h-57){enterTournament();return;}
  if(arena.portrait&&y>arena.y+arena.h+57)selected=1-selected;
 }
 function xy(e){const rect=canvas.getBoundingClientRect();return {x:e.clientX-rect.left,y:e.clientY-rect.top};}
@@ -833,7 +856,7 @@ canvas.addEventListener('pointermove',e=>{if(!observerOpen||!observerTouch)retur
 canvas.addEventListener('pointerup',e=>{const wasMoving=observerTouch?.moved;observerTouch=null;if(!wasMoving)pointer(e);});
 canvas.addEventListener('pointercancel',()=>observerTouch=null);
 window.addEventListener('resize',resize);window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();running=!running;last=0;accum=0;if(!running)save(true);}
- if(e.key==='Digit1')selected=0;if(e.key==='Digit2')selected=1;if(e.key==='KeyS')cycleSpeed();
+ if(e.key==='KeyT'){tournament?leaveTournament():enterTournament();}if(e.key==='Digit1')selected=0;if(e.key==='Digit2')selected=1;if(e.key==='KeyS')cycleSpeed();
  if(e.key==='KeyL'||e.key==='Escape'){observerOpen=!observerOpen;observerScroll=0;}
  if(e.key==='ArrowDown'&&observerOpen){observerScroll=clamp(observerScroll+80,0,observerMaxScroll);e.preventDefault();}
  if(e.key==='ArrowUp'&&observerOpen){observerScroll=clamp(observerScroll-80,0,observerMaxScroll);e.preventDefault();}
@@ -842,7 +865,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){running=fa
 window.addEventListener('pagehide',()=>save(true));
 load();begin();save();resize();requestAnimationFrame(frame);
 // Tiny explicit debug surface for browser automation / development without influencing combat.
-window.__soulCrucible={state:()=>({round,running,speed,headless,actualSpeed,genomePoolSize:world?.genomePool?.length||0,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo,reflection:f.soul.depth?.reflection})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
+window.__soulCrucible={state:()=>({round,running,speed,headless,tournament,arenaCount,arenaSlots:arenaSlots.length,actualSpeed,genomePoolSize:world?.genomePool?.length||0,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo,reflection:f.soul.depth?.reflection})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>{localStorage.removeItem(KEY);load();begin();save();},advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
 })();
 </script>
 </body></html>
