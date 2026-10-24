@@ -8,7 +8,7 @@ const AXES=['closeness','contact','pressure','defense','pain'];
 const colors=['#b4c2ff','#ffcb9d','#efabd1','#91e2d1'];
 const names=['AURORA','UMBRA','S1','S2'];
 const phases=[{name:'REINFORCE',valence:-.8},{name:'CONTRADICT',valence:.8},{name:'RECOVERY',valence:-.8}];
-let axis=3,mode=0,seed=7419,noise=true,phaseLength=1500,rateScale=1,subjects=[],samples=[],step=0,running=false,done=false,last=0,buttons=[],W=0,H=0,DPR=1,scroll=0,drag=null;
+let axis=3,mode=0,seed=7419,noise=true,phaseLength=1500,rateScale=1,subjects=[],samples=[],step=0,running=false,done=false,last=0,buttons=[],W=0,H=0,DPR=1,scroll=0,maxScroll=0,drag=null;
 function rngFactory(n){return ()=>{n|=0;n=n+0x6D2B79F5|0;let t=Math.imul(n^n>>>15,1|n);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
 let random=rngFactory(seed);
 function reset(){
@@ -50,7 +50,7 @@ function rect(x,y,w,h,fill,stroke='',r=10){ctx.beginPath();ctx.roundRect(x,y,w,h
 function txt(s,x,y,size=13,color='#e8eaf9',weight='600',align='left'){ctx.font=weight+' '+size+'px system-ui, sans-serif';ctx.textAlign=align;ctx.fillStyle=color;ctx.fillText(s,x,y);}
 function btn(label,x,y,w,h,action,active=false){rect(x,y,w,h,active?'#49577e':'#26334f',active?'#b5b9e8':'#6e7b9b',10);txt(label,x+w/2,y+h/2+5,12,active?'#fff2d6':'#e6e8fb','750','center');buttons.push({x,y,w,h,action});}
 function draw(){
- if(!W||!H)return;buttons=[];ctx.fillStyle='#111a31';ctx.fillRect(0,0,W,H);
+ if(!W||!H)return;buttons=[];ctx.fillStyle='#111a31';ctx.fillRect(0,0,W,H);ctx.save();ctx.translate(0,-scroll);
  const narrow=W<430,pad=18,inner=W-pad*2;
  txt('✧  SOUL CRUCIBLE',pad,38,20,'#ebd7ff','850');
  txt('REVERSAL CHAMBER  ·  ISOLATED EXPERIMENT',pad,58,10,'#aabbd9','700');
@@ -96,10 +96,13 @@ function draw(){
  y+=8;
  subjects.forEach(s=>{txt(s.name+':  reversal '+(s.crossedAt===null?'not yet':s.crossedAt+' events')+'  ·  return '+(s.firstReversal===null?'not yet':s.firstReversal+' events'),pad,y,10,s.color);y+=19;});
  txt('Isolated model: one axis, no combat or reincarnation.',pad,y+12,10,'#9cabc5');
- txt('Production saves are never accessed.',pad,y+28,10,'#9cabc5');
+ txt('Production saves are never accessed.',pad,y+28,10,'#9cabc5');maxScroll=Math.max(0,y+70-H);ctx.restore();
 }
-c.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};});
-c.addEventListener('pointerup',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)<14&&Math.abs(dy)<14){for(const b of buttons)if(e.clientX>=b.x&&e.clientX<=b.x+b.w&&e.clientY>=b.y&&e.clientY<=b.y+b.h){b.action();break;}}drag=null;draw();});
+c.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,lastY:e.clientY,moved:false};c.setPointerCapture(e.pointerId);});
+c.addEventListener('pointermove',e=>{if(!drag)return;const dy=e.clientY-drag.lastY;drag.lastY=e.clientY;if(Math.abs(e.clientY-drag.y)>9)drag.moved=true;if(drag.moved){scroll=clamp(scroll-dy,0,maxScroll);draw();}});
+c.addEventListener('pointerup',e=>{if(!drag)return;if(!drag.moved){const yy=e.clientY+scroll;for(const b of buttons)if(e.clientX>=b.x&&e.clientX<=b.x+b.w&&yy>=b.y&&yy<=b.y+b.h){b.action();break;}}drag=null;draw();});
+c.addEventListener('pointercancel',()=>{drag=null;});
+c.addEventListener('wheel',e=>{e.preventDefault();scroll=clamp(scroll+e.deltaY,0,maxScroll);draw();},{passive:false});
 function frame(t){if(running){for(let i=0;i<80&&step<phaseLength*3;i++)runStep();draw();}requestAnimationFrame(frame);}
 window.addEventListener('resize',resize);resize();reset();requestAnimationFrame(frame);
 </script></body></html>
