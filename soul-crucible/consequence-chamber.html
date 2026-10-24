@@ -1,0 +1,129 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#10182e"><title>Soul Crucible · Consequence Chamber</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10182e;touch-action:none}canvas{width:100%;height:100%;display:block;touch-action:none}</style></head><body><canvas id="c"></canvas><script>
+'use strict';
+// Independent experimental chamber. No production localStorage, soul state, or combat writes.
+const c=document.getElementById('c'),g=c.getContext('2d');
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const names=['AURORA','UMBRA','S1','S2'],cols=['#b4c2ff','#ffcb9d','#efabd1','#91e2d1'];
+const scenarios=[
+ {name:'DESPERATE STRIKE',hp:.06,opp:.62,attack:true,caption:'Same desperate attack. Different consequences.'},
+ {name:'CLOSE CALL',hp:.12,opp:.18,attack:true,caption:'Both wounded. The next move matters.'},
+ {name:'FALSE OPENING',hp:.31,opp:.81,attack:false,caption:'A tempting opening may be a trap.'}
+];
+const lenses=[
+ {name:'AURORA',courage:.18,blame:-.68,trust:.24,plasticity:.9},
+ {name:'UMBRA',courage:-.10,blame:.72,trust:-.10,plasticity:1},
+ {name:'S1',courage:.06,blame:.18,trust:.12,plasticity:1.12},
+ {name:'S2',courage:-.04,blame:-.24,trust:-.24,plasticity:1.04}
+];
+let scenario=0,seed=7321,noise=true,mode=1,step=0,total=900,running=false,subjects=[],history=[],buttons=[],W=0,H=0,D=1,scroll=0,maxScroll=0,drag=null;
+function rng(n){return ()=>{n|=0;n=n+0x6D2B79F5|0;let t=Math.imul(n^n>>>15,1|n);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
+let random=rng(seed);
+function rect(x,y,w,h,fill,border='',r=9){g.beginPath();g.roundRect(x,y,w,h,r);g.fillStyle=fill;g.fill();if(border){g.strokeStyle=border;g.lineWidth=1;g.stroke();}}
+function txt(t,x,y,size=12,color='#e7ebfa',weight='600',align='left'){g.font=weight+' '+size+'px system-ui';g.fillStyle=color;g.textAlign=align;g.fillText(t,x,y);}
+function btn(t,x,y,w,h,fn,on=false){rect(x,y,w,h,on?'#4d5d85':'#27344f',on?'#bdc6ef':'#657594');txt(t,x+w/2,y+h/2+4,Math.min(12,w/Math.max(8,t.length*.62)),'#f4efff','750','center');buttons.push({x,y,w,h,fn});}
+function reset(){random=rng(seed);step=0;running=false;history=[];subjects=lenses.map((l,i)=>({name:l.name,color:cols[i],lens:l,belief:0,urgency:0,interpret:0,actions:{strike:0,guard:0,evade:0,lunge:0},success:0,fail:0,flips:0,conflicts:0,last:'-',prev:'',trail:[],attribution:0}));draw();}
+function decision(s,sc,r,withLearning){
+ const u=clamp(Math.pow(1-sc.hp,1.45)*1.22+(sc.attack?.18:0),0,1.5);
+ const b=withLearning?s.belief:0;
+ const scores={
+  strike:.65+u*.22+b*.9+s.lens.courage*.28,
+  lunge:.61+u*.34+b*.95+s.lens.courage*.38,
+  guard:.72+u*.36-b*.74-s.lens.courage*.2,
+  evade:.67+u*.39-b*.69-s.lens.courage*.2
+ };
+ if(sc.opp<.25){scores.strike+=.25;scores.lunge+=.29;}
+ for(const k of Object.keys(scores))scores[k]+=(r()-.5)*(noise?.33:0);
+ return Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
+}
+function tick(){
+ if(step>=total){running=false;return;}
+ const sc=scenarios[scenario];
+ // Shared, deterministic encounter schedule. 40% desperate strikes succeed,
+ // 60% fail, independently of each subject's interpretation.
+ const eventRandom=rng(seed+step*101+77),success=eventRandom()<.4;
+ const impact=.35+eventRandom()*.65;
+ for(let i=0;i<subjects.length;i++){
+  const s=subjects[i],rseed=seed+step*97+i*113;
+  const old=decision(s,sc,rng(rseed),false);
+  const chosen=decision(s,sc,rng(rseed),mode===1);
+  s.actions[chosen]++;if(old!==chosen)s.flips++;
+  const u=clamp(Math.pow(1-sc.hp,1.45)*1.22+(sc.attack?.18:0),0,1.5);
+  s.urgency+=u;
+  // The encounter's outcome is external and shared. Attribution is internal.
+  // Blame > 0: failure attributed to hesitation, reinforcing boldness.
+  // Blame < 0: failure attributed to reckless exposure, reinforcing caution.
+  const raw=success?(.55+impact*.35):(-.55-impact*.35);
+  const meaning=success
+    ?raw*(.72+s.lens.trust*.18)+s.lens.courage*.13
+    :raw*(-s.lens.blame*.88)+s.lens.courage*.08;
+  const felt=clamp(meaning+(noise?(rng(seed+step*79+i*19+900)()-.5)*.22:0),-1,1);
+  const significance=1+u*1.45;
+  const rate=.013*significance*s.lens.plasticity;
+  if(mode===1){s.belief=clamp(s.belief+rate*(felt-s.belief),-.95,.95);}
+  s.interpret+=felt;s.attribution+=success?0:(felt>0?1:-1);
+  if(success)s.success++;else s.fail++;
+  if(s.prev&&s.prev!==chosen)s.conflicts++;
+  s.prev=chosen;s.last=chosen;s.trail.push(s.belief);if(s.trail.length>160)s.trail.shift();
+ }
+ step++;if(step>=total)running=false;
+}
+function advance(n){for(let i=0;i<n&&step<total;i++)tick();draw();}
+function resize(){D=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=W*D;c.height=H*D;g.setTransform(D,0,0,D,0,0);draw();}
+function draw(){
+ if(!W||!H)return;buttons=[];g.fillStyle='#111a31';g.fillRect(0,0,W,H);g.save();g.translate(0,-scroll);
+ const pad=18,inner=W-pad*2,half=(inner-8)/2,third=(inner-14)/3;let y=37;
+ txt('✧ SOUL CRUCIBLE',pad,y,21,'#ecd6ff','850');y+=24;
+ txt('CONSEQUENCE CHAMBER · ISOLATED TEST',pad,y,10,'#b2c1df','750');y+=29;
+ txt('Can identical pain produce opposite lessons?',pad,y,13);y+=18;
+ rect(pad,y,inner,91,'#24304b','#596989');
+ txt('ONE EVENT. FOUR INTERPRETATIONS.',pad+12,y+21,12,'#a2e6d2','800');
+ txt('Shared outcomes. Different attribution lenses.',pad+12,y+42,11);
+ txt('Learning changes future choices, not outcomes.',pad+12,y+59,11);
+ txt('No access to the production simulation or saves.',pad+12,y+76,10,'#b8c7e0');y+=107;
+ txt('ENCOUNTER',pad,y+10,11,'#b6c4e0','800');y+=19;
+ scenarios.forEach((sc,i)=>btn(sc.name,pad,y+i*41,inner,35,()=>{scenario=i;reset();},scenario===i));y+=135;
+ const sc=scenarios[scenario];
+ rect(pad,y,inner,72,'#1d2943','#536481');
+ txt('SELF '+Math.round(sc.hp*100)+'% HP   ·   FOE '+Math.round(sc.opp*100)+'% HP',pad+12,y+21,12,'#ffcb9d','800');
+ txt('Attack succeeds in 40% of shared events.',pad+12,y+42,11);
+ txt('Same event sequence for every subject.',pad+12,y+59,10,'#a8e4c9');y+=85;
+ txt('MODEL',pad,y+10,11,'#b6c4e0','800');y+=18;
+ btn('NO LEARNING',pad,y,half,38,()=>{mode=0;reset();},mode===0);
+ btn('INTERPRET + LEARN',pad+half+8,y,half,38,()=>{mode=1;reset();},mode===1);y+=51;
+ txt('EXPERIMENT: '+(running?'RUNNING':step===total?'COMPLETE':'PAUSED'),pad,y+11,11,'#a8e4c9','800');
+ txt(step.toLocaleString()+' / '+total.toLocaleString(),pad+inner,y+11,11,'#f0d5a3','800','right');y+=23;
+ btn(running?'Ⅱ PAUSE':'▶ RUN',pad,y,third,42,()=>{running=!running;});
+ btn('+150',pad+third+7,y,third,42,()=>{running=false;advance(150);});
+ btn('↻ RESET',pad+2*(third+7),y,third,42,()=>reset());y+=55;
+ btn('NOISE '+(noise?'ON':'OFF'),pad,y,half,36,()=>{noise=!noise;reset();},noise);
+ btn('NEW SEED',pad+half+8,y,half,36,()=>{seed+=101;reset();});y+=55;
+ txt('LEARNED BELIEF · ATTACK (+) / DEFEND (-)',pad,y+10,11,'#b6c4e0','800');y+=20;
+ const gh=166;rect(pad,y,inner,gh,'#1c2943','#586989');
+ g.strokeStyle='#667795';g.lineWidth=1;g.beginPath();g.moveTo(pad+13,y+gh/2);g.lineTo(pad+inner-12,y+gh/2);g.stroke();
+ txt('+1',pad+6,y+15,10,'#b7c7df');txt('0',pad+6,y+gh/2-5,10,'#b7c7df');txt('-1',pad+6,y+gh-10,10,'#b7c7df');
+ subjects.forEach(s=>{if(s.trail.length<2)return;g.strokeStyle=s.color;g.lineWidth=2;g.beginPath();s.trail.forEach((v,i)=>{const x=pad+30+(inner-43)*i/Math.max(1,s.trail.length-1),yy=y+gh/2-v*(gh/2-14);if(i===0)g.moveTo(x,yy);else g.lineTo(x,yy);});g.stroke();});y+=gh+20;
+ txt('MEASURED RESPONSES',pad,y+10,11,'#b6c4e0','800');y+=21;
+ subjects.forEach((s,i)=>{
+  const yy=y+i*122;rect(pad,yy,inner,113,'#23304b',s.color+'88');
+  txt(s.name,pad+12,yy+19,12,s.color,'800');txt('Belief '+(s.belief>=0?'+':'')+s.belief.toFixed(3),pad+inner-12,yy+19,11,'#edf0ff','750','right');
+  const top=Object.entries(s.actions).sort((a,b)=>b[1]-a[1]).slice(0,2);
+  txt('Top: '+top.map(([k,n])=>k+' '+Math.round(n/Math.max(1,step)*100)+'%').join(' · '),pad+12,yy+40,11);
+  txt('Choice flips '+Math.round(s.flips/Math.max(1,step)*100)+'% · switches '+Math.round(s.conflicts/Math.max(1,step)*100)+'%',pad+12,yy+60,11,'#a8e4c9');
+  txt('Same outcomes: '+s.success+' wins / '+s.fail+' failures',pad+12,yy+80,10);
+  txt('Failure interpreted as '+(s.lens.blame>0?'hesitation':'overexposure'),pad+12,yy+99,10,'#c7d4ed');
+ });y+=subjects.length*122+12;
+ rect(pad,y,inner,131,'#1e2a44','#52617e');
+ txt('WHAT THE TEST MEASURES',pad+11,y+21,11,'#a8e4c9','800');
+ const notes=['All four witness identical success/failure events.','Their attribution lenses are explicitly different.','Positive belief favors attack; negative favors defense.','No real combat is simulated. Outcomes are scripted.','Interpretation is a hypothesis, not proven emergence.','No production code or save data is changed.'];
+ notes.forEach((n,i)=>txt(n,pad+11,y+41+i*16,Math.min(10,(inner-22)/Math.max(24,n.length*.56)),'#d4ddf0'));y+=150;
+ txt('Independent chamber · no production storage access',pad,y+3,10,'#9eadc9');y+=30;
+ maxScroll=Math.max(0,y-H+24);scroll=clamp(scroll,0,maxScroll);g.restore();
+}
+c.addEventListener('pointerdown',e=>{drag={y:e.clientY,last:e.clientY,moved:false};c.setPointerCapture(e.pointerId);});
+c.addEventListener('pointermove',e=>{if(!drag)return;const dy=e.clientY-drag.last;drag.last=e.clientY;if(Math.abs(e.clientY-drag.y)>9)drag.moved=true;if(drag.moved){scroll=clamp(scroll-dy,0,maxScroll);draw();}});
+c.addEventListener('pointerup',e=>{if(!drag)return;if(!drag.moved){const yy=e.clientY+scroll;for(const b of buttons){if(e.clientX>=b.x&&e.clientX<=b.x+b.w&&yy>=b.y&&yy<=b.y+b.h){b.fn();break;}}}drag=null;draw();});
+c.addEventListener('pointercancel',()=>drag=null);
+c.addEventListener('wheel',e=>{e.preventDefault();scroll=clamp(scroll+e.deltaY,0,maxScroll);draw();},{passive:false});
+function frame(){if(running){for(let i=0;i<15&&step<total;i++)tick();draw();}requestAnimationFrame(frame);}
+addEventListener('resize',resize);resize();reset();requestAnimationFrame(frame);
+</script></body></html>
