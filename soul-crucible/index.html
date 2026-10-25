@@ -35,7 +35,7 @@ function toggleHeadless(){headless=!headless;headlessStartRound=round;accum=0;la
 let triadFx=4; // Visual-only intensity. Never stored in simulation checkpoints.
 let souls, fighters, world, restoreFighters=null, round=1, selected=0, running=true, speed=1, headless=false, headlessStartRound=0, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
 let saveStatus='unknown',saveMessage='',lastSavedRound=0,saveBytes=0,saveFailures=0,storageMode='opening',savePending=null,saveInFlight=false,saveGeneration=0,saveDatabase=null;
-let currentTournamentStep=-1,tournament=false,arenaCount=4,arenaSlots=[],activeArena=0,restoreArenaSlots=null,parkedArenaSlots=[],parkedArenaIndex=0,restoreParkedArenaSlots=null,reserveArenaSlots=[],restoreReserveArenaSlots=null,tournamentButtons=[];
+let currentTournamentStep=-1,tournament=false,arenaCount=4,arenaSlots=[],activeArena=0,restoreArenaSlots=null,parkedArenaSlots=[],parkedArenaIndex=0,restoreParkedArenaSlots=null,reserveArenaSlots=[],restoreReserveArenaSlots=null,promotionSlots=[],restorePromotionSlots=null,tournamentButtons=[];
 let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true, timedOut=false, speedSampleWall=0, speedSampleSim=0, actualSpeed=0, lastSaveAt=0, lastRenderAt=0;
 // Observation only: sampled timings never feed decisions, physics, genetics or random draws.
 const perf={frames:0,ticks:0,stepMs:0,drawMs:0,saveMs:0,saveCount:0,decisionMs:0,decisionSamples:0,decisions:0,lifecycleMs:0,lifecycleCount:0,elapsedMs:0,lastReport:0,report:{},lastRound:1,duelsPerSecond:0};
@@ -282,7 +282,7 @@ function auditLivingBodies(){
  // Existing fighters are left intact; mark their ongoing lives as incumbents
  // when the instrument is first installed or an older checkpoint is restored.
  if(tournament&&arenaSlots.length){for(const slot of arenaSlots)for(const f of slot.fighters||[])noteRecruit(f,'incumbent');}
- else if(Array.isArray(fighters)){for(const f of fighters)noteRecruit(f,'incumbent');for(const slot of parkedArenaSlots)for(const f of slot?.fighters||[])noteRecruit(f,'incumbent');for(const slot of reserveArenaSlots)for(const f of slot?.fighters||[])noteRecruit(f,'incumbent');}
+ else if(Array.isArray(fighters)){for(const f of fighters)noteRecruit(f,'incumbent');for(const slot of parkedArenaSlots)for(const f of slot?.fighters||[])noteRecruit(f,'incumbent');for(const slot of reserveArenaSlots)for(const f of slot?.fighters||[])noteRecruit(f,'incumbent');for(const f of promotionSlots)if(f)noteRecruit(f,'incumbent');}
 }
 function auditDuel(loser,winner){
  assureWorld();const rows=world.recruitAudit.rows;
@@ -352,6 +352,7 @@ function restoreCheckpoint(p){
  restoreArenaSlots=Array.isArray(p.tournamentSlots)?p.tournamentSlots:null;tournament=!!p.tournament&&!!restoreArenaSlots;
  restoreParkedArenaSlots=!tournament&&Array.isArray(p.parkedTournamentSlots)?p.parkedTournamentSlots:null;
  restoreReserveArenaSlots=Array.isArray(p.reserveTournamentSlots)?p.reserveTournamentSlots:null;
+ restorePromotionSlots=Array.isArray(p.promotionSlots)?p.promotionSlots:null;
  parkedArenaIndex=Number.isInteger(p.parkedArenaIndex)?Math.max(0,p.parkedArenaIndex):0;
  arenaCount=[2,4,8,16].includes(p.arenaCount)?p.arenaCount:4;activeArena=Number.isInteger(p.activeArena)?Math.max(0,p.activeArena):0;
  lastSavedRound=round;saveStatus='saved';
@@ -365,14 +366,14 @@ async function load(){
  // A legacy checkpoint can be newer during an interrupted migration.
  const best=legacyOK&&(!storedOK||(legacy.round||0)>(stored.round||0))?legacy:(storedOK?stored:null);
  if(best){restoreCheckpoint(best);return;}
- souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;restoreParkedArenaSlots=null;parkedArenaSlots=[];parkedArenaIndex=0;restoreReserveArenaSlots=null;reserveArenaSlots=[];tournament=false;arenaSlots=[];
+ souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;restoreParkedArenaSlots=null;parkedArenaSlots=[];parkedArenaIndex=0;restoreReserveArenaSlots=null;reserveArenaSlots=[];restorePromotionSlots=null;promotionSlots=[];tournament=false;arenaSlots=[];
 }
 // Snapshot every arena's living minds and body states, but never visual effects.
 function packedArena(slot){return {fighters:slot.fighters.map(packFighter),t:slot.t,roundTimer:slot.roundTimer,banner:slot.banner,bannerTimer:slot.bannerTimer,countdown:slot.countdown,timedOut:slot.timedOut};}
 function checkpointPayload(){
  assureWorld();
  if(tournament&&arenaSlots.length&&currentTournamentStep>=0)arenaSlots[currentTournamentStep]=snapshotArena();
- return {souls,round,world,activeFighters:fighters?.map(packFighter),tournament,arenaCount,activeArena,tournamentSlots:tournament?arenaSlots.map(packedArena):null,parkedTournamentSlots:!tournament&&parkedArenaSlots.length?parkedArenaSlots.map(slot=>slot?packedArena(slot):null):null,parkedArenaIndex:!tournament?parkedArenaIndex:0,reserveTournamentSlots:reserveArenaSlots.length?reserveArenaSlots.map(packedArena):null};
+ return {souls,round,world,activeFighters:fighters?.map(packFighter),tournament,arenaCount,activeArena,tournamentSlots:tournament?arenaSlots.map(packedArena):null,parkedTournamentSlots:!tournament&&parkedArenaSlots.length?parkedArenaSlots.map(slot=>slot?packedArena(slot):null):null,parkedArenaIndex:!tournament?parkedArenaIndex:0,reserveTournamentSlots:reserveArenaSlots.length?reserveArenaSlots.map(packedArena):null,promotionSlots:promotionSlots.length?promotionSlots.map(f=>f?packFighter(f):null):null};
 }
 function compactCheckpoint(p){
  // Trim only archival observer trails in a copy; preserve every active soul, genome,
@@ -432,7 +433,7 @@ async function resetCheckpoint(){
  while(saveInFlight)await new Promise(resolve=>setTimeout(resolve,25));
  if(saveDatabase)await eraseCheckpoint(saveDatabase);
  localStorage.removeItem(KEY);
- souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];fighters=null;saveStatus='unknown';saveMessage='';
+ souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;restoreParkedArenaSlots=null;restoreReserveArenaSlots=null;restorePromotionSlots=null;parkedArenaSlots=[];parkedArenaIndex=0;reserveArenaSlots=[];promotionSlots=[];tournament=false;arenaSlots=[];fighters=null;saveStatus='unknown';saveMessage='';
  begin();running=true;save(true);
 }
 function drawSaveStatus(){
@@ -447,7 +448,7 @@ function drawSaveStatus(){
 
 function born(soul,side,proposedSeed=null){ensureSoul(soul);const seed=makeBodySeed(proposedSeed),
  b=bodyFromDNA(TYPES.find(t=>t.name===seed.origin)||TYPES[0],seed.dna,seed.generation),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,bodyId:seed.id,parentId:seed.parentId,origin:seed.origin,generation:seed.generation,genome:{...b.dna},genomeId:seed.genomeId||(seed.generation===0?'G0:'+seed.origin:seed.id),budded:false,soulEater:!!seed.soulEater,captiveSoulIds:[],mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0,affectiveMoments:[]},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},winStreak:0,stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},evadeResolved:false,evadeConnected:false,phase:rand(0,TAU),style:rint(0,4),tone:factor};if(f.soulEater){assureWorld();world.soulEaterStats.spawned++;}soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;if(world?.lineageCensus){const c=world.lineageCensus;c.lives[f.generation]=(c.lives[f.generation]||0)+1;}noteRecruit(f,proposedSeed?.recruitSource||'incumbent');return f;}
-function begin(){if(restoreFighters){const pair=restoreFighters.map(restoreFighter);if(pair.every(Boolean)){fighters=pair;restoreFighters=null;roundTimer=0;countdown=.70;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;}events.length=0;addEvent('Bloodlines restored. Souls remain their own.');if(fighters.some(f=>f.hp<=0))nextLife();if(tournament&&restoreArenaSlots)restoreTournament();else if(restoreParkedArenaSlots)restoreParkedTournament();if(restoreReserveArenaSlots)restoreReserveTournament();auditLivingBodies();return;}restoreFighters=null;}
+function begin(){if(restoreFighters){const pair=restoreFighters.map(restoreFighter);if(pair.every(Boolean)){fighters=pair;restoreFighters=null;roundTimer=0;countdown=.70;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;}events.length=0;addEvent('Bloodlines restored. Souls remain their own.');if(fighters.some(f=>f.hp<=0))nextLife();if(tournament&&restoreArenaSlots)restoreTournament();else if(restoreParkedArenaSlots)restoreParkedTournament();if(restoreReserveArenaSlots)restoreReserveTournament();if(restorePromotionSlots)restorePromotions();auditLivingBodies();return;}restoreFighters=null;}
  fighters=[born(souls[0],0),born(souls[1],1)];roundTimer=0;countdown=1.0;timedOut=false;for(const f of fighters){f.soul.obs.duelsStarted++;f.openingDuelCounted=false;}events.length=0;addEvent('Fresh minds. Fresh bodies. Old feelings.');}
 // Tournament contexts isolate duel-local state while sharing souls, genomes and census.
 function snapshotArena(){return {fighters,t,roundTimer,banner,bannerTimer,countdown,timedOut,particles,floats,events};}
@@ -457,6 +458,7 @@ function newArenaSlot(){const pair=[];for(let side=0;side<2;side++){const seed=r
 function restoreTournament(){const slots=restoreArenaSlots;restoreArenaSlots=null;arenaSlots=[];if(!slots?.length){tournament=false;return;}for(const s of slots){const pair=s.fighters?.map(restoreFighter);if(pair?.length===2&&pair.every(Boolean))arenaSlots.push({...s,fighters:pair,particles:[],floats:[],events:[]});}if(!arenaSlots.length){tournament=false;return;}arenaCount=arenaSlots.length;activeArena=Math.min(activeArena,arenaSlots.length-1);loadArena(arenaSlots[activeArena]);}
 function restoreParkedTournament(){const slots=restoreParkedArenaSlots;restoreParkedArenaSlots=null;parkedArenaSlots=[];if(!slots?.length)return;for(const slot of slots){if(!slot){parkedArenaSlots.push(null);continue;}const pair=slot.fighters?.map(restoreFighter);parkedArenaSlots.push(pair?.length===2&&pair.every(Boolean)?{...slot,fighters:pair,particles:[],floats:[],events:[]}:null);}if(parkedArenaSlots.length&&!parkedArenaSlots.some(Boolean))parkedArenaSlots=[];}
 function restoreReserveTournament(){const slots=restoreReserveArenaSlots;restoreReserveArenaSlots=null;reserveArenaSlots=[];for(const slot of slots||[]){const pair=slot?.fighters?.map(restoreFighter);if(pair?.length===2&&pair.every(Boolean))reserveArenaSlots.push({...slot,fighters:pair,particles:[],floats:[],events:[]});}}
+function restorePromotions(){const waiting=restorePromotionSlots;restorePromotionSlots=null;promotionSlots=waiting.map(f=>f?restoreFighter(f):null);}
 function enterTournament(){if(tournament)return;if(parkedArenaSlots.length){const live=snapshotArena();arenaSlots=parkedArenaSlots.map((slot,i)=>i===parkedArenaIndex?live:slot);for(let i=0;i<arenaSlots.length;i++)if(!arenaSlots[i])arenaSlots[i]=newArenaSlot();activeArena=Math.min(parkedArenaIndex,arenaSlots.length-1);parkedArenaSlots=[];parkedArenaIndex=0;tournament=true;loadArena(arenaSlots[activeArena]);}else{arenaSlots=[snapshotArena()];tournament=true;for(let i=1;i<arenaCount;i++)arenaSlots.push(reserveArenaSlots.pop()||newArenaSlot());activeArena=0;loadArena(arenaSlots[0]);}save(true);}
 function leaveTournament(){if(!tournament)return;parkedArenaIndex=Math.min(activeArena,arenaSlots.length-1);parkedArenaSlots=arenaSlots.map((slot,i)=>i===parkedArenaIndex?null:slot);loadArena(arenaSlots[parkedArenaIndex]||arenaSlots[0]);arenaSlots=[];tournament=false;save(true);}
 function changeArenaCount(){if(!tournament)return;const sizes=[2,4,8,16];const target=sizes[(sizes.indexOf(arenaCount)+1)%sizes.length];if(target>arenaSlots.length){while(arenaSlots.length<target)arenaSlots.push(reserveArenaSlots.pop()||newArenaSlot());}else{while(arenaSlots.length>target)reserveArenaSlots.push(arenaSlots.pop());}arenaCount=target;activeArena=Math.min(activeArena,target-1);loadArena(arenaSlots[activeArena]);save(true);}
@@ -546,9 +548,41 @@ function death(loser,winner){if(bannerTimer>0)return;const lifecycleStart=perfor
  addEvent(`${loser.soul.id} lost life ${loser.soul.lives}. ${winner.soulEater?'Its voice joins the eater.':'Emotional impressions remain.'}`);
  winner.hp=Math.min(winner.maxHp, winner.hp+Math.round(winner.maxHp*.32*winner.body.recovery));winner.stamina=100;winner.attack=null;winner.guard=0;winner.evade=0;winner.vx=0;winner.lock=0;
  bannerTimer=1.8;round++;save();perf.lifecycleMs+=performance.now()-lifecycleStart;perf.lifecycleCount++;}
+// A one-slot holding place per destination prevents an unbounded queue of living
+// bodies. Winners stay and continue competing until their next rung can accept them.
+// Transit never calls death(), born(), or retireSoul() on the advancing fighter.
+function promotionCandidate(destination){
+ if(!tournament||currentTournamentStep<0)return null;
+ const fighter=promotionSlots[destination]||null;
+ if(fighter)promotionSlots[destination]=null;
+ return fighter;
+}
+function seatPromotedFighter(f,side){
+ f.side=side;f.x=side===0?205:795;f.vx=0;f.hop=0;f.hopV=0;
+ f.action='observe';f.decisionT=Math.min(f.decisionT||.18,.18);
+ f.attack=null;f.guard=0;f.evade=0;f.stagger=0;f.lock=0;
+ return f;
+}
+function newChallenger(side){
+ const seed=recruitSeed();return born(getRecruitSoul(seed),side,seed);
+}
 function nextLife(){const dead=fighters.findIndex(f=>f.hp<=0),survive=dead===0?1:0;if(dead<0)return;
- const recruit=recruitSeed(),soul=getRecruitSoul(recruit);fighters[dead]=born(soul,dead,recruit);
- fighters[survive].x=survive===0?205:795;fighters[survive].vx=0;fighters[dead].x=dead===0?205:795;countdown=.85;roundTimer=0;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;f.soul.obs.duelsStarted++;}save();}
+ const source=currentTournamentStep;
+ // Move a genuine victor one step toward Arena 1 at the end of the duel.
+ // Never duplicate the same living body in two arenas or in transit.
+ if(tournament&&source>0&&!promotionSlots[source-1]){
+  promotionSlots[source-1]=fighters[survive];
+  fighters[survive]=newChallenger(survive);
+ }
+ // At the next opening in this arena, the waiting winner from below challenges
+ // whoever survived here. The old loser has already completed its death cycle.
+ const arriving=promotionCandidate(source);
+ fighters[dead]=arriving?seatPromotedFighter(arriving,dead):newChallenger(dead);
+ fighters[survive].x=survive===0?205:795;fighters[survive].vx=0;fighters[dead].x=dead===0?205:795;
+ countdown=.85;roundTimer=0;timedOut=false;
+ for(const f of fighters){f.openingDuelCounted=false;f.soul.obs.duelsStarted++;}
+ save();
+}
 
 function step(dt){t+=dt; for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=190*dt;if(p.life<=0)particles.splice(i,1)}for(let i=floats.length-1;i>=0;i--){let p=floats[i];p.life-=dt;p.y-=27*dt;if(p.life<=0)floats.splice(i,1)}
  if(bannerTimer>0){bannerTimer-=dt;if(bannerTimer<=0){bannerTimer=0;nextLife();}return;}if(countdown>0){countdown=Math.max(0,countdown-dt);return;}roundTimer+=dt;
@@ -1289,7 +1323,7 @@ function draw(){if(tournament&&!observerOpen&&!headless){drawTournament();drawSa
 function drawTournament(){
  drawBg();tournamentButtons=[];const pad=12;
  rr(pad,12,w-pad*2,56,13,'#202b48','#6c779b');
- fit('✧  CRUCIBLE TOURNAMENT',pad+13,31,w-pad*2-26,16,'#f0e3ff','left','850');
+ fit('✧  CRUCIBLE LADDER · ARENA 1 SUMMIT',pad+13,31,w-pad*2-26,16,'#f0e3ff','left','850');
  fit(arenaCount+' ARENAS  ·  DUEL '+round,pad+13,53,w-pad*2-26,10,'#a6e5ca','left','750');
  const cols=w>620?4:2,gap=7,cellW=(w-24-(cols-1)*gap)/cols,rows=Math.ceil(arenaSlots.length/cols);
  const top=81,footerTop=h-129,available=Math.max(1,footerTop-top-8-(rows-1)*gap);
@@ -1301,7 +1335,7 @@ function drawTournament(){
   const flashing=(slot.flashUntil||0)>Date.now(),bg=flashing?'#9d263a':mix('222e4c','85537c',power);
   rr(x,y,cellW,cellH,10,bg,flashing?'#ff9e9e':i===activeArena?'#d9c3ff':mix('667797','dcb2ad',power));
   const inset=8,half=(cellW-inset*2-8)/2;
-  fit('ARENA '+(i+1),x+inset,y+12,cellW*.54,10,'#f3eaff','left','850');
+  fit(i===0?'ARENA 1 ★':'ARENA '+(i+1),x+inset,y+12,cellW*.54,10,'#f3eaff','left','850');
   if(streak>0)fit('🔥 '+streak+' STREAK',x+cellW-inset,y+12,cellW*.51,9,flashing?'#fff1f1':'#ffcf9b','right','850');
   const barY=y+Math.max(23,cellH-27),labelY=Math.min(y+cellH-7,barY+17);
   for(let k=0;k<2;k++){
@@ -1311,10 +1345,11 @@ function drawTournament(){
   }
   // Taller cards can show IDs without ever overlapping the health bars.
   if(cellH>=79)fit(f[0].soul.id+'  vs  '+f[1].soul.id,x+inset,y+28,cellW-inset*2,9,'#d4ddf5');
+  if(promotionSlots[i])fit('↑ CHALLENGER WAITING',x+inset,y+Math.min(43,cellH-35),cellW-inset*2,8,'#e8cbff','left','800');
   tournamentButtons.push({x,y,w:cellW,h:cellH,type:'arena',index:i});
  }
  const fy=h-123;rr(12,fy,w-24,30,11,'#202c48','#637499');
- fit('Nursery '+world.nursery.length+'  ·  Births '+world.births+'  ·  Selected '+(activeArena+1),w/2,fy+15,w-44,11,'#d5e4ff','center','750');
+ fit('Nursery '+world.nursery.length+'  ·  ↑ '+promotionSlots.filter(Boolean).length+' advancing  ·  Selected '+(activeArena+1),w/2,fy+15,w-44,11,'#d5e4ff','center','750');
  const bw=(w-42)/3;
  for(let j=0;j<2;j++)for(let i=0;i<3;i++){
   const by=h-88+j*40,labels=[[running?'Ⅱ PAUSE':'▶ PLAY',speed+'× SPEED',arenaCount+' ARENAS'],['◀ DUEL','✦ OBSERVE','⚡ TURBO']],types=[['pause','speed','count'],['exit','observe','turbo']],x=12+i*(bw+9);
