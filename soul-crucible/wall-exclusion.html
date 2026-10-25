@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><meta name="theme-color" content="#10162a">
-<title>Soul Crucible • Duel Prototype</title>
+<title>Soul Crucible · Wall Exclusion Lab</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10162a;overscroll-behavior:none}canvas{width:100%;height:100%;display:block;touch-action:none}noscript{color:white;font:16px system-ui}
 </style>
@@ -966,7 +966,20 @@ function drawLivesTab(){const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=151;
 }
 
 function drawGenesTab(){assureWorld();const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=151;
- sectionLabel('BUDDING & REINCARNATION',x,y,'5 WINS · ONE OFFSPRING');y+=26;
+ const trial=world.experiment,ranking=trialRanking();
+ sectionLabel('WALL EXCLUSION STUDY',x,y,wallExcluded()?'SIX LINEAGES · NO WALLS':'WALLS REINTRODUCED');y+=26;
+ rr(x,y,ww,70,11,'#26324e','#778ba177');
+ fit(trial.source,x+10,y+17,ww-20,10,'#eed7b4','left','800');
+ fit('Since duel '+trial.baselineRound+' · '+Math.max(0,round-trial.baselineRound)+' duels elapsed',x+10,y+38,ww-20,10,'#b7e5d4');
+ fit('Preserved Walls '+trial.wallVault.length+' · Reintroduced '+trial.reintroduced,x+10,y+58,ww-20,9,'#ced3e8');y+=79;
+ const maxWins=Math.max(1,...ranking.map(z=>z.wins));
+ for(let j=0;j<ranking.length;j++){const z=ranking[j];
+  rr(x,y,ww,45,10,j===0?'#303b55':'#202d48','#64718f66');
+  fit((j+1)+'. '+z.name.toUpperCase(),x+9,y+15,ww*.49,10,j===0?'#ffe4bc':'#e5eafa','left','850');
+  fit(z.wins+' W · '+z.births+' buds · G'+z.generation,x+ww-9,y+15,ww*.58,9,'#a6e3cf','right','800');
+  rr(x+10,y+31,ww-20,5,2,'#394a6c');if(z.wins)rr(x+10,y+31,(ww-20)*z.wins/maxWins,5,2,j===0?'#ffd3a6':'#97d5bc');y+=51;
+ }
+ y+=12;sectionLabel('BUDDING & REINCARNATION',x,y,'5 WINS · ONE OFFSPRING');y+=26;
  const tiles=[['BIRTHS',world.births,'#a8e5c9'],['WAITING BODIES',world.nursery.length,'#ffd2ae'],['WAITING SOULS',world.waiting.length,'#c6baff'],['NEW SOULS',world.novelSouls,'#c2d6ff']],cellW=(ww-gap)/2;
  for(let i=0;i<tiles.length;i++){const row=tiles[i],xx=x+i%2*(cellW+gap),yy=y+Math.floor(i/2)*67;rr(xx,yy,cellW,59,12,'#202b46',row[2]+'55');fit(row[0],xx+10,yy+17,cellW-20,9,'#bbc9e3');text(String(row[1]),xx+10,yy+43,18,row[2],'left','800');}
  y+=145;rr(x,y,ww,58,12,'#22304b','#6886ab77');fit('Every bud is assigned a soul at birth.',x+11,y+19,ww-22,10,'#e9edf8');fit('Rebirth wait: '+REINCARNATION_WAIT+' completed duels minimum.',x+11,y+40,ww-22,9,'#b9cae5');y+=81;
