@@ -768,7 +768,27 @@ function drawTriadLandscape(){
   fit('SOUL  ·  MIND  ·  BODY',cx,cy+2,Math.max(65,right-(left+cardW)-8),8,'#b4c2e0','center','750');
  }
 }
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9.5',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9.6',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+// Ten arcade victory crests per tier. Completed tiers upgrade the entire row's color.
+function drawVictoryCrests(x,y,available,streak,small=false){
+ const wins=Math.max(0,Math.floor(streak||0)),tier=Math.floor(wins/10);
+ const filled=wins>0&&wins%10===0?10:wins%10;
+ const colors=['#a9e7d8','#88c7ff','#c7a1ff','#ffd27f','#ff9cb8','#f8e58d'];
+ const color=colors[tier%colors.length],cell=Math.min(small?12:17,Math.max(6,(available-12)/10));
+ const span=cell*10,ox=x+Math.max(0,(available-span)/2),cy=y+(small?5:7);
+ for(let k=0;k<10;k++){
+  const active=k<filled,cx=ox+k*cell+cell/2;
+  g.save();
+  g.beginPath();
+  const r=Math.max(2.1,cell*.30);
+  // Diamond victory marks stay crisp even when ten fit on a phone.
+  g.moveTo(cx,cy-r);g.lineTo(cx+r,cy);g.lineTo(cx,cy+r);g.lineTo(cx-r,cy);g.closePath();
+  g.fillStyle=active?color:'#23314c';g.strokeStyle=active?color:'#60718b';g.lineWidth=active?1.1:.65;
+  if(active){g.shadowColor=color;g.shadowBlur=small?4:9;}
+  g.fill();g.stroke();g.restore();
+ }
+ return {tier,color};
+}
 function drawFighterBars(){
  const A=arena,compact=w<550,desktop=!A.portrait&&w>=900,gap=12,bw=(A.w-gap-26)/2;
  for(let i=0;i<2;i++){
@@ -781,7 +801,10 @@ function drawFighterBars(){
    g.restore();
    rr(xx+pad,yy+5,Math.max(24,(bw-pad*2)*(selected===i?1:.35)),2,1,tint);
    fit((i===0?'◈  ':'◇  ')+f.soul.id+'  ·  '+f.name,xx+pad,yy+22,bw-2*pad-68,14,f.soul.color,'left','850');
-   fit((f.soulEater?'☄  ':'')+f.body.name.toUpperCase()+'  ·  G'+f.generation+'  ·  '+f.winStreak+' STREAK'+(f.soulEater?'  ·  '+(f.captiveSoulIds?.length||0)+' SOULS':''),xx+pad,yy+38,bw-2*pad,10,'#d5e2f5','left','750');
+   fit((f.soulEater?'☄  ':'')+f.body.name.toUpperCase()+'  ·  G'+f.generation+(f.soulEater?'  ·  '+(f.captiveSoulIds?.length||0)+' SOULS':''),xx+pad,yy+38,Math.max(75,barW-230),10,'#d5e2f5','left','750');
+   const wins=Math.max(0,f.winStreak||0),crestW=Math.min(174,barW*.42),crestX=xx+bw-pad-crestW;
+   drawVictoryCrests(crestX,yy+27,crestW,wins);
+   fit('×'+wins+'  ·  TIER '+(Math.floor(wins/10)+1),crestX,yy+39,crestW,9,'#e2dcff','center','850');
    fit(Math.round(health*100)+'% HP',xx+bw-pad,yy+22,64,11,tint,'right','850');
    rr(barX,yy+44,barW,10,5,'#111a30');
    g.save();g.shadowColor=tint;g.shadowBlur=10;
@@ -798,7 +821,8 @@ function drawFighterBars(){
   }else{
    rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');
    text(f.soul.id+' · '+f.name,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');
-   fit((f.soulEater?'☄ ':'')+f.body.name+' · '+f.winStreak+' IN A ROW'+(f.soulEater?' · '+(f.captiveSoulIds?.length||0)+' SOULS':''),xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');
+   fit((f.soulEater?'☄ ':'')+f.body.name+(f.soulEater?' · '+(f.captiveSoulIds?.length||0)+' SOULS':''),xx+8,yy+20,Math.max(30,bw*.46),compact?8:10,'#ddddf0','left','600');
+   drawVictoryCrests(xx+bw*.49,yy+11,bw*.47,f.winStreak,true);
    rr(xx+8,yy+26,bw-16,8,4,'#161e38');
    rr(xx+8,yy+26,(bw-16)*health,8,4,i===0?'#8eddd0':'#e9a2b6');
    rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');
