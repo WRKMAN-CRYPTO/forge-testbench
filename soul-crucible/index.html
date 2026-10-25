@@ -282,7 +282,10 @@ function auditLivingBodies(){
  // Existing fighters are left intact; mark their ongoing lives as incumbents
  // when the instrument is first installed or an older checkpoint is restored.
  if(tournament&&arenaSlots.length){for(const slot of arenaSlots)for(const f of slot.fighters||[])noteRecruit(f,'incumbent');}
- else if(Array.isArray(fighters)){for(const f of fighters)noteRecruit(f,'incumbent');for(const slot of parkedArenaSlots)for(const f of slot?.fighters||[])noteRecruit(f,'incumbent');for(const slot of reserveArenaSlots)for(const f of slot?.fighters||[])noteRecruit(f,'incumbent');for(const f of promotionSlots)if(f)noteRecruit(f,'incumbent');}
+ else if(Array.isArray(fighters)){for(const f of fighters)noteRecruit(f,'incumbent');}
+ for(const slot of parkedArenaSlots)for(const f of slot?.fighters||[])noteRecruit(f,'incumbent');
+ for(const slot of reserveArenaSlots)for(const f of slot?.fighters||[])noteRecruit(f,'incumbent');
+ for(const f of promotionSlots)if(f)noteRecruit(f,'incumbent');
 }
 function auditDuel(loser,winner){
  assureWorld();const rows=world.recruitAudit.rows;
@@ -448,7 +451,7 @@ function drawSaveStatus(){
 
 function born(soul,side,proposedSeed=null){ensureSoul(soul);const seed=makeBodySeed(proposedSeed),
  b=bodyFromDNA(TYPES.find(t=>t.name===seed.origin)||TYPES[0],seed.dna,seed.generation),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,bodyId:seed.id,parentId:seed.parentId,origin:seed.origin,generation:seed.generation,genome:{...b.dna},genomeId:seed.genomeId||(seed.generation===0?'G0:'+seed.origin:seed.id),budded:false,soulEater:!!seed.soulEater,captiveSoulIds:[],mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0,affectiveMoments:[]},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},winStreak:0,stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},evadeResolved:false,evadeConnected:false,phase:rand(0,TAU),style:rint(0,4),tone:factor};if(f.soulEater){assureWorld();world.soulEaterStats.spawned++;}soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;if(world?.lineageCensus){const c=world.lineageCensus;c.lives[f.generation]=(c.lives[f.generation]||0)+1;}noteRecruit(f,proposedSeed?.recruitSource||'incumbent');return f;}
-function begin(){if(restoreFighters){const pair=restoreFighters.map(restoreFighter);if(pair.every(Boolean)){fighters=pair;restoreFighters=null;roundTimer=0;countdown=.70;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;}events.length=0;addEvent('Bloodlines restored. Souls remain their own.');if(fighters.some(f=>f.hp<=0))nextLife();if(tournament&&restoreArenaSlots)restoreTournament();else if(restoreParkedArenaSlots)restoreParkedTournament();if(restoreReserveArenaSlots)restoreReserveTournament();if(restorePromotionSlots)restorePromotions();auditLivingBodies();return;}restoreFighters=null;}
+function begin(){if(restoreFighters){const pair=restoreFighters.map(restoreFighter);if(pair.every(Boolean)){fighters=pair;restoreFighters=null;roundTimer=0;countdown=.70;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;}events.length=0;addEvent('Bloodlines restored. Souls remain their own.');if(tournament&&restoreArenaSlots){restoreTournament();}else{if(fighters.some(f=>f.hp<=0))nextLife();if(restoreParkedArenaSlots)restoreParkedTournament();}if(restoreReserveArenaSlots)restoreReserveTournament();if(restorePromotionSlots)restorePromotions();auditLivingBodies();return;}restoreFighters=null;}
  fighters=[born(souls[0],0),born(souls[1],1)];roundTimer=0;countdown=1.0;timedOut=false;for(const f of fighters){f.soul.obs.duelsStarted++;f.openingDuelCounted=false;}events.length=0;addEvent('Fresh minds. Fresh bodies. Old feelings.');}
 // Tournament contexts isolate duel-local state while sharing souls, genomes and census.
 function snapshotArena(){return {fighters,t,roundTimer,banner,bannerTimer,countdown,timedOut,particles,floats,events};}
@@ -884,7 +887,7 @@ function drawTriadLandscape(){
   fit('SOUL  ·  MIND  ·  BODY',cx,cy+2,Math.max(65,right-(left+cardW)-8),8,'#b4c2e0','center','750');
  }
 }
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.10.3',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.11.0',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 // Ten arcade victory crests per tier. Completed tiers upgrade the entire row's color.
 function drawVictoryCrests(x,y,available,streak,small=false){
  const wins=Math.max(0,Math.floor(streak||0)),tier=Math.floor(wins/10);
