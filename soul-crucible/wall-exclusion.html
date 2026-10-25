@@ -26,7 +26,7 @@ const ACTIONS=['approach','retreat','observe','strike','heavy','guard','evade','
 const OPP=['AURORA','UMBRA'];
 const NAME1=['Moss','Peb','Bri','Nim','Lum','Fae','Thim','Spri','Wisp','Rune','Glim','Pip','Kip','Vex','Mira'];
 const NAME2=['let','ling','bit','kin','fin','nip','bel','wick','moth','paw','thorn','bell','tail','glow','crest'];
-const KEY='soul-crucible-v0.2'; // Keep the same storage key: preserve decades of reincarnations.
+const KEY='soul-crucible-wall-exclusion-v1',MAIN_KEY='soul-crucible-v0.2',MAIN_DB='soul-crucible-checkpoints'; // Independent saves only.
 const SPEEDS=[1,3,10,30,100,300,1000,3000,10000],FIXED_DT=1/60,FAST_FX_THRESHOLD=30;
 // The simulation always advances in fixed physics steps. Only the desired number of steps changes.
 function cycleSpeed(){speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];accum=0;if(speed>=FAST_FX_THRESHOLD){particles.length=0;floats.length=0;}speedSampleWall=0;speedSampleSim=0;actualSpeed=0;}
@@ -34,6 +34,7 @@ function toggleHeadless(){headless=!headless;headlessStartRound=round;accum=0;la
 
 let souls, fighters, world, restoreFighters=null, round=1, selected=0, running=true, speed=1, headless=false, headlessStartRound=0, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
 let saveStatus='unknown',saveMessage='',lastSavedRound=0,saveBytes=0,saveFailures=0,storageMode='opening',savePending=null,saveInFlight=false,saveGeneration=0,saveDatabase=null;
+let experimentButton=null;
 let currentTournamentStep=-1,tournament=false,arenaCount=4,arenaSlots=[],activeArena=0,restoreArenaSlots=null,tournamentButtons=[];
 let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true, timedOut=false, speedSampleWall=0, speedSampleSim=0, actualSpeed=0, lastSaveAt=0, lastRenderAt=0;
 // Observation only: sampled timings never feed decisions, physics, genetics or random draws.
@@ -214,7 +215,7 @@ function takeWaitingSoul(){assureWorld();const eligible=world.waiting.map((entry
 function assignSoul(){return takeWaitingSoul()||createNewSoul();}
 function uniqueBodyId(){assureWorld();return 'B'+(world.nextBody++);}
 function makeBodySeed(origin=null){const type=origin?.origin?TYPES.find(t=>t.name===origin.origin):pick(TYPES);
- const b=type||pick(TYPES);return {id:origin?.id||uniqueBodyId(),parentId:origin?.parentId||null,origin:b.name,generation:origin?.generation||0,dna:origin?.dna||baseDNA(),genomeId:origin?.genomeId||null};
+ const b=type||pick(wallExcluded()?TYPES.filter(t=>t.name!=='Wall'):TYPES);return {id:origin?.id||uniqueBodyId(),parentId:origin?.parentId||null,origin:b.name,generation:origin?.generation||0,dna:origin?.dna||baseDNA(),genomeId:origin?.genomeId||null};
 }
 function queueOffspring(f){assureWorld();if(f.budded||f.winStreak!==5)return null;
  f.budded=true;
@@ -256,10 +257,11 @@ function auditDuel(loser,winner){
  if(lost){lost.deaths++;lost.completedDuels+=(loser.auditWins||0)+1;}
 }
 function recruitSeed(){assureWorld();
+ const eligibleNursery=wallExcluded()?world.nursery.filter(s=>s.origin!=='Wall'):world.nursery;
  // In tournament mode, give actual waiting offspring their opportunity first.
- if(tournament&&world.nursery.length){const origins=[...new Set(world.nursery.map(s=>s.origin))],origin=pick(origins),candidates=world.nursery.filter(s=>s.origin===origin);let total=0;const weights=candidates.map(s=>{const v=genomeWeight(s.genomeId||s.id);total+=v;return v;});let needle=Math.random()*total,index=candidates.length-1;for(let i=0;i<candidates.length;i++){needle-=weights[i];if(needle<0){index=i;break;}}const seed=candidates[index];world.nursery.splice(world.nursery.indexOf(seed),1);return {...seed,recruitSource:'nursery'};}
+ if(tournament&&eligibleNursery.length){const origins=[...new Set(eligibleNursery.map(s=>s.origin))],origin=pick(origins),candidates=eligibleNursery.filter(s=>s.origin===origin);let total=0;const weights=candidates.map(s=>{const v=genomeWeight(s.genomeId||s.id);total+=v;return v;});let needle=Math.random()*total,index=candidates.length-1;for(let i=0;i<candidates.length;i++){needle-=weights[i];if(needle<0){index=i;break;}}const seed=candidates[index];world.nursery.splice(world.nursery.indexOf(seed),1);return {...seed,recruitSource:'nursery'};}
  // Equal chance for each ancestral design; smoothed fitness selects within it.
- const origin=pick(TYPES).name;
+ const origin=pick(wallExcluded()?TYPES.filter(t=>t.name!=='Wall'):TYPES).name;
  const earned=world.genomePool.filter(g=>g.origin===origin);
  const pending=world.nursery.filter(g=>g.origin===origin);
  const candidates=[{kind:'g0',id:'G0:'+origin},...earned.map(g=>({kind:'earned',id:g.bodyId,g})),...pending.map(g=>({kind:'pending',id:g.genomeId||g.id,g}))];
@@ -277,10 +279,50 @@ function restoreFighter(p){if(!p||!p.soulId)return null;const soul=soulById(p.so
  const type=TYPES.find(t=>t.name===p.origin)||TYPES[0];return {...p,soul,body:bodyFromDNA(type,p.genome,p.generation)};
 }
 
+
+function wallExcluded(){return !world?.experiment||world.experiment.phase==='excluded';}
+function initWallLab(source){
+ assureWorld();if(world.experiment?.phase)return;
+ const baseline={};for(const type of TYPES)baseline[type.name]={wins:world.recruitAudit?.rows?.[type.name]?.wins||0,births:world.familyStats?.[type.name]?.births||0};
+ world.experiment={phase:'excluded',source:source?'MAIN CHECKPOINT COPY':'FRESH INDEPENDENT STUDY',baselineRound:round,baseline,wallVault:[],parked:0,reintroduced:0,releasedAt:null};
+}
+function parkExistingWalls(){
+ if(!wallExcluded()||!fighters)return;
+ const exp=world.experiment,slots=tournament&&arenaSlots.length?arenaSlots:[{fighters}];
+ for(const slot of slots){let changed=false;
+  for(let side=0;side<2;side++){const f=slot.fighters[side];if(!f||f.origin!=='Wall')continue;
+   exp.wallVault.push(packFighter(f));exp.parked++;changed=true;
+   const seed=recruitSeed();slot.fighters[side]=born(getRecruitSoul(seed),side,seed);slot.fighters[side].soul.obs.duelsStarted++;
+  }
+  if(changed){slot.countdown=.85;slot.bannerTimer=0;slot.banner='';}
+ }
+ if(tournament&&arenaSlots.length)loadArena(arenaSlots[activeArena]);else fighters=slots[0].fighters;
+}
+function takeReleasedWall(side){
+ const exp=world?.experiment;if(!exp||exp.phase!=='released'||!exp.wallVault.length)return null;
+ const f=restoreFighter(exp.wallVault.shift());if(!f)return null;
+ f.side=side;f.x=side===0?205:795;f.vx=0;f.attack=null;f.guard=0;f.evade=0;f.lock=0;f.stagger=0;exp.reintroduced++;return f;
+}
+function releaseWallVault(){
+ const exp=world?.experiment;if(!exp||exp.phase!=='excluded')return;
+ if(!confirm('Release the preserved Walls into this experimental population? This ends the exclusion phase.'))return;
+ exp.phase='released';exp.releasedAt=round;save(true);
+}
+function trialRanking(){const exp=world?.experiment;if(!exp)return [];
+ return TYPES.filter(t=>t.name!=='Wall').map(t=>{const name=t.name,old=exp.baseline[name]||{},row=world.recruitAudit?.rows?.[name]||{},fam=world.familyStats?.[name]||{};
+ return {name,wins:Math.max(0,(row.wins||0)-(old.wins||0)),births:Math.max(0,(fam.births||0)-(old.births||0)),generation:fam.maxGeneration||0};
+ }).sort((a,b)=>b.wins-a.wins||b.births-a.births);
+}
+function drawWallControl(x,y,width){
+ const excluded=wallExcluded();
+ rr(x,y,width,29,10,excluded?'#3f374c':'#25453e',excluded?'#e1b7a5':'#93d6b7');
+ fit(excluded?'WALLS SEALED  ·  RELEASE?':'WALLS RETURNED  ·  REUNION',x+width/2,y+14,width-15,10,excluded?'#ffe6d8':'#cbf5e1','center','850');
+ experimentButton=excluded?{x,y,w:width,h:29}:null;
+}
 function makeSoul(i){let im={};AXES.forEach(a=>im[a.key]=rand(-.18,.18));return ensureSoul({id:i===0?'AURORA':'UMBRA',color:i===0?'#aab8ff':'#ffc79f',im,origin:{...im},lives:0,wins:0,losses:0,record:[],totalDamage:0,obs:freshObserver()});}
 // IndexedDB stores complete checkpoints as structured objects, without localStorage's tiny string quota.
 // Keep the original localStorage checkpoint untouched until a newer IndexedDB transaction commits.
-const DB_NAME='soul-crucible-checkpoints',DB_STORE='snapshots',DB_VERSION=1;
+const DB_NAME='soul-crucible-wall-exclusion-checkpoints',DB_STORE='snapshots',DB_VERSION=1;
 function openCheckpointDB(){
  return new Promise((resolve,reject)=>{
   if(!('indexedDB' in window)){reject(Error('IndexedDB unavailable'));return;}
