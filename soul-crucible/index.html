@@ -1167,8 +1167,9 @@ function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect()
  }
  if(x>=10&&x<=43&&y>=11&&y<=53){if(confirm('Reset souls and all incarnation history?')){localStorage.removeItem(KEY);load();begin();selected=0;save();}return;}
  for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;accum=0;if(!running)save(true);}else if(i===1)cycleSpeed();else if(i===2){observerOpen=true;observerTab=0;observerScroll=0;}return;}}
- if(y>=arena.y&&y<arena.y+arena.h){const wx=((x-arena.x)/arena.w)*1000;selected=Math.abs(wx-fighters[0].x)<Math.abs(wx-fighters[1].x)?0:1;return;}
- if(y>=h-105&&y<h-67){enterTournament();return;}
+ if(x>=w/2-73&&x<=w/2+73&&y>=h-102&&y<h-70){enterTournament();return;}
+  if(y>=arena.y&&y<arena.y+arena.h){const wx=((x-arena.x)/arena.w)*1000;selected=Math.abs(wx-fighters[0].x)<Math.abs(wx-fighters[1].x)?0:1;return;}
+ 
  if(arena.portrait&&y>arena.y+arena.h+57){const top=arena.y+arena.h+61;if(y>=top+7&&y<=top+35&&x>=arena.x+arena.w-82){triadFx=triadFx===4?3:4;return;}selected=1-selected;}
 }
 function xy(e){const rect=canvas.getBoundingClientRect();return {x:e.clientX-rect.left,y:e.clientY-rect.top};}
@@ -1177,7 +1178,7 @@ canvas.addEventListener('pointermove',e=>{if(!observerOpen||!observerTouch)retur
 canvas.addEventListener('pointerup',e=>{const wasMoving=observerTouch?.moved;observerTouch=null;if(!wasMoving)pointer(e);});
 canvas.addEventListener('pointercancel',()=>observerTouch=null);
 window.addEventListener('resize',resize);window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();running=!running;last=0;accum=0;if(!running)save(true);}
- if(e.key==='KeyT'){tournament?leaveTournament():enterTournament();}if(e.key==='Digit1')selected=0;if(e.key==='Digit2')selected=1;if(e.key==='KeyS')cycleSpeed();
+ if(e.code==='KeyT'){tournament?leaveTournament():enterTournament();}if(e.key==='Digit1')selected=0;if(e.key==='Digit2')selected=1;if(e.key==='KeyS')cycleSpeed();
  if(e.key==='KeyL'||e.key==='Escape'){observerOpen=!observerOpen;observerScroll=0;}
  if(e.key==='ArrowDown'&&observerOpen){observerScroll=clamp(observerScroll+80,0,observerMaxScroll);e.preventDefault();}
  if(e.key==='ArrowUp'&&observerOpen){observerScroll=clamp(observerScroll-80,0,observerMaxScroll);e.preventDefault();}
