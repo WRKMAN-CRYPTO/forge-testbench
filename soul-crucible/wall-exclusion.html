@@ -214,7 +214,7 @@ function takeWaitingSoul(){assureWorld();const eligible=world.waiting.map((entry
 }
 function assignSoul(){return takeWaitingSoul()||createNewSoul();}
 function uniqueBodyId(){assureWorld();return 'B'+(world.nextBody++);}
-function makeBodySeed(origin=null){const type=origin?.origin?TYPES.find(t=>t.name===origin.origin):pick(TYPES);
+function makeBodySeed(origin=null){const type=origin?.origin?TYPES.find(t=>t.name===origin.origin):pick(wallExcluded()?TYPES.filter(t=>t.name!=='Wall'):TYPES);
  const b=type||pick(wallExcluded()?TYPES.filter(t=>t.name!=='Wall'):TYPES);return {id:origin?.id||uniqueBodyId(),parentId:origin?.parentId||null,origin:b.name,generation:origin?.generation||0,dna:origin?.dna||baseDNA(),genomeId:origin?.genomeId||null};
 }
 function queueOffspring(f){assureWorld();if(f.budded||f.winStreak!==5)return null;
@@ -447,7 +447,7 @@ async function resetCheckpoint(){
  if(saveDatabase)await eraseCheckpoint(saveDatabase);
  localStorage.removeItem(KEY);
  souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];fighters=null;saveStatus='unknown';saveMessage='';
- begin();running=true;save(true);
+ initWallLab(false);begin();parkExistingWalls();running=true;save(true);
 }
 function drawSaveStatus(){
  if(saveStatus==='unknown')return;
@@ -1075,7 +1075,7 @@ function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect()
  if(observerOpen){if(y<69&&x>w-89){observerOpen=false;return;}
   if(y>=78&&y<127){const gap=6,tw=(w-26-gap*4)/5;const i=Math.floor((x-13)/(tw+gap));if(i>=0&&i<5){observerTab=i;observerScroll=0;}return;}return;
  }
- if(x>=10&&x<=43&&y>=11&&y<=53){if(confirm('Reset souls and all incarnation history?')){localStorage.removeItem(KEY);load();begin();selected=0;save();}return;}
+ if(x>=10&&x<=43&&y>=11&&y<=53){if(confirm('Reset only this isolated experiment? The original Crucible will not be touched.')){void resetCheckpoint();selected=0;}return;}
  for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;accum=0;if(!running)save(true);}else if(i===1)cycleSpeed();else if(i===2){observerOpen=true;observerTab=0;observerScroll=0;}return;}}
  if(y>=arena.y&&y<arena.y+arena.h){const wx=((x-arena.x)/arena.w)*1000;selected=Math.abs(wx-fighters[0].x)<Math.abs(wx-fighters[1].x)?0:1;return;}
  if(y>=h-108&&y<h-57){enterTournament();return;}
