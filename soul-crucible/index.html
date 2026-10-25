@@ -202,6 +202,7 @@ function assureWorld(){if(!world)world=createWorld();for(const k of ['nursery','
  for(const type of TYPES){if(!world.recruitAudit.rows[type.name])world.recruitAudit.rows[type.name]={entries:0,g0:0,earned:0,nursery:0,incumbent:0,duel:0,tournament:0,wins:0,deaths:0,completedDuels:0,bestObservedStreak:0};}
  // Prospective lineage census. Existing history is not backfilled with invented outcomes.
  if(!world.lineageCensus||typeof world.lineageCensus!=='object')world.lineageCensus={since:round,born:{},died:{},budded:{},wins:{},maxStreak:{},lives:{}};
+ if(!world.soulEaterStats)world.soulEaterStats={since:round,spawned:0,captures:0,releases:0,maxBound:0,defeats:0};
  return world;
 }
 function soulById(id){if(!id)return null;const founder=souls.find(s=>s.id===id);return founder||assureWorld().bank[id]||null;}
@@ -217,7 +218,7 @@ function takeWaitingSoul(){assureWorld();const eligible=world.waiting.map((entry
 function assignSoul(){return takeWaitingSoul()||createNewSoul();}
 function uniqueBodyId(){assureWorld();return 'B'+(world.nextBody++);}
 function makeBodySeed(origin=null){const type=origin?.origin?TYPES.find(t=>t.name===origin.origin):pick(TYPES);
- const b=type||pick(TYPES);return {id:origin?.id||uniqueBodyId(),parentId:origin?.parentId||null,origin:b.name,generation:origin?.generation||0,dna:origin?.dna||baseDNA(),genomeId:origin?.genomeId||null};
+ const b=type||pick(TYPES);return {id:origin?.id||uniqueBodyId(),parentId:origin?.parentId||null,origin:b.name,generation:origin?.generation||0,dna:origin?.dna||baseDNA(),genomeId:origin?.genomeId||null,soulEater:origin?.soulEater??(Math.random()<.004)};
 }
 function buildAllowed(origin){assureWorld();return world.buildBirthControls[origin]!==false;}
 function toggleBuildBirth(origin){assureWorld();const enabled=TYPES.filter(t=>buildAllowed(t.name));if(buildAllowed(origin)&&enabled.length<=1)return;world.buildBirthControls[origin]=!buildAllowed(origin);save(true);}
@@ -225,15 +226,17 @@ function queueOffspring(f){assureWorld();if(f.budded||f.winStreak!==5||!buildAll
  f.budded=true;
  // A G1+ reproducer earns one permanent, immutable genome entry. Its future copies
  // receive new body IDs, fresh minds and independently assigned souls.
- if(f.generation>=1&&!world.genomePool.some(g=>g.bodyId===(f.genomeId||f.bodyId)))world.genomePool.push({bodyId:f.genomeId||f.bodyId,origin:f.origin,generation:f.generation,dna:{...f.genome},registeredAt:round});
- const soul=assignSoul();const id=uniqueBodyId(),dna=mutateDNA(f.genome),seed={id,parentId:f.bodyId,origin:f.origin,generation:f.generation+1,dna,soulId:soul.id,genomeId:id};
+ if(f.generation>=1&&!world.genomePool.some(g=>g.bodyId===(f.genomeId||f.bodyId)))world.genomePool.push({bodyId:f.genomeId||f.bodyId,origin:f.origin,generation:f.generation,dna:{...f.genome},soulEater:!!f.soulEater,registeredAt:round});
+ const soul=assignSoul();const id=uniqueBodyId(),dna=mutateDNA(f.genome),seed={id,parentId:f.bodyId,origin:f.origin,generation:f.generation+1,dna,soulId:soul.id,genomeId:id,soulEater:!!f.soulEater};
  world.nursery.push(seed);world.births++;const census=world.lineageCensus;census.born[seed.generation]=(census.born[seed.generation]||0)+1;census.budded[f.generation]=(census.budded[f.generation]||0)+1;
  const fam=world.familyStats[seed.origin]||(world.familyStats[seed.origin]={births:0,maxGeneration:0});fam.births++;fam.maxGeneration=Math.max(fam.maxGeneration,seed.generation);
  world.history.unshift({id,parentId:seed.parentId,soulId:soul.id,origin:seed.origin,generation:seed.generation,duel:round});if(world.history.length>500)world.history.length=500;
  addEvent(`${f.name} budded ${seed.id} (G${seed.generation}) • ${soul.id} enters its life.`);
  return seed;
 }
-function retireSoul(f){assureWorld();world.waiting.push({id:f.soul.id,readyAt:round+REINCARNATION_WAIT});}
+function retireSoul(f){assureWorld();if(!world.waiting.some(s=>s.id===f.soul.id))world.waiting.push({id:f.soul.id,readyAt:round+REINCARNATION_WAIT});}
+function releaseCaptives(f){if(!f?.soulEater||!f.captiveSoulIds?.length)return 0;assureWorld();let n=0;for(const id of f.captiveSoulIds){if(soulById(id)&&!world.waiting.some(q=>q.id===id)){world.waiting.push({id,readyAt:round+REINCARNATION_WAIT});n++;}}f.captiveSoulIds=[];world.soulEaterStats.releases+=n;return n;}
+function collectiveImpression(f){const members=[f.soul,...(f.soulEater?(f.captiveSoulIds||[]).map(soulById).filter(Boolean):[])];const I={};for(const axis of AXES){const k=axis.key;let sum=0;for(const soul of members){const d=ensureDepth(soul);sum+=clamp(soul.im[k]*.70+d.lens[k]*.43+d.echo[k]*.70,-1.3,1.3);}I[k]=sum/members.length;}return I;}
 function genomeRecord(id){assureWorld();const key=String(id);return world.genomeStats[key]||(world.genomeStats[key]={wins:0,losses:0});}
 function genomeWeight(id){const s=genomeRecord(id),n=s.wins+s.losses;const estimate=(s.wins+5)/(n+10);return .30+Math.pow(estimate*2,3);}
 function noteRecruit(f,source='incumbent'){
@@ -273,13 +276,13 @@ function recruitSeed(){assureWorld();
  let needle=Math.random()*total,chosen=candidates[candidates.length-1];
  for(let k=0;k<candidates.length;k++){needle-=weights[k];if(needle<0){chosen=candidates[k];break;}}
  if(chosen.kind==='g0')return {...makeBodySeed({origin,genomeId:'G0:'+origin}),recruitSource:'g0'};
- if(chosen.kind==='earned'){const saved=chosen.g;return {...makeBodySeed({origin:saved.origin,generation:saved.generation,dna:{...saved.dna},parentId:saved.bodyId,genomeId:saved.bodyId}),recruitSource:'earned'};}
+ if(chosen.kind==='earned'){const saved=chosen.g;return {...makeBodySeed({origin:saved.origin,generation:saved.generation,dna:{...saved.dna},parentId:saved.bodyId,genomeId:saved.bodyId,soulEater:!!saved.soulEater}),recruitSource:'earned'};}
  const seed=chosen.g;const idx=world.nursery.indexOf(seed);if(idx>=0)world.nursery.splice(idx,1);return {...seed,recruitSource:'nursery'};
 }
 function getRecruitSoul(seed){return seed.soulId?soulById(seed.soulId)||createNewSoul():assignSoul();}
 function packFighter(f){if(!f)return null;const {soul,body,...rest}=f;return {...rest,soulId:soul.id};}
 function restoreFighter(p){if(!p||!p.soulId)return null;const soul=soulById(p.soulId);if(!soul)return null;
- const type=TYPES.find(t=>t.name===p.origin)||TYPES[0];return {...p,soul,body:bodyFromDNA(type,p.genome,p.generation)};
+ const type=TYPES.find(t=>t.name===p.origin)||TYPES[0];return {...p,soul,body:bodyFromDNA(type,p.genome,p.generation),soulEater:!!p.soulEater,captiveSoulIds:Array.isArray(p.captiveSoulIds)?p.captiveSoulIds:[]};
 }
 
 function makeSoul(i){let im={};AXES.forEach(a=>im[a.key]=rand(-.18,.18));return ensureSoul({id:i===0?'AURORA':'UMBRA',color:i===0?'#aab8ff':'#ffc79f',im,origin:{...im},lives:0,wins:0,losses:0,record:[],totalDamage:0,obs:freshObserver()});}
@@ -411,7 +414,7 @@ function drawSaveStatus(){
 }
 
 function born(soul,side,proposedSeed=null){ensureSoul(soul);const seed=makeBodySeed(proposedSeed),
- b=bodyFromDNA(TYPES.find(t=>t.name===seed.origin)||TYPES[0],seed.dna,seed.generation),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,bodyId:seed.id,parentId:seed.parentId,origin:seed.origin,generation:seed.generation,genome:{...b.dna},genomeId:seed.genomeId||(seed.generation===0?'G0:'+seed.origin:seed.id),budded:false,mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0,affectiveMoments:[]},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},winStreak:0,stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},evadeResolved:false,evadeConnected:false,phase:rand(0,TAU),style:rint(0,4),tone:factor};soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;if(world?.lineageCensus){const c=world.lineageCensus;c.lives[f.generation]=(c.lives[f.generation]||0)+1;}noteRecruit(f,proposedSeed?.recruitSource||'incumbent');return f;}
+ b=bodyFromDNA(TYPES.find(t=>t.name===seed.origin)||TYPES[0],seed.dna,seed.generation),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,bodyId:seed.id,parentId:seed.parentId,origin:seed.origin,generation:seed.generation,genome:{...b.dna},genomeId:seed.genomeId||(seed.generation===0?'G0:'+seed.origin:seed.id),budded:false,soulEater:!!seed.soulEater,captiveSoulIds:[],mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0,affectiveMoments:[]},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},winStreak:0,stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},evadeResolved:false,evadeConnected:false,phase:rand(0,TAU),style:rint(0,4),tone:factor};if(f.soulEater){assureWorld();world.soulEaterStats.spawned++;}soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;if(world?.lineageCensus){const c=world.lineageCensus;c.lives[f.generation]=(c.lives[f.generation]||0)+1;}noteRecruit(f,proposedSeed?.recruitSource||'incumbent');return f;}
 function begin(){if(restoreFighters){const pair=restoreFighters.map(restoreFighter);if(pair.every(Boolean)){fighters=pair;restoreFighters=null;roundTimer=0;countdown=.70;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;}events.length=0;addEvent('Bloodlines restored. Souls remain their own.');if(fighters.some(f=>f.hp<=0))nextLife();if(tournament&&restoreArenaSlots)restoreTournament();auditLivingBodies();return;}restoreFighters=null;}
  fighters=[born(souls[0],0),born(souls[1],1)];roundTimer=0;countdown=1.0;timedOut=false;for(const f of fighters){f.soul.obs.duelsStarted++;f.openingDuelCounted=false;}events.length=0;addEvent('Fresh minds. Fresh bodies. Old feelings.');}
 // Tournament contexts isolate duel-local state while sharing souls, genomes and census.
@@ -434,7 +437,7 @@ function actionScore(f,o,a){const b=f.body, dist=Math.abs(o.x-f.x), reach=54+b.r
  safeDistance=dist>enemyReach+72, retreatRoom=f.x<o.x?f.x-62:938-f.x,
  danger=!!o.attack&&o.attack.time<o.attack.wind+.10&&dist<enemyReach+52,
  hurt=f.hp/f.maxHp, tired=f.stamina<23;
- let mind=0,body=0,soul=0;const d=ensureDepth(f.soul),I={};for(const a of AXES){const k=a.key;I[k]=clamp(f.soul.im[k]*.70+d.lens[k]*.43+d.echo[k]*.70,-1.3,1.3);}
+ let mind=0,body=0,soul=0;const I=collectiveImpression(f);
  switch(a){
  case 'approach': mind=.16+(dist>reach*1.1?1.0:.1)+(o.guard?.25:0);body=.1+b.speed*.045;soul=I.closeness*.85+I.pressure*.22;break;
  case 'retreat':mind=.13+(dist<reach*1.13?.45:0)+(hurt<.35?.35:0)+(danger?.35:0);mind-=safeDistance?1.35:0;mind-=retreatRoom<45?1.2:retreatRoom<110?.52:0;body=b.speed*.055;soul=-I.closeness*.48-I.pain*.54-I.pressure*.20;break;
@@ -498,10 +501,17 @@ function death(loser,winner){if(bannerTimer>0)return;const lifecycleStart=perfor
  const struggle=clamp(loser.stat.damage/Math.max(1,loser.stat.taken),0,2);
  feel(loser,{pain:1,pressure:.85,defense:.48,contact:.46,closeness:.30},clamp(-.53+struggle*.39,-.80,.35),1.7,'Life extinguished');
  feel(winner,{pressure:.65,contact:.48,defense:.27},clamp(.30-winner.stat.taken/520,-.1,.48),1.0,'Still standing');
- reflectAtDeath(loser);traceSoul(loser.soul);retireSoul(loser);
+ reflectAtDeath(loser);traceSoul(loser.soul);
+ const released=releaseCaptives(loser);
+ if(released)addEvent('☄ '+loser.name+' fell. '+released+' captive souls escaped!');
+ if(winner.soulEater){
+  winner.captiveSoulIds=winner.captiveSoulIds||[];
+  if(!winner.captiveSoulIds.includes(loser.soul.id)){winner.captiveSoulIds.push(loser.soul.id);world.soulEaterStats.captures++;world.soulEaterStats.maxBound=Math.max(world.soulEaterStats.maxBound,winner.captiveSoulIds.length);addEvent('☄ '+winner.name+' absorbed '+loser.soul.id+' · '+winner.captiveSoulIds.length+' voices');}
+ }else retireSoul(loser);
+ if(loser.soulEater)world.soulEaterStats.defeats++;
  let entry={life:loser.soul.lives,body:loser.body.name,result:'Defeat',damage:Math.round(loser.stat.damage),streak:loser.winStreak,date:round};loser.soul.record.unshift(entry);loser.soul.record=loser.soul.record.slice(0,12);
- winner.soul.record[0]&&0;banner=`${winner.name} survives • ${loser.soul.id} reincarnates`;
- addEvent(`${loser.soul.id} lost life ${loser.soul.lives}. Emotional impressions remain.`);
+ winner.soul.record[0]&&0;banner=winner.soulEater?winner.name+' devours '+loser.soul.id+' • '+winner.captiveSoulIds.length+' souls':released?winner.name+' freed '+released+' souls':winner.name+' survives • '+loser.soul.id+' reincarnates';
+ addEvent(`${loser.soul.id} lost life ${loser.soul.lives}. ${winner.soulEater?'Its voice joins the eater.':'Emotional impressions remain.'}`);
  winner.hp=Math.min(winner.maxHp, winner.hp+Math.round(winner.maxHp*.32*winner.body.recovery));winner.stamina=100;winner.attack=null;winner.guard=0;winner.evade=0;winner.vx=0;winner.lock=0;
  bannerTimer=1.8;round++;save();perf.lifecycleMs+=performance.now()-lifecycleStart;perf.lifecycleCount++;}
 function nextLife(){const dead=fighters.findIndex(f=>f.hp<=0),survive=dead===0?1:0;if(dead<0)return;
@@ -713,7 +723,7 @@ function drawTriadLandscape(){
 }
 
 function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9.3',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
-function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');fit(`${f.body.name} · ${f.winStreak} IN A ROW`,xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
+function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');fit(`${f.soulEater?'☄ ':''}${f.body.name} · ${f.winStreak} IN A ROW${f.soulEater?' · '+(f.captiveSoulIds?.length||0)+' SOULS':''}`,xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
 function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
 function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(`${speed}× SPEED`,xx+bw+11,yy,bw,40,speed>1);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
 function drawHeadless(){
@@ -1024,6 +1034,11 @@ function drawGenesTab(){assureWorld();const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;le
  fit('OFF stops new buds and recruitment; living bodies remain.',x+2,y+5,ww-4,9,'#b7c9e6');y+=18;
  for(let i=0;i<TYPES.length;i++){const type=TYPES[i],on=buildAllowed(type.name),bx=x+(i%2)*(cw+gap),by=y+Math.floor(i/2)*39;rr(bx,by,cw,33,9,on?'#284d4c':'#493340',on?'#80c9b0':'#c18d9c');fit(type.name.toUpperCase(),bx+9,by+17,cw-57,10,'#f1eafa','left','800');fit(on?'ON':'OFF',bx+cw-8,by+17,42,10,on?'#a6f3d0':'#ffbac7','right','850');}
  y+=Math.ceil(TYPES.length/2)*39+13;
+ sectionLabel('SOUL EATERS',x,y,'RARE HEREDITARY ANOMALY');y+=24;
+ const es=world.soulEaterStats;rr(x,y,ww,65,11,'#332c4e','#a08ab966');
+ fit('Born '+es.spawned+'  ·  Captured '+es.captures+'  ·  Released '+es.releases,x+10,y+19,ww-20,10,'#edc5ff');
+ fit('Largest collective '+es.maxBound+'  ·  Eater deaths '+es.defeats,x+10,y+39,ww-20,10,'#d2ddef');
+ fit('No captivity limit. Defeat releases every voice.',x+10,y+55,ww-20,9,'#b4c6df');y+=80;
  sectionLabel('BUDDING & REINCARNATION',x,y,'5 WINS · ONE OFFSPRING');y+=26;
  const tiles=[['BIRTHS',world.births,'#a8e5c9'],['WAITING BODIES',world.nursery.length,'#ffd2ae'],['WAITING SOULS',world.waiting.length,'#c6baff'],['NEW SOULS',world.novelSouls,'#c2d6ff']],cellW=(ww-gap)/2;
  for(let i=0;i<tiles.length;i++){const row=tiles[i],xx=x+i%2*(cellW+gap),yy=y+Math.floor(i/2)*67;rr(xx,yy,cellW,59,12,'#202b46',row[2]+'55');fit(row[0],xx+10,yy+17,cellW-20,9,'#bbc9e3');text(String(row[1]),xx+10,yy+43,18,row[2],'left','800');}
@@ -1104,7 +1119,7 @@ function drawTournament(){
   for(let k=0;k<2;k++){
    const fighter=f[k],bx=x+inset+k*(half+8),ratio=clamp(fighter.hp/fighter.maxHp,0,1);
    rr(bx,barY,half,7,3,'#10182c');rr(bx,barY,half*ratio,7,3,k?'#f2adba':'#a4e3cb');
-   fit(fighter.body.name+' G'+fighter.generation,bx,labelY,half,8,'#e4e9fa','left','700');
+   fit((fighter.soulEater?'☄ ':'')+fighter.body.name+' G'+fighter.generation+(fighter.soulEater?' +'+(fighter.captiveSoulIds?.length||0):''),bx,labelY,half,8,'#e4e9fa','left','700');
   }
   // Taller cards can show IDs without ever overlapping the health bars.
   if(cellH>=79)fit(f[0].soul.id+'  vs  '+f[1].soul.id,x+inset,y+28,cellW-inset*2,9,'#d4ddf5');
