@@ -592,6 +592,7 @@ function drawArena(){const A=arena,{x,y,w:aw,h:ah,ground}=A;g.save();g.beginPath
  // The triad is a live visualization of soul impressions, mind choices and bodily condition.
  // Draw the auras behind the creatures and the tactical filaments over them.
  if(triadFx)for(let i=0;i<2;i++)drawTriadAura(fighters[i],x+(fighters[i].x/1000)*aw,ground,s,i);
+ for(let i=0;i<2;i++)drawSoulEaterHalo(fighters[i],x+(fighters[i].x/1000)*aw,ground,s);
  for(let i=0;i<2;i++)drawCritter(fighters[i],x+(fighters[i].x/1000)*aw,ground,s,i===0?1:-1);
  if(triadFx)for(let i=0;i<2;i++)drawTriadMind(fighters[i],x+(fighters[i].x/1000)*aw,ground,s,i);
  for(const p of particles){g.globalAlpha=clamp(p.life/p.max,0,1);g.fillStyle=p.c;g.beginPath();g.arc(p.x,p.y,p.r,0,TAU);g.fill();}g.globalAlpha=1;
@@ -599,8 +600,36 @@ function drawArena(){const A=arena,{x,y,w:aw,h:ah,ground}=A;g.save();g.beginPath
  if(countdown>0){rr(x+aw*.5-95,y+ah*.30,190,42,18,'#141930d9','#b8b1e088');text('PREPARE TO DUEL',x+aw*.5,y+ah*.3+21,14,'#f3e5ff','center','800');}
  if(bannerTimer>0){rr(x+Math.max(3,aw*.06),y+ah*.35,aw-Math.max(3,aw*.06)*2,60,14,'#14182ee9','#c8b3db');let short=aw<500?banner.replace(' survives • ',' wins • '):banner;text(short,x+aw*.5,y+ah*.35+30,aw<410?12:15,'#ffedce','center','800');}
  g.restore();rr(x,y,aw,ah,17,null,'#727b9e66');}
-function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighters[1-f.side].x?1:-1,hop=f.hop||0;const walk=Math.sin(f.phase)*Math.min(1,Math.abs(f.vx)/160);const bd=f.hitFlash>0?'#fff4df':b.color;
+// Soul Eater visual corruption: logarithmic scaling preserves readable growth
+// from a single captive to hundreds, without changing combat or persistent state.
+function soulEaterVisualPower(f){
+ const count=f.soulEater?(f.captiveSoulIds?.length||0):0;
+ return count>0?Math.min(1,Math.log1p(count)/Math.log(701)):0;
+}
+function drawSoulEaterHalo(f,px,ground,s){
+ const power=soulEaterVisualPower(f);if(!power)return;
+ const cx=px,cy=ground-(64+(f.hop||0))*s;
+ const pulse=.92+.08*Math.sin(t*2.8+f.phase),radius=(65+32*power)*s;
+ g.save();
+ // Pale corona expands as the host body loses its color.
+ const halo=g.createRadialGradient(cx,cy,radius*.36,cx,cy,radius*1.65);
+ halo.addColorStop(0,'rgba(255,255,255,0)');
+ halo.addColorStop(.34,'rgba(185,145,255,'+(.05+power*.13)+')');
+ halo.addColorStop(.68,'rgba(154,109,255,'+(.10+power*.26)+')');
+ halo.addColorStop(1,'rgba(185,145,255,0)');
+ g.globalAlpha=pulse;g.fillStyle=halo;g.beginPath();g.ellipse(cx,cy,radius*1.65,radius*1.65,0,0,TAU);g.fill();
+ for(let k=0;k<3;k++){
+  const rx=(57+k*(7+power*5))*s,ry=(70+k*(8+power*5))*s;
+  g.globalAlpha=(.12+power*.35)/(k+1)*pulse;
+  g.strokeStyle=k===0?'#fff4ff':'#ad83ff';g.lineWidth=(1.5+power*3)/(k*.4+1);
+  g.shadowColor='#cda4ff';g.shadowBlur=8+power*24;
+  g.beginPath();g.ellipse(cx,cy,rx,ry,0,0,TAU);g.stroke();
+ }
+ g.restore();
+}
+function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighters[1-f.side].x?1:-1,hop=f.hop||0;const walk=Math.sin(f.phase)*Math.min(1,Math.abs(f.vx)/160);const corruption=soulEaterVisualPower(f);const bd=f.hitFlash>0?'#fff4df':b.color;
  g.save();g.translate(px,ground-hop*s);g.scale(s*dir,s);const hs=(f.body.name==='Wall'?1.28:f.body.name==='Glass Fang'?.8:1)*Math.pow((f.genome?.frame||1),.31);g.scale(Math.pow(f.genome?.frame||1,.13),Math.pow(f.genome?.legs||1,.10));
+ if(corruption>0){g.save();g.globalAlpha=.10+corruption*.75;g.fillStyle='#060711';g.shadowColor='#a67cff';g.shadowBlur=5+corruption*16;g.beginPath();g.ellipse(0,-62,64*hs,76*hs,0,0,TAU);g.fill();g.restore();}
  g.fillStyle='#12182766';g.beginPath();g.ellipse(0,7,64*hs,11,0,0,TAU);g.fill();
  if(f.guard>0){g.lineWidth=6;g.strokeStyle='#93e6f4b5';g.beginPath();g.ellipse(1,-53,60*hs,57,0,0,TAU);g.stroke();}
  if(f.evade>0){glow(0,-65,78,'#b3f6ff',.15);}
@@ -634,6 +663,15 @@ function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighte
  // soul-like visible magic insignia, *not* a mechanically deterministic soul color
  g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
  if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
+ if(corruption>0){
+  // Darken only the completed creature, preserving its body silhouette and animation.
+  // 'source-atop' limits the darkness to existing drawn pixels.
+  g.save();g.globalCompositeOperation='source-atop';g.globalAlpha=Math.min(.88,.12+corruption*.76);
+  g.fillStyle='#05050d';g.fillRect(-190,-195,380,230);g.restore();
+  // Eyes remain readable at the highest corruption levels.
+  g.globalAlpha=.35+corruption*.65;g.fillStyle='#e9d6ff';g.shadowColor='#e0baff';g.shadowBlur=8+corruption*15;
+  g.beginPath();g.ellipse(34,-79,3+corruption*2,5+corruption*2,0,0,TAU);g.fill();g.shadowBlur=0;g.globalAlpha=1;
+ }
  g.restore();}
 
 // VISUAL TRIAD v1: all effects derive from living combat state. No RNG, no physics changes,
@@ -801,7 +839,7 @@ function drawTriadLandscape(){
   fit('SOUL  ·  MIND  ·  BODY',cx,cy+2,Math.max(65,right-(left+cardW)-8),8,'#b4c2e0','center','750');
  }
 }
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.10.1',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.10.2',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 // Ten arcade victory crests per tier. Completed tiers upgrade the entire row's color.
 function drawVictoryCrests(x,y,available,streak,small=false){
  const wins=Math.max(0,Math.floor(streak||0)),tier=Math.floor(wins/10);
