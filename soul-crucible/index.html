@@ -32,6 +32,7 @@ const SPEEDS=[1,3,10,30,100,300,1000,3000,10000],FIXED_DT=1/60,FAST_FX_THRESHOLD
 function cycleSpeed(){speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];accum=0;if(speed>=FAST_FX_THRESHOLD){particles.length=0;floats.length=0;}speedSampleWall=0;speedSampleSim=0;actualSpeed=0;}
 function toggleHeadless(){headless=!headless;headlessStartRound=round;accum=0;lastRenderAt=0;speedSampleWall=0;speedSampleSim=0;actualSpeed=0;particles.length=0;floats.length=0;save(true);}
 
+let triadFx=4; // Visual-only intensity. Never stored in simulation checkpoints.
 let souls, fighters, world, restoreFighters=null, round=1, selected=0, running=true, speed=1, headless=false, headlessStartRound=0, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
 let saveStatus='unknown',saveMessage='',lastSavedRound=0,saveBytes=0,saveFailures=0,storageMode='opening',savePending=null,saveInFlight=false,saveGeneration=0,saveDatabase=null;
 let currentTournamentStep=-1,tournament=false,arenaCount=4,arenaSlots=[],activeArena=0,restoreArenaSlots=null,tournamentButtons=[];
@@ -544,7 +545,12 @@ function drawArena(){const A=arena,{x,y,w:aw,h:ah,ground}=A;g.save();g.beginPath
  for(let i=0;i<16;i++){let xx=x+(i/15)*aw;line(xx,ground+6,xx-13,ground+ah*.17,'#85829955',1)}
  // Rune circle floor
  g.strokeStyle='#8ad1c45a';g.lineWidth=1.5;g.beginPath();g.ellipse(x+aw*.5,ground+17,aw*.13,8,0,0,TAU);g.stroke();
- const s=Math.max(.43,Math.min(.94,aw/840));for(let i=0;i<2;i++)drawCritter(fighters[i],x+(fighters[i].x/1000)*aw,ground,s,i===0?1:-1);
+ const s=Math.max(.43,Math.min(.94,aw/840));
+ // The triad is a live visualization of soul impressions, mind choices and bodily condition.
+ // Draw the auras behind the creatures and the tactical filaments over them.
+ if(triadFx)for(let i=0;i<2;i++)drawTriadAura(fighters[i],x+(fighters[i].x/1000)*aw,ground,s,i);
+ for(let i=0;i<2;i++)drawCritter(fighters[i],x+(fighters[i].x/1000)*aw,ground,s,i===0?1:-1);
+ if(triadFx)for(let i=0;i<2;i++)drawTriadMind(fighters[i],x+(fighters[i].x/1000)*aw,ground,s,i);
  for(const p of particles){g.globalAlpha=clamp(p.life/p.max,0,1);g.fillStyle=p.c;g.beginPath();g.arc(p.x,p.y,p.r,0,TAU);g.fill();}g.globalAlpha=1;
  for(const f of floats){g.globalAlpha=clamp(f.life/.7,0,1);text(f.txt,x+(f.x/1000)*aw,f.y,Math.max(10,Math.min(15,aw*.023)),f.c,'center','800')}g.globalAlpha=1;
  if(countdown>0){rr(x+aw*.5-95,y+ah*.30,190,42,18,'#141930d9','#b8b1e088');text('PREPARE TO DUEL',x+aw*.5,y+ah*.3+21,14,'#f3e5ff','center','800');}
@@ -586,7 +592,103 @@ function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighte
  g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
  if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
  g.restore();}
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.8',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+
+// VISUAL TRIAD v1: all effects derive from living combat state. No RNG, no physics changes,
+// no persistent visual state, and no extra work during tournament or headless mode.
+const TRIAD_SOUL='#b9a6ff',TRIAD_MIND='#78f1e6',TRIAD_BODY='#ffbc82';
+function triadSignals(f){
+ const im=f.soul.im||{},hurt=clamp(1-f.hp/Math.max(1,f.maxHp),0,1),fatigue=clamp(1-f.stamina/100,0,1);
+ const affect=clamp((Math.abs(im.pressure||0)+Math.abs(im.contact||0)+Math.abs(im.pain||0)+Math.abs(im.defense||0))/4,0,1);
+ const soul=clamp(.18+affect*.50+hurt*.26,0,1);
+ const active=f.action==='strike'||f.action==='heavy'||f.action==='lunge'||f.attack?1:f.action==='guard'||f.action==='evade'?.75:.42;
+ const mind=clamp(.22+active*.40+hurt*.20+Math.min(1,(f.mind.experience||0)/120)*.13,0,1);
+ const body=clamp(.15+hurt*.52+fatigue*.20+(f.hitFlash>0?.30:0)+(f.attack?.16:0),0,1);
+ return {soul,mind,body,hurt,fatigue,active};
+}
+function triadStrokeRing(cx,cy,rx,ry,color,opacity,width=1.2){
+ g.beginPath();g.ellipse(cx,cy,rx,ry,0,0,TAU);g.strokeStyle=color;g.globalAlpha=opacity;g.lineWidth=width;g.stroke();g.globalAlpha=1;
+}
+function drawTriadAura(f,px,ground,scale,i){
+ const sig=triadSignals(f),mag=triadFx===4?1.42:1,cy=ground-56*scale-(f.hop||0)*scale,breath=Math.sin(t*(2.2+sig.hurt*5)+i*1.8),r=(58+sig.hurt*23+breath*5)*scale;
+ const color=f.soul.color||TRIAD_SOUL;
+ glow(px,cy,r*1.95,color,(.18+sig.soul*.26)*mag);
+ for(let k=0;k<(triadFx===4?3:2);k++)triadStrokeRing(px,cy,r+k*9*scale,r*.87+k*7*scale,color,(.20+sig.soul*.20)*mag/(k+1),1.2+k*.25);
+ const n=triadFx===4?10:7;
+ for(let j=0;j<n;j++){
+  const angle=j*TAU/n+t*(.22+sig.hurt*.32)*(i? -1:1),xx=px+Math.cos(angle)*r*1.10,yy=cy+Math.sin(angle)*r*.83;
+  g.globalAlpha=(.40+sig.soul*.48)*mag;g.fillStyle=j%3?'#fff0ff':color;g.beginPath();g.arc(xx,yy,Math.max(.8,1.4*scale+(j%3)*.35),0,TAU);g.fill();
+ }
+ g.globalAlpha=1;
+ if(sig.hurt>.65){triadStrokeRing(px,cy,r*1.3,r*.98,'#ffb0b5',(.10+sig.hurt*.23)*mag,2);}
+ if(f.hitFlash>0){
+  glow(px,cy,r*1.7,TRIAD_BODY,.30*mag);
+  for(let j=0;j<8;j++){const angle=j*TAU/8+t*.3,dx=Math.cos(angle),dy=Math.sin(angle);
+   line(px+dx*r*.6,cy+dy*r*.6,px+dx*r*1.15,cy+dy*r*1.05,'#ffddaf',1.4);}
+ }
+}
+function drawTriadMind(f,px,ground,scale,i){
+ const sig=triadSignals(f),mag=triadFx===4?1.32:1,cy=ground-(128+(f.hop||0))*scale;
+ const radius=Math.max(13,31*scale),color=TRIAD_MIND,rot=t*(i?-.46:.40);
+ // Thought nodes orbit the head. Activity is tied to the current choice and urgency.
+ for(let k=0;k<5;k++){
+  const angle=k*TAU/5+rot,xx=px+Math.cos(angle)*radius,yy=cy+Math.sin(angle)*radius*.69;
+  g.globalAlpha=(.28+sig.mind*.56)*mag;g.fillStyle=k===0?'#e7ffff':color;g.beginPath();g.arc(xx,yy,1.7+(k===0?1.0:0),0,TAU);g.fill();
+ }
+ g.globalAlpha=1;
+ const dir=f.x<fighters[1-i].x?1:-1,ax=px+dir*(29+sig.active*12)*scale,ay=cy-8*scale;
+ g.strokeStyle=color;g.lineWidth=1.4;g.globalAlpha=(.23+sig.mind*.50)*mag;g.setLineDash([3,5]);g.lineDashOffset=-t*22;
+ g.beginPath();g.moveTo(px+dir*8*scale,cy+12*scale);g.quadraticCurveTo(px+dir*30*scale,cy-32*scale,ax,ay);g.stroke();
+ g.setLineDash([]);g.globalAlpha=1;
+ const attack=f.attack||f.action==='strike'||f.action==='heavy'||f.action==='lunge';
+ if(attack){
+  const tipX=px+dir*(38+12*Math.sin(t*10)**2)*scale,tipY=cy+3*scale;
+  glow(tipX,tipY,15*scale,color,(.22+sig.mind*.25)*mag);
+  line(ax,ay,tipX,tipY,'#9ff8ee',1.5);
+ }
+ if(f.guard>0)triadStrokeRing(px,ground-61*scale,64*scale,61*scale,'#8fe7ff',.28*mag,2.4);
+ if(f.evade>0){glow(px,ground-70*scale,65*scale,'#8befff',.23*mag);}
+}
+function triadGauge(x,y,width,power,color){
+ rr(x,y,width,5,3,'#121d35');rr(x,y,Math.max(1,width*clamp(power,0,1)),5,3,color);
+}
+function drawTriadPortrait(){
+ const A=arena,x=A.x,y=A.y+A.h+61,ww=A.w,hh=h-y-10;
+ if(hh<100)return;
+ rr(x,y,ww,hh,16,'#1b2540','#61749a9c');
+ text('✧  LIVING TRIAD',x+14,y+19,12,'#f2e9ff','left','850');
+ rr(x+ww-76,y+7,65,25,8,triadFx===4?'#4a4771':'#293752','#8b91c0');
+ text('FX '+triadFx,x+ww-43,y+20,11,'#e9e0ff','center','850');
+ const gap=9,cw=(ww-30-gap)/2,top=y+38,cardH=Math.min(hh-51,216);
+ for(let i=0;i<2;i++){
+  const f=fighters[i],sig=triadSignals(f),cx=x+11+i*(cw+gap),c= i===0?'#91e6d6':'#ffb5c8';
+  rr(cx,top,cw,cardH,12,'#111c34','#59688d');
+  fit(f.soul.id+' · '+f.name,cx+9,top+16,cw-18,11,f.soul.color,'left','850');
+  fit(f.body.name+' G'+f.generation+'  ·  '+f.winStreak+' streak',cx+9,top+33,cw-18,9,'#cbd9f1','left','700');
+  const action=(f.attack?f.attack.type||f.action:f.action||'observe').toUpperCase();
+  rr(cx+8,top+43,cw-16,25,7,'#263553');
+  fit(action,cx+cw/2,top+55,cw-23,10,c,'center','850');
+  const data=[['SOUL',sig.soul,f.soul.color],['MIND',sig.mind,TRIAD_MIND],['BODY',sig.body,TRIAD_BODY]];
+  for(let k=0;k<3;k++){
+   const yy=top+84+k*35;if(yy+17>top+cardH)break;
+   text(data[k][0],cx+9,yy,9,data[k][2],'left','850');
+   text(Math.round(data[k][1]*100)+'',cx+cw-9,yy,9,'#c7d7ed','right','700');
+   triadGauge(cx+9,yy+11,cw-18,data[k][1],data[k][2]);
+  }
+  if(cardH>=206)fit('HP '+Math.round(f.hp/Math.max(1,f.maxHp)*100)+'%  ·  ST '+Math.round(f.stamina)+'%',cx+9,top+cardH-12,cw-18,9,'#b9cbe4');
+ }
+ const bottom=top+cardH+15;
+ if(bottom+14<y+hh)fit('Soul feels  ·  Mind chooses  ·  Body pays the price',x+ww/2,bottom,ww-30,10,'#bfcfe9','center','700');
+}
+function drawTriadLandscape(){
+ const A=arena,f=fighters[selected],sig=triadSignals(f),x=A.x+8,y=A.y+A.h-98,ww=Math.min(310,A.w*.49);
+ rr(x,y,ww,85,11,'#131d36e9','#9ca4d17a');
+ fit('✧  '+f.soul.id+'  ·  '+f.body.name+' G'+f.generation,x+10,y+16,ww-20,11,f.soul.color,'left','850');
+ fit((f.action||'observe').toUpperCase()+'  ·  '+f.winStreak+' STREAK',x+10,y+34,ww-20,10,'#e7dfff','left','750');
+ const data=[sig.soul,sig.mind,sig.body],colors=[f.soul.color,TRIAD_MIND,TRIAD_BODY],names=['S','M','B'],third=(ww-22)/3;
+ for(let k=0;k<3;k++){const bx=x+10+k*third;text(names[k],bx,y+53,9,colors[k],'left','850');triadGauge(bx,y+66,third-9,data[k],colors[k]);}
+}
+
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');fit(`${f.body.name} · ${f.winStreak} IN A ROW`,xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
 function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
 function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(`${speed}× SPEED`,xx+bw+11,yy,bw,40,speed>1);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
@@ -625,30 +727,7 @@ function compareSignals(idx){const a=souls[idx],b=souls[1-idx],ao=ensureSoul(a).
  if(f.diff<.045)return {icon:'≈',title:'No strong contrast yet',line:'Observed action mixes are similar',note:'Different bodies may still explain small changes.',kind:'neutral'};
  return {icon:f.icon,title:`MORE ${f.name.toLowerCase()}`,line:`${a.id} ${f.va}%  ·  ${b.id} ${f.vb}%`,note:`${f.unit}  •  correlation, not soul causation`,kind:'contrast'};
 }
-function drawDuelSnapshot(){const A=arena,f=fighters[selected],s=f.soul,o=ensureSoul(s).obs;
- if(A.portrait){const x=A.x,y=A.y+A.h+61,ww=A.w,hh=h-y-10;if(hh<72)return;
-  rr(x,y,ww,hh,16,'#1b223a','#5660869c');
-  text(`${selected===0?'◀':'▶'}  ${s.id}  ·  LIFE ${s.lives}`,x+15,y+24,Math.min(15,w/26),s.color,'left','800');
-  text(`${f.body.name}  ·  ${s.wins} W / ${s.losses} L`,x+15,y+47,11,'#c5d2eb');
-  const base=y+62, tileW=(ww-42)/3;
-  if(hh>136){
-   for(const [i,label,val,color] of [[0,'WIN RATE',percent(s.wins,s.wins+s.losses)+'%',s.color],[1,'EARLY HOPS',`${o.openingEvades}/${o.duelsStarted}`,'#ffc4d2'],[2,'DODGES',`${o.successfulDodges}/${o.evades}`,'#99e9d9']]){
-    const tx=x+12+i*(tileW+9);rr(tx,base,tileW,55,11,'#10182d','#56628177');text(label,tx+8,base+13,8,'#98a7cb','left','800');text(val,tx+8,base+37,17,color,'left','800');
-   }
-  }
-  if(hh>205){const sy=base+76;sectionLabel('CURRENT SOUL IMPRESSIONS',x+15,sy);for(let i=0;i<5;i++){
-   const a=AXES[i],v=s.im[a.key],cy=sy+24+i*23;
-   text(a.title,x+15,cy,10,'#c2c9df');const xx=x+114,bw=ww-131;rr(xx,cy-5,bw,9,4,'#343e5b');line(xx+bw/2,cy-6,xx+bw/2,cy+6,'#94a9cc8c');let length=Math.abs(v)*bw*.48;rr(v<0?xx+bw/2-length:xx+bw/2,cy-3,length,5,3,v<0?'#e6abd8':'#84d9c9');
-  }}
-  if(hh>345)fit(`Arena timeouts observed: ${o.timeoutDuels}  ·  Tap OBSERVE for more`,x+15,y+hh-19,ww-28,9,'#a1aed0');
- }else{
-  const x=A.x+8,y=A.y+A.h-90,ww=Math.min(345,A.w*.49);
-  rr(x,y,ww,78,12,'#141b31e6','#ffffff36');
-  text(`${s.id} · LIFE ${s.lives} · ${f.body.name}`,x+10,y+17,11,s.color,'left','800');
-  text(`${s.wins} W / ${s.losses} L · ${percent(s.wins,s.wins+s.losses)}% wins`,x+10,y+36,10,'#eff0fb');
-  text(`Early hops ${o.openingEvades}/${o.duelsStarted} · Dodges ${o.successfulDodges}/${o.evades}`,x+10,y+56,10,'#addbd7');
- }
-}
+function drawDuelSnapshot(){if(arena.portrait)drawTriadPortrait();else drawTriadLandscape();}
 function drawSoulCard(s,x,y,cw){const o=ensureSoul(s).obs;rr(x,y,cw,116,14,'#1d2742',s.color+'70');
  text(s.id,x+13,y+18,13,s.color,'left','850');
  const r=Math.min(23,cw*.13);drawRing(x+cw-r-14,y+44,r,s.wins/Math.max(1,s.wins+s.losses),s.color);
@@ -1051,7 +1130,7 @@ function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect()
  for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;accum=0;if(!running)save(true);}else if(i===1)cycleSpeed();else if(i===2){observerOpen=true;observerTab=0;observerScroll=0;}return;}}
  if(y>=arena.y&&y<arena.y+arena.h){const wx=((x-arena.x)/arena.w)*1000;selected=Math.abs(wx-fighters[0].x)<Math.abs(wx-fighters[1].x)?0:1;return;}
  if(y>=h-108&&y<h-57){enterTournament();return;}
- if(arena.portrait&&y>arena.y+arena.h+57)selected=1-selected;
+ if(arena.portrait&&y>arena.y+arena.h+57){const top=arena.y+arena.h+61;if(y>=top+7&&y<=top+35&&x>=arena.x+arena.w-82){triadFx=triadFx===4?3:4;return;}selected=1-selected;}
 }
 function xy(e){const rect=canvas.getBoundingClientRect();return {x:e.clientX-rect.left,y:e.clientY-rect.top};}
 canvas.addEventListener('pointerdown',e=>{const p=xy(e);observerTouch=observerOpen&&p.y>132?{y:p.y,scroll:observerScroll,moved:false}:null;});
