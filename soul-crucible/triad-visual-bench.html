@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f172b"><title>Soul Crucible | Triad Visual Test Bench</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b1222}body{display:flex;justify-content:center;align-items:center}canvas{display:block;width:min(100vw,620px);height:100%;height:100svh;touch-action:none;outline:0;-webkit-tap-highlight-color:transparent}
+</style>
+</head>
+<body><canvas id="lab" role="img" tabindex="0" aria-label="Interactive Soul Crucible visual test bench. Tap scene to cycle Calm, Clash, Critical, and Recovery. Tap layer to view Soul, Mind, Body or All. Tap intensity to adjust effects. This is a visual-only scripted experiment with no access to game saves."></canvas>
+<script>
+(()=>{'use strict';
+const canvas=document.getElementById('lab'),ctx=canvas.getContext('2d',{alpha:false});
+const BASE_W=420;let H=860,S=1,DPR=1,clock=0,last=0,paused=false,scene=0,view=0,fx=2,focus=-1,frames=0;
+let hitSpark=0;const touch=[];const scenes=[
+ {name:'CALM',sub:'The moment before contact',stats:[[.98,.32,.35,.45],[.94,.25,.46,.4]],intent:['OBSERVE','CIRCLE'],signal:'Low threat. Both minds have time to evaluate.'},
+ {name:'CLASH',sub:'Instinct meets experience',stats:[[.76,.62,.78,.87],[.60,.68,.83,.79]],intent:['GUARD','LUNGE'],signal:'Contact changes the body. The mind revises its plan.'},
+ {name:'CRITICAL',sub:'Survival urgency rises',stats:[[.09,.97,.98,.22],[.23,.82,.90,.49]],intent:['DESPERATE STRIKE','EVADE'],signal:'Urgency magnifies experience, but cannot create stamina.'},
+ {name:'RECOVER',sub:'The danger passes, not the memory',stats:[[.43,.64,.40,.32],[.57,.51,.48,.39]],intent:['REASSESS','WITHDRAW'],signal:'Soul retains an impression. Mind plans the next step.'}
+ ];
+const palette={bg:'#0c1428',panel:'#1c2847',edge:'#65799c',milk:'#e9e3fa',muted:'#a4b5d6',mint:'#9fe8d3',rose:'#f3acbf',soul:'#bfb3ff',mind:'#85edee',body:'#f7bc94',gold:'#fbd49a'};
+const fighters=[
+ {name:'AURORA',kind:'Glass Fang · G4',color:'#8de1b9',dark:'#4e9d85',bright:'#c6f8d7',x:132,targetX:132,face:1,hp:.98,soul:.32,mind:.35,body:.45,intent:'OBSERVE',hair:0,streak:2},
+ {name:'UMBRA',kind:'Bruiser · G27',color:'#ecab7e',dark:'#b97c70',bright:'#ffddb1',x:288,targetX:288,face:-1,hp:.94,soul:.25,mind:.46,body:.40,intent:'CIRCLE',hair:1,streak:17}
+ ];
+let w=420,buttons=[],spots=[];
+function clamp(v,a=0,b=1){return Math.max(a,Math.min(b,v))}function lerp(a,b,t){return a+(b-a)*t}
+function rgb(hex){let n=parseInt(hex.slice(1),16);return [(n>>16)&255,(n>>8)&255,n&255]}
+function rgba(hex,a){const z=rgb(hex);return `rgba(${z[0]},${z[1]},${z[2]},${a})`}
+function rounded(x,y,ww,hh,r,fill,stroke,lw=1){ctx.beginPath();ctx.roundRect(x,y,ww,hh,Math.min(r,hh/2,ww/2));if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.lineWidth=lw;ctx.strokeStyle=stroke;ctx.stroke()}}
+function text(str,x,y,size=12,color=palette.milk,align='left',weight=600){ctx.textAlign=align;ctx.textBaseline='middle';ctx.font=`${weight} ${size}px system-ui,-apple-system,BlinkMacSystemFont,sans-serif`;ctx.fillStyle=color;ctx.fillText(str,x,y)}
+function fit(str,x,y,max,size=12,color=palette.milk,align='left',weight=650){let t=size;ctx.font=`${weight} ${t}px system-ui`;while(ctx.measureText(str).width>max&&t>7){t-=.5;ctx.font=`${weight} ${t}px system-ui`}text(str,x,y,t,color,align,weight)}
+function circle(x,y,r,fill,stroke,lw=1){ctx.beginPath();ctx.arc(x,y,Math.max(.1,r),0,Math.PI*2);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.lineWidth=lw;ctx.strokeStyle=stroke;ctx.stroke()}}
+function line(x1,y1,x2,y2,stroke,width=1){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke()}
+function grad(x,y,r,color,strength){let g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,rgba(color,strength));g.addColorStop(.42,rgba(color,strength*.27));g.addColorStop(1,rgba(color,0));return g}
+function resize(){const rect=canvas.getBoundingClientRect();w=BASE_W;S=rect.width/w;H=rect.height/S;DPR=Math.min(2.3,window.devicePixelRatio||1);canvas.width=Math.round(rect.width*DPR);canvas.height=Math.round(rect.height*DPR);ctx.setTransform(S*DPR,0,0,S*DPR,0,0)}
+function bg(){ctx.fillStyle=palette.bg;ctx.fillRect(0,0,w,H);let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#101a34');g.addColorStop(.55,'#131c36');g.addColorStop(1,'#0b1225');ctx.fillStyle=g;ctx.fillRect(0,0,w,H);
+ for(let k=0;k<48;k++){const x=(k*73.129+17)%420,y=(k*53.3+49)%(H-90);circle(x,y,k%4===0?1.3:.65,rgba('#bccafa',.12+.09*Math.sin(clock*.25+k)))}
+ for(let k=0;k<14;k++){const x=(k*89.123+clock*(k%2?2:-3)+560)%420,y=(k*113.2+29)%(H-140);circle(x,y,.8+k%3*.2,rgba(palette.mint,.10+.07*Math.sin(clock*.44+k)))}
+}
+function header(){rounded(12,14,396,77,17,'#1c2745','#455674');text('✧  SOUL CRUCIBLE',29,40,19,'#eedfff','left',850);text('TRIAD VISUAL TEST  ·  CANVAS ONLY',29,67,10,palette.muted,'left',760);
+ rounded(332,32,62,28,10,'#293858','#4c6483');text('LAB 01',363,46,10,palette.mint,'center',800);
+}
+function sceneTabs(){const y=105,gap=5,bw=(396-gap*3)/4;for(let i=0;i<4;i++){let x=12+i*(bw+gap),active=scene===i;rounded(x,y,bw,31,10,active?'#4b597d':'#263451',active?'#b6c1ec':'#53647f');fit(scenes[i].name,x+bw/2,y+15,bw-12,10,active?'#f9e9bc':'#bec9dd','center',800);touch.push({x,y,w:bw,h:31,act:()=>{scene=i;hitSpark=1;}})}}
+function fighterLabels(ay){for(let i=0;i<2;i++){let f=fighters[i],x=i===0?16:218;rounded(x,ay,186,57,13,'#222f50',i===0?'#8dd7c8':'#e8b9ad');text(f.name,x+11,ay+15,11,i===0?'#b5ffe3':'#ffcfb4','left',850);fit(f.kind,x+11,ay+32,165,10,'#d9def1','left',650);rounded(x+11,ay+44,164,5,3,'#0f172b');rounded(x+11,ay+44,164*f.hp,5,3,i===0?palette.mint:palette.rose)}}
+function arenaArea(){const top=155,bottom=H-255;heightCheck();rounded(12,top,396,bottom-top,22,'#1e2a4d','#6575a1',1.5);ctx.save();ctx.beginPath();ctx.roundRect(14,top+2,392,bottom-top-4,20);ctx.clip();
+ let g=ctx.createLinearGradient(0,top,0,bottom);g.addColorStop(0,'#283b66');g.addColorStop(.56,'#303a64');g.addColorStop(1,'#202a4c');ctx.fillStyle=g;ctx.fillRect(14,top+2,392,bottom-top-4);
+ let gy=top+105;ctx.fillStyle=grad(210,gy,145,'#f7e2ba',.35);ctx.fillRect(14,top,392,230);circle(210,gy,27,'#f0dfc8');circle(207,gy-6,22,rgba('#ffe9d2',.21));
+ const floorY=bottom-55;
+ ctx.fillStyle='#1c2745';for(let i=0;i<8;i++){let bx=12+i*57;ctx.beginPath();ctx.moveTo(bx, floorY);ctx.lineTo(bx+25,gy+22+(i%3)*11);ctx.lineTo(bx+45,floorY);ctx.fill()}
+ ctx.fillStyle='#252e52';for(let i=0;i<8;i++){let bx=14+i*56;rounded(bx,floorY-98-(i%3)*14,30,108+(i%3)*14,16,'#252e52')}
+ ctx.fillStyle='#323a60';ctx.fillRect(14,floorY,392,bottom-floorY);line(15,floorY,405,floorY,'#a9abce',2);
+ for(let i=0;i<10;i++){let sx=12+i*44;line(sx,floorY+5,sx-12,bottom,rgba('#9daacf',.17),1)}
+ ctx.save();ctx.translate(210,floorY+22);ctx.scale(1,.26);circle(0,0,96,null,rgba(palette.mint,.3),2.2);circle(0,0,68,null,rgba(palette.soul,.2),1.1);ctx.restore();
+ const midY=floorY-47;fighterLabels(top+12);
+ drawInteractions(midY);
+ for(let i=0;i<2;i++)drawFighter(fighters[i],i,midY,floorY);
+ if((scene===1||scene===2)&&fx>0)drawContact(midY);
+ ctx.restore();
+ // Arena context label unobtrusive, above the legend.
+ fit(scenes[scene].sub,210,bottom-15,356,10,'#d9daf6','center',650);
+ return bottom;
+}
+function heightCheck(){/* Layout intentionally adapts to short phone viewports. */}
+function drawInteractions(midY){if(view!==0&&view!==2)return;const a=fighters[0],b=fighters[1];let alpha=.2+.4*(a.mind+b.mind)/2,appear=fx/3;
+ if(!appear)return;
+ ctx.save();ctx.setLineDash([6,7]);ctx.lineDashOffset=-clock*28;line(a.x+45,midY-36,b.x-45,midY-36,rgba(palette.mind,alpha*appear),1.5);ctx.restore();
+ circle(210,midY-36,3.5,rgba(palette.mind,alpha*appear));
+ const dir=clock*2;for(let i=0;i<3;i++){let tt=((clock*.20+i/3)%1),px=lerp(a.x+35,b.x-35,tt);circle(px,midY-36,2.5,rgba(palette.mind,(1-tt)*alpha*appear))}
+}
+function drawSoul(f,y,i){if((view!==0&&view!==1)||fx===0)return;let power=f.soul,urgent=(1-f.hp);let beat=Math.sin(clock*(2.5+urgent*9)+i*1.8),rad=68+urgent*13+beat*(2+urgent*5),a=(.07+power*.19)*fx/2;
+ ctx.fillStyle=grad(f.x,y-28,rad+42,i===0?palette.soul:palette.rose,a*1.2);ctx.fillRect(f.x-rad-45,y-rad-70,2*(rad+45),2*(rad+45));
+ for(let k=0;k<(fx===3?3:2);k++){circle(f.x,y-22,rad-k*13+(Math.sin(clock*(1.1+urgent*2)+k+i)*2),null,rgba(i===0?palette.soul:'#f9b4cb',(.12+.09*power)*(fx/2)) ,1.4)}
+ let n=fx>=2?8:4;for(let j=0;j<n;j++){const angle=j*Math.PI*2/n+clock*(.18+urgent*.45)*(i?-1:1),rr=rad-5+8*Math.sin(clock*.7+j*4),px=f.x+Math.cos(angle)*rr,py=y-22+Math.sin(angle)*rr*.65;circle(px,py,1.2+power*1.7,rgba(i===0?palette.soul:'#ffb3c6',(.22+.5*power)*(fx/3)))}
+}
+function drawMind(f,y,i){if((view!==0&&view!==2)||fx===0)return;const energy=f.mind,urg=1-f.hp,cy=y-38;
+ ctx.save();ctx.translate(f.x,cy);ctx.rotate(clock*(i?-.27:.24));
+ for(let k=0;k<5;k++){let ang=k*2*Math.PI/5,rr=53+Math.sin(clock*2+k)*4,pX=Math.cos(ang)*rr,pY=Math.sin(ang)*rr*.75;circle(pX,pY,2.4,rgba(palette.mind,(.13+.42*energy)*fx/2.5));if(k>0){let ang2=(k-1)*2*Math.PI/5;line(Math.cos(ang2)*rr,Math.sin(ang2)*rr*.75,pX,pY,rgba(palette.mind,.08+.11*energy),.8)}}
+ ctx.restore();
+ const tx=f.x+(f.face*62),ty=y-57+Math.sin(clock*3+i)*7,aa=(.22+.4*energy)*(fx/3);ctx.strokeStyle=rgba(palette.mind,aa);ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(f.x+f.face*22,cy);ctx.quadraticCurveTo(f.x+f.face*56,cy-45,tx,ty);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(tx-f.face*9,ty-4);ctx.lineTo(tx,ty);ctx.lineTo(tx-f.face*6,ty+8);ctx.stroke();
+ if(energy>.70){circle(tx,ty,5,null,rgba(palette.mind,aa),1.2)}
+}
+function drawBody(f,y,i){ctx.save();const hp=f.hp,energy=f.body,urg=1-hp;let bob=Math.sin(clock*(2+energy*2)+i*2)*(.8+energy*1.7),cr=scene===1?Math.sin(clock*9+i)*5:0,shake=scene===2?Math.sin(clock*18+i*2.3)*1.5:0;
+ const bx=f.x+shake+cr*(i?-1:1),by=y+bob;
+ ctx.fillStyle=grad(bx,by+27,56,'#020719',.55);ctx.fillRect(bx-70,by-2,140,60);
+ ctx.translate(bx,by);ctx.scale(f.face,1);let squash=(scene===2?.95:1)+Math.sin(clock*4+i)*.008;ctx.scale(1/squash,squash);
+ // tail and arms animated by actual bodily energy
+ ctx.strokeStyle=f.color;ctx.lineCap='round';ctx.lineWidth=10;ctx.beginPath();ctx.moveTo(-33,15);ctx.quadraticCurveTo(-61,-9-energy*17,-60,-25+Math.sin(clock*3)*9);ctx.stroke();
+ ctx.strokeStyle=f.dark;ctx.lineWidth=14;ctx.beginPath();ctx.moveTo(-30,38);ctx.lineTo(-41,45);ctx.moveTo(29,38);ctx.lineTo(40,44);ctx.stroke();
+ // antenna/ears, reach varying by scene
+ const le=energy*6;ctx.fillStyle=f.color;ctx.strokeStyle=rgba(f.bright,.85);ctx.lineWidth=2;
+ ctx.beginPath();ctx.moveTo(-27,-19);ctx.quadraticCurveTo(-50,-99-le,-15,-72);ctx.quadraticCurveTo(-6,-61,-9,-29);ctx.fill();ctx.stroke();
+ ctx.beginPath();ctx.moveTo(10,-31);ctx.quadraticCurveTo(22,-104-le,42,-75);ctx.quadraticCurveTo(42,-54,29,-23);ctx.fill();ctx.stroke();
+ ctx.fillStyle=rgba('#f9d3d8',.68);ctx.beginPath();ctx.moveTo(-24,-38);ctx.quadraticCurveTo(-36,-75,-20,-67);ctx.quadraticCurveTo(-12,-53,-17,-37);ctx.fill();
+ ctx.beginPath();ctx.moveTo(21,-38);ctx.quadraticCurveTo(26,-77,33,-65);ctx.quadraticCurveTo(35,-47,27,-37);ctx.fill();
+ const bodygrad=ctx.createLinearGradient(0,-43,0,50);bodygrad.addColorStop(0,f.bright);bodygrad.addColorStop(.34,f.color);bodygrad.addColorStop(1,f.dark);ctx.fillStyle=bodygrad;ctx.beginPath();ctx.ellipse(0,4,48,48,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle=rgba('#fff7dc',.27);ctx.beginPath();ctx.ellipse(-14,22,20,14,-.5,0,Math.PI*2);ctx.fill();
+ // eye tracking toward foe, urgency widens eye
+ circle(21,-18,9+urg*1.6,'#fdfbff');circle(23+Math.min(2,energy*2),-17,4.3,'#202941');circle(24,-19,1.65,'white');
+ circle(36,1,3.6,'#374761');circle(29,11,4,rgba('#ffe5b7',.92));
+ ctx.strokeStyle=rgba('#fff6e8',.48);ctx.lineWidth=1.7;ctx.beginPath();ctx.arc(0,4,35,-.8,.95);ctx.stroke();
+ // subtle injury tint in critical stage; not an invented limb loss
+ if(hp<.2){ctx.strokeStyle=rgba('#ffb3ad',.8);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(2,-3);ctx.lineTo(12,6);ctx.moveTo(5,3);ctx.lineTo(11,-2);ctx.stroke()}
+ ctx.restore();
+ if((view===0||view===3)&&fx>0){const pulse=clamp(energy,.1,1)*(fx/3);circle(bx,by+40,40+Math.sin(clock*4+i)*3,null,rgba(palette.body,.11*pulse),1.4);if(scene===1||scene===2){for(let k=0;k<4;k++){let a=k*Math.PI/2+clock*.9;circle(bx+Math.cos(a)*54,by+Math.sin(a)*38,1.8,rgba(palette.body,.35*pulse))}}}
+}
+function drawFighter(f,i,y,floorY){drawSoul(f,y,i);drawMind(f,y,i);drawBody(f,y,i);spots.push({x:f.x,y,r:58,index:i});
+ if(focus===i)circle(f.x,y+43,48,null,rgba('#fde0a7',.65),2);
+}
+function drawContact(y){const power=(.35+.65*Math.sin(clock*3)**2)*hitSpark*(fx/3),x=210,yy=y-3;if(power<.02)return;
+ ctx.fillStyle=grad(x,yy,65,palette.body,power*.6);ctx.fillRect(x-66,yy-66,132,132);circle(x,yy,7+power*7,rgba(palette.body,power*.65));for(let k=0;k<6;k++){let a=k*Math.PI/3+clock*.7;line(x+Math.cos(a)*12,yy+Math.sin(a)*12,x+Math.cos(a)*(24+power*21),yy+Math.sin(a)*(24+power*21),rgba('#ffe2b4',power*.7),1.8)}
+}
+function legend(y){rounded(13,y,394,29,10,'#182542','#354b70');const labels=[['◉','SOUL','#c5b7ff'],['◇','MIND','#86e7e5'],['⟡','BODY','#f7c096']];let xx=[72,207,338];for(let i=0;i<3;i++){text(labels[i][0],xx[i]-43,y+15,13,labels[i][2],'center',850);text(labels[i][1],xx[i],y+15,10,labels[i][2],'center',850)}}
+function triad(y){rounded(13,y,394,135,14,'#1c2948','#526582');text('LIVING SIGNALS',24,y+17,10,'#d8c9f6','left',850);fit('Scripted data • visual demonstration',395,y+17,225,9,'#99b3cf','right',650);
+ const names=[['S','SOUL',palette.soul],['M','MIND',palette.mind],['B','BODY',palette.body]];
+ for(let i=0;i<2;i++){const f=fighters[i],xx=i===0?23:220;fit(f.name,xx,y+39,167,11,i===0?palette.mint:palette.rose,'left',850);
+  const vals=[f.soul,f.mind,f.body];for(let k=0;k<3;k++){const cy=y+58+k*21;rounded(xx,cy-5,15,15,4,rgba(names[k][2],.16),rgba(names[k][2],.4));text(names[k][0],xx+7.5,cy+3,9,names[k][2],'center',850);rounded(xx+24,cy-1,135,6,3,'#0f1830');rounded(xx+24,cy-1,Math.max(2,135*vals[k]),6,3,names[k][2]);}}
+ line(209,y+30,209,y+123,rgba('#869abd',.3));
+}
+function controls(y){const data=[['Ⅱ PAUSE','▶ PLAY'],['SCENE ↻'],['LAYER: ALL','LAYER: SOUL','LAYER: MIND','LAYER: BODY'],['FX: '+fx]],g=5,ww=(396-g*3)/4;
+ for(let i=0;i<4;i++){let x=12+i*(ww+g),label=i===0?(paused?'▶ PLAY':'Ⅱ PAUSE'):i===1?'SCENE ↻':i===2?'LAYER: '+['ALL','SOUL','MIND','BODY'][view]:'FX: '+fx;rounded(x,y,ww,40,11,i===2?'#3f4972':'#2a3656',i===2?'#a6a6d7':'#687b9f');fit(label,x+ww/2,y+20,ww-12,10,'#f5eafa','center',800);
+ touch.push({x,y,w:ww,h:40,act:()=>{if(i===0)paused=!paused;if(i===1){scene=(scene+1)%4;hitSpark=1}if(i===2)view=(view+1)%4;if(i===3)fx=(fx+1)%4;}})}
+ text('NO LIVE COMBAT  ·  NO SAVE ACCESS  ·  TAP A FIGHTER TO FOCUS',210,y+55,8,'#8099b5','center',750);
+}
+function signal(y){fit(scenes[scene].signal,210,y,380,10,'#acc5de','center',600)}
+function advance(dt){clock+=dt;hitSpark=Math.max(0,hitSpark-dt*.95);if(scene===1||scene===2){hitSpark=Math.max(hitSpark,Math.pow(Math.max(0,Math.sin(clock*(scene===2?6:4))),10)*.70)}
+ for(let i=0;i<2;i++){let f=fighters[i],target=scenes[scene].stats[i],speed=Math.min(1,dt*2.5);[f.hp,f.soul,f.mind,f.body]=[f.hp,f.soul,f.mind,f.body].map((v,j)=>lerp(v,target[j],speed));f.intent=scenes[scene].intent[i];f.targetX=[132,288][i]+(scene===1?[33,-33][i]:scene===2?[21,-21][i]:scene===3?[-6,6][i]:0);f.x=lerp(f.x,f.targetX,speed*.9)}
+}
+function render(){touch.length=0;spots.length=0;bg();header();sceneTabs();const arenaBottom=arenaArea();legend(arenaBottom+8);
+ const panelY=H-213;triad(panelY);controls(H-69);
+ if(paused){rounded(161,143,98,27,9,'#1e294b','#a6b4d9');text('PAUSED',210,156,11,'#f7dcb5','center',850)}
+}
+function frame(ts){if(!last)last=ts;let dt=Math.min((ts-last)/1000,.045);last=ts;if(!paused)advance(dt);render();frames++;requestAnimationFrame(frame)}
+function tap(ev){ev.preventDefault();const r=canvas.getBoundingClientRect(),x=(ev.clientX-r.left)/S,y=(ev.clientY-r.top)/S;for(let i=touch.length-1;i>=0;i--){const t=touch[i];if(x>=t.x&&x<=t.x+t.w&&y>=t.y&&y<=t.y+t.h){t.act();return}}for(const spot of spots){if(Math.hypot(x-spot.x,y-spot.y)<spot.r+13){focus=focus===spot.index?-1:spot.index;return}}}
+canvas.addEventListener('pointerdown',tap,{passive:false});canvas.addEventListener('keydown',ev=>{if(ev.code==='Space'){paused=!paused;ev.preventDefault()}else if(ev.key.toLowerCase()==='s')scene=(scene+1)%4;else if(ev.key.toLowerCase()==='l')view=(view+1)%4;else if(ev.key.toLowerCase()==='f')fx=(fx+1)%4});
+window.addEventListener('resize',resize);window.addEventListener('orientationchange',resize);document.addEventListener('visibilitychange',()=>{last=0});resize();requestAnimationFrame(frame);
+})();
+</script>
+</body></html>
