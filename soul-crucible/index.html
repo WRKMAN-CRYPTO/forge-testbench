@@ -714,15 +714,61 @@ function drawTriadPortrait(){
  }
 }
 function drawTriadLandscape(){
- const A=arena,f=fighters[selected],sig=triadSignals(f),x=A.x+8,y=A.y+A.h-98,ww=Math.min(310,A.w*.49);
- rr(x,y,ww,85,11,'#131d36e9','#9ca4d17a');
- fit('✧  '+f.soul.id+'  ·  '+f.body.name+' G'+f.generation,x+10,y+16,ww-20,11,f.soul.color,'left','850');
- fit((f.action||'observe').toUpperCase()+'  ·  '+f.winStreak+' STREAK',x+10,y+34,ww-20,10,'#e7dfff','left','750');
- const data=[sig.soul,sig.mind,sig.body],colors=[f.soul.color,TRIAD_MIND,TRIAD_BODY],names=['S','M','B'],third=(ww-22)/3;
- for(let k=0;k<3;k++){const bx=x+10+k*third;text(names[k],bx,y+53,9,colors[k],'left','850');triadGauge(bx,y+66,third-9,data[k],colors[k]);}
+ // Desktop spectator HUD: two independently animated triads, no change to arena geometry.
+ const A=arena,wide=w>=900,compact=w<690;
+ const gap=wide?Math.max(115,Math.min(290,A.w*.21)):Math.max(12,A.w*.08);
+ const cardW=Math.min(wide?390:320,(A.w-gap-30)/2);
+ const cardH=wide?156:compact?103:128;
+ const y=A.y+A.h-cardH-14,edge=14;
+ const left=A.x+edge,right=A.x+A.w-edge-cardW;
+ const labels=['SOUL','MIND','BODY'];
+ for(let i=0;i<2;i++){
+  const f=fighters[i],sig=triadSignals(f),x=i===0?left:right;
+  const tint=i===0?'#8ce9d8':'#ffb6c9';
+  const values=[sig.soul,sig.mind,sig.body];
+  const colors=[f.soul.color,TRIAD_MIND,TRIAD_BODY];
+  g.save();
+  g.shadowColor=tint;g.shadowBlur=wide?13:6;
+  rr(x,y,cardW,cardH,13,'#0e1934e9',selected===i?tint:'#7c90ba80');
+  g.restore();
+  // Fine accent line tracks the currently selected fighter.
+  rr(x+12,y+6,Math.max(16,(cardW-24)*(selected===i?1:.36)),2,1,tint);
+  fit((i===0?'◈  ':'◇  ')+f.soul.id+'  /  '+f.name,x+13,y+24,cardW-26,wide?14:11,f.soul.color,'left','850');
+  fit(f.body.name.toUpperCase()+'  ·  G'+f.generation+'  ·  '+f.winStreak+' WIN STREAK',x+13,y+42,cardW-26,wide?10:9,'#b8c8e8','left','750');
+  const action=(f.attack?.type||f.action||'observe').toUpperCase();
+  const actY=y+(wide?59:51);
+  rr(x+12,actY,cardW-24,wide?23:19,6,'#283858bb');
+  fit('✦ '+action,x+cardW/2,actY+(wide?12:10),cardW-35,wide?11:9,tint,'center','850');
+  const barTop=actY+(wide?36:27);
+  const rowH=wide?21:compact?10:16;
+  for(let k=0;k<3;k++){
+   const yy=barTop+k*rowH,barX=x+(wide?67:compact?32:47),barW=cardW-(wide?115:compact?72:88);
+   fit(compact?labels[k][0]:labels[k],x+13,yy+4,wide?47:compact?17:36,wide?10:8,colors[k],'left','850');
+   rr(barX,yy,barW,wide?8:6,4,'#111c33');
+   rr(barX,yy,Math.max(1,barW*clamp(values[k],0,1)),wide?8:6,4,colors[k]);
+   const glint=(Math.sin(t*(1.6+k*.38)+i*1.7)+1)*.5;
+   if(wide&&values[k]>.03){
+    g.globalAlpha=.18+glint*.33;
+    rr(barX+Math.max(0,barW*clamp(values[k],0,1)-5),yy-2,5,12,3,'#ffffff');
+    g.globalAlpha=1;
+   }
+   text(Math.round(values[k]*100)+'%',x+cardW-13,yy+4,wide?10:8,'#dce8f7','right','800');
+  }
+  if(wide){
+   const pulse=(Math.sin(t*2.5+i*1.8)+1)*.5;
+   g.globalAlpha=.25+pulse*.35;
+   g.beginPath();g.arc(x+cardW-20,y+23,4+pulse*2,0,TAU);g.fillStyle=tint;g.fill();
+   g.globalAlpha=1;
+  }
+ }
+ // Deliberately leave the middle of the battlefield unobstructed.
+ if(wide){
+  const cx=A.x+A.w/2,cy=y+cardH-14;
+  fit('✧ LIVING TRIAD ✧',cx,cy-15,Math.max(65,right-(left+cardW)-8),11,'#e2d5ff','center','850');
+  fit('SOUL  ·  MIND  ·  BODY',cx,cy+2,Math.max(65,right-(left+cardW)-8),8,'#b4c2e0','center','750');
+ }
 }
-
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9.3',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9.4',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');fit(`${f.soulEater?'☄ ':''}${f.body.name} · ${f.winStreak} IN A ROW${f.soulEater?' · '+(f.captiveSoulIds?.length||0)+' SOULS':''}`,xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
 function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
 function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(`${speed}× SPEED`,xx+bw+11,yy,bw,40,speed>1);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
