@@ -202,7 +202,8 @@ function assureWorld(){if(!world)world=createWorld();for(const k of ['nursery','
  for(const type of TYPES){if(!world.recruitAudit.rows[type.name])world.recruitAudit.rows[type.name]={entries:0,g0:0,earned:0,nursery:0,incumbent:0,duel:0,tournament:0,wins:0,deaths:0,completedDuels:0,bestObservedStreak:0};}
  // Prospective lineage census. Existing history is not backfilled with invented outcomes.
  if(!world.lineageCensus||typeof world.lineageCensus!=='object')world.lineageCensus={since:round,born:{},died:{},budded:{},wins:{},maxStreak:{},lives:{}};
- if(!world.soulEaterStats)world.soulEaterStats={since:round,spawned:0,captures:0,releases:0,maxBound:0,defeats:0};
+ if(!world.soulEaterStats)world.soulEaterStats={since:round,spawned:0,captures:0,releases:0,maxBound:0,defeats:0,sacrifices:0};
+  if(!Number.isFinite(world.soulEaterStats.sacrifices))world.soulEaterStats.sacrifices=0;
  return world;
 }
 function soulById(id){if(!id)return null;const founder=souls.find(s=>s.id===id);return founder||assureWorld().bank[id]||null;}
@@ -236,6 +237,34 @@ function queueOffspring(f){assureWorld();if(f.budded||f.winStreak!==5||!buildAll
 }
 function retireSoul(f){assureWorld();if(!world.waiting.some(s=>s.id===f.soul.id))world.waiting.push({id:f.soul.id,readyAt:round+REINCARNATION_WAIT});}
 function releaseCaptives(f){if(!f?.soulEater||!f.captiveSoulIds?.length)return 0;assureWorld();let n=0;for(const id of f.captiveSoulIds){if(soulById(id)&&!world.waiting.some(q=>q.id===id)){world.waiting.push({id,readyAt:round+REINCARNATION_WAIT});n++;}}f.captiveSoulIds=[];world.soulEaterStats.releases+=n;return n;}
+// A captive can be sacrificed once to prevent a lethal defeat.
+// The released soul retains the painful impression and rejoins normal reincarnation.
+function soulEaterLastResort(f){
+ if(!f?.soulEater||f.hp>0||!f.captiveSoulIds?.length)return false;
+ assureWorld();
+ // Never spend a stale or missing soul reference as a free life.
+ let soul=null;
+ while(f.captiveSoulIds.length&&!soul){
+  const id=f.captiveSoulIds[f.captiveSoulIds.length-1];
+  soul=soulById(id);
+  if(!soul)f.captiveSoulIds.pop();
+ }
+ if(!soul)return false;
+ f.captiveSoulIds.pop();
+ ensureSoul(soul);
+ // Feed the existing emotional learning system without fabricating a new life.
+ const vessel={soul,hp:0,maxHp:1,stamina:0,mind:{affectiveMoments:[]}};
+ feel(vessel,{pain:1,pressure:.92,defense:.62,contact:.55},-1,2.6,'Torn from captivity');
+ if(!world.waiting.some(q=>q.id===soul.id))world.waiting.push({id:soul.id,readyAt:round+REINCARNATION_WAIT});
+ world.soulEaterStats.releases++;
+ world.soulEaterStats.sacrifices++;
+ const healed=Math.max(1,Math.round(f.maxHp*.10*f.body.recovery));
+ f.hp=Math.min(f.maxHp,healed);
+ f.hitFlash=.25;
+ floatText(f.x,'SOUL SACRIFICE +'+f.hp,'#f6a9ff');
+ addEvent('☄ '+f.name+' sacrificed '+soul.id+' to escape death · '+f.captiveSoulIds.length+' voices remain');
+ return true;
+}
 function collectiveImpression(f){const members=[f.soul,...(f.soulEater?(f.captiveSoulIds||[]).map(soulById).filter(Boolean):[])];const I={};for(const axis of AXES){const k=axis.key;let sum=0;for(const soul of members){const d=ensureDepth(soul);sum+=clamp(soul.im[k]*.70+d.lens[k]*.43+d.echo[k]*.70,-1.3,1.3);}I[k]=sum/members.length;}return I;}
 function genomeRecord(id){assureWorld();const key=String(id);return world.genomeStats[key]||(world.genomeStats[key]={wins:0,losses:0});}
 function genomeWeight(id){const s=genomeRecord(id),n=s.wins+s.losses;const estimate=(s.wins+5)/(n+10);return .30+Math.pow(estimate*2,3);}
@@ -529,7 +558,8 @@ function step(dt){t+=dt; for(let i=particles.length-1;i>=0;i--){let p=particles[
  if(f.hopV>0||f.hop>0){f.hop+=f.hopV*dt*38;f.hopV-=dt*11;if(f.hop<0){f.hop=0;f.hopV=0;}}
  if(f.attack){const a=f.attack;a.time+=dt;if(!a.hit&&a.time>=a.wind)impact(f,o);if(a.time>=a.full){f.attack=null;f.lock=.07;}}
  }
- const a=fighters[0],b=fighters[1],dx=b.x-a.x;if(Math.abs(dx)<63){const push=(63-Math.abs(dx))/2;a.x=clamp(a.x-push,62,938);b.x=clamp(b.x+push,62,938);} if(a.hp<=0||b.hp<=0){death(a.hp<=0?a:b,a.hp<=0?b:a);} else if(roundTimer>65){ // Arena pressure prevents endless stalemates.
+ const a=fighters[0],b=fighters[1],dx=b.x-a.x;if(Math.abs(dx)<63){const push=(63-Math.abs(dx))/2;a.x=clamp(a.x-push,62,938);b.x=clamp(b.x+push,62,938);} if(a.hp<=0)soulEaterLastResort(a);if(b.hp<=0)soulEaterLastResort(b);
+ if(a.hp<=0||b.hp<=0){death(a.hp<=0?a:b,a.hp<=0?b:a);} else if(roundTimer>65){ // Arena pressure prevents endless stalemates.
    if(!timedOut){timedOut=true;for(const f of fighters)f.soul.obs.timeoutDuels++;}
    for(const f of fighters){f.hp=Math.max(0,f.hp-1.2*dt);}
  }
@@ -768,7 +798,7 @@ function drawTriadLandscape(){
   fit('SOUL  ·  MIND  ·  BODY',cx,cy+2,Math.max(65,right-(left+cardW)-8),8,'#b4c2e0','center','750');
  }
 }
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9.7',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9.8',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 // Ten arcade victory crests per tier. Completed tiers upgrade the entire row's color.
 function drawVictoryCrests(x,y,available,streak,small=false){
  const wins=Math.max(0,Math.floor(streak||0)),tier=Math.floor(wins/10);
@@ -1143,7 +1173,7 @@ function drawGenesTab(){assureWorld();const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;le
  sectionLabel('SOUL EATERS',x,y,'RARE HEREDITARY ANOMALY');y+=24;
  const es=world.soulEaterStats;rr(x,y,ww,65,11,'#332c4e','#a08ab966');
  fit('Born '+es.spawned+'  ·  Captured '+es.captures+'  ·  Released '+es.releases,x+10,y+19,ww-20,10,'#edc5ff');
- fit('Largest collective '+es.maxBound+'  ·  Eater deaths '+es.defeats,x+10,y+39,ww-20,10,'#d2ddef');
+ fit('Largest collective '+es.maxBound+'  ·  Eater deaths '+es.defeats+'  ·  Sacrifices '+(es.sacrifices||0),x+10,y+39,ww-20,10,'#d2ddef');
  fit('No captivity limit. Defeat releases every voice.',x+10,y+55,ww-20,9,'#b4c6df');y+=80;
  sectionLabel('BUDDING & REINCARNATION',x,y,'5 WINS · ONE OFFSPRING');y+=26;
  const tiles=[['BIRTHS',world.births,'#a8e5c9'],['WAITING BODIES',world.nursery.length,'#ffd2ae'],['WAITING SOULS',world.waiting.length,'#c6baff'],['NEW SOULS',world.novelSouls,'#c2d6ff']],cellW=(ww-gap)/2;
