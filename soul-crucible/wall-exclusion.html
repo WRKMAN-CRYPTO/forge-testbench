@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><meta name="theme-color" content="#10162a">
+<title>Soul Crucible • Duel Prototype</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10162a;overscroll-behavior:none}canvas{width:100%;height:100%;display:block;touch-action:none}noscript{color:white;font:16px system-ui}
+</style>
+</head>
+<body><canvas id="game" aria-label="Soul Crucible autonomous side-view duel simulator. Tap arena creatures or soul labels to inspect. Tap Pause or Speed to control."></canvas><noscript>Enable JavaScript to play Soul Crucible.</noscript>
+<script>
+(()=>{'use strict';
+const canvas=document.getElementById('game'),g=canvas.getContext('2d',{alpha:false});
+const TAU=Math.PI*2, clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), rand=(a=0,b=1)=>a+Math.random()*(b-a), pick=a=>a[Math.floor(rand(0,a.length))], rint=(a,b)=>Math.floor(rand(a,b+1));
+const TYPES=[
+{name:'Skirmisher',family:'Sproutling',hp:2,speed:5,reach:2,power:2,defense:2,mass:1.8,poise:2,color:'#69d6a4'},
+{name:'Bruiser',family:'Tufflet',hp:4,speed:2,reach:2,power:4,defense:4,mass:4.1,poise:4,color:'#e5aa74'},
+{name:'Duelist',family:'Longling',hp:3,speed:3,reach:5,power:3,defense:2,mass:2.1,poise:2,color:'#c0acf6'},
+{name:'Pouncer',family:'Bristlehop',hp:3,speed:5,reach:3,power:4,defense:1,mass:2.1,poise:2,color:'#f5b87b'},
+{name:'Wall',family:'Pebblit',hp:5,speed:1,reach:2,power:3,defense:5,mass:5,poise:5,color:'#a9bf9f'},
+{name:'Trickster',family:'Ribbonel',hp:2,speed:4,reach:3,power:2,defense:2,mass:1.6,poise:1,color:'#90d9ee'},
+{name:'Glass Fang',family:'Mistril',hp:1,speed:4,reach:4,power:5,defense:1,mass:1.4,poise:1,color:'#f49cc5'}
+];
+const AXES=[{key:'closeness',title:'Closeness',desc:'Comfort approaching danger'},{key:'contact',title:'Contact',desc:'Feeling after trading blows'},{key:'pressure',title:'Pressure',desc:'Feeling about commitment'},{key:'defense',title:'Defense',desc:'Feeling about protection'},{key:'pain',title:'Pain',desc:'Emotional response to injury'}];
+const ACTIONS=['approach','retreat','observe','strike','heavy','guard','evade','lunge'];
+const OPP=['AURORA','UMBRA'];
+const NAME1=['Moss','Peb','Bri','Nim','Lum','Fae','Thim','Spri','Wisp','Rune','Glim','Pip','Kip','Vex','Mira'];
+const NAME2=['let','ling','bit','kin','fin','nip','bel','wick','moth','paw','thorn','bell','tail','glow','crest'];
+const KEY='soul-crucible-v0.2'; // Keep the same storage key: preserve decades of reincarnations.
+const SPEEDS=[1,3,10,30,100,300,1000,3000,10000],FIXED_DT=1/60,FAST_FX_THRESHOLD=30;
+// The simulation always advances in fixed physics steps. Only the desired number of steps changes.
+function cycleSpeed(){speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];accum=0;if(speed>=FAST_FX_THRESHOLD){particles.length=0;floats.length=0;}speedSampleWall=0;speedSampleSim=0;actualSpeed=0;}
+function toggleHeadless(){headless=!headless;headlessStartRound=round;accum=0;lastRenderAt=0;speedSampleWall=0;speedSampleSim=0;actualSpeed=0;particles.length=0;floats.length=0;save(true);}
+
+let souls, fighters, world, restoreFighters=null, round=1, selected=0, running=true, speed=1, headless=false, headlessStartRound=0, observerOpen=false, observerTab=0, observerScroll=0, observerMaxScroll=0, observerTouch=null;
+let saveStatus='unknown',saveMessage='',lastSavedRound=0,saveBytes=0,saveFailures=0,storageMode='opening',savePending=null,saveInFlight=false,saveGeneration=0,saveDatabase=null;
+let currentTournamentStep=-1,tournament=false,arenaCount=4,arenaSlots=[],activeArena=0,restoreArenaSlots=null,tournamentButtons=[];
+let particles=[], floats=[], events=[], buttons=[], arena=null, w=0,h=0,dpr=1,last=0, accum=0, t=0, roundTimer=0, banner='',bannerTimer=0, countdown=0, resetArmed=false, pauseOnHidden=true, timedOut=false, speedSampleWall=0, speedSampleSim=0, actualSpeed=0, lastSaveAt=0, lastRenderAt=0;
+// Observation only: sampled timings never feed decisions, physics, genetics or random draws.
+const perf={frames:0,ticks:0,stepMs:0,drawMs:0,saveMs:0,saveCount:0,decisionMs:0,decisionSamples:0,decisions:0,lifecycleMs:0,lifecycleCount:0,elapsedMs:0,lastReport:0,report:{},lastRound:1,duelsPerSecond:0};
+function profiledDecide(f,o){perf.decisions++;if((perf.decisions&127)!==0){decide(f,o);return;}const st=performance.now();decide(f,o);perf.decisionMs+=performance.now()-st;perf.decisionSamples++;}
+function perfReport(ms){if(!perf.lastReport)perf.lastReport=ms;const interval=ms-perf.lastReport;if(interval<1800)return;perf.duelsPerSecond=(round-perf.lastRound)*1000/interval;perf.lastRound=round;perf.report={ticksPerSecond:Math.round(perf.ticks*1000/interval),stepMsPerSecond:+(perf.stepMs*1000/interval).toFixed(1),drawMsPerSecond:+(perf.drawMs*1000/interval).toFixed(1),saveMsPerSecond:+(perf.saveMs*1000/interval).toFixed(1),saves:perf.saveCount,avgDecisionUs:perf.decisionSamples?Math.round(perf.decisionMs/perf.decisionSamples*1000):0,avgLifecycleMs:perf.lifecycleCount?+(perf.lifecycleMs/perf.lifecycleCount).toFixed(2):0,decisionsPerSecond:Math.round(perf.decisions*1000/interval),framesPerSecond:Math.round(perf.frames*1000/interval),duelsPerSecond:+perf.duelsPerSecond.toFixed(2)};perf.frames=perf.ticks=perf.stepMs=perf.drawMs=perf.saveMs=perf.saveCount=perf.decisionMs=perf.decisionSamples=perf.decisions=perf.lifecycleMs=perf.lifecycleCount=0;perf.lastReport=ms;}
+function blankCounts(list){const out={};for(const item of list){const key=typeof item==='string'?item:item.name;out[key]=0;}return out;}
+function freshObserver(){return {soulInfluence:{since:null,decisions:0,changed:0,aligned:0,conflicted:0,randomOverride:0,soulStrength:0,chosenSoul:0,byAction:blankCounts(ACTIONS),contexts:{near:{n:0,changed:0},far:{n:0,changed:0},hurt:{n:0,changed:0},healthy:{n:0,changed:0}}},decisionCounts:blankCounts(ACTIONS),bodyLives:blankCounts(TYPES),bodyWins:blankCounts(TYPES),bodyLosses:blankCounts(TYPES),openingEvades:0,duelsStarted:0,timeoutDuels:0,evades:0,successfulDodges:0,totalDamage:0,totalTaken:0,totalStrikes:0,totalGuards:0,livesObserved:0,openingSwings:0,openingAirSwings:0,openingMisses:0,airSwingParts:{mind:0,body:0,soul:0},openingWhiffParts:{mind:0,body:0,soul:0},openingSwingBodies:{}};}
+// Observation-only statistics: never feed this data into action selection or rewards.
+// Streaks belong to ONE living body/mind, not to its reincarnating soul. The observer
+// stores historical bests by body family and soul only so we can compare the results.
+function blankStreakRecords(){const out={};for(const b of TYPES)out[b.name]={best:0,reached5:0};return out;}
+function ensureStreakStats(o){
+ if(!o.streakRecords){o.streakRecords=blankStreakRecords();o.streakSince=round;}
+ if(!Number.isFinite(o.streakSince))o.streakSince=round;
+ for(const b of TYPES){const k=b.name;
+  if(!o.streakRecords[k])o.streakRecords[k]={best:0,reached5:0};
+  const row=o.streakRecords[k];
+  if(!Number.isFinite(row.best))row.best=0;
+  if(!Number.isFinite(row.reached5))row.reached5=0;
+ }
+ return o.streakRecords;
+}
+function recordSurvivalStreak(winner){
+ winner.winStreak=(winner.winStreak||0)+1;
+ const rows=ensureStreakStats(winner.soul.obs),row=rows[winner.body.name];
+ row.best=Math.max(row.best,winner.winStreak);assureWorld();const global=world.globalStreaks[winner.origin];global.best=Math.max(global.best,winner.winStreak);if(winner.winStreak===5)global.reached5++;
+ // Exactly one threshold crossing per living body. Nothing reproduces yet.
+ if(winner.winStreak===5)row.reached5++;
+}
+function streakSummary(s){const rows=ensureStreakStats(ensureSoul(s).obs);
+ return {best:Math.max(0,...TYPES.map(b=>rows[b.name].best)),reached5:TYPES.reduce((n,b)=>n+rows[b.name].reached5,0)};
+}
+
+function makeOpeningBodyRows(){const rows={};for(const b of TYPES)rows[b.name]={swings:0,air:0,misses:0};return rows;}
+function ensureOpeningStats(o){for(const k of ['openingSwings','openingAirSwings','openingMisses'])if(!Number.isFinite(o[k]))o[k]=0;
+ if(!o.openingSwingBodies)o.openingSwingBodies=makeOpeningBodyRows();
+ for(const b of TYPES){if(!o.openingSwingBodies[b.name])o.openingSwingBodies[b.name]={swings:0,air:0,misses:0};for(const k of ['swings','air','misses'])if(!Number.isFinite(o.openingSwingBodies[b.name][k]))o.openingSwingBodies[b.name][k]=0;}
+ if(!o.airSwingParts)o.airSwingParts={mind:0,body:0,soul:0};if(!o.openingWhiffParts)o.openingWhiffParts={mind:0,body:0,soul:0};for(const k of ['mind','body','soul']){if(!Number.isFinite(o.airSwingParts[k]))o.airSwingParts[k]=0;if(!Number.isFinite(o.openingWhiffParts[k]))o.openingWhiffParts[k]=0;}
+ return o;}
+function recordOpeningSwing(f,o,attack){const stats=ensureOpeningStats(f.soul.obs);if(roundTimer>=3||attack.type==='lunge')return;
+ // Match impact()'s reach rule; at launch the attack cannot connect at this distance.
+ const air=Math.abs(f.x-o.x)>=attack.reach+28;attack.openingSwing=true;attack.openingParts={...f.lastParts};
+ stats.openingSwings++;const row=stats.openingSwingBodies[f.body.name];row.swings++;
+ if(air){stats.openingAirSwings++;row.air++;
+  for(const k of ['mind','body','soul'])stats.airSwingParts[k]+=f.lastParts[k];
+ }}
+
+function ensureSoul(s){s.im=s.im||{};AXES.forEach(a=>{if(!Number.isFinite(s.im[a.key]))s.im[a.key]=0;});if(!s.origin)s.origin={...s.im};if(!Array.isArray(s.record))s.record=[];if(!Number.isFinite(s.lives))s.lives=0;if(!Number.isFinite(s.wins))s.wins=0;if(!Number.isFinite(s.losses))s.losses=0;if(!Number.isFinite(s.totalDamage))s.totalDamage=0;if(!s.obs){s.obs=freshObserver();s.obsStartedAtLife=s.lives||0;}const o=s.obs;if(!o.decisionCounts)o.decisionCounts=blankCounts(ACTIONS);if(!o.bodyLives)o.bodyLives=blankCounts(TYPES);if(!o.bodyWins)o.bodyWins=blankCounts(TYPES);if(!o.bodyLosses)o.bodyLosses=blankCounts(TYPES);for(const k of ACTIONS)if(!Number.isFinite(o.decisionCounts[k]))o.decisionCounts[k]=0;for(const t of TYPES){for(const map of [o.bodyLives,o.bodyWins,o.bodyLosses])if(!Number.isFinite(map[t.name]))map[t.name]=0;}for(const k of ['openingEvades','duelsStarted','timeoutDuels','evades','successfulDodges','totalDamage','totalTaken','totalStrikes','totalGuards','livesObserved']) if(!Number.isFinite(o[k]))o[k]=0;ensureOpeningStats(o);ensureStreakStats(o);ensureDepth(s);if(!o.soulInfluence)o.soulInfluence={since:round,decisions:0,changed:0,aligned:0,conflicted:0,randomOverride:0,soulStrength:0,chosenSoul:0,byAction:blankCounts(ACTIONS),contexts:{near:{n:0,changed:0},far:{n:0,changed:0},hurt:{n:0,changed:0},healthy:{n:0,changed:0}}};return s;}
+function bodyStats(soul,name){ensureSoul(soul);return {lives:soul.obs.bodyLives[name]||0,wins:soul.obs.bodyWins[name]||0,losses:soul.obs.bodyLosses[name]||0};}
+function totalCount(obj){let n=0;for(const k in obj)n+=obj[k]||0;return n;}
+// Soul depth: affective continuity, not episodes, tactics, names or opponent identities.
+// Everything the soul can use is a small, abstract emotional response to sensation.
+function soulDepth(s){
+ const lens={},echo={};AXES.forEach(a=>{const k=a.key;lens[k]=clamp(s.im[k]*.19+(s.origin?.[k]||0)*.30+rand(-.12,.12),-.5,.5);echo[k]=0;});
+ return {version:1,fromLife:s.lives,baseline:{...s.im},lens,echo,plasticity:rand(.80,1.20),feelings:0,last:{tone:'Unfamiliar quiet',valence:0},trail:[],reflection:{count:0,last:null,wrong:0}};
+}
+function ensureDepth(s){
+ if(!s.depth||s.depth.version!==1)s.depth=soulDepth(s);
+ const d=s.depth;
+ if(!d.baseline)d.baseline={...s.im};if(!d.lens)d.lens={};if(!d.echo)d.echo={};if(!Array.isArray(d.trail))d.trail=[];
+ for(const a of AXES){const k=a.key;if(!Number.isFinite(d.lens[k]))d.lens[k]=rand(-.28,.28);if(!Number.isFinite(d.echo[k]))d.echo[k]=0;}
+ if(!Number.isFinite(d.fromLife))d.fromLife=s.lives;
+ if(!Number.isFinite(d.feelings))d.feelings=0;
+ if(!Number.isFinite(d.plasticity))d.plasticity=1;
+ if(!d.reflection)d.reflection={count:0,last:null,wrong:0};
+ return d;
+}
+// Experience-driven appraisal: even the same sensation is colored differently
+// by emotional history, a lifetime's physiology, and each soul's mutable lens.
+function feel(f,cues,valence,strength,tone){
+ const s=f.soul,d=ensureDepth(s);
+ const divergence=ensureDivergence(s);divergence.events[tone]||(divergence.events[tone]={n:0});divergence.events[tone].n++;
+ const bodyStrain=(1-f.hp/Math.max(1,f.maxHp))*.20+(1-f.stamina/100)*.12;
+ const inherited=AXES.reduce((a,x)=>a+d.echo[x.key],0)/AXES.length;
+ const baseline=clamp(valence+inherited*.18-bodyStrain*.25,-1,1);
+ for(const axis of AXES){const k=axis.key,signal=cues[k]||0;
+  if(!signal)continue;
+  const felt=clamp(baseline + d.lens[k]*.95 + d.echo[k]*.24 + rand(-.23,.23),-1,1);
+  const rate=clamp(.040*strength*Math.abs(signal)*d.plasticity,.0005,.10);
+  const before=s.im[k];
+  s.im[k]=clamp(s.im[k]+rate*(felt-s.im[k]),-1,1); // Both positive AND negative updates.
+  logFeeling(s,k,tone,felt,before,s.im[k]);
+  logDivergence(s,tone,k,felt);
+  d.echo[k]=clamp(d.echo[k]*.89+felt*rate*.75,-.78,.78);
+  d.lens[k]=clamp(d.lens[k]+rate*.09*(felt-d.lens[k]),-.90,.90); // The initial core can change.
+ }
+ const shade=baseline>.38?'Bright pull':baseline>.05?'Faint ease':baseline<-.38?'Deep unease':baseline<-.05?'Restless tension':'Uncertain calm';
+ // Remember only the emotional weight and abstract sensations of salient moments.
+ // No opponent, tactic, event name, or episodic memory is stored here.
+ if(!Array.isArray(f.mind.affectiveMoments))f.mind.affectiveMoments=[];
+ const weight=Math.abs(baseline)*strength;
+ if(weight>.17){const moment={cues:Object.fromEntries(AXES.filter(a=>cues[a.key]).map(a=>[a.key,Math.abs(cues[a.key])])),valence:baseline,weight};const moments=f.mind.affectiveMoments;moments.push(moment);if(moments.length>18)moments.shift();}
+ d.feelings++;d.last={tone:shade,valence:baseline}; // The soul retains a feeling, never a named event.
+}
+// A deathbed review interprets fragments of affect, not a factual replay.
+// Misinterpretation is possible, and strong prior feelings bias the reading.
+// Each life contributes a small, bounded revision; ordinary experience can undo it.
+function reflectAtDeath(f){
+ const s=f.soul,d=ensureDepth(s),moments=f.mind.affectiveMoments||[];
+ if(!moments.length)return;
+ const sampled=moments.slice(-12),interpretations={};let wrong=0;
+ for(const a of AXES){const k=a.key;let weighted=0,denom=0;
+  for(const m of sampled){const cue=m.cues[k]||0;if(!cue)continue;weighted+=m.valence*cue*m.weight;denom+=cue*m.weight;}
+  if(denom<.01)continue;
+  const evidence=clamp(weighted/denom,-1,1);
+  const belief=clamp(evidence*.65+s.im[k]*.35+rand(-.38,.38),-1,1);
+  if(Math.abs(evidence)>.16&&Math.sign(belief)!==Math.sign(evidence))wrong++;
+  const influence=clamp(.035+.055*Math.abs(belief),.035,.09);
+  s.im[k]=clamp(s.im[k]+(belief-s.im[k])*influence,-1,1);
+  d.lens[k]=clamp(d.lens[k]+(belief-d.lens[k])*influence*.45,-.90,.90);
+  interpretations[k]=+belief.toFixed(3);
+ }
+ d.reflection.count++;d.reflection.wrong+=wrong;
+ d.reflection.last={life:s.lives,axes:interpretations,misread:wrong};
+}
+function traceSoul(s){const d=ensureDepth(s);d.trail.push({life:s.lives,im:{...s.im},lens:{...d.lens}});if(d.trail.length>44)d.trail.shift();
+ for(const a of AXES)d.echo[a.key]*=.52; // Residue survives, but short-lived arousal fades between lives.
+}
+
+// GENETICS v1: the original seven body classes are ancestral populations, never immutable limits.
+// One eligible 5-win parent buds once per living body; each child gets a soul immediately.
+const GENES=['frame','muscle','legs','limbs','armor','recovery','crest','tail','pigment'];
+const GENETIC_TRAITS=['frame','muscle','legs','limbs','armor','recovery'];
+const REINCARNATION_WAIT=2; // Minimum completed duels, not an exact rebirth date.
+function baseDNA(){return {frame:1,muscle:1,legs:1,limbs:1,armor:1,recovery:1,crest:1,tail:1,pigment:0};}
+function mutateDNA(from){const out={...from};let changed=0;
+ for(const gene of GENES){let value=Number.isFinite(out[gene])?out[gene]:(gene==='pigment'?0:1);
+  if(Math.random()<.46){const delta=(rand(-1,1)+rand(-1,1))*(Math.random()<.035?.30:.075);value+=delta;changed++;}
+  out[gene]=clamp(value,gene==='pigment'?-1:.35,gene==='pigment'?1:2.7);
+ }
+ // New offspring may look very similar; neutral and detrimental mutations are permitted.
+ return out;
+}
+function tintDNA(hex,v){const x=hex.replace('#','');if(x.length!==6)return hex;
+ const m=clamp(v,-1,1),parts=[0,2,4].map(i=>parseInt(x.slice(i,i+2),16));
+ return '#'+parts.map((n,i)=>Math.round(clamp(n+(i===0?34:i===2?-27:8)*m,0,255)).toString(16).padStart(2,'0')).join('');
+}
+function bodyFromDNA(type,dna,generation=0){const q=Object.assign(baseDNA(),dna||{}),b={...type};
+ b.hp=type.hp*(.5+.5*q.frame)*(.80+.20*q.armor);
+ b.speed=type.speed*(.28+.72*q.legs)/Math.sqrt(.4+.6*q.frame);
+ b.reach=type.reach*(.3+.7*q.limbs);
+ b.power=type.power*(.3+.7*q.muscle)*(.75+.25*q.frame);
+ b.defense=type.defense*(.3+.7*q.armor);
+ b.mass=type.mass*(.25+.75*q.frame)*(.85+.15*q.armor);
+ b.poise=type.poise*(.5+.5*q.frame)*(.5+.5*q.armor);
+ b.recovery=q.recovery;
+ b.color=tintDNA(type.color,q.pigment);
+ b.dna=q;b.generation=generation;
+ return b;
+}
+function createWorld(){return {version:1,since:round,nextSoul:1,nextBody:1,births:0,rebirths:0,novelSouls:0,nursery:[],waiting:[],bank:{},history:[],familyStats:{},soulOrigins:{}};}
+function assureWorld(){if(!world)world=createWorld();for(const k of ['nursery','waiting','history'])if(!Array.isArray(world[k]))world[k]=[];
+ for(const k of ['bank','familyStats','soulOrigins'])if(!world[k]||typeof world[k]!=='object')world[k]={};if(!world.globalStreaks){world.globalStreaks=blankStreakRecords();if(Array.isArray(souls))for(const type of TYPES)for(const soul of souls){const row=soul.obs?.streakRecords?.[type.name];if(row){world.globalStreaks[type.name].best=Math.max(world.globalStreaks[type.name].best,row.best||0);world.globalStreaks[type.name].reached5+=(row.reached5||0);}}}
+ for(const k of ['nextSoul','nextBody','births','rebirths','novelSouls'])if(!Number.isFinite(world[k]))world[k]= k.startsWith('next')?1:0;
+ if(!Number.isFinite(world.since))world.since=round;
+ if(!Array.isArray(world.genomePool))world.genomePool=[];
+ if(!world.genomeStats||typeof world.genomeStats!=='object')world.genomeStats={};
+ // Recruitment accounting begins at install. Do not invent historic arrivals or results.
+ if(!world.recruitAudit||!world.recruitAudit.rows){
+  world.recruitAudit={since:round,rows:{},total:0,bySource:{g0:0,earned:0,nursery:0,incumbent:0},byMode:{duel:0,tournament:0}};
+ }
+ for(const type of TYPES){if(!world.recruitAudit.rows[type.name])world.recruitAudit.rows[type.name]={entries:0,g0:0,earned:0,nursery:0,incumbent:0,duel:0,tournament:0,wins:0,deaths:0,completedDuels:0,bestObservedStreak:0};}
+ // Prospective lineage census. Existing history is not backfilled with invented outcomes.
+ if(!world.lineageCensus||typeof world.lineageCensus!=='object')world.lineageCensus={since:round,born:{},died:{},budded:{},wins:{},maxStreak:{},lives:{}};
+ return world;
+}
+function soulById(id){if(!id)return null;const founder=souls.find(s=>s.id===id);return founder||assureWorld().bank[id]||null;}
+function createNewSoul(){assureWorld();let id='S'+(world.nextSoul++);while(soulById(id))id='S'+(world.nextSoul++);
+ const im={};AXES.forEach(a=>im[a.key]=rand(-.18,.18));const color=tintDNA('#c7afd8',rand(-1,1));
+ const s=ensureSoul({id,color,im,origin:{...im},lives:0,wins:0,losses:0,record:[],totalDamage:0,obs:freshObserver()});
+ world.bank[id]=s;world.novelSouls++;return s;
+}
+function takeWaitingSoul(){assureWorld();const eligible=world.waiting.map((entry,i)=>({...entry,i})).filter(x=>x.readyAt<=round);
+ if(!eligible.length)return null;const chosen=pick(eligible);world.waiting.splice(chosen.i,1);world.rebirths++;
+ return soulById(chosen.id);
+}
+function assignSoul(){return takeWaitingSoul()||createNewSoul();}
+function uniqueBodyId(){assureWorld();return 'B'+(world.nextBody++);}
+function makeBodySeed(origin=null){const type=origin?.origin?TYPES.find(t=>t.name===origin.origin):pick(TYPES);
+ const b=type||pick(TYPES);return {id:origin?.id||uniqueBodyId(),parentId:origin?.parentId||null,origin:b.name,generation:origin?.generation||0,dna:origin?.dna||baseDNA(),genomeId:origin?.genomeId||null};
+}
+function queueOffspring(f){assureWorld();if(f.budded||f.winStreak!==5)return null;
+ f.budded=true;
+ // A G1+ reproducer earns one permanent, immutable genome entry. Its future copies
+ // receive new body IDs, fresh minds and independently assigned souls.
+ if(f.generation>=1&&!world.genomePool.some(g=>g.bodyId===(f.genomeId||f.bodyId)))world.genomePool.push({bodyId:f.genomeId||f.bodyId,origin:f.origin,generation:f.generation,dna:{...f.genome},registeredAt:round});
+ const soul=assignSoul();const id=uniqueBodyId(),dna=mutateDNA(f.genome),seed={id,parentId:f.bodyId,origin:f.origin,generation:f.generation+1,dna,soulId:soul.id,genomeId:id};
+ world.nursery.push(seed);world.births++;const census=world.lineageCensus;census.born[seed.generation]=(census.born[seed.generation]||0)+1;census.budded[f.generation]=(census.budded[f.generation]||0)+1;
+ const fam=world.familyStats[seed.origin]||(world.familyStats[seed.origin]={births:0,maxGeneration:0});fam.births++;fam.maxGeneration=Math.max(fam.maxGeneration,seed.generation);
+ world.history.unshift({id,parentId:seed.parentId,soulId:soul.id,origin:seed.origin,generation:seed.generation,duel:round});if(world.history.length>500)world.history.length=500;
+ addEvent(`${f.name} budded ${seed.id} (G${seed.generation}) • ${soul.id} enters its life.`);
+ return seed;
+}
+function retireSoul(f){assureWorld();world.waiting.push({id:f.soul.id,readyAt:round+REINCARNATION_WAIT});}
+function genomeRecord(id){assureWorld();const key=String(id);return world.genomeStats[key]||(world.genomeStats[key]={wins:0,losses:0});}
+function genomeWeight(id){const s=genomeRecord(id),n=s.wins+s.losses;const estimate=(s.wins+5)/(n+10);return .30+Math.pow(estimate*2,3);}
+function noteRecruit(f,source='incumbent'){
+ if(!f||f.auditTracked)return;
+ assureWorld();const audit=world.recruitAudit,record=audit.rows[f.origin];
+ if(!record)return;
+ const kind=['g0','earned','nursery','incumbent'].includes(source)?source:'incumbent';
+ const mode=tournament?'tournament':'duel';
+ f.auditTracked=true;f.auditWins=0;f.auditSource=kind;f.auditMode=mode;
+ record.entries++;record[kind]++;record[mode]++;
+ audit.total++;audit.bySource[kind]++;audit.byMode[mode]++;
+}
+function auditLivingBodies(){
+ // Existing fighters are left intact; mark their ongoing lives as incumbents
+ // when the instrument is first installed or an older checkpoint is restored.
+ if(tournament&&arenaSlots.length){for(const slot of arenaSlots)for(const f of slot.fighters||[])noteRecruit(f,'incumbent');}
+ else if(Array.isArray(fighters)){for(const f of fighters)noteRecruit(f,'incumbent');}
+}
+function auditDuel(loser,winner){
+ assureWorld();const rows=world.recruitAudit.rows;
+ // Track observed results even if a restored fighter predates installation.
+ noteRecruit(loser,'incumbent');noteRecruit(winner,'incumbent');
+ const lost=rows[loser.origin],won=rows[winner.origin];
+ if(won){won.wins++;winner.auditWins=(winner.auditWins||0)+1;won.bestObservedStreak=Math.max(won.bestObservedStreak,winner.auditWins);}
+ if(lost){lost.deaths++;lost.completedDuels+=(loser.auditWins||0)+1;}
+}
+function recruitSeed(){assureWorld();
+ // In tournament mode, give actual waiting offspring their opportunity first.
+ if(tournament&&world.nursery.length){const origins=[...new Set(world.nursery.map(s=>s.origin))],origin=pick(origins),candidates=world.nursery.filter(s=>s.origin===origin);let total=0;const weights=candidates.map(s=>{const v=genomeWeight(s.genomeId||s.id);total+=v;return v;});let needle=Math.random()*total,index=candidates.length-1;for(let i=0;i<candidates.length;i++){needle-=weights[i];if(needle<0){index=i;break;}}const seed=candidates[index];world.nursery.splice(world.nursery.indexOf(seed),1);return {...seed,recruitSource:'nursery'};}
+ // Equal chance for each ancestral design; smoothed fitness selects within it.
+ const origin=pick(TYPES).name;
+ const earned=world.genomePool.filter(g=>g.origin===origin);
+ const pending=world.nursery.filter(g=>g.origin===origin);
+ const candidates=[{kind:'g0',id:'G0:'+origin},...earned.map(g=>({kind:'earned',id:g.bodyId,g})),...pending.map(g=>({kind:'pending',id:g.genomeId||g.id,g}))];
+ const weights=candidates.map(x=>genomeWeight(x.id));
+ const total=weights.reduce((a,b)=>a+b,0);
+ let needle=Math.random()*total,chosen=candidates[candidates.length-1];
+ for(let k=0;k<candidates.length;k++){needle-=weights[k];if(needle<0){chosen=candidates[k];break;}}
+ if(chosen.kind==='g0')return {...makeBodySeed({origin,genomeId:'G0:'+origin}),recruitSource:'g0'};
+ if(chosen.kind==='earned'){const saved=chosen.g;return {...makeBodySeed({origin:saved.origin,generation:saved.generation,dna:{...saved.dna},parentId:saved.bodyId,genomeId:saved.bodyId}),recruitSource:'earned'};}
+ const seed=chosen.g;const idx=world.nursery.indexOf(seed);if(idx>=0)world.nursery.splice(idx,1);return {...seed,recruitSource:'nursery'};
+}
+function getRecruitSoul(seed){return seed.soulId?soulById(seed.soulId)||createNewSoul():assignSoul();}
+function packFighter(f){if(!f)return null;const {soul,body,...rest}=f;return {...rest,soulId:soul.id};}
+function restoreFighter(p){if(!p||!p.soulId)return null;const soul=soulById(p.soulId);if(!soul)return null;
+ const type=TYPES.find(t=>t.name===p.origin)||TYPES[0];return {...p,soul,body:bodyFromDNA(type,p.genome,p.generation)};
+}
+
+function makeSoul(i){let im={};AXES.forEach(a=>im[a.key]=rand(-.18,.18));return ensureSoul({id:i===0?'AURORA':'UMBRA',color:i===0?'#aab8ff':'#ffc79f',im,origin:{...im},lives:0,wins:0,losses:0,record:[],totalDamage:0,obs:freshObserver()});}
+// IndexedDB stores complete checkpoints as structured objects, without localStorage's tiny string quota.
+// Keep the original localStorage checkpoint untouched until a newer IndexedDB transaction commits.
+const DB_NAME='soul-crucible-checkpoints',DB_STORE='snapshots',DB_VERSION=1;
+function openCheckpointDB(){
+ return new Promise((resolve,reject)=>{
+  if(!('indexedDB' in window)){reject(Error('IndexedDB unavailable'));return;}
+  let request;try{request=indexedDB.open(DB_NAME,DB_VERSION);}catch(e){reject(e);return;}
+  request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(DB_STORE))db.createObjectStore(DB_STORE);};
+  request.onsuccess=()=>{const db=request.result;db.onversionchange=()=>db.close();resolve(db);};
+  request.onerror=()=>reject(request.error||Error('Cannot open IndexedDB'));
+  request.onblocked=()=>reject(Error('IndexedDB blocked by another tab'));
+ });
+}
+function readCheckpoint(db){return new Promise((resolve,reject)=>{
+ try{const tx=db.transaction(DB_STORE,'readonly'),req=tx.objectStore(DB_STORE).get('latest');
+ req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error||Error('Read failed'));tx.onabort=()=>reject(tx.error||Error('Read aborted'));
+ }catch(e){reject(e);}
+});}
+function writeCheckpoint(db,payload){return new Promise((resolve,reject)=>{
+ try{const tx=db.transaction(DB_STORE,'readwrite');
+ tx.objectStore(DB_STORE).put(payload,'latest');
+ tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error||Error('Checkpoint transaction aborted'));
+ tx.onerror=()=>{}; // onabort supplies the definitive transaction failure
+ }catch(e){reject(e);}
+});}
+function eraseCheckpoint(db){return new Promise((resolve,reject)=>{
+ try{const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).delete('latest');
+ tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('Erase aborted'));
+ }catch(e){reject(e);}
+});}
+function validCheckpoint(p){return !!(p&&Array.isArray(p.souls)&&p.souls.length===2&&p.souls.every(s=>s.im&&AXES.every(a=>Number.isFinite(s.im[a.key]))));}
+function restoreCheckpoint(p){
+ round=p.round||1;souls=p.souls.map(ensureSoul);world=p.world&&p.world.version===1?p.world:createWorld();assureWorld();
+ restoreFighters=Array.isArray(p.activeFighters)&&p.activeFighters.length===2?p.activeFighters:null;
+ restoreArenaSlots=Array.isArray(p.tournamentSlots)?p.tournamentSlots:null;tournament=!!p.tournament&&!!restoreArenaSlots;
+ arenaCount=[2,4,8,16].includes(p.arenaCount)?p.arenaCount:4;activeArena=Number.isInteger(p.activeArena)?Math.max(0,p.activeArena):0;
+ lastSavedRound=round;saveStatus='saved';
+}
+async function load(){
+ let legacy=null,stored=null;
+ try{legacy=JSON.parse(localStorage.getItem(KEY));}catch(e){console.warn('Legacy checkpoint unreadable',e);}
+ try{saveDatabase=await openCheckpointDB();stored=await readCheckpoint(saveDatabase);storageMode='indexeddb';}
+ catch(e){storageMode='localstorage';console.warn('IndexedDB unavailable',e);}
+ const legacyOK=validCheckpoint(legacy),storedOK=validCheckpoint(stored);
+ // A legacy checkpoint can be newer during an interrupted migration.
+ const best=legacyOK&&(!storedOK||(legacy.round||0)>(stored.round||0))?legacy:(storedOK?stored:null);
+ if(best){restoreCheckpoint(best);return;}
+ souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];
+}
+// Snapshot every arena's living minds and body states, but never visual effects.
+function packedArena(slot){return {fighters:slot.fighters.map(packFighter),t:slot.t,roundTimer:slot.roundTimer,banner:slot.banner,bannerTimer:slot.bannerTimer,countdown:slot.countdown,timedOut:slot.timedOut};}
+function checkpointPayload(){
+ assureWorld();
+ if(tournament&&arenaSlots.length&&currentTournamentStep>=0)arenaSlots[currentTournamentStep]=snapshotArena();
+ return {souls,round,world,activeFighters:fighters?.map(packFighter),tournament,arenaCount,activeArena,tournamentSlots:tournament?arenaSlots.map(packedArena):null};
+}
+function compactCheckpoint(p){
+ // Trim only archival observer trails in a copy; preserve every active soul, genome,
+ // living mind, nursery body, combat tally and current tournament state.
+ const lean=JSON.parse(JSON.stringify(p));
+ lean.world.history=lean.world.history?.slice(0,100)||[];
+ for(const soul of [...lean.souls,...Object.values(lean.world.bank||{})]){
+  if(Array.isArray(soul.record))soul.record=soul.record.slice(-16);
+  if(Array.isArray(soul.depth?.trail))soul.depth.trail=soul.depth.trail.slice(-16);
+ }
+ return lean;
+}
+function save(force=false){
+ const now=performance.now();
+ // Keep saves bounded even during hundreds of duels per second.
+ if(!force&&running&&now-lastSaveAt<2000)return;
+ if(storageMode==='opening')return;
+ let payload;
+ try{payload=checkpointPayload();}catch(e){saveError(e);return;}
+ lastSaveAt=now;
+ // One in-flight write and one latest pending checkpoint: never race old snapshots over new.
+ savePending={payload,generation:saveGeneration};
+ if(!saveInFlight)void flushSaves();
+}
+function saveError(e){saveStatus='failed';saveFailures++;saveMessage=(e?.name||'Save error')+': '+(e?.message||'storage write failed');running=false;accum=0;console.error('Soul Crucible checkpoint failed',e);}
+async function flushSaves(){
+ if(saveInFlight)return;saveInFlight=true;
+ try{
+  while(savePending){
+   const job=savePending;savePending=null;
+   if(job.generation!==saveGeneration)continue;
+   const started=performance.now();
+   let payload=job.payload;
+   try{
+    if(storageMode==='indexeddb'){
+     try{await writeCheckpoint(saveDatabase,payload);}
+     catch(e){if(e?.name!=='QuotaExceededError'&&e?.code!==22)throw e;payload=compactCheckpoint(payload);await writeCheckpoint(saveDatabase,payload);}
+     // A successful committed transaction is the authority, not an optimistic enqueue.
+     // Remove the legacy copy only after the first verified durable IndexedDB commit.
+     try{if(localStorage.getItem(KEY)!==null)localStorage.removeItem(KEY);}catch(e){}
+    }else{
+     let json=JSON.stringify(payload);
+     try{localStorage.setItem(KEY,json);}
+     catch(e){if(e?.name!=='QuotaExceededError'&&e?.code!==22)throw e;json=JSON.stringify(compactCheckpoint(payload));localStorage.setItem(KEY,json);}
+     if(localStorage.getItem(KEY)!==json)throw Error('Checkpoint verification failed');
+    }
+    if(job.generation!==saveGeneration)continue;
+    lastSavedRound=payload.round;saveStatus='saved';saveMessage='';
+    saveBytes=storageMode==='indexeddb'?0:JSON.stringify(payload).length*2;
+    perf.saveMs+=performance.now()-started;perf.saveCount++;
+   }catch(e){if(job.generation===saveGeneration){saveError(e);savePending=null;}break;}
+  }
+ }finally{saveInFlight=false;if(savePending)void flushSaves();}
+}
+async function resetCheckpoint(){
+ running=false;saveGeneration++;savePending=null;
+ while(saveInFlight)await new Promise(resolve=>setTimeout(resolve,25));
+ if(saveDatabase)await eraseCheckpoint(saveDatabase);
+ localStorage.removeItem(KEY);
+ souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];fighters=null;saveStatus='unknown';saveMessage='';
+ begin();running=true;save(true);
+}
+function drawSaveStatus(){
+ if(saveStatus==='unknown')return;
+ const msg=saveStatus==='failed'?'SAVE FAILED • SIMULATION PAUSED':('SAVED DUEL '+Math.max(0,lastSavedRound-1)+' • '+(storageMode==='indexeddb'?'DB':'LOCAL'));
+ const yy=headless?Math.max(9,h-115):Math.max(8,h-28);
+ const bw=Math.min(w-24,340);
+ rr((w-bw)/2,yy,bw,24,8,saveStatus==='failed'?'#783340':'#233e40',saveStatus==='failed'?'#ffb5b5':'#88dfbd');
+ fit(msg,w/2,yy+12,bw-16,10,saveStatus==='failed'?'#ffe1dd':'#d2f7e8','center','800');
+ if(saveStatus==='failed')fit(saveMessage,w/2,Math.max(16,yy-13),w-24,9,'#ffc8c8','center','650');
+}
+
+function born(soul,side,proposedSeed=null){ensureSoul(soul);const seed=makeBodySeed(proposedSeed),
+ b=bodyFromDNA(TYPES.find(t=>t.name===seed.origin)||TYPES[0],seed.dna,seed.generation),factor=rand(.90,1.10),hp=Math.round((60+b.hp*19)*factor),f={soul,side,body:b,bodyId:seed.id,parentId:seed.parentId,origin:seed.origin,generation:seed.generation,genome:{...b.dna},genomeId:seed.genomeId||(seed.generation===0?'G0:'+seed.origin:seed.id),budded:false,mind:{q:ACTIONS.map(()=>rand(-.16,.16)),lastAction:0,experience:0,learning:0.13,seenAttacks:0,affectiveMoments:[]},name:pick(NAME1)+pick(NAME2),x:side===0?205:795,vx:0,hop:0,hopV:0,hp,maxHp:hp,stamina:100,action:'observe',actionTime:0,lock:0,attack:null,guard:0,evade:0,hitFlash:0,stagger:0,decisionT:rand(.05,.24),lastParts:{mind:0,soul:0,body:0},winStreak:0,stat:{damage:0,taken:0,strikes:0,guards:0,evades:0,dodges:0,decisions:0,openingEvades:0},evadeResolved:false,evadeConnected:false,phase:rand(0,TAU),style:rint(0,4),tone:factor};soul.lives++;soul.obs.livesObserved++;soul.obs.bodyLives[b.name]++;if(world?.lineageCensus){const c=world.lineageCensus;c.lives[f.generation]=(c.lives[f.generation]||0)+1;}noteRecruit(f,proposedSeed?.recruitSource||'incumbent');return f;}
+function begin(){if(restoreFighters){const pair=restoreFighters.map(restoreFighter);if(pair.every(Boolean)){fighters=pair;restoreFighters=null;roundTimer=0;countdown=.70;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;}events.length=0;addEvent('Bloodlines restored. Souls remain their own.');if(fighters.some(f=>f.hp<=0))nextLife();if(tournament&&restoreArenaSlots)restoreTournament();auditLivingBodies();return;}restoreFighters=null;}
+ fighters=[born(souls[0],0),born(souls[1],1)];roundTimer=0;countdown=1.0;timedOut=false;for(const f of fighters){f.soul.obs.duelsStarted++;f.openingDuelCounted=false;}events.length=0;addEvent('Fresh minds. Fresh bodies. Old feelings.');}
+// Tournament contexts isolate duel-local state while sharing souls, genomes and census.
+function snapshotArena(){return {fighters,t,roundTimer,banner,bannerTimer,countdown,timedOut,particles,floats,events};}
+function loadArena(s){fighters=s.fighters;t=s.t;roundTimer=s.roundTimer;banner=s.banner;bannerTimer=s.bannerTimer;countdown=s.countdown;timedOut=s.timedOut;particles=s.particles;floats=s.floats;events=s.events;}
+function runInArena(index,fn){const previous=snapshotArena();loadArena(arenaSlots[index]);try{fn();}finally{arenaSlots[index]=snapshotArena();loadArena(previous);}}
+function newArenaSlot(){const pair=[];for(let side=0;side<2;side++){const seed=recruitSeed();pair.push(born(getRecruitSoul(seed),side,seed));}for(const f of pair){f.openingDuelCounted=false;f.soul.obs.duelsStarted++;}return {fighters:pair,t:0,roundTimer:0,banner:'',bannerTimer:0,countdown:.8,timedOut:false,particles:[],floats:[],events:[]};}
+function restoreTournament(){const slots=restoreArenaSlots;restoreArenaSlots=null;arenaSlots=[];if(!slots?.length){tournament=false;return;}for(const s of slots){const pair=s.fighters?.map(restoreFighter);if(pair?.length===2&&pair.every(Boolean))arenaSlots.push({...s,fighters:pair,particles:[],floats:[],events:[]});}if(!arenaSlots.length){tournament=false;return;}arenaCount=arenaSlots.length;activeArena=Math.min(activeArena,arenaSlots.length-1);loadArena(arenaSlots[activeArena]);}
+function enterTournament(){if(tournament)return;arenaSlots=[snapshotArena()];tournament=true;for(let i=1;i<arenaCount;i++)arenaSlots.push(newArenaSlot());activeArena=0;loadArena(arenaSlots[0]);save(true);}
+function leaveTournament(){if(!tournament)return;loadArena(arenaSlots[activeArena]||arenaSlots[0]);arenaSlots=[];tournament=false;save(true);}
+function changeArenaCount(){if(!tournament)return;const sizes=[2,4,8,16];const target=sizes[(sizes.indexOf(arenaCount)+1)%sizes.length];if(target>arenaSlots.length){while(arenaSlots.length<target)arenaSlots.push(newArenaSlot());}else{ // Retire removed arenas safely: living bodies keep their souls in a reserved queue.
+ while(arenaSlots.length>target){const slot=arenaSlots.pop();for(const f of slot.fighters){world.nursery.push({id:f.bodyId,parentId:f.parentId,origin:f.origin,generation:f.generation,dna:{...f.genome},soulId:f.soul.id,genomeId:f.genomeId});}}
+ }arenaCount=target;activeArena=Math.min(activeArena,target-1);loadArena(arenaSlots[activeArena]);save(true);}
+function tournamentStep(dt){const focus=activeArena;for(let i=0;i<arenaSlots.length;i++){loadArena(arenaSlots[i]);currentTournamentStep=i;step(dt);arenaSlots[i]=snapshotArena();currentTournamentStep=-1;}loadArena(arenaSlots[focus]);}
+function addEvent(msg){events.unshift(msg);if(events.length>5)events.length=5;}
+function imprint(s,k,amt){s.im[k]=clamp(s.im[k]+amt,-1,1);}
+function learn(f,r){const m=f.mind;const idx=m.lastAction; m.q[idx]=clamp(m.q[idx]+m.learning*(r-m.q[idx]*.1),-1.4,1.4);m.experience++;}
+function actionScore(f,o,a){const b=f.body, dist=Math.abs(o.x-f.x), reach=54+b.reach*17,
+ enemyReach=54+o.body.reach*17+(o.attack?.type==='lunge'?36:0),
+ safeDistance=dist>enemyReach+72, retreatRoom=f.x<o.x?f.x-62:938-f.x,
+ danger=!!o.attack&&o.attack.time<o.attack.wind+.10&&dist<enemyReach+52,
+ hurt=f.hp/f.maxHp, tired=f.stamina<23;
+ let mind=0,body=0,soul=0;const d=ensureDepth(f.soul),I={};for(const a of AXES){const k=a.key;I[k]=clamp(f.soul.im[k]*.70+d.lens[k]*.43+d.echo[k]*.70,-1.3,1.3);}
+ switch(a){
+ case 'approach': mind=.16+(dist>reach*1.1?1.0:.1)+(o.guard?.25:0);body=.1+b.speed*.045;soul=I.closeness*.85+I.pressure*.22;break;
+ case 'retreat':mind=.13+(dist<reach*1.13?.45:0)+(hurt<.35?.35:0)+(danger?.35:0);mind-=safeDistance?1.35:0;mind-=retreatRoom<45?1.2:retreatRoom<110?.52:0;body=b.speed*.055;soul=-I.closeness*.48-I.pain*.54-I.pressure*.20;break;
+ case 'observe':mind=.16+(dist>reach*1.9?.1:0);body=.1;soul=-I.pressure*.15;break;
+ case 'strike':mind=dist<=reach+18?.91:-1.15;body=b.power*.06+(b.speed*.045);soul=I.contact*.68+I.pressure*.27;break;
+ case 'heavy':mind=dist<=reach+10?.75:-1.1;body=b.power*.10-(b.speed*.01);soul=I.pressure*.6+I.contact*.32;break;
+ case 'guard':mind=.22+(danger?.9:0)+(dist<reach+25?.16:0);body=b.defense*.055;soul=I.defense*.78-I.pain*.32;break;
+ case 'evade':mind=.12+(danger?.9:0)+(dist<enemyReach+40?.20:0)-(safeDistance?.85:0);body=b.speed*.08;soul=-I.pain*.35+I.defense*.24-I.closeness*.13;break;
+ case 'lunge':mind=(dist>=reach*.6&&dist<=reach+120)?.79:-.9;body=b.speed*.06+b.power*.045;soul=I.pressure*.76+I.closeness*.32;break;
+ }
+ mind+=f.mind.q[ACTIONS.indexOf(a)]*.70; if(tired&&['lunge','heavy','evade'].includes(a))body-=.9;
+ if(f.stamina<12&&['heavy','lunge'].includes(a))body-=2;
+ if(f.lock>0&&['strike','heavy','lunge'].includes(a))body-=2;
+ if(a==='guard'&&o.action==='retreat')mind-=.18;
+ return {mind,body,soul,total:mind+body+soul+rand(-.18,.18)};}
+function blankSoulCharacter(){return {since:round,decisions:0,actions:Object.fromEntries(ACTIONS.map(a=>[a,{n:0,sum:0,positive:0,negative:0,promoted:0,suppressed:0,flipsIn:0,flipsOut:0}])),axes:Object.fromEntries(AXES.map(a=>[a.key,{sum:0,min:Infinity,max:-Infinity}])),changedFrom:Object.fromEntries(ACTIONS.map(a=>[a,blankCounts(ACTIONS)])),situations:{near:{n:0,changes:0},far:{n:0,changes:0},hurt:{n:0,changes:0},healthy:{n:0,changes:0}}};}
+function ensureSoulCharacter(o){if(!o.soulCharacter)o.soulCharacter=blankSoulCharacter();return o.soulCharacter;}
+function recordSoulCharacter(f,o,options,baseline,chosen){const c=ensureSoulCharacter(f.soul.obs),d=ensureDepth(f.soul);c.decisions++;
+ for(const a of AXES){const k=a.key,v=clamp(f.soul.im[k]*.70+d.lens[k]*.43+d.echo[k]*.70,-1.3,1.3),r=c.axes[k];r.sum+=v;r.min=Math.min(r.min,v);r.max=Math.max(r.max,v);}
+ for(const opt of options){const row=c.actions[opt.a];row.n++;row.sum+=opt.soul;if(opt.soul>0)row.positive++;if(opt.soul<0)row.negative++;
+  if(opt.soul>0&&opt.total-opt.soul<baseline.total-baseline.soul&&opt.total>=baseline.total)row.promoted++;
+  if(opt.soul<0&&opt.total-opt.soul>=chosen.total-chosen.soul&&opt.total<chosen.total)row.suppressed++;
+ }
+ if(baseline.a!==chosen.a){c.actions[chosen.a].flipsIn++;c.actions[baseline.a].flipsOut++;c.changedFrom[baseline.a][chosen.a]++;}
+ const dist=Math.abs(o.x-f.x),near=dist<54+f.body.reach*17+35;for(const k of [near?'near':'far',f.hp/f.maxHp<.5?'hurt':'healthy']){c.situations[k].n++;if(baseline.a!==chosen.a)c.situations[k].changes++;}
+}
+function decide(f,o){if(f.stagger>0)return; const options=ACTIONS.map(a=>({a,...actionScore(f,o,a)}));options.sort((a,b)=>b.total-a.total);
+ // Passive counterfactual using the SAME scored options and noise: no extra RNG calls.
+ // 'No soul' subtracts the soul term, without rerunning mind, body or learning.
+ const si=f.soul.obs.soulInfluence;const baseline=options.reduce((best,v)=>(v.total-v.soul>best.total-best.soul?v:best),options[0]);const soulPick=options.reduce((best,v)=>(v.soul>best.soul?v:best),options[0]);const changed=baseline.a!==options[0].a;
+ recordSoulCharacter(f,o,options,baseline,options[0]);
+ si.decisions++;if(changed){si.changed++;si.byAction[options[0].a]++;}if(soulPick.a===options[0].a)si.aligned++;if(soulPick.a!==baseline.a&&soulPick.total-soulPick.soul<baseline.total-baseline.soul)si.conflicted++;si.soulStrength+=Math.abs(options[0].soul);si.chosenSoul+=options[0].soul;
+ const dist=Math.abs(o.x-f.x),near=dist<54+f.body.reach*17+35,ctx=si.contexts;for(const k of [near?'near':'far',f.hp/f.maxHp<.5?'hurt':'healthy']){ctx[k].n++;if(changed)ctx[k].changed++;}
+ let opt=options[0];if(Math.random()<.12){const picked=options[rint(0,Math.min(2,options.length-1))];if(picked!==options[0])si.randomOverride++;opt=picked;}f.action=opt.a;f.lastParts={mind:opt.mind,soul:opt.soul,body:opt.body};f.mind.lastAction=ACTIONS.indexOf(opt.a);f.actionTime=.35;f.stat.decisions++;f.soul.obs.decisionCounts[opt.a]=(f.soul.obs.decisionCounts[opt.a]||0)+1;
+ if(opt.a==='guard'&&f.stamina>5){f.guard=.46;f.stat.guards++;f.soul.obs.totalGuards++;}
+ if(opt.a==='evade'&&f.stamina>12){f.evade=.35;f.evadeResolved=false;f.evadeConnected=false;f.hopV=1.5;f.stamina-=13;f.vx=(f.x<o.x?-1:1)*(135+f.body.speed*19);f.stat.evades++;f.soul.obs.evades++;if(roundTimer<3&&!f.openingDuelCounted){f.stat.openingEvades++;f.openingDuelCounted=true;f.soul.obs.openingEvades++;}}
+ if(['strike','heavy','lunge'].includes(opt.a)&&f.lock<=0&&!f.attack){const heavy=opt.a==='heavy',lunge=opt.a==='lunge';const wind=(heavy?.42:lunge?.30:.19)*(1.16-f.body.speed*.055),recovery=(heavy?.60:lunge?.49:.33)*(1.15-f.body.speed*.05);let cost=heavy?27:lunge?24:12;if(f.stamina>=cost){f.stamina-=cost;f.attack={type:opt.a,time:0,wind,full:wind+recovery,hit:false,impacted:false,reach:54+f.body.reach*17+(lunge?36:0),power:(heavy?1.55:lunge?1.24:1)*f.body.power}; recordOpeningSwing(f,o,f.attack);f.stat.strikes++;f.soul.obs.totalStrikes++;f.guard=0;if(lunge)f.vx=(f.x<o.x?1:-1)*(185+f.body.speed*18);}}
+ }
+function impact(f,o){const at=f.attack;if(!at||at.hit)return;at.hit=true;const dist=Math.abs(f.x-o.x),reachable=dist<at.reach+28;let success=false;if(at.openingSwing&&!reachable){const oStats=f.soul.obs;oStats.openingMisses++;oStats.openingSwingBodies[f.body.name].misses++;for(const k of ['mind','body','soul'])oStats.openingWhiffParts[k]+=at.openingParts[k];}
+ if(reachable){let dodge=o.evade>0.06&&Math.random()<.66;let defending=o.guard>.06; if(dodge){floatText(o.x,'DODGE','#9de6fa');o.stat.dodges++;o.soul.obs.successfulDodges++;o.evadeConnected=true;learn(o,.17);feel(o,{defense:1,pressure:.4,pain:.2},.56,1.0,'Relief in motion');}
+ else{let raw=(6+f.body.power*3.4)*at.power/f.body.power*rand(.83,1.16),blocked=defending?(.60+o.body.defense*.035):0,armor=1/(1+o.body.defense*.073);let dmg=Math.max(1,Math.round(raw*(1-blocked)*armor));o.hp=Math.max(0,o.hp-dmg);o.stat.taken+=dmg;f.stat.damage+=dmg;f.soul.totalDamage+=dmg;f.soul.obs.totalDamage+=dmg;o.soul.obs.totalTaken+=dmg;success=true;
+ o.hitFlash=.18;let push=(22+f.body.power*13)*(1-blocked*.7)*(2.7/(o.body.mass+1.4));o.vx+=(f.x<o.x?1:-1)*push;
+ if(at.type==='heavy'&&f.body.power>=o.body.poise&&Math.random()<.5)o.stagger=.14;
+ spawnHit(o.x,arena?arena.ground-37:200,defending?'#8bcbf9':'#fcd6a6');floatText(o.x,defending?`${dmg} BLOCK`:`-${dmg}`,defending?'#9fe4fa':'#ffe3bd');
+ learn(f,clamp(dmg/35,-.5,1));learn(o,-clamp(dmg/42,0,1));
+ feel(f,{contact:1,pressure:.72,closeness:.45},clamp(.22+dmg/95,-.2,.70),.70,'Force answered');
+ feel(o,{pain:1,defense:.7,closeness:.38,contact:.28},clamp(-.25-dmg/80+(defending?.20:0),-.85,.25),.85,'Impact endured');
+ if(defending){learn(o,.20);feel(o,{defense:1,pressure:.12},.36,.6,'Shelter held');} }
+ }
+ if(!success){learn(f,-.045);feel(f,{pressure:.75,contact:.3},-.21,.48,'Effort unanswered');if(!reachable)floatText(f.x,'MISS','#aeb6ce');}
+ }
+function spawnHit(px,py,c){if(speed>=FAST_FX_THRESHOLD)return;for(let i=0;i<10;i++)particles.push({x:arena.x+(px/1000)*arena.w,y:py,vx:rand(-100,100),vy:rand(-110,18),life:rand(.24,.5),max:.5,c,r:rand(2,5)});}
+function floatText(x,txt,c){if(speed>=FAST_FX_THRESHOLD)return;floats.push({x,y:arena?arena.ground-90:155,txt,c,life:.85});}
+function death(loser,winner){if(bannerTimer>0)return;const lifecycleStart=performance.now();auditDuel(loser,winner);
+ if(world?.lineageCensus){const c=world.lineageCensus;c.died[loser.generation]=(c.died[loser.generation]||0)+1;c.wins[winner.generation]=(c.wins[winner.generation]||0)+1;c.maxStreak[winner.generation]=Math.max(c.maxStreak[winner.generation]||0,(winner.winStreak||0)+1);}
+ genomeRecord(loser.genomeId||(loser.generation===0?'G0:'+loser.origin:loser.bodyId)).losses++;
+ genomeRecord(winner.genomeId||(winner.generation===0?'G0:'+winner.origin:winner.bodyId)).wins++;
+ loser.soul.losses++;winner.soul.wins++;winner.soul.obs.bodyWins[winner.body.name]++;loser.soul.obs.bodyLosses[loser.body.name]++;recordSurvivalStreak(winner);queueOffspring(winner);
+ // Death changes a soul through bodily experience, not a canned lesson.
+ // A costly last stand can be interpreted differently from a helpless defeat.
+ const struggle=clamp(loser.stat.damage/Math.max(1,loser.stat.taken),0,2);
+ feel(loser,{pain:1,pressure:.85,defense:.48,contact:.46,closeness:.30},clamp(-.53+struggle*.39,-.80,.35),1.7,'Life extinguished');
+ feel(winner,{pressure:.65,contact:.48,defense:.27},clamp(.30-winner.stat.taken/520,-.1,.48),1.0,'Still standing');
+ reflectAtDeath(loser);traceSoul(loser.soul);retireSoul(loser);
+ let entry={life:loser.soul.lives,body:loser.body.name,result:'Defeat',damage:Math.round(loser.stat.damage),streak:loser.winStreak,date:round};loser.soul.record.unshift(entry);loser.soul.record=loser.soul.record.slice(0,12);
+ winner.soul.record[0]&&0;banner=`${winner.name} survives • ${loser.soul.id} reincarnates`;
+ addEvent(`${loser.soul.id} lost life ${loser.soul.lives}. Emotional impressions remain.`);
+ winner.hp=Math.min(winner.maxHp, winner.hp+Math.round(winner.maxHp*.32*winner.body.recovery));winner.stamina=100;winner.attack=null;winner.guard=0;winner.evade=0;winner.vx=0;winner.lock=0;
+ bannerTimer=1.8;round++;save();perf.lifecycleMs+=performance.now()-lifecycleStart;perf.lifecycleCount++;}
+function nextLife(){const dead=fighters.findIndex(f=>f.hp<=0),survive=dead===0?1:0;if(dead<0)return;
+ const recruit=recruitSeed(),soul=getRecruitSoul(recruit);fighters[dead]=born(soul,dead,recruit);
+ fighters[survive].x=survive===0?205:795;fighters[survive].vx=0;fighters[dead].x=dead===0?205:795;countdown=.85;roundTimer=0;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;f.soul.obs.duelsStarted++;}save();}
+
+function step(dt){t+=dt; for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=190*dt;if(p.life<=0)particles.splice(i,1)}for(let i=floats.length-1;i>=0;i--){let p=floats[i];p.life-=dt;p.y-=27*dt;if(p.life<=0)floats.splice(i,1)}
+ if(bannerTimer>0){bannerTimer-=dt;if(bannerTimer<=0){bannerTimer=0;nextLife();}return;}if(countdown>0){countdown=Math.max(0,countdown-dt);return;}roundTimer+=dt;
+ for(let i=0;i<2;i++){const f=fighters[i],o=fighters[1-i],b=f.body;f.phase+=dt*(3.4+b.speed*.58);f.decisionT-=dt;f.guard=Math.max(0,f.guard-dt);f.evade=Math.max(0,f.evade-dt);f.hitFlash=Math.max(0,f.hitFlash-dt);f.stagger=Math.max(0,f.stagger-dt);f.lock=Math.max(0,f.lock-dt);f.stamina=clamp(f.stamina+dt*(9+b.speed*1.35)*b.recovery,0,100);
+ if(f.evade<=0&&!f.evadeResolved&&f.stat.evades>0){f.evadeResolved=true;if(!f.evadeConnected){learn(f,-.085);feel(f,{defense:.70,pressure:.32,pain:.13},-.24,.65,'Energy spent in silence');}}
+ if(f.decisionT<=0){f.decisionT=rand(.28,.47);profiledDecide(f,o);}
+ let move=0;if(f.stagger<=0){if(f.action==='approach')move=f.x<o.x?1:-1;else if(f.action==='retreat')move=f.x<o.x?-1:1;else if(f.action==='lunge'&&f.attack)move=f.x<o.x?1:-1;}
+ if(f.evade>0)move=0;let targetV=move*(75+b.speed*32)*(f.guard>0?.4:1);if(f.attack&&f.attack.type!=='lunge')targetV*=.32;
+ f.vx+=(targetV-f.vx)*Math.min(1,dt*(f.evade>0?1.9:5.8));f.x=clamp(f.x+f.vx*dt,62,938);
+ if(f.hopV>0||f.hop>0){f.hop+=f.hopV*dt*38;f.hopV-=dt*11;if(f.hop<0){f.hop=0;f.hopV=0;}}
+ if(f.attack){const a=f.attack;a.time+=dt;if(!a.hit&&a.time>=a.wind)impact(f,o);if(a.time>=a.full){f.attack=null;f.lock=.07;}}
+ }
+ const a=fighters[0],b=fighters[1],dx=b.x-a.x;if(Math.abs(dx)<63){const push=(63-Math.abs(dx))/2;a.x=clamp(a.x-push,62,938);b.x=clamp(b.x+push,62,938);} if(a.hp<=0||b.hp<=0){death(a.hp<=0?a:b,a.hp<=0?b:a);} else if(roundTimer>65){ // Arena pressure prevents endless stalemates.
+   if(!timedOut){timedOut=true;for(const f of fighters)f.soul.obs.timeoutDuels++;}
+   for(const f of fighters){f.hp=Math.max(0,f.hp-1.2*dt);}
+ }
+}
+function rr(x,y,ww,hh,r,fill,stroke){g.beginPath();g.roundRect(x,y,ww,hh,r);if(fill){g.fillStyle=fill;g.fill()}if(stroke){g.strokeStyle=stroke;g.lineWidth=1;g.stroke()}}
+function text(str,x,y,size=14,col='#eff1ff',align='left',weight='500'){g.font=`${weight} ${size}px system-ui,-apple-system,sans-serif`;g.fillStyle=col;g.textAlign=align;g.textBaseline='middle';g.fillText(str,x,y)}
+function line(x1,y1,x2,y2,col,width=1){g.strokeStyle=col;g.lineWidth=width;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke()}
+function glow(x,y,r,color,alpha=1){let grad=g.createRadialGradient(x,y,0,x,y,r);grad.addColorStop(0,color);grad.addColorStop(1,'transparent');g.globalAlpha=alpha;g.fillStyle=grad;g.fillRect(x-r,y-r,r*2,r*2);g.globalAlpha=1;}
+function drawBg(){g.fillStyle='#10162a';g.fillRect(0,0,w,h);const bg=g.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#10172c');bg.addColorStop(.64,'#1c213e');bg.addColorStop(1,'#141728');g.fillStyle=bg;g.fillRect(0,0,w,h);
+ for(let i=0;i<65;i++){let xx=(i*97.13+39)%w,yy=(i*41.8+24)%h;g.globalAlpha=.18+.2*(1+Math.sin(t*.45+i))/2;g.fillStyle='#dddbff';g.fillRect(xx,yy,1.4,1.4)}g.globalAlpha=1;
+}
+function layout(){const portrait=h>w*.95;const sidePad=clamp(w*.025,8,20);let x=sidePad,width=w-sidePad*2,y=portrait?117:69,hh=portrait?Math.min(345,h*.40):Math.max(180,h-132);arena={x,y,w:width,h:hh,ground:y+hh-39,portrait};}
+function drawArena(){const A=arena,{x,y,w:aw,h:ah,ground}=A;g.save();g.beginPath();g.roundRect(x,y,aw,ah,17);g.clip();let sky=g.createLinearGradient(0,y,0,y+ah);sky.addColorStop(0,'#222b55');sky.addColorStop(.55,'#36416b');sky.addColorStop(1,'#424267');g.fillStyle=sky;g.fillRect(x,y,aw,ah);
+ glow(x+aw*.5,y+ah*.14,aw*.35,'#acb1f4',.18);
+ g.fillStyle='#e5d6c4';g.beginPath();g.arc(x+aw*.5,y+ah*.23,Math.min(20,aw*.06),0,TAU);g.fill();
+ for(let i=0;i<17;i++){let sx=x+((i*73.2+13)%aw),sy=y+((i*43.1+16)%(ah*.6));g.fillStyle=i%2?'#9fb4df':'#c7bbe9';g.globalAlpha=.35;g.fillRect(sx,sy,1.5,1.5)}g.globalAlpha=1;
+ // Monument silhouettes and arches.
+ for(let i=0;i<6;i++){const bx=x+(i/5)*aw-21;g.fillStyle='#283152';g.beginPath();g.moveTo(bx,y+ah*.70);g.lineTo(bx+14,y+ah*.3+Math.sin(i*3)*16);g.lineTo(bx+31,y+ah*.70);g.fill();}
+ g.fillStyle='#2c314f';for(let i=0;i<7;i++){let xx=x+aw*(i/6)-15;g.fillRect(xx,y+ah*.59,27,ah*.31);g.beginPath();g.arc(xx+13,y+ah*.59,13,Math.PI,0);g.fill();}
+ for(let i=0;i<4;i++){let xx=x+aw*(i/3);glow(xx,y+ah*.58,21,'#83f1c9',.12);}
+ g.fillStyle='#51516a';g.fillRect(x,ground,aw,ah);
+ const floor=g.createLinearGradient(0,ground,0,y+ah);floor.addColorStop(0,'#52516a');floor.addColorStop(1,'#292c44');g.fillStyle=floor;g.fillRect(x,ground,aw,ah);line(x,ground,x+aw,ground,'#c7c1cc',2);
+ for(let i=0;i<16;i++){let xx=x+(i/15)*aw;line(xx,ground+6,xx-13,ground+ah*.17,'#85829955',1)}
+ // Rune circle floor
+ g.strokeStyle='#8ad1c45a';g.lineWidth=1.5;g.beginPath();g.ellipse(x+aw*.5,ground+17,aw*.13,8,0,0,TAU);g.stroke();
+ const s=Math.max(.43,Math.min(.94,aw/840));for(let i=0;i<2;i++)drawCritter(fighters[i],x+(fighters[i].x/1000)*aw,ground,s,i===0?1:-1);
+ for(const p of particles){g.globalAlpha=clamp(p.life/p.max,0,1);g.fillStyle=p.c;g.beginPath();g.arc(p.x,p.y,p.r,0,TAU);g.fill();}g.globalAlpha=1;
+ for(const f of floats){g.globalAlpha=clamp(f.life/.7,0,1);text(f.txt,x+(f.x/1000)*aw,f.y,Math.max(10,Math.min(15,aw*.023)),f.c,'center','800')}g.globalAlpha=1;
+ if(countdown>0){rr(x+aw*.5-95,y+ah*.30,190,42,18,'#141930d9','#b8b1e088');text('PREPARE TO DUEL',x+aw*.5,y+ah*.3+21,14,'#f3e5ff','center','800');}
+ if(bannerTimer>0){rr(x+Math.max(3,aw*.06),y+ah*.35,aw-Math.max(3,aw*.06)*2,60,14,'#14182ee9','#c8b3db');let short=aw<500?banner.replace(' survives • ',' wins • '):banner;text(short,x+aw*.5,y+ah*.35+30,aw<410?12:15,'#ffedce','center','800');}
+ g.restore();rr(x,y,aw,ah,17,null,'#727b9e66');}
+function drawCritter(f,px,ground,s,defaultFacing){const b=f.body,dir= f.x<fighters[1-f.side].x?1:-1,hop=f.hop||0;const walk=Math.sin(f.phase)*Math.min(1,Math.abs(f.vx)/160);const bd=f.hitFlash>0?'#fff4df':b.color;
+ g.save();g.translate(px,ground-hop*s);g.scale(s*dir,s);const hs=(f.body.name==='Wall'?1.28:f.body.name==='Glass Fang'?.8:1)*Math.pow((f.genome?.frame||1),.31);g.scale(Math.pow(f.genome?.frame||1,.13),Math.pow(f.genome?.legs||1,.10));
+ g.fillStyle='#12182766';g.beginPath();g.ellipse(0,7,64*hs,11,0,0,TAU);g.fill();
+ if(f.guard>0){g.lineWidth=6;g.strokeStyle='#93e6f4b5';g.beginPath();g.ellipse(1,-53,60*hs,57,0,0,TAU);g.stroke();}
+ if(f.evade>0){glow(0,-65,78,'#b3f6ff',.15);}
+ // tail
+ g.save();g.lineCap='round';g.strokeStyle=bd;g.lineWidth=(b.name==='Wall'?21:12)*(f.genome?.tail||1);g.beginPath();g.moveTo(-24,-52);g.quadraticCurveTo(-85*(f.genome?.tail||1),-70+walk*11,-78*(f.genome?.tail||1),-100+Math.sin(t*4+f.phase)*7);g.stroke();g.restore();
+ const shape=b.name;
+ // rear leg feet
+ g.fillStyle='#2d365b';for(let k=-1;k<=1;k+=2){g.beginPath();g.ellipse(-24+k*25+walk*9*k,-10,19*hs*(f.genome?.legs||1)**.20,14*(f.genome?.legs||1)**.45,-.2,0,TAU);g.fill();}
+ if(shape==='Duelist'||shape==='Trickster'){
+ g.fillStyle=bd;g.beginPath();g.ellipse(0,-56,37,54,-.12,0,TAU);g.fill();
+ }else if(shape==='Wall'||shape==='Bruiser'){
+ g.fillStyle=bd;g.beginPath();g.ellipse(0,-54,53*hs,47*hs,.05,0,TAU);g.fill();
+ }else{g.fillStyle=bd;g.beginPath();g.ellipse(0,-51,44*hs,42*hs,-.12,0,TAU);g.fill();}
+ // gradient belly and shoulder patch
+ g.fillStyle='#fff6dc4a';g.beginPath();g.ellipse(17,-41,21,23,.2,0,TAU);g.fill();
+ if(shape==='Wall'||shape==='Bruiser'){g.fillStyle='#394e63';g.beginPath();g.ellipse(-17,-70,27,23,-.5,0,TAU);g.fill();}
+ // mystical crest and ears
+ g.fillStyle=bd;
+ function ear(ex,rot){g.save();g.translate(ex,-88);g.rotate(rot);g.beginPath();g.moveTo(-12,8);g.quadraticCurveTo(-22,-27,-10,-57*(f.genome?.crest||1));g.quadraticCurveTo(12,-47*(f.genome?.crest||1),14,6);g.fill();g.fillStyle='#ffd8ed77';g.beginPath();g.moveTo(-3,1);g.quadraticCurveTo(-10,-23,-6,-42);g.quadraticCurveTo(5,-30,6,1);g.fill();g.restore();}
+ ear(-17,-.19);ear(23,.18);
+ if(shape==='Bruiser'||shape==='Wall'){g.fillStyle='#f1d8b5';for(const xx of [-28,21]){g.beginPath();g.moveTo(xx,-101);g.lineTo(xx+7,-129);g.lineTo(xx+17,-101);g.fill();}}
+ if(shape==='Glass Fang'){g.fillStyle='#fff0f0';for(let i=0;i<3;i++){let xx=-28+i*25;g.beginPath();g.moveTo(xx,-83);g.lineTo(xx+12,-124-8*(i===1));g.lineTo(xx+23,-83);g.fill();}}
+ // head
+ g.fillStyle=bd;g.beginPath();g.ellipse(23,-74,35,32,-.04,0,TAU);g.fill();
+ g.fillStyle='#ffffffc9';g.beginPath();g.ellipse(34,-79,9,12,0,0,TAU);g.fill();g.fillStyle='#293249';g.beginPath();g.ellipse(37+(f.attack?2:0),-78,4.5,8,0,0,TAU);g.fill();g.fillStyle='#fff';g.beginPath();g.arc(39,-81,2,0,TAU);g.fill();
+ g.fillStyle='#3e375d';g.beginPath();g.ellipse(52,-62,5,3,0,0,TAU);g.fill();
+ // arm animated windup
+ const swing=f.attack? clamp((f.attack.time-f.attack.wind+.07)/.22,0,1):0;
+ const armX=(shape==='Duelist'?59:38)*(f.genome?.limbs||1), armY=-45-(f.attack?swing*18:walk*2);
+ g.strokeStyle=bd;g.lineWidth=(shape==='Bruiser'?23:shape==='Glass Fang'?10:16)*Math.sqrt(f.genome?.muscle||1);g.lineCap='round';g.beginPath();g.moveTo(23,-51);g.lineTo(armX+(f.attack?swing*30:0),armY);g.stroke();g.fillStyle='#f8e3c5a3';g.beginPath();g.arc(armX+(f.attack?swing*30:0),armY,shape==='Bruiser'?11:7,0,TAU);g.fill();
+ // soul-like visible magic insignia, *not* a mechanically deterministic soul color
+ g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
+ if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
+ g.restore();}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.8',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawFighterBars(){const A=arena;const compact=w<550,margin=12,gap=12,bw=(A.w-gap-26)/2;for(let i=0;i<2;i++){let f=fighters[i],xx=A.x+13+i*(bw+gap),yy=A.y+11;rr(xx,yy,bw,44,9,'#14172baf','#ffffff2d');text(`${f.soul.id} · ${f.name}`,xx+8,yy+10,compact?9:11,f.soul.color,'left','800');fit(`${f.body.name} · ${f.winStreak} IN A ROW`,xx+8,yy+20,bw-14,compact?8:10,'#ddddf0','left','600');rr(xx+8,yy+26,bw-16,8,4,'#161e38');rr(xx+8,yy+26,(bw-16)*clamp(f.hp/f.maxHp,0,1),8,4,i===0?'#8eddd0':'#e9a2b6');rr(xx+8,yy+38,bw-16,3.5,2,'#2a334a');rr(xx+8,yy+38,(bw-16)*(f.stamina/100),3.5,2,'#b9b7ff');}}
+function btn(label,x,y,bw,bh,active=false){buttons.push({label,x,y,w:bw,h:bh});rr(x,y,bw,bh,11,active?'#8282c93b':'#ffffff0d',active?'#cbc1ff8a':'#ffffff25');text(label,x+bw/2,y+bh/2,Math.min(12,Math.max(10,w/39)),active?'#f4eaff':'#dddaf0','center','800');}
+function drawButtons(){buttons=[];const A=arena,yy=A.portrait?A.y+A.h+11:h-52,xx=A.x,bw=(A.w-22)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',xx,yy,bw,40,!running);btn(`${speed}× SPEED`,xx+bw+11,yy,bw,40,speed>1);btn('✦ OBSERVE',xx+2*(bw+11),yy,bw,40,false);}
+function drawHeadless(){
+ g.fillStyle='#11182b';g.fillRect(0,0,w,h);const cx=w/2,wide=Math.min(w-30,520),left=cx-wide/2,top=Math.max(18,h*.12);
+ text('✧  SOUL CRUCIBLE',cx,top,Math.min(19,w/19),'#e8deff','center','850');
+ text('HEADLESS • EVOLUTION LAB',cx,top+27,11,'#9caed2','center','800');
+ const stats=[['DUELS COMPLETED',String(Math.max(0,round-1))],['SINCE TURBO',String(Math.max(0,round-headlessStartRound))],['SPEED TARGET',speed+'×'],['ACTUAL SPEED',running?(actualSpeed?actualSpeed+'×':'MEASURING…'):'PAUSED'],['TOTAL BIRTHS',String(world?.births||0)],['HIGHEST GENERATION','G'+Math.max(0,...Object.values(world?.familyStats||{}).map(x=>x.maxGeneration||0))],['NURSERY',String(world?.nursery?.length||0)]];
+ const available=Math.max(150,h-top-230),stepH=Math.min(47,available/stats.length);
+ for(let i=0;i<stats.length;i++){const yy=top+53+i*stepH;rr(left,yy,wide,stepH-5,9,'#202b46','#52608044');text(stats[i][0],left+11,yy+(stepH-5)/2,Math.min(10,w/39),'#aebed8','left','700');fit(stats[i][1],left+wide-11,yy+(stepH-5)/2,wide*.48,Math.min(15,w/23),'#f8e4c1','right','850');}
+ const p=perf.report,baseY=top+53+stats.length*stepH+5;
+ text('ENGINE PROFILER  •  LAST ~2 SECONDS',left+4,baseY+10,10,'#b9c9e9','left','850');
+ const rows=[`STEPS/s  ${p.ticksPerSecond??'…'}   •   DUELS/s  ${p.duelsPerSecond??'…'}`,`CPU ms/s  SIM ${p.stepMsPerSecond??'…'}  DRAW ${p.drawMsPerSecond??'…'}  SAVE ${p.saveMsPerSecond??'…'}`,`DECISIONS/s  ${p.decisionsPerSecond??'…'}   •   AVG ${p.avgDecisionUs??'…'} µs`,`LIFECYCLE  ${p.avgLifecycleMs??'…'} ms/duel   •   UI ${p.framesPerSecond??'…'} fps`];
+ for(let i=0;i<rows.length;i++)fit(rows[i],left+4,baseY+30+i*20,wide-8,Math.min(11,w/37),'#d5e0f2','left','650');
+ buttons=[];const by=h-54,gap=7,bw=(wide-2*gap)/3;btn(running?'Ⅱ PAUSE':'▶ PLAY',left,by,bw,40,!running);btn(speed+'× SPEED',left+bw+gap,by,bw,40,true);btn('◀ ARENA',left+2*(bw+gap),by,bw,40,true);
+}
+function fit(str,x,y,maxWidth,size=11,color='#f5f0ff',align='left',weight='600'){
+ let tx=String(str);g.font=`${weight} ${size}px system-ui,-apple-system,sans-serif`;
+ if(g.measureText(tx).width>maxWidth){while(tx.length>1&&g.measureText(tx+'…').width>maxWidth)tx=tx.slice(0,-1);tx+='…';}
+ text(tx,x,y,size,color,align,weight);
+}
+function sectionLabel(label,x,y,tag=''){text(label,x,y,11,'#cbd3fa','left','800');if(tag)text(tag,w-18,y,9,'#96a2c6','right','650');}
+function tinyIcon(x,y,icon,c='#b9d9ea'){rr(x-12,y-12,24,24,8,c+'24',c+'66');text(icon,x,y+1,14,c,'center','800');}
+function littleBar(x,y,bw,v,col){rr(x,y,bw,7,4,'#303958');rr(x,y,Math.max(0,bw*clamp(v,0,1)),7,4,col);}
+function percent(n,d){return d>0?Math.round(100*n/d):0;}
+function drawRing(x,y,r,p,col){g.beginPath();g.arc(x,y,r,-Math.PI/2,-Math.PI/2+TAU, false);g.strokeStyle='#38435f';g.lineWidth=5;g.stroke();g.beginPath();g.arc(x,y,r,-Math.PI/2,-Math.PI/2+TAU*clamp(p,0,1),false);g.strokeStyle=col;g.lineCap='round';g.stroke();}
+function compareSignals(idx){const a=souls[idx],b=souls[1-idx],ao=ensureSoul(a).obs,bo=ensureSoul(b).obs;
+ const al=Math.max(1,ao.duelsStarted),bl=Math.max(1,bo.duelsStarted),ac=totalCount(ao.decisionCounts),bc=totalCount(bo.decisionCounts);
+ if(ao.duelsStarted<8||bo.duelsStarted<8||ac<40||bc<40)return {icon:'◌',title:'Still gathering evidence',line:`${ao.duelsStarted} vs ${bo.duelsStarted} observed duels`,note:'Old duels are not included in new counters.',kind:'collect'};
+ const fields=[
+  {icon:'↶',name:'Opening hops',diff:ao.openingEvades/al-bo.openingEvades/bl,va:percent(ao.openingEvades,al),vb:percent(bo.openingEvades,bl),unit:'% of duels'},
+  ...['evade','retreat','guard','lunge','strike','heavy'].map(k=>({icon:k==='evade'?'↝':k==='guard'?'◇':'✦',name:k[0].toUpperCase()+k.slice(1)+' choices',diff:(ao.decisionCounts[k]||0)/ac-(bo.decisionCounts[k]||0)/bc,va:percent(ao.decisionCounts[k]||0,ac),vb:percent(bo.decisionCounts[k]||0,bc),unit:'% of decisions'}))
+ ];
+ // Display the largest absolute measurable behavioral difference, even if the opposite soul has more.
+ fields.sort((u,v)=>v.diff-u.diff);const f=fields[0];
+ if(f.diff<.045)return {icon:'≈',title:'No strong contrast yet',line:'Observed action mixes are similar',note:'Different bodies may still explain small changes.',kind:'neutral'};
+ return {icon:f.icon,title:`MORE ${f.name.toLowerCase()}`,line:`${a.id} ${f.va}%  ·  ${b.id} ${f.vb}%`,note:`${f.unit}  •  correlation, not soul causation`,kind:'contrast'};
+}
+function drawDuelSnapshot(){const A=arena,f=fighters[selected],s=f.soul,o=ensureSoul(s).obs;
+ if(A.portrait){const x=A.x,y=A.y+A.h+61,ww=A.w,hh=h-y-10;if(hh<72)return;
+  rr(x,y,ww,hh,16,'#1b223a','#5660869c');
+  text(`${selected===0?'◀':'▶'}  ${s.id}  ·  LIFE ${s.lives}`,x+15,y+24,Math.min(15,w/26),s.color,'left','800');
+  text(`${f.body.name}  ·  ${s.wins} W / ${s.losses} L`,x+15,y+47,11,'#c5d2eb');
+  const base=y+62, tileW=(ww-42)/3;
+  if(hh>136){
+   for(const [i,label,val,color] of [[0,'WIN RATE',percent(s.wins,s.wins+s.losses)+'%',s.color],[1,'EARLY HOPS',`${o.openingEvades}/${o.duelsStarted}`,'#ffc4d2'],[2,'DODGES',`${o.successfulDodges}/${o.evades}`,'#99e9d9']]){
+    const tx=x+12+i*(tileW+9);rr(tx,base,tileW,55,11,'#10182d','#56628177');text(label,tx+8,base+13,8,'#98a7cb','left','800');text(val,tx+8,base+37,17,color,'left','800');
+   }
+  }
+  if(hh>205){const sy=base+76;sectionLabel('CURRENT SOUL IMPRESSIONS',x+15,sy);for(let i=0;i<5;i++){
+   const a=AXES[i],v=s.im[a.key],cy=sy+24+i*23;
+   text(a.title,x+15,cy,10,'#c2c9df');const xx=x+114,bw=ww-131;rr(xx,cy-5,bw,9,4,'#343e5b');line(xx+bw/2,cy-6,xx+bw/2,cy+6,'#94a9cc8c');let length=Math.abs(v)*bw*.48;rr(v<0?xx+bw/2-length:xx+bw/2,cy-3,length,5,3,v<0?'#e6abd8':'#84d9c9');
+  }}
+  if(hh>345)fit(`Arena timeouts observed: ${o.timeoutDuels}  ·  Tap OBSERVE for more`,x+15,y+hh-19,ww-28,9,'#a1aed0');
+ }else{
+  const x=A.x+8,y=A.y+A.h-90,ww=Math.min(345,A.w*.49);
+  rr(x,y,ww,78,12,'#141b31e6','#ffffff36');
+  text(`${s.id} · LIFE ${s.lives} · ${f.body.name}`,x+10,y+17,11,s.color,'left','800');
+  text(`${s.wins} W / ${s.losses} L · ${percent(s.wins,s.wins+s.losses)}% wins`,x+10,y+36,10,'#eff0fb');
+  text(`Early hops ${o.openingEvades}/${o.duelsStarted} · Dodges ${o.successfulDodges}/${o.evades}`,x+10,y+56,10,'#addbd7');
+ }
+}
+function drawSoulCard(s,x,y,cw){const o=ensureSoul(s).obs;rr(x,y,cw,116,14,'#1d2742',s.color+'70');
+ text(s.id,x+13,y+18,13,s.color,'left','850');
+ const r=Math.min(23,cw*.13);drawRing(x+cw-r-14,y+44,r,s.wins/Math.max(1,s.wins+s.losses),s.color);
+ text(percent(s.wins,s.wins+s.losses)+'%',x+cw-r-14,y+44,11,s.color,'center','800');
+ text(`${s.wins}W  ${s.losses}L`,x+12,y+44,13,'#fbf1df','left','800');
+ text(`LIFE ${s.lives}`,x+12,y+66,10,'#c3cae6','left','700');
+ text(`${o.livesObserved} monitored`,x+12,y+85,10,'#b2bcd8');
+ littleBar(x+12,y+103,cw-24,s.wins/Math.max(1,s.wins+s.losses),s.color);
+}
+function drawAnomalyCard(s,idx,x,y,ww){const report=compareSignals(idx);rr(x,y,ww,89,13,'#212c46',s.color+'58');tinyIcon(x+24,y+25,report.icon,s.color);text(s.id+'  ·  '+report.title.toUpperCase(),x+45,y+17,10,s.color,'left','800');
+ fit(report.line,x+45,y+40,ww-60,12,'#f0eff8');fit(report.note,x+14,y+70,ww-28,10,'#aebbd7');}
+function drawSoulTab(){const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=151;
+ sectionLabel('THE FOUNDING SOULS',x,y,'AURORA & UMBRA • FULL ARCHIVES');y+=18;
+ drawSoulCard(souls[0],x,y,cw);drawSoulCard(souls[1],x+cw+gap,y,cw);y+=132;
+ sectionLabel('✧  ANOMALY WATCH',x,y,'OBSERVED ≠ EXPLAINED');y+=18;
+ drawAnomalyCard(souls[0],0,x,y,ww);y+=99;drawAnomalyCard(souls[1],1,x,y,ww);y+=111;
+ sectionLabel('SOUL IMPRINTS',x,y,'CURRENT VALUES   −1 TO +1');y+=24;
+ for(const a of AXES){text(a.title.toUpperCase(),x,y,10,'#c5ceeb','left','700');const bx=x+105,bw=w-bx-15;rr(bx,y-5,bw,9,4,'#303e58');line(bx+bw/2,y-6,bx+bw/2,y+6,'#abb3d277');for(let i=0;i<2;i++){let v=souls[i].im[a.key],len=Math.abs(v)*bw*.47;rr(v<0?bx+bw/2-len:bx+bw/2,y-3+i*4,len,3,2,souls[i].color);}y+=28;}
+ text('AURORA',x+2,y+7,9,souls[0].color,'left','800');text('●',x+54,y+7,9,souls[0].color);text('UMBRA',x+85,y+7,9,souls[1].color,'left','800');text('●',x+132,y+7,9,souls[1].color);y+=30;
+ sectionLabel('EMOTIONAL LENSES',x,y,'MUTABLE • NOT EPISODIC MEMORY');y+=22;
+ for(const a of AXES){text(a.title.toUpperCase(),x,y,10,'#b8c9e5','left','700');const bx=x+105,bw=w-bx-15;rr(bx,y-5,bw,9,4,'#303e58');line(bx+bw/2,y-6,bx+bw/2,y+6,'#abb3d277');for(let i=0;i<2;i++){const v=ensureDepth(souls[i]).lens[a.key],len=Math.abs(v)*bw*.47;rr(v<0?bx+bw/2-len:bx+bw/2,y-3+i*4,len,3,2,souls[i].color);}y+=28;}
+ y+=9;sectionLabel('LINGERING ECHOES',x,y,'STRONG FEELINGS FADE OVER LIVES');y+=22;
+ for(const a of AXES){text(a.title.toUpperCase(),x,y,10,'#b8c9e5','left','700');const bx=x+105,bw=w-bx-15;rr(bx,y-5,bw,9,4,'#303e58');line(bx+bw/2,y-6,bx+bw/2,y+6,'#abb3d277');for(let i=0;i<2;i++){const v=ensureDepth(souls[i]).echo[a.key],len=Math.abs(v)*bw*.47;rr(v<0?bx+bw/2-len:bx+bw/2,y-3+i*4,len,3,2,souls[i].color);}y+=28;}
+ y+=11;sectionLabel('LAST FEELING',x,y,'IMPRESSION, NOT A FACTUAL MEMORY');y+=20;
+ for(let i=0;i<2;i++){const s=souls[i],d=ensureDepth(s),half=(ww-10)/2,bx=x+i*(half+10);rr(bx,y,half,67,12,'#202c46',s.color+'64');fit(s.id,bx+10,y+15,half-20,11,s.color,'left','800');fit(d.last?.tone||'Quiet',bx+10,y+36,half-20,11,'#edf1fa');text(`${d.feelings} feelings observed`,bx+10,y+54,9,'#a6b6d1');}
+ y+=84;sectionLabel('IMPRINT DRIFT',x,y,'TRACKED SINCE SOUL DEPTH UPGRADE');y+=20;
+ const chartX=x+16,chartW=ww-32,chartH=73;rr(x,y,ww,chartH+24,13,'#202b45','#64729a55');
+ for(let i=0;i<2;i++){const s=souls[i],d=ensureDepth(s),trace=[{im:d.baseline},...d.trail];if(trace.length<2)continue;
+  g.beginPath();g.strokeStyle=s.color;g.lineWidth=2;
+  for(let j=0;j<trace.length;j++){const impression=trace[j].im,drift=AXES.reduce((acc,axis)=>acc+Math.abs(impression[axis.key]-d.baseline[axis.key]),0)/(AXES.length*2),px=chartX+(j/(trace.length-1))*chartW,py=y+chartH-6-drift*(chartH-16);if(j===0)g.moveTo(px,py);else g.lineTo(px,py);}g.stroke();}
+ line(chartX,y+chartH-6,chartX+chartW,y+chartH-6,'#8d9dc655');fit('Emotional distance from upgrade baseline',x+12,y+chartH+11,ww-24,9,'#aebcdb');y+=chartH+39;
+ fit('Imprints guide instincts · lenses interpret sensations · echoes fade',x,y,ww,9,'#aec2dd');y+=19;text('OLD WINS & LIVES PRESERVED · NEW FEELINGS BEGIN HERE',x,y,9,'#99a8c4');return y+28;}
+
+// Observational only. No RNG, no score changes, and no modifications to emotional learning.
+const FEEL_EVENTS=['Force answered','Impact endured','Relief in motion','Shelter held','Effort unanswered','Energy spent in silence','Life extinguished','Still standing'];
+function newEmotionRow(){return {n:0,positive:0,negative:0,neutral:0,up:0,down:0,delta:0,absDelta:0,targetSum:0};}
+function ensureEmotionLedger(s){
+ const o=s.obs||(s.obs=freshObserver());
+ if(!o.emotionLedger)o.emotionLedger={since:round,events:{},axes:{}};
+ const l=o.emotionLedger;
+ for(const a of AXES)if(!l.axes[a.key])l.axes[a.key]=newEmotionRow();
+ return l;
+}
+function logFeeling(s,k,tone,felt,before,after){
+ const l=ensureEmotionLedger(s),name=FEEL_EVENTS.includes(tone)?tone:'Other';
+ if(!l.events[name])l.events[name]={};
+ if(!l.events[name][k])l.events[name][k]=newEmotionRow();
+ const delta=after-before;
+ for(const row of [l.axes[k],l.events[name][k]]){
+  row.n++;row.targetSum+=felt;
+  if(felt>0.01)row.positive++;else if(felt<-.01)row.negative++;else row.neutral++;
+  if(delta>1e-9)row.up++;else if(delta< -1e-9)row.down++;
+  row.delta+=delta;row.absDelta+=Math.abs(delta);
+ }
+}
+// Soul Divergence Monitor: cumulative per-soul experience composition and felt targets.
+// All counters are observational. No RNG, action scores, learning, or combat changes.
+function ensureDivergence(s){
+ const o=s.obs||(s.obs=freshObserver());
+ if(!o.divergence)o.divergence={since:round,events:{},feelings:{},samples:0};
+ const d=o.divergence;
+ if(!d.events)d.events={};if(!d.feelings)d.feelings={};
+ if(!Number.isFinite(d.samples))d.samples=0;
+ return d;
+}
+function logDivergence(s,event,axis,felt){
+ const d=ensureDivergence(s),e=d.events[event]||(d.events[event]={n:0});
+ // Event incidence counts once per feeling call, not once per affected attribute.
+ if(!d.feelings[event])d.feelings[event]={};
+ const a=d.feelings[event][axis]||(d.feelings[event][axis]={n:0,sum:0,sumSq:0});
+ a.n++;a.sum+=felt;a.sumSq+=felt*felt;
+ // Event incidence is incremented on the first axis of each event.
+ if(!d._eventOpen)d._eventOpen=null;
+}
+function divergenceDistance(a,b){
+ return Math.sqrt(AXES.reduce((sum,k)=>sum+Math.pow((a.im[k.key]||0)-(b.im[k.key]||0),2),0)/AXES.length);
+}
+function drawDivergenceMonitor(startY){
+ const x=14,ww=w-28,all=[...souls,...Object.values(world?.bank||{})].filter(s=>s&&s.id),ordered=all.slice().sort((a,b)=>a.id.localeCompare(b.id));let y=startY+12;
+ sectionLabel('SOUL DIVERGENCE MONITOR',x,y,'OBSERVATION ONLY · SINCE INSTALL');y+=26;
+ rr(x,y,ww,66,11,'#25314b','#7182a377');
+ fit('Experience = event frequency. Interpretation = mean felt target.',x+10,y+20,ww-20,9,'#e3eaf8');
+ fit('Same event type does not guarantee identical circumstances.',x+10,y+40,ww-20,9,'#b7c9e0');
+ fit('Counters begin now. Historical feelings are not reconstructed.',x+10,y+57,ww-20,9,'#b7c9e0');y+=80;
+ const totalEvents=s=>Object.values(ensureDivergence(s).events).reduce((n,r)=>n+(r.n||0),0);
+ for(const s of ordered){
+  const d=ensureDivergence(s),total=totalEvents(s);
+  rr(x,y,ww,43,10,'#202b46',(s.color||'#b5c6e8')+'77');
+  fit(s.id+' · '+total.toLocaleString()+' experiences',x+10,y+17,ww-20,11,s.color||'#b5c6e8','left','800');
+  fit('Measured since duel '+d.since,x+10,y+34,ww-20,9,'#b9c9df');y+=49;
+  for(const ev of FEEL_EVENTS){
+   const count=d.events[ev]?.n||0;
+   rr(x,y,ww,25,7,'#1e2942','#52638144');
+   fit(ev,x+8,y+16,ww*.57,9,'#e1e7f3');
+   fit(total?((count/total)*100).toFixed(1)+'% · '+count.toLocaleString():'Awaiting data',x+ww-8,y+16,ww*.43,9,'#b8d5e0','right');y+=29;
+  }
+  y+=12;
+ }
+ sectionLabel('SAME EVENT · DIFFERENT FEELING',x,y,'MEAN FELT TARGET · -1 TO +1');y+=23;
+ for(const ev of FEEL_EVENTS){
+  rr(x,y,ww,27,8,'#27334d','#65728d66');fit(ev.toUpperCase(),x+10,y+18,ww-20,10,'#e7e4f7','left','800');y+=32;
+  for(const axis of AXES){
+   const values=ordered.map(s=>{const r=ensureDivergence(s).feelings[ev]?.[axis.key];return r&&r.n?{id:s.id,color:s.color||'#b5c6e8',mean:r.sum/r.n,n:r.n}:null;}).filter(Boolean);
+   if(!values.length)continue;
+   rr(x,y,ww,20+values.length*18,8,'#1e2942','#52638144');
+   fit(axis.title,x+9,y+14,ww-18,9,'#bfcfe4');let yy=y+29;
+   for(const v of values){fit(v.id,x+10,yy,ww*.27,9,v.color);fit((v.mean>=0?'+':'')+v.mean.toFixed(3)+' · n='+v.n.toLocaleString(),x+ww-9,yy,ww*.68,9,'#e0e8f3','right');yy+=18;}
+   y+=27+values.length*18;
+  }
+  y+=9;
+ }
+ sectionLabel('PERSONALITY DISTANCE',x,y,'ROOT MEAN SQUARE · CURRENT IMPRINTS');y+=23;
+ for(let i=0;i<ordered.length;i++)for(let j=i+1;j<ordered.length;j++){
+  const a=ordered[i],b=ordered[j],distance=divergenceDistance(a,b);
+  rr(x,y,ww,28,8,'#202b46','#52638155');
+  fit(a.id+' / '+b.id,x+9,y+18,ww*.60,10,'#e4e7f5');
+  fit(distance.toFixed(3),x+ww-10,y+18,ww*.3,11,'#b7e2d3','right','800');y+=33;
+ }
+ rr(x,y+8,ww,45,9,'#25314b','#7182a366');
+ fit('Compare after more duels. Distance is not proof of cause.',x+10,y+26,ww-20,9,'#d3e0ed');
+ return y+67;
+}
+function drawEmotionLedger(startY){
+ const x=14,ww=w-28;let y=startY+15;
+ sectionLabel('EMOTIONAL CAUSALITY LEDGER',x,y,'OBSERVATION ONLY · SINCE INSTALL');y+=27;
+ rr(x,y,ww,70,12,'#25314b','#7182a377');
+ fit('Positive / negative = felt emotional target, not outcome.',x+11,y+20,ww-22,10,'#e4ecfb');
+ fit('↑ / ↓ = actual attribute changes. Events can oppose each other.',x+11,y+41,ww-22,10,'#b7c9e0');
+ fit('Counters start now; earlier lives are not reconstructed.',x+11,y+59,ww-22,9,'#b7c9e0');y+=85;
+ const all=[...souls,...Object.values(world?.bank||{})].filter(s=>s&&s.id);
+ for(const s of all){
+  const l=ensureEmotionLedger(s),color=s.color||'#b5c6e8';
+  rr(x,y,ww,39,11,'#202b46',color+'77');
+  text(s.id,x+11,y+17,12,color,'left','850');
+  const total=Object.values(l.axes).reduce((a,r)=>a+r.n,0);
+  fit(`${total.toLocaleString()} attribute updates · duel ${l.since}`,x+11,y+32,ww-22,9,'#b8c7e1');y+=47;
+  for(const a of AXES){
+   const row=l.axes[a.key]||newEmotionRow();
+   rr(x,y,ww,63,10,'#202a44','#596a8766');
+   text(a.title.toUpperCase(),x+10,y+16,10,'#e7e6f5','left','800');
+   text(`+${row.positive} / −${row.negative} targets`,x+ww-10,y+16,10,'#b9e3d7','right','700');
+   const n=Math.max(1,row.positive+row.negative),bx=x+10,bw=ww-20;
+   rr(bx,y+25,bw,7,3,'#4a536d');
+   rr(bx,y+25,bw*row.positive/n,7,3,'#8bd6bd');
+   text(`↑${row.up}  ↓${row.down}   net ${row.delta>=0?'+':''}${row.delta.toFixed(2)}`,x+10,y+48,10,'#becce6','left','700');
+   text(`now ${Number(s.im[a.key]||0).toFixed(2)}`,x+ww-10,y+48,10,color,'right','800');
+   y+=70;
+  }
+  sectionLabel('EVENT SOURCES',x,y,'POSITIVE / NEGATIVE TARGETS');y+=24;
+  for(const name of FEEL_EVENTS){
+   const rows=l.events[name];if(!rows)continue;
+   const pos=Object.values(rows).reduce((a,r)=>a+r.positive,0),neg=Object.values(rows).reduce((a,r)=>a+r.negative,0);
+   rr(x,y,ww,37,9,'#1e2942','#596a8755');
+   fit(name,x+9,y+14,ww*.52,10,'#e5e8f5');
+   text(`+${pos}  /  −${neg}`,x+ww-9,y+14,10,'#bed9df','right','750');
+   const signed=Object.entries(rows).map(([k,r])=>`${k.slice(0,3)}:${r.positive}/${r.negative}`).join('  ');
+   fit(signed,x+9,y+29,ww-18,9,'#aebfda');y+=43;
+  }
+  y+=18;
+ }
+ return y+20;
+}
+
+function drawActionsTab(){const x=14,ww=w-28;let y=151;
+ sectionLabel('DECISION DISTRIBUTION',x,y,'COUNTS SINCE MONITORING');y+=22;
+ const first=souls[0].obs,second=souls[1].obs,aN=totalCount(first.decisionCounts),bN=totalCount(second.decisionCounts);
+ for(let i=0;i<2;i++){let s=souls[i],o=s.obs,tot=totalCount(o.decisionCounts);rr(x,y,ww,66,13,'#202a45',s.color+'45');text(s.id,x+12,y+17,12,s.color,'left','800');text(`${tot} decisions`,x+ww-12,y+17,10,'#b6c1de','right');
+  let pos=x+12,constW=ww-24;for(const a of ACTIONS){let frac=(o.decisionCounts[a]||0)/Math.max(1,tot),seg=constW*frac;if(seg>0){rr(pos,y+32,seg,13,0,actionColor(a));pos+=seg;}}
+  text(`OPEN HOPS ${o.openingEvades}/${o.duelsStarted}  ·  TIMEOUTS ${o.timeoutDuels}`,x+12,y+56,9,'#b7c6dd');y+=76;
+ }
+ y+=6;sectionLabel('ACTION BY ACTION',x,y,'AURORA / UMBRA');y+=20;
+ for(const a of ACTIONS){const v0=first.decisionCounts[a]||0,v1=second.decisionCounts[a]||0,p0=v0/Math.max(1,aN),p1=v1/Math.max(1,bN);
+  text(a.toUpperCase(),x,y+10,11,'#e2e1f3','left','700');const bx=x+108,bw=ww-156;rr(bx,y+3,bw,5,2,'#2a3350');rr(bx,y+12,bw,5,2,'#2a3350');rr(bx,y+3,bw*p0,5,2,souls[0].color);rr(bx,y+12,bw*p1,5,2,souls[1].color);text(`${percent(v0,aN)} / ${percent(v1,bN)}%`,x+ww,y+9,10,'#c4cedf','right','750');y+=31;
+ }
+ y+=14;sectionLabel('SOUL INFLUENCE OBSERVATORY',x,y,'PASSIVE • NO NEW RNG');y+=24;
+ const observed=[...souls,...Object.values(world?.bank||{})].filter(v=>v&&v.obs).sort((a,b)=>(b.obs.soulInfluence?.decisions||0)-(a.obs.soulInfluence?.decisions||0));
+ for(const s of observed){const z=s.obs.soulInfluence;if(!z||!z.decisions)continue;rr(x,y,ww,100,12,'#202b46',s.color+'66');fit(s.id+'  •  '+z.decisions.toLocaleString()+' measured decisions',x+11,y+17,ww-22,11,s.color,'left','800');
+  fit('Soul changed top choice: '+ratio(z.changed,z.decisions)+'% ('+z.changed.toLocaleString()+')',x+11,y+38,ww-22,10,'#e3eaf8');
+  fit('Soul aligned: '+ratio(z.aligned,z.decisions)+'%  •  inner conflict: '+ratio(z.conflicted,z.decisions)+'%',x+11,y+57,ww-22,10,'#bfd9dc');
+  fit('Mean |soul score|: '+(z.soulStrength/z.decisions).toFixed(3)+'  •  random override: '+ratio(z.randomOverride,z.decisions)+'%',x+11,y+77,ww-22,9,'#b5c3df');y+=109;
+  const c=z.contexts;rr(x,y,ww,43,9,'#1d2840','#56688b55');fit('Near: '+ratio(c.near.changed,c.near.n)+'% ('+c.near.n+')  •  Far: '+ratio(c.far.changed,c.far.n)+'% ('+c.far.n+')',x+9,y+16,ww-18,9,'#d1e0ee');fit('Hurt: '+ratio(c.hurt.changed,c.hurt.n)+'% ('+c.hurt.n+')  •  Healthy: '+ratio(c.healthy.changed,c.healthy.n)+'% ('+c.healthy.n+')',x+9,y+33,ww-18,9,'#b5c9e2');y+=51;
+ }
+ if(!observed.some(s=>s.obs.soulInfluence?.decisions)){fit('Waiting for new decisions. Historical choices cannot be reconstructed.',x+10,y+18,ww-20,10,'#aebdd7');y+=30;}
+ rr(x,y,ww,54,10,'#202b46','#586b8c77');fit('Counterfactual: remove soul score from existing action scores.',x+10,y+17,ww-20,9,'#d3e2ed');fit('Includes original random noise; choice changes are estimates, not causal proof.',x+10,y+37,ww-20,9,'#afc2dc');y+=65;
+ y+=10;sectionLabel('SOUL CHARACTER LAB',x,y,'ATTRIBUTES → ACTIONS');y+=23;
+ fit('Each soul term is measured for all 8 candidate actions, before random selection.',x,y,ww,9,'#b9c9e0');y+=20;
+ for(const s of observed){const c=s.obs.soulCharacter;if(!c||!c.decisions)continue;
+  rr(x,y,ww,44,11,'#202b46',s.color+'66');fit(s.id+' • '+c.decisions.toLocaleString()+' decisions',x+10,y+17,ww-20,11,s.color,'left','800');fit('Soul score contribution: signed; positive encourages, negative discourages.',x+10,y+34,ww-20,9,'#bac9de');y+=51;
+  sectionLabel('EMOTIONAL SIGNATURE',x,y,'EFFECTIVE AVERAGE · -1.3 TO +1.3');y+=20;
+  for(const axis of AXES){const z=c.axes[axis.key],v=z.sum/c.decisions;rr(x,y,ww,28,7,'#1d2942','#52638155');fit(axis.title,x+8,y+18,ww*.37,10,'#dce4f6');const bx=x+ww*.43,bw=ww*.38;rr(bx,y+11,bw,6,3,'#33405e');line(bx+bw/2,y+9,bx+bw/2,y+20,'#d2d7e077');rr(v<0?bx+bw/2-Math.abs(v)*bw/2.6:bx+bw/2,y+11,Math.abs(v)*bw/2.6,6,2,s.color);fit((v>=0?'+':'')+v.toFixed(3),x+ww-7,y+18,ww*.15,10,'#d5e2ef','right');y+=32;}
+  y+=7;sectionLabel('WHAT THE SOUL ENCOURAGES',x,y,'MEAN SCORE / CHANGED CHOICES');y+=20;
+  for(const act of ACTIONS){const row=c.actions[act],avg=row.sum/Math.max(1,row.n);rr(x,y,ww,38,8,'#202b46','#586b8a44');fit(act.toUpperCase(),x+8,y+14,ww*.29,10,'#e0e6f3','left','800');fit((avg>=0?'+':'')+avg.toFixed(3),x+ww*.36,y+14,ww*.2,10,avg>=0?'#a8e5cd':'#efb4bb');fit('IN '+row.flipsIn+'  OUT '+row.flipsOut,x+ww-8,y+14,ww*.43,9,'#b6c9e3','right');fit('Positive '+ratio(row.positive,row.n)+'% · Negative '+ratio(row.negative,row.n)+'%',x+8,y+30,ww-16,9,'#aabbd4');y+=43;}
+  const moves=[];for(const from of ACTIONS)for(const to of ACTIONS){const n=c.changedFrom[from][to];if(n)moves.push({from,to,n});}moves.sort((a,b)=>b.n-a.n);
+  rr(x,y,ww,57,9,'#1d2942','#52638155');fit('MOST COMMON SOUL-DRIVEN SWITCHES',x+10,y+17,ww-20,9,'#e4d7fb','left','800');
+  fit(moves.slice(0,2).map(v=>v.from+' → '+v.to+' ('+v.n+')').join('  •  ')||'None observed',x+10,y+37,ww-20,9,'#d0e4e6');y+=68;
+ }
+ if(!observed.some(s=>s.obs.soulCharacter?.decisions)){fit('Awaiting new decisions to reveal emotional character.',x+10,y+16,ww-20,10,'#c3d3e6');y+=30;}
+ rr(x,y,ww,48,9,'#202b46','#52638155');fit('Historical imprints are preserved; these action measurements start now.',x+10,y+18,ww-20,9,'#d4dfed');fit('No added randomness, actions, instincts, or changes to selection.',x+10,y+36,ww-20,9,'#aebed6');y+=57;
+ y+=10;rr(x,y,ww,60,12,'#243148','#6a7c9c88');tinyIcon(x+24,y+26,'↶','#b7dfdf');fit('Early hops: evade during first 3 seconds. Timeout: 65s without KO.',x+44,y+17,ww-53,10,'#ecf1fc');fit('A difference is evidence to inspect, not a cause.',x+44,y+39,ww-53,10,'#abbdd7');
+ return drawDivergenceMonitor(drawEmotionLedger(drawOpeningWhiffs(y+80)));
+}
+
+function ratio(n,d){return d?Math.round(n*100/d):0;}
+function drawOpeningWhiffs(startY){const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=startY;
+ // This section follows the original action graph and appears when scrolling below it.
+ sectionLabel('OPENING WHIFF WATCH',x,y,'NEW COUNTS · FIRST 3 SECONDS');y+=25;
+ for(let i=0;i<2;i++){const s=souls[i],o=ensureOpeningStats(s.obs),xx=x+i*(cw+gap);rr(xx,y,cw,114,13,'#202b44',s.color+'77');
+  text(s.id,xx+11,y+19,12,s.color,'left','800');
+  text(`${ratio(o.openingMisses,o.openingSwings)}%`,xx+11,y+48,22,'#f6e4ce','left','800');
+  fit('missed at impact',xx+11,y+64,cw-22,9,'#bfd0e5');
+  fit(`${o.openingMisses} / ${o.openingSwings} swings`,xx+11,y+83,cw-22,10,s.color);
+  fit(`${o.openingAirSwings} started out of range`,xx+11,y+100,cw-22,9,'#a8b9d0');
+ }y+=126;
+ rr(x,y,ww,64,12,'#222f49','#7182a466');
+ tinyIcon(x+22,y+29,'◎','#c6d6f4');
+ fit('Only STRIKE and HEAVY; LUNGE closes distance.',x+43,y+21,ww-53,10,'#ecf1fc');
+ fit('Miss = out of range at impact; launch gap is also tracked.',x+43,y+44,ww-53,9,'#b2c5de');y+=82;
+ sectionLabel('SAME BODY · DIFFERENT SOUL',x,y,'MISSES / OPENING SWINGS');y+=24;
+ for(const body of TYPES){rr(x,y,ww,67,11,'#202b44','#65728d65');text(body.name.toUpperCase(),x+11,y+15,10,'#eee8f6','left','800');
+  for(let i=0;i<2;i++){const s=souls[i],row=ensureOpeningStats(s.obs).openingSwingBodies[body.name],by=y+30+i*16,bx=x+92,bw=ww-175;
+    g.fillStyle=s.color;g.fillRect(x+11,by-5,6,6);littleBar(bx,by-5,bw,ratio(row.misses,row.swings)/100,s.color);
+    text(`${row.misses}/${row.swings}`,x+ww-11,by,10,'#dce5f3','right','700');}y+=74;
+ }
+ y+=6;sectionLabel('SIGNED SCORE COMPONENTS',x,y,'AVERAGE ON MISSED SWINGS');y+=26;
+ for(const k of ['mind','body','soul']){text(k.toUpperCase(),x,y+11,11,'#dce4f1','left','800');
+  for(let i=0;i<2;i++){const s=souls[i],o=ensureOpeningStats(s.obs),v=o.openingMisses?o.openingWhiffParts[k]/o.openingMisses:0,xx=x+116+i*(ww-116)/2;
+   text(o.openingMisses?(v>=0?'+':'')+v.toFixed(2):'—',xx,y+11,12,s.color,'left','800');}y+=29;
+ }
+ rr(x,y+7,ww,66,12,'#25314b','#7284a36b');
+ fit("Scores show the selected action's mind, body, and soul terms.",x+11,y+26,ww-22,10,'#e0eaf7');
+ fit('Positive ≠ cause. Randomness and alternatives still matter.',x+11,y+47,ww-22,9,'#bbcbe1');
+ return y+94;
+}
+
+function actionColor(a){return ({approach:'#83c7c4',retreat:'#c8a0de',observe:'#8aa0bb',strike:'#ffce8c',heavy:'#ec9aa4',guard:'#b9aef4',evade:'#99e0e1',lunge:'#d7cb83'})[a];}
+function drawBodiesTab(){const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=151;
+ sectionLabel('SURVIVAL STREAK LAB',x,y,'5 WINS TO QUALIFY');y+=19;
+ fit('Five consecutive wins buds one offspring per living body.',x,y,ww,10,'#aebad5');y+=19;
+ for(let i=0;i<2;i++){const s=souls[i],summary=streakSummary(s),f=fighters[i],bx=x+i*(cw+gap);
+  rr(bx,y,cw,91,13,'#202b45',s.color+'70');fit(s.id,bx+11,y+15,cw-22,11,s.color,'left','800');
+  text(`BEST ${summary.best}`,bx+11,y+38,16,'#f4e7d4','left','800');
+  fit(`${summary.reached5} lives reached 5`,bx+11,y+57,cw-22,10,'#b7c9e6');
+  fit(`IN ARENA: ${f.winStreak} • ${f.soul.id}`,bx+11,y+76,cw-22,9,'#a4e0d0');
+ }y+=108;
+ sectionLabel('STREAKS BY ANCESTRY',x,y,'ALL-SOUL BEST · FOUNDER COMPARISON');y+=24;
+ for(const b of TYPES){rr(x,y,ww,85,12,'#1d2943','#566a8b77');text(b.name.toUpperCase(),x+11,y+14,11,'#e4e6f6','left','800');
+  const global=world.globalStreaks[b.name],best=global.best;
+  fit('ALL SOULS: BEST '+best+' · '+global.reached5+' FIVE+',x+ww-10,y+14,ww*.69,8,best>=5?'#a6e5ca':'#94a4c8','right','800');
+  for(let i=0;i<2;i++){const s=souls[i],r=ensureStreakStats(s.obs)[b.name],by=y+34+i*23;
+   g.fillStyle=s.color;g.fillRect(x+11,by-4,7,7);
+   const barX=x+28,barW=Math.max(60,ww-173),segGap=3,segW=(barW-segGap*4)/5;
+   for(let j=0;j<5;j++)rr(barX+j*(segW+segGap),by-6,segW,10,3,j<r.best?s.color:'#33405e');
+   fit(`${r.best} BEST · ${r.reached5} FIVE+`,x+ww-10,by,ww-barW-51,10,'#d6e0f3','right','750');
+  }y+=94;
+ }
+ y+=7;sectionLabel('BODY WIN / LOSS RECORDS',x,y,'ALL OBSERVED COMPLETED DUELS');y+=22;
+ for(const t of TYPES){rr(x,y,ww,67,13,'#1c2943','#52658777');text(t.name.toUpperCase(),x+11,y+16,10,'#e4e6f6','left','800');for(let i=0;i<2;i++){const s=souls[i],r=bodyStats(s,t.name),n=r.wins+r.losses,by=y+32+i*16;g.fillStyle=s.color;g.fillRect(x+12,by-4,5,5);let bx=x+104,bw=ww-169;littleBar(bx,by-4,bw,n?r.wins/n:0,s.color);text(n?`${r.wins}W / ${r.losses}L`:'NO DATA',x+ww-10,by,9,'#c9d4e8','right','700');}y+=74;}
+ y+=5;fit('Streak tracking starts in v0.9; earlier streaks cannot be reconstructed.',x,y,ww,9,'#a6b5ce');y+=18;
+ fit('Refresh now keeps the active bodies, genetics and waiting roster.',x,y,ww,9,'#a6b5ce');return y+29;
+}
+function drawLivesTab(){const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=151;
+ sectionLabel('INCARNATION ARCHIVE',x,y,'LATEST DEFEATS');y+=24;
+ for(let i=0;i<2;i++){const s=souls[i],bx=x+i*(cw+gap);rr(bx,y,cw,40,11,'#202b45',s.color+'6d');text(s.id,bx+11,y+17,12,s.color,'left','800');text(`${s.losses} losses`,bx+11,y+31,10,'#abb9d3');}y+=51;
+ for(let j=0;j<12;j++){for(let i=0;i<2;i++){const s=souls[i],r=s.record[j],bx=x+i*(cw+gap);rr(bx,y,cw,46,9,j%2?'#222a42':'#1c263d','#4d5c7a55');if(r){text(`LIFE ${r.life}`,bx+8,y+12,9,s.color,'left','800');fit(r.body,bx+8,y+29,cw-17,10,'#e5e7f3');text(`${r.damage||0} damage`,bx+cw-8,y+12,9,'#a0aeca','right');}else{text('NO ENTRY',bx+8,y+22,10,'#717f9a');}}y+=51;}
+ y+=10;text('The winner continues in its current mind and body.',x,y,10,'#b3c0d9');return y+35;
+}
+
+function drawGenesTab(){assureWorld();const x=14,ww=w-28,gap=10,cw=(ww-gap)/2;let y=151;
+ sectionLabel('BUDDING & REINCARNATION',x,y,'5 WINS · ONE OFFSPRING');y+=26;
+ const tiles=[['BIRTHS',world.births,'#a8e5c9'],['WAITING BODIES',world.nursery.length,'#ffd2ae'],['WAITING SOULS',world.waiting.length,'#c6baff'],['NEW SOULS',world.novelSouls,'#c2d6ff']],cellW=(ww-gap)/2;
+ for(let i=0;i<tiles.length;i++){const row=tiles[i],xx=x+i%2*(cellW+gap),yy=y+Math.floor(i/2)*67;rr(xx,yy,cellW,59,12,'#202b46',row[2]+'55');fit(row[0],xx+10,yy+17,cellW-20,9,'#bbc9e3');text(String(row[1]),xx+10,yy+43,18,row[2],'left','800');}
+ y+=145;rr(x,y,ww,58,12,'#22304b','#6886ab77');fit('Every bud is assigned a soul at birth.',x+11,y+19,ww-22,10,'#e9edf8');fit('Rebirth wait: '+REINCARNATION_WAIT+' completed duels minimum.',x+11,y+40,ww-22,9,'#b9cae5');y+=81;
+ sectionLabel('CURRENT LIVING BODIES',x,y,'SOULS ARE INDEPENDENT');y+=21;
+ for(let i=0;i<2;i++){const f=fighters[i],xx=x+i*(cw+gap);rr(xx,y,cw,95,12,'#202b45',f.soul.color+'65');fit(f.soul.id,xx+10,y+18,cw-20,12,f.soul.color,'left','800');fit(f.body.name+' • G'+f.generation,xx+10,y+37,cw-20,10,'#f0e9f9');fit(f.bodyId+' ← '+(f.parentId||'founder'),xx+10,y+56,cw-20,9,'#b3c4e2');fit(f.winStreak+' W streak · '+(f.budded?'budded':'not budded'),xx+10,y+76,cw-20,9,'#a7dcc9');}
+ y+=116;sectionLabel('INHERITED GENE EXPRESSION',x,y,'1.00 = ANCESTRAL FORM');y+=23;
+ for(const key of GENETIC_TRAITS){text(key.toUpperCase(),x,y+8,10,'#d6e0f7','left','800');const xx=x+104,bw=Math.max(40,ww-173),v0=fighters[0].genome[key],v1=fighters[1].genome[key];littleBar(xx,y,bw,v0/2.7,fighters[0].soul.color);littleBar(xx,y+11,bw,v1/2.7,fighters[1].soul.color);fit(v0.toFixed(2)+'/'+v1.toFixed(2),x+ww,y+9,66,9,'#c3d3ee','right');y+=30;}
+ y+=19;sectionLabel('ANCESTRAL BLOODLINES',x,y,'BIRTHS • MOST EVOLVED');y+=24;
+ for(const type of TYPES){const z=world.familyStats[type.name]||{births:0,maxGeneration:0},g=world.globalStreaks[type.name];rr(x,y,ww,49,11,'#202b45','#52668666');fit(type.name.toUpperCase(),x+10,y+17,ww*.52,10,'#e9e9f5','left','800');fit(z.births+' buds • G'+z.maxGeneration,x+ww-10,y+17,ww*.55,10,'#a2dcc7','right');fit('Best '+g.best+' consecutive wins · '+g.reached5+' qualified',x+10,y+37,ww-20,9,'#a9bad9');y+=56;}
+ y+=14;sectionLabel('RECRUITMENT AUDIT',x,y,'ACTUAL ENTRIES · SINCE INSTALL');y+=25;
+ const audit=world.recruitAudit||{since:round,total:0,rows:{},bySource:{},byMode:{}};
+ rr(x,y,ww,76,11,'#22304b','#7598ac77');
+ fit('Measured since duel '+audit.since+' · '+audit.total+' entrants',x+11,y+17,ww-22,10,'#eddbb7','left','800');
+ fit('Nursery '+(audit.bySource.nursery||0)+' · Earned '+(audit.bySource.earned||0)+' · G0 '+(audit.bySource.g0||0),x+11,y+39,ww-22,10,'#c2e9d9');
+ fit('Incumbents '+(audit.bySource.incumbent||0)+' · Tournament '+(audit.byMode.tournament||0)+' · Duel '+(audit.byMode.duel||0),x+11,y+59,ww-22,9,'#b4c9e5');y+=85;
+ rr(x,y,ww,44,10,'#25304a','#53648277');fit('An entry = one body joining a fight, not one duel.',x+10,y+15,ww-20,9,'#dbe3f5');fit('Completed duels/life excludes fighters still alive.',x+10,y+33,ww-20,9,'#abbfdb');y+=51;
+ const liveCounts={};if(tournament&&arenaSlots.length){for(const slot of arenaSlots){for(const f of slot.fighters||[])if(f?.origin)liveCounts[f.origin]=(liveCounts[f.origin]||0)+1;}}else for(const f of fighters||[])if(f?.origin)liveCounts[f.origin]=(liveCounts[f.origin]||0)+1;
+ for(const type of TYPES){const a=audit.rows[type.name]||{},entries=a.entries||0,deaths=a.deaths||0,wins=a.wins||0,share=audit.total?Math.round(entries/audit.total*100):0,mean=deaths?(a.completedDuels/deaths).toFixed(1):'—';
+  rr(x,y,ww,78,11,'#202b45','#52668666');fit(type.name.toUpperCase(),x+10,y+16,ww*.48,11,'#eaeafa','left','850');fit(entries+' entries · '+share+'% · '+(liveCounts[type.name]||0)+' active',x+ww-10,y+16,ww*.67,10,'#a5e4d0','right');
+  fit('Nursery '+(a.nursery||0)+' · Earned '+(a.earned||0)+' · G0 '+(a.g0||0)+' · Existing '+(a.incumbent||0),x+10,y+36,ww-20,9,'#d2ddef');
+  fit('W '+wins+' · L '+deaths+' · '+mean+' duels/completed life · Best '+(a.bestObservedStreak||0),x+10,y+56,ww-20,9,'#bccce8');
+  const pct=audit.total?entries/audit.total:0;rr(x+10,y+66,ww-20,4,2,'#33425f');if(pct>0)rr(x+10,y+66,(ww-20)*pct,4,2,'#8ccfbb');y+=85;
+ }
+ if(!audit.total){fit('New arrivals will appear as the simulation advances.',x+10,y+12,ww-20,9,'#b0c8e2');y+=20;}
+ y+=13;sectionLabel('GENETIC RESP AWN POOL'.replace('RESP AWN','RESPAWN'),x,y,'EQUAL CHANCE PER DESIGN');y+=24;
+ rr(x,y,ww,54,10,'#202b46','#53648266');fit(TYPES.length+' ancestral designs  +  '+world.genomePool.length+' earned genomes',x+10,y+17,ww-20,10,'#d6e9dd');fit('Eligible G1+ parents register once when budding. Pool began at v1.6.',x+10,y+39,ww-20,9,'#aabedc');y+=65;
+ y+=13;sectionLabel('LINEAGE AUTOPSY',x,y,'PROSPECTIVE CENSUS');y+=24;
+ const census=world.lineageCensus,gens=new Set([...Object.keys(census.born),...Object.keys(census.died),...Object.keys(census.budded),...Object.keys(census.wins),...Object.keys(census.lives)]);
+ const sorted=[...gens].map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
+ rr(x,y,ww,46,10,'#202b46','#53648266');fit('Tracking began at duel '+census.since+'. Earlier outcomes unavailable.',x+10,y+16,ww-20,9,'#e8cda8');fit('Born / Entered / Died / Won / Budded',x+10,y+34,ww-20,9,'#b8c9e8');y+=54;
+ for(const gen of sorted){const yy=y;rr(x,yy,ww,42,9,'#202b46','#53648244');text('G'+gen,x+9,yy+13,11,'#e9dbff','left','850');fit('B '+(census.born[gen]||0)+'  E '+(census.lives[gen]||0)+'  D '+(census.died[gen]||0)+'  W '+(census.wins[gen]||0)+'  R '+(census.budded[gen]||0),x+ww-10,yy+14,ww-55,10,'#c6e8d5','right');fit('Best recorded streak: '+(census.maxStreak[gen]||0),x+9,yy+32,ww-18,9,'#9fb2d2');y+=48;}
+ if(!sorted.length){fit('Awaiting new duels to collect generational outcomes.',x+9,y+12,ww-18,10,'#aebcda');y+=28;}
+ y+=13;sectionLabel('RECENT BIRTH RECORDS',x,y,'LAST '+world.history.length+' OF '+world.births);y+=23;
+ const hist={};for(const b of world.history)hist[b.generation]=(hist[b.generation]||0)+1;
+ const gensHist=Object.keys(hist).map(Number).sort((a,b)=>a-b);
+ for(const gen of gensHist){rr(x,y,ww,34,9,'#202b46','#53648244');fit('G'+gen+'  ·  '+hist[gen]+' births in retained records',x+10,y+17,ww-20,10,'#c4dfeb');y+=40;}
+ y+=12;sectionLabel('OFFSPRING NURSERY',x,y,'EVERY BODY HAS A SOUL');y+=23;
+ if(!world.nursery.length){rr(x,y,ww,54,12,'#202b44','#65749355');fit('No offspring waiting. Five wins creates a bud.',x+11,y+29,ww-22,10,'#cdd8ee');y+=64;}
+ else for(const child of world.nursery.slice(0,9)){rr(x,y,ww,51,12,'#202b44','#65749355');fit(child.id+' · '+child.origin+' G'+child.generation,x+10,y+20,ww-20,11,'#f3ebff','left','800');fit('Parent '+child.parentId+' · Soul '+child.soulId,x+10,y+39,ww-20,9,'#b0c5e0');y+=58;}
+ y+=13;sectionLabel('RECENT BIRTHS',x,y,'GENES ≠ SOUL MEMORIES');y+=23;
+ if(!world.history.length){fit('No births yet. The five-win rule is active.',x+8,y+27,ww-16,10,'#b7c8df');y+=60;}
+ else for(const birth of world.history.slice(0,10)){rr(x,y,ww,45,10,'#202b44','#52668666');fit(birth.id+' · '+birth.origin+' G'+birth.generation,x+10,y+18,ww*.63,10,'#e7efff');fit(birth.soulId,x+ww-10,y+18,ww*.24,10,'#f0c6a6','right');fit('Parent '+birth.parentId+' · Duel '+birth.duel,x+10,y+35,ww-20,9,'#bac8df');y+=51;}
+ return y+35;
+}
+
+function drawObserver(){const bg=g.createLinearGradient(0,0,w,h);bg.addColorStop(0,'#111a31');bg.addColorStop(1,'#202644');g.fillStyle=bg;g.fillRect(0,0,w,h);
+ for(let i=0;i<45;i++){g.fillStyle='#c8dafa22';g.fillRect((i*97.13+33)%w,(i*61.2+22)%h,1.4,1.4);}
+ rr(11,11,w-22,55,14,'#222b49','#7884a34d');text('✧  OBSERVER ATLAS',25,30,16,'#f7eafe','left','850');
+ text(`DUEL ${round}  ·  ${running?'LIVE':'PAUSED'}`,25,51,10,running?'#9adcc5':'#d8acbd','left','800');
+ rr(w-70,22,46,32,10,'#3d4862','#a7a8c280');text('✕',w-47,38,17,'#f8eaf7','center','750');
+ const labels=['SOULS','ACTIONS','BODIES','LIVES','GENES'],x0=13,gap=6,tabw=(w-26-4*gap)/5,taby=80;
+ for(let i=0;i<5;i++){const xx=x0+i*(tabw+gap);rr(xx,taby,tabw,42,11,i===observerTab?'#455276':'#222c46',i===observerTab?'#abaee299':'#4a5875');text(labels[i],xx+tabw/2,taby+21,Math.min(10,Math.max(7,w/43)),i===observerTab?'#fff1d5':'#bac8e3','center','850');}
+ const top=138,bottom=h-12;g.save();g.beginPath();g.rect(0,top,w,Math.max(5,bottom-top));g.clip();g.translate(0,-observerScroll);let contentBottom=0;
+ if(observerTab===0)contentBottom=drawSoulTab();else if(observerTab===1)contentBottom=drawActionsTab();else if(observerTab===2)contentBottom=drawBodiesTab();else if(observerTab===3)contentBottom=drawLivesTab();else contentBottom=drawGenesTab();g.restore();
+ observerMaxScroll=Math.max(0,contentBottom-bottom+15);observerScroll=clamp(observerScroll,0,observerMaxScroll);
+ if(observerMaxScroll>0){rr(w-6,top,3,bottom-top,2,'#55608066');const thumb=(bottom-top)*Math.max(.10,(bottom-top)/(bottom-top+observerMaxScroll));rr(w-6,top+(bottom-top-thumb)*(observerScroll/observerMaxScroll),3,thumb,2,'#bed6eb');}
+}
+function draw(){if(tournament&&!observerOpen&&!headless){drawTournament();drawSaveStatus();return;}if(headless){drawHeadless();drawSaveStatus();return;}drawBg();layout();if(observerOpen){drawObserver();drawSaveStatus();return;}drawHeader();drawArena();drawFighterBars();drawButtons();drawDuelSnapshot();rr(w/2-73,h-104,146,35,10,'#292c50','#a3a4d35c');text('🏟 TOURNAMENT MODE',w/2,h-86,11,'#e8e2ff','center','800');drawSaveStatus();}
+function drawTournament(){drawBg();tournamentButtons=[];const pad=12;rr(pad,12,w-pad*2,56,13,'#202b48','#6c779b');text('✧  CRUCIBLE TOURNAMENT',pad+13,31,Math.min(16,w/23),'#f0e3ff','left','850');text(arenaCount+' ARENAS  ·  DUEL '+round,pad+13,53,10,'#a6e5ca','left','750');
+ const cols=w>620?4:2,gap=9,cellW=(w-24-(cols-1)*gap)/cols,rows=Math.ceil(arenaSlots.length/cols),top=83,footer=146,cellH=Math.max(58,Math.min(145,(h-top-footer-(rows-1)*gap)/rows));
+ for(let i=0;i<arenaSlots.length;i++){const s=arenaSlots[i],x=12+(i%cols)*(cellW+gap),y=top+Math.floor(i/cols)*(cellH+gap),f=s.fighters;rr(x,y,cellW,cellH,12,i===activeArena?'#34436a':'#222e4c',i===activeArena?'#d9c3ff':'#667797');text('ARENA '+(i+1),x+9,y+14,10,'#e3dafa','left','800');text(f[0].soul.id+'  vs  '+f[1].soul.id,x+9,y+32,Math.min(10,cellW/15),'#d4ddf5');const barY=y+cellH-29;for(let k=0;k<2;k++){const bw=(cellW-28)/2,bx=x+9+k*(bw+10);rr(bx,barY,bw,8,3,'#111a31');rr(bx,barY,bw*clamp(f[k].hp/f[k].maxHp,0,1),8,3,k?'#f2adba':'#a4e3cb');text(f[k].body.name+' G'+f[k].generation,bx,barY+17,Math.min(9,bw/9),'#d5d9ec');}tournamentButtons.push({x,y,w:cellW,h:cellH,type:'arena',index:i});}
+ const fy=h-123;rr(12,fy,w-24,30,11,'#202c48','#637499');text('Nursery '+world.nursery.length+'  ·  Births '+world.births+'  ·  Selected '+(activeArena+1),w/2,fy+15,Math.min(11,w/32),'#d5e4ff','center','750');
+ const bw=(w-42)/3;for(let j=0;j<2;j++){const by=h-88+j*40;for(let i=0;i<3;i++){const labels=[[running?'Ⅱ PAUSE':'▶ PLAY',speed+'× SPEED',arenaCount+' ARENAS'],['◀ DUEL','✦ OBSERVE','⚡ TURBO']];const types=[['pause','speed','count'],['exit','observe','turbo']];const x=12+i*(bw+9);rr(x,by,bw,35,10,'#333d62','#929ac3');text(labels[j][i],x+bw/2,by+18,Math.min(11,bw/10),'#f5eaff','center','850');tournamentButtons.push({x,y:by,w:bw,h:35,type:types[j][i]});}}
+}
+function resize(){const rect=canvas.getBoundingClientRect();w=rect.width;h=rect.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);g.setTransform(dpr,0,0,dpr,0,0);layout();}
+function frame(ms){
+ if(!w)resize();const elapsed=last?Math.min(.10,(ms-last)/1000):0;last=ms;
+ if(running){
+  // A requested 10,000× is a workload target, not a claim that the phone can achieve it.
+  // Bound catch-up debt so an overloaded phone never freezes trying to repay minutes of work.
+  accum=Math.min(speed>=300?(headless?120:8):3.5,accum+elapsed*speed);
+  const begin=performance.now();let ticks=0;
+  // Keep the same 60Hz simulation and combat rules at every speed.
+  // At extreme speeds devote a slightly larger, bounded slice to simulation.
+  const budgetMs=headless?12:(speed>=300?17:12), maxTicks=headless?48000:(speed>=300?1200:480);
+  while(accum>=FIXED_DT&&ticks<maxTicks){
+   if(tournament)tournamentStep(FIXED_DT);else step(FIXED_DT);accum-=FIXED_DT;ticks++;
+   if((ticks&31)===0&&performance.now()-begin>budgetMs)break;
+  }
+  perf.frames++;perf.ticks+=ticks;perf.stepMs+=performance.now()-begin;
+  speedSampleWall+=elapsed;speedSampleSim+=ticks*FIXED_DT;
+  if(speedSampleWall>=1.2){actualSpeed=Math.round(speedSampleSim/speedSampleWall);speedSampleWall=0;speedSampleSim=0;}
+ }
+ // Draw at most ~15fps at extreme speeds, leaving time for simulation and touch events.
+ if(!running||ms-lastRenderAt>=(headless?400:speed>=300?65:0)){const renderStart=performance.now();draw();perf.drawMs+=performance.now()-renderStart;lastRenderAt=ms;}
+ perfReport(ms);
+ requestAnimationFrame(frame);
+}
+function pointer(e){e.preventDefault();const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*w/rect.width,y=(e.clientY-rect.top)*h/rect.height;
+ if(tournament&&!observerOpen&&!headless){for(const b of tournamentButtons){if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(b.type==='arena'){activeArena=b.index;loadArena(arenaSlots[activeArena]);}else if(b.type==='exit')leaveTournament();else if(b.type==='count')changeArenaCount();else if(b.type==='pause'){running=!running;last=0;accum=0;if(!running)save(true);}else if(b.type==='speed')cycleSpeed();else if(b.type==='turbo')toggleHeadless();else if(b.type==='observe'){observerOpen=true;observerTab=4;observerScroll=0;}return;}}return;}
+ if(headless){for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;accum=0;if(!running)save(true);}else if(i===1)cycleSpeed();else if(i===2)toggleHeadless();return;}}return;}
+ if(observerOpen){if(y<69&&x>w-89){observerOpen=false;return;}
+  if(y>=78&&y<127){const gap=6,tw=(w-26-gap*4)/5;const i=Math.floor((x-13)/(tw+gap));if(i>=0&&i<5){observerTab=i;observerScroll=0;}return;}return;
+ }
+ if(x>=10&&x<=43&&y>=11&&y<=53){if(confirm('Reset souls and all incarnation history?')){localStorage.removeItem(KEY);load();begin();selected=0;save();}return;}
+ for(let i=0;i<buttons.length;i++){const b=buttons[i];if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){if(i===0){running=!running;last=0;accum=0;if(!running)save(true);}else if(i===1)cycleSpeed();else if(i===2){observerOpen=true;observerTab=0;observerScroll=0;}return;}}
+ if(y>=arena.y&&y<arena.y+arena.h){const wx=((x-arena.x)/arena.w)*1000;selected=Math.abs(wx-fighters[0].x)<Math.abs(wx-fighters[1].x)?0:1;return;}
+ if(y>=h-108&&y<h-57){enterTournament();return;}
+ if(arena.portrait&&y>arena.y+arena.h+57)selected=1-selected;
+}
+function xy(e){const rect=canvas.getBoundingClientRect();return {x:e.clientX-rect.left,y:e.clientY-rect.top};}
+canvas.addEventListener('pointerdown',e=>{const p=xy(e);observerTouch=observerOpen&&p.y>132?{y:p.y,scroll:observerScroll,moved:false}:null;});
+canvas.addEventListener('pointermove',e=>{if(!observerOpen||!observerTouch)return;const p=xy(e);if(Math.abs(p.y-observerTouch.y)>6)observerTouch.moved=true;if(observerTouch.moved){e.preventDefault();observerScroll=clamp(observerTouch.scroll+observerTouch.y-p.y,0,observerMaxScroll);}});
+canvas.addEventListener('pointerup',e=>{const wasMoving=observerTouch?.moved;observerTouch=null;if(!wasMoving)pointer(e);});
+canvas.addEventListener('pointercancel',()=>observerTouch=null);
+window.addEventListener('resize',resize);window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();running=!running;last=0;accum=0;if(!running)save(true);}
+ if(e.key==='KeyT'){tournament?leaveTournament():enterTournament();}if(e.key==='Digit1')selected=0;if(e.key==='Digit2')selected=1;if(e.key==='KeyS')cycleSpeed();
+ if(e.key==='KeyL'||e.key==='Escape'){observerOpen=!observerOpen;observerScroll=0;}
+ if(e.key==='ArrowDown'&&observerOpen){observerScroll=clamp(observerScroll+80,0,observerMaxScroll);e.preventDefault();}
+ if(e.key==='ArrowUp'&&observerOpen){observerScroll=clamp(observerScroll-80,0,observerMaxScroll);e.preventDefault();}
+ if(e.key==='KeyR'&&e.shiftKey){if(confirm('Reset all souls and incarnation history?'))void resetCheckpoint();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){running=false;last=0;save(true);}});
+window.addEventListener('pagehide',()=>save(true));
+resize();void load().then(()=>{begin();auditLivingBodies();save(true);requestAnimationFrame(frame);}).catch(e=>{saveError(e);});
+// Tiny explicit debug surface for browser automation / development without influencing combat.
+window.__soulCrucible={state:()=>({saveStatus,saveMessage,lastSavedRound,saveBytes,saveFailures,storageMode,round,running,speed,headless,tournament,arenaCount,arenaSlots:arenaSlots.length,actualSpeed,genomePoolSize:world?.genomePool?.length||0,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo,reflection:f.soul.depth?.reflection})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>resetCheckpoint(),advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
+})();
+</script>
+</body></html>
