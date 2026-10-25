@@ -358,6 +358,16 @@ function restoreCheckpoint(p){
  arenaCount=[2,4,8,16].includes(p.arenaCount)?p.arenaCount:4;activeArena=Number.isInteger(p.activeArena)?Math.max(0,p.activeArena):0;
  lastSavedRound=round;saveStatus='saved';
 }
+
+async function readOriginalCrucible(){
+ let base=null;try{base=JSON.parse(localStorage.getItem(MAIN_KEY));}catch(e){}
+ let db=null;try{
+  const req=indexedDB.open(MAIN_DB);
+  db=await new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);req.onupgradeneeded=()=>req.transaction.abort();});
+  if(db.objectStoreNames.contains(DB_STORE)){const other=await readCheckpoint(db);if(validCheckpoint(other)&&(!validCheckpoint(base)||(other.round||0)>=(base.round||0)))base=other;}
+ }catch(e){console.info('No original checkpoint available for copy',e?.message||e);}finally{db?.close();}
+ return validCheckpoint(base)?base:null;
+}
 async function load(){
  let legacy=null,stored=null;
  try{legacy=JSON.parse(localStorage.getItem(KEY));}catch(e){console.warn('Legacy checkpoint unreadable',e);}
@@ -366,8 +376,10 @@ async function load(){
  const legacyOK=validCheckpoint(legacy),storedOK=validCheckpoint(stored);
  // A legacy checkpoint can be newer during an interrupted migration.
  const best=legacyOK&&(!storedOK||(legacy.round||0)>(stored.round||0))?legacy:(storedOK?stored:null);
- if(best){restoreCheckpoint(best);return;}
- souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];
+ if(best){restoreCheckpoint(best);initWallLab(false);return;}
+ const source=await readOriginalCrucible();
+ if(source){restoreCheckpoint(source);initWallLab(true);return;}
+ souls=[makeSoul(0),makeSoul(1)];round=1;world=createWorld();restoreFighters=null;restoreArenaSlots=null;tournament=false;arenaSlots=[];initWallLab(false);
 }
 // Snapshot every arena's living minds and body states, but never visual effects.
 function packedArena(slot){return {fighters:slot.fighters.map(packFighter),t:slot.t,roundTimer:slot.roundTimer,banner:slot.banner,bannerTimer:slot.bannerTimer,countdown:slot.countdown,timedOut:slot.timedOut};}
@@ -542,7 +554,7 @@ function death(loser,winner){if(bannerTimer>0)return;const lifecycleStart=perfor
  winner.hp=Math.min(winner.maxHp, winner.hp+Math.round(winner.maxHp*.32*winner.body.recovery));winner.stamina=100;winner.attack=null;winner.guard=0;winner.evade=0;winner.vx=0;winner.lock=0;
  bannerTimer=1.8;round++;save();perf.lifecycleMs+=performance.now()-lifecycleStart;perf.lifecycleCount++;}
 function nextLife(){const dead=fighters.findIndex(f=>f.hp<=0),survive=dead===0?1:0;if(dead<0)return;
- const recruit=recruitSeed(),soul=getRecruitSoul(recruit);fighters[dead]=born(soul,dead,recruit);
+ const restored=takeReleasedWall(dead);if(restored)fighters[dead]=restored;else {const recruit=recruitSeed(),soul=getRecruitSoul(recruit);fighters[dead]=born(soul,dead,recruit);}
  fighters[survive].x=survive===0?205:795;fighters[survive].vx=0;fighters[dead].x=dead===0?205:795;countdown=.85;roundTimer=0;timedOut=false;for(const f of fighters){f.openingDuelCounted=false;f.soul.obs.duelsStarted++;}save();}
 
 function step(dt){t+=dt; for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=190*dt;if(p.life<=0)particles.splice(i,1)}for(let i=floats.length-1;i>=0;i--){let p=floats[i];p.life-=dt;p.y-=27*dt;if(p.life<=0)floats.splice(i,1)}
@@ -1069,9 +1081,9 @@ window.addEventListener('resize',resize);window.addEventListener('keydown',e=>{i
  if(e.key==='KeyR'&&e.shiftKey){if(confirm('Reset all souls and incarnation history?'))void resetCheckpoint();}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){running=false;last=0;save(true);}});
 window.addEventListener('pagehide',()=>save(true));
-resize();void load().then(()=>{begin();auditLivingBodies();save(true);requestAnimationFrame(frame);}).catch(e=>{saveError(e);});
+resize();void load().then(()=>{begin();parkExistingWalls();auditLivingBodies();save(true);requestAnimationFrame(frame);}).catch(e=>{saveError(e);});
 // Tiny explicit debug surface for browser automation / development without influencing combat.
-window.__soulCrucible={state:()=>({saveStatus,saveMessage,lastSavedRound,saveBytes,saveFailures,storageMode,round,running,speed,headless,tournament,arenaCount,arenaSlots:arenaSlots.length,actualSpeed,genomePoolSize:world?.genomePool?.length||0,perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo,reflection:f.soul.depth?.reflection})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>resetCheckpoint(),advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
+window.__soulCrucible={state:()=>({saveStatus,saveMessage,lastSavedRound,saveBytes,saveFailures,storageMode,round,running,speed,headless,tournament,arenaCount,arenaSlots:arenaSlots.length,actualSpeed,genomePoolSize:world?.genomePool?.length||0,exclusion:world?.experiment&&{phase:world.experiment.phase,source:world.experiment.source,baselineRound:world.experiment.baselineRound,vault:world.experiment.wallVault.length,returned:world.experiment.reintroduced,ranking:trialRanking()},perf:JSON.parse(JSON.stringify(perf.report)),backlogSeconds:+accum.toFixed(3),souls:JSON.parse(JSON.stringify(souls)),fighters:fighters.map(f=>({name:f.name,hp:f.hp,maxHp:f.maxHp,body:f.body.name,winStreak:f.winStreak,action:f.action,impressions:f.soul.im,lens:f.soul.depth?.lens,echo:f.soul.depth?.echo,reflection:f.soul.depth?.reflection})),observer:{open:observerOpen,tab:observerTab,scroll:observerScroll}}),reset:()=>resetCheckpoint(),advance:(seconds=10)=>{for(let i=0;i<seconds*60;i++)step(1/60);},render:()=>draw(),showObserver:(tab=0)=>{observerOpen=true;observerTab=tab;observerScroll=0;}};
 })();
 </script>
 </body></html>
