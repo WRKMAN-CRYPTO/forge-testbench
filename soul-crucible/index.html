@@ -432,12 +432,12 @@ function tournamentStep(dt){const focus=activeArena;for(let i=0;i<arenaSlots.len
 function addEvent(msg){events.unshift(msg);if(events.length>5)events.length=5;}
 function imprint(s,k,amt){s.im[k]=clamp(s.im[k]+amt,-1,1);}
 function learn(f,r){const m=f.mind;const idx=m.lastAction; m.q[idx]=clamp(m.q[idx]+m.learning*(r-m.q[idx]*.1),-1.4,1.4);m.experience++;}
-function actionScore(f,o,a){const b=f.body, dist=Math.abs(o.x-f.x), reach=54+b.reach*17,
+function actionScore(f,o,a,impression){const b=f.body, dist=Math.abs(o.x-f.x), reach=54+b.reach*17,
  enemyReach=54+o.body.reach*17+(o.attack?.type==='lunge'?36:0),
  safeDistance=dist>enemyReach+72, retreatRoom=f.x<o.x?f.x-62:938-f.x,
  danger=!!o.attack&&o.attack.time<o.attack.wind+.10&&dist<enemyReach+52,
  hurt=f.hp/f.maxHp, tired=f.stamina<23;
- let mind=0,body=0,soul=0;const I=collectiveImpression(f);
+ let mind=0,body=0,soul=0;const I=impression;
  switch(a){
  case 'approach': mind=.16+(dist>reach*1.1?1.0:.1)+(o.guard?.25:0);body=.1+b.speed*.045;soul=I.closeness*.85+I.pressure*.22;break;
  case 'retreat':mind=.13+(dist<reach*1.13?.45:0)+(hurt<.35?.35:0)+(danger?.35:0);mind-=safeDistance?1.35:0;mind-=retreatRoom<45?1.2:retreatRoom<110?.52:0;body=b.speed*.055;soul=-I.closeness*.48-I.pain*.54-I.pressure*.20;break;
@@ -464,7 +464,7 @@ function recordSoulCharacter(f,o,options,baseline,chosen){const c=ensureSoulChar
  if(baseline.a!==chosen.a){c.actions[chosen.a].flipsIn++;c.actions[baseline.a].flipsOut++;c.changedFrom[baseline.a][chosen.a]++;}
  const dist=Math.abs(o.x-f.x),near=dist<54+f.body.reach*17+35;for(const k of [near?'near':'far',f.hp/f.maxHp<.5?'hurt':'healthy']){c.situations[k].n++;if(baseline.a!==chosen.a)c.situations[k].changes++;}
 }
-function decide(f,o){if(f.stagger>0)return; const options=ACTIONS.map(a=>({a,...actionScore(f,o,a)}));options.sort((a,b)=>b.total-a.total);
+function decide(f,o){if(f.stagger>0)return; const impression=collectiveImpression(f);const options=ACTIONS.map(a=>({a,...actionScore(f,o,a,impression)}));options.sort((a,b)=>b.total-a.total);
  // Passive counterfactual using the SAME scored options and noise: no extra RNG calls.
  // 'No soul' subtracts the soul term, without rerunning mind, body or learning.
  const si=f.soul.obs.soulInfluence;const baseline=options.reduce((best,v)=>(v.total-v.soul>best.total-best.soul?v:best),options[0]);const soulPick=options.reduce((best,v)=>(v.soul>best.soul?v:best),options[0]);const changed=baseline.a!==options[0].a;
@@ -768,7 +768,7 @@ function drawTriadLandscape(){
   fit('SOUL  ·  MIND  ·  BODY',cx,cy+2,Math.max(65,right-(left+cardW)-8),8,'#b4c2e0','center','750');
  }
 }
-function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9.6',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
+function drawHeader(){const compact=w<560;const y=11;rr(10,y,w-20,54,14,'#ffffff0b','#d8d9f016');text('✧  SOUL CRUCIBLE',23,y+19,compact?13:17,'#eee8ff','left','800');text('DUEL ENGINE  v1.9.7',23,y+40,compact?9:11,'#acaad0','left','700');text(`DUEL ${round}`,w-24,y+19,compact?13:16,'#ffe6bb','right','800');fit(running?`×${speed} SET • ×${actualSpeed||'…'} ACTUAL`:`×${speed} • PAUSED`,w-24,y+40,Math.min(240,w*.48),compact?10:12,running?'#b7eecf':'#ffcebd','right','700');}
 // Ten arcade victory crests per tier. Completed tiers upgrade the entire row's color.
 function drawVictoryCrests(x,y,available,streak,small=false){
  const wins=Math.max(0,Math.floor(streak||0)),tier=Math.floor(wins/10);
