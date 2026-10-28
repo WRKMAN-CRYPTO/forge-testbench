@@ -29,8 +29,15 @@ function classify(m,x,y,a){const f=inputs(x,y,a),p=softmax(m.neighborBrain.logit
  let conf=p[q];
  const g=(xx,yy)=>xx<0||yy<0||xx>=16||yy>=16?0:a[idx(xx,yy)];
  const opp=[[g(x-1,y),g(x+1,y)],[g(x,y-1),g(x,y+1)],[g(x-1,y-1),g(x+1,y+1)],[g(x+1,y-1),g(x-1,y+1)]];
- const bridge=opp.filter(([u,v])=>u===q&&v===q).length;
- if(bridge)conf=Math.max(conf,bridge>=2?.96:.89);
+ const votes=[0,1,2,3].map(c=>c===0?0:opp.filter(([u,v])=>u===c&&v===c).length);
+ const strongest=[1,2,3].sort((c,d)=>votes[d]-votes[c]||p[d]-p[c])[0];
+ if(votes[strongest]>=2){
+   // Two independent axes agree. A strong local pattern can override model doubt.
+   const color=strongest;
+   return {color,confidence:.98,features:f,probabilities:p,bridge:votes[color]};
+ }
+ const bridge=votes[q];
+ if(bridge)conf=Math.max(conf,.89);
  return {color:q,confidence:conf,features:f,probabilities:p,bridge};
 }
 P.designerTick=function(){
@@ -91,7 +98,7 @@ P.inferNeighbors=function(){
    if(this.audited_rows.has(y)||this.pending_scans.has(y))continue;
    const p=classify(this,x,y,a);
    const neighbors=p.features[23];
-   if(p.color!==c&&p.confidence>=Math.max(.94,this.inferConfidence)&&p.probabilities[c]<.13&&neighbors>=.5){
+   if(p.color!==c&&p.confidence>=Math.max(.94,this.inferConfidence)&&(p.bridge>=2||p.probabilities[c]<.13)&&neighbors>=.375){
       this.suspected.set(k,{reported:c,predicted:p.color,confidence:p.confidence});
       this.identified.add(k);this.challengeCount++;
       this.pending_scans.set(y,this.ticks+2);this.audited_rows.add(y);this.audit_requests++;
