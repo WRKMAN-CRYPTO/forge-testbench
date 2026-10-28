@@ -58,4 +58,12 @@ model.forget_mode='off';model.newPicture(vm.runInContext("shape('checker')",sand
 model.run(400);
 const disputed={injected:model.corruptPackets,challenges:model.challengeCount,valid:model.challengesCorrect,false:model.challengesIncorrect,wrong:model.wrong};
 assert(disputed.injected>0,'Test should include altered designer packets');
-console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed},null,2));
+// A solid block offers abundant independent neighbor evidence.
+const solid=Array.from({length:16},(_,y)=>Array.from({length:16},(_,x)=>x>=3&&x<=12&&y>=3&&y<=12?2:0));
+model.rng=vm.runInContext('randomGenerator(177)',sandbox);
+model.newPicture(solid);
+model.run(500);
+const solidDispute={injected:model.corruptPackets,challenges:model.challengeCount,valid:model.challengesCorrect,false:model.challengesIncorrect,wrong:model.wrong,scans:model.audit_requests};
+assert(solidDispute.injected>0,'Injected corruption should be present in solid block');
+assert(solidDispute.challenges>0,'Supervisors should challenge some suspicious designer pixels');
+console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed,solidDispute},null,2));
