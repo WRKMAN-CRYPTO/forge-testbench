@@ -1,0 +1,10 @@
+{
+  "name": "Fitter's Bible | South Carolina",
+  "short_name": "Fitter's Bible",
+  "description": "South Carolina sprinkler fitter field reference",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#09151e",
+  "theme_color": "#09151e",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
