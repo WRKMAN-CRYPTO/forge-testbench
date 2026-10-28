@@ -99,8 +99,9 @@ P.inferNeighbors=function(){
  }
 };
 P.chooseAudits=function(){
- if(!this.initial_done||!this.audit_enabled)return;
+ if(!this.initial_done)return;
  this.inferNeighbors();
+ if(!this.audit_enabled)return;
  // In bold mode, high-confidence guesses can stand without a rescan, explicitly at risk.
  if(this.inferMode==='bold'){
    const rows=[];
@@ -167,7 +168,7 @@ document.getElementById('save').onclick=function(){download('cellcanvas_brains_v
 document.querySelector('h1').innerHTML='CELLCANVAS <span style="color:var(--mint)">v0.3</span>';
 document.title='CellCanvas v0.3 | Supervisor Intuition • Forge Testbench';
 document.querySelector('.header p').textContent='Forgetful designers, skeptical supervisors, and local pattern learning. No AI API. Experiment with guesses, verification, and incorrect instructions.';
-document.querySelector('.chip').textContent='236 WEIGHTS · LOCAL LEARNING';
+document.querySelector('.chip').textContent='220 WEIGHTS · LOCAL LEARNING';
 const foot=document.createElement('p');foot.className='under';foot.innerHTML='<b>Experiment note:</b> Neighbor predictions come from local received instructions, not the reference. Training uses synthetic examples with known answers. Accuracy on unfamiliar drawings is not guaranteed. Rescans, not guesses, establish truth.';
 options.parentElement.insertBefore(foot,options.nextSibling);
 render();
