@@ -207,7 +207,7 @@ function settings(){
  return {forget:model.forget_mode,audit:model.audit_enabled,infer:model.inferMode,
   confidence:model.inferConfidence,challenge:model.challengeEnabled,
   designErrors:model.designErrors,recovery:model.recoveryEnabled,threshold:model.stallThreshold,
-  speed:$t('speed')?.value||'5',auto:trainingOn};
+  speed:$t('speed')?.value||'5',auto:trainingOn,radio:model.commEnabled};
 }
 function savePayload(){
  return {version:VERSION,when:Date.now(),brain:model.serialize(),target:model.target.map(row=>row.slice()),
@@ -248,6 +248,7 @@ function loadSave(){
   model.inferConfidence=clampN(Number(s.confidence)||.84,.52,.98);
   model.challengeEnabled=s.challenge!==false;
   model.designErrors=s.designErrors===true;
+  if(s.radio!==undefined)model.commEnabled=s.radio!==false;
   model.recoveryEnabled=s.recovery!==false;
   model.stallThreshold=clampN(Number(s.threshold)||28,12,80);
   if(s.speed&&$t('speed')){$t('speed').value=s.speed;$t('speedLabel').textContent=s.speed+'×';}
