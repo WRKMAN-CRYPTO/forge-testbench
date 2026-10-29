@@ -40,7 +40,7 @@ assert.equal(model.neighborBrain.inputs,24);
 assert.equal(model.neighborBrain.outputs,4);
 assert.equal(model.neighborExamples,3500,'Warm start performed');
 assert.equal(model.inferMode,'cautious');
-assert(document.title.includes('v0.5')); // v0.5 Learning Lab is the final UI module
+assert(document.title.includes('v0.6'),'Communication version must be the visible title');
 assert.equal(model.commBrain.weights.flat().length,14);
 assert.equal(model.recoveryBrain.weights.flat().length,40);
 assert.equal(model.recoverySamples,4500);
