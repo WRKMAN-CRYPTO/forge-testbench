@@ -159,7 +159,7 @@ P.recoveryChoose=function(s){
 P.recoveryRespond=function(s){
  ensure(this);
  if(!this.recoveryEnabled || !this.initial_done || s.queued>0 ||
-   this.idleTicks<this.stallThreshold || s.pending>0 ||
+   this.idleTicks<(s.moving>0?Math.max(this.stallThreshold+24,this.stallThreshold*2):this.stallThreshold) || s.pending>0 ||
    this.ticks-this.lastRecoveryTick<Math.max(15,this.stallThreshold) ||
    this.recoveryCount>=12)return;
  const {f,rank}=this.recoveryChoose(s);
@@ -239,8 +239,8 @@ function updateRecoveryPanel(){
  let label='ACTIVE';
  if(!m.initial_done)label='DESIGNERS WORKING';
  else if(s.pending)label='WAITING ON RESCAN';
- else if(m.idleTicks>=m.stallThreshold)label=s.tasks?'STALLED':'QUIESCENT';
- else if(s.tasks||s.moving)label='WORKERS ACTIVE';
+ else if(m.idleTicks>=(s.moving>0?Math.max(m.stallThreshold+24,m.stallThreshold*2):m.stallThreshold))label=s.tasks?'STALLED':'QUIESCENT';
+ else if(s.tasks||s.moving)label='WORKERS ACTIVE / TRAVEL';
  else label='IDLE / CHECKING';
  $s('recoveryState').textContent=label;
  $s('idleCount').textContent=m.idleTicks;
@@ -266,6 +266,8 @@ const heading=document.querySelector('h1');
 heading.innerHTML='CELLCANVAS <span style="color:var(--mint)">v0.4</span>';
 document.title='CellCanvas v0.4 | Recovery Loop • Forge Testbench';
 document.querySelector('.chip').textContent='260 WEIGHTS · SELF-RECOVERY';
+const previousTick=tick;
+tick=function(){previousTick();if(!running&&model.ticks>=600&&model.wrong>0)status('600-tick experiment budget reached, not a voluntary stop. '+model.wrong+' mismatches remain; '+model.recoveryCount+' recovery attempts made. Increase SPEED to watch a new attempt, or reset.');};
 document.querySelector('.header p').textContent='A tiny image-making colony. Designers forget, supervisors guess, and now stalled work can trigger independent recovery attempts. No external AI.';
 render();
 status('v0.4 ready. Watch the IDLE counter and recovery activity log. Supervisors never read the hidden target.');
