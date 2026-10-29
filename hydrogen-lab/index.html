@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab</title>
+<title>HYDROGEN // Emergence Lab | Phase 2</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -21,7 +21,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   // u(0)=u(Rmax)=0. Finite differences; ground states by inverse imaginary time,
   // excited 2s by orthogonalization against the computed 1s solution.
   const HARTREE_EV=27.211386245988, BOHR_NM=0.05291772109;
-  const PLANCK_EV_FS=4.135667696, HC_EV_NM=1239.841984;
+  const PLANCK_EV_FS=4.135667696, HC_EV_NM=1239.841984, AU_TIME_FS=0.02418884326505;
   const N=660, DR=0.045, DT=0.8;
   const canvas=document.getElementById('lab'), g=canvas.getContext('2d',{alpha:false});
   const imgCanvas=document.createElement('canvas');imgCanvas.width=240;imgCanvas.height=240;
@@ -30,17 +30,23 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   for(let i=0;i<N;i++)rGrid[i]=(i+1)*DR;
   let W=390,H=800,DPR=1,activeHits=[],tab='ATOM',mode='1s',Z=1;
   let timeFs=0,speed=1,running=true,viewRadius=8,contrast=1.05,states=null;
-  let dirty=true,lastImageAt=0,lastTime=0,layout={};
+  let dirty=true,lastImageAt=0,lastTime=0,layout={},sliderDrag=false;
+  const field={wl:null,amp:.02,run:false,speed:4,tAU:0,re:[1,0,0],im:[0,0,0],
+    history:[],scan:[],showScan:false,d13:0,d23:0,nextRecordAU:0,seenImageAt:0};
+  const STEP_AU=.075;
   const C={bg:'#070c16',panel:'#0e1729',line:'#26354d',ink:'#e9f3ff',
     muted:'#889bb8',blue:'#74c8ff',mint:'#7febd8',gold:'#f4be6e',violet:'#b5a0ff'};
   try{const saved=JSON.parse(localStorage.getItem('hydrogen-emergence-v1')||'{}');
     if(saved.Z===1||saved.Z===2)Z=saved.Z;
     if(['1s','2s','2p','MIX'].includes(saved.mode))mode=saved.mode;
     if([.25,1,4].includes(saved.speed))speed=saved.speed;
-    if(saved.tab==='ATOM'||saved.tab==='SPECTRUM'||saved.tab==='METHOD')tab=saved.tab;
+    if(['ATOM','FIELD','SPECTRUM','METHOD'].includes(saved.tab))tab=saved.tab;
+    if(typeof saved.wl==='number'&&Number.isFinite(saved.wl))field.wl=saved.wl;
+    if([.008,.012,.02,.035].includes(saved.amp))field.amp=saved.amp;
+    if([1,4,12].includes(saved.fsSpeed))field.speed=saved.fsSpeed;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
   }catch(e){}
-  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab}));}catch(e){}}
+  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed}));}catch(e){}}
   function normalize(u){
     let n=0;for(let i=0;i<N;i++)n+=u[i]*u[i];
     n=Math.sqrt(n*DR);for(let i=0;i<N;i++)u[i]/=n;
@@ -87,6 +93,15 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const s2=solve(0,310,s1.u);
     const p2=solve(1,250,null);
     states={'1s':s1,'2s':s2,'2p':p2};
+    field.d13=0;field.d23=0;
+    for(let i=0;i<N;i++){
+      field.d13+=s1.u[i]*p2.u[i]*rGrid[i]*DR/Math.sqrt(3);
+      field.d23+=s2.u[i]*p2.u[i]*rGrid[i]*DR/Math.sqrt(3);
+    }
+    const resonance=HC_EV_NM/((p2.E-s1.E)*HARTREE_EV);
+    if(field.wl===null)field.wl=resonance;
+    field.wl=Math.max(90/Z**2,Math.min(170/Z**2,field.wl));
+    resetField();
     timeFs=0;dirty=true;lastImageAt=0;
   }
   function sample(state,r){
@@ -163,16 +178,16 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.1',W-15,23,10,C.muted,'right',650);
+    txt('v0.2',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
-    const p=14,gap=8,bw=(W-28-16)/3;
-    ['ATOM','SPECTRUM','METHOD'].forEach((a,i)=>{
-      button(p+i*(bw+gap),53,bw,37,a,tab===a,()=>{tab=a;save();},tab===a?C.mint:null);
+    const p=14,gap=6,bw=(W-28-18)/4;
+    ['ATOM','FIELD','SPECTRUM','METHOD'].forEach((a,i)=>{
+      button(p+i*(bw+gap),53,bw,37,a,tab===a,()=>{tab=a;dirty=true;save();},tab===a?C.mint:null);
     });
   }
   function calcLayout(){
     const top=103;
-    const bottomHeight=Math.min(295,Math.max(215,H*.34));
+    const bottomHeight=Math.min(302,Math.max(248,H*.35));
     const vh=Math.max(215,H-top-bottomHeight-10);
     const panelX=13,panelW=W-26;
     layout={x:panelX,y:top,w:panelW,h:vh,bottom:top+vh+9};
@@ -215,6 +230,231 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     txt('E = '+(E*HARTREE_EV).toFixed(4)+' eV',a.x+20,a.y+a.h-30,12,C.ink,'left',650);
     txt((viewRadius*BOHR_NM).toFixed(2)+' nm view',a.x+a.w-20,a.y+a.h-30,10,C.muted,'right');
   }
+
+  // The light is a classical time-dependent field, not a quantized photon.
+  // z has angular parity: 1s ↔ 2s = 0; 1s ↔ 2p and 2s ↔ 2p from radial integrals.
+  // Propagate the 3-state Schrödinger equation using symmetric unitary operator splitting.
+  // This conserves norm to floating-point precision, unlike an explicit Euler update.
+  function resonantWavelength(){
+    return HC_EV_NM/((states['2p'].E-states['1s'].E)*HARTREE_EV);
+  }
+  function resetField(){
+    field.re=[1,0,0];field.im=[0,0,0];field.tAU=0;
+    field.nextRecordAU=0;field.history=[{t:0,p:0,s:0}];field.showScan=false;
+    dirty=true;field.seenImageAt=0;
+  }
+  function fieldNorm(){
+    let s=0;for(let i=0;i<3;i++)s+=field.re[i]**2+field.im[i]**2;return s;
+  }
+  function populations(){
+    return field.re.map((v,i)=>v*v+field.im[i]*field.im[i]);
+  }
+  function rotatePair(re,im,i,j,theta){
+    const c=Math.cos(theta),s=Math.sin(theta);
+    const ar=re[i],ai=im[i],br=re[j],bi=im[j];
+    re[i]=c*ar+s*bi;im[i]=c*ai-s*br;
+    re[j]=c*br+s*ai;im[j]=c*bi-s*ar;
+  }
+  function phaseState(re,im,i,angle){
+    const c=Math.cos(angle),s=Math.sin(angle),r=re[i],v=im[i];
+    re[i]=c*r+s*v;im[i]=c*v-s*r;
+  }
+  function quantumStep(sim,wl,amp,dtAU){
+    const w=HC_EV_NM/(wl*HARTREE_EV);
+    const deltaS=states['2s'].E-states['1s'].E;
+    const deltaP=states['2p'].E-states['1s'].E;
+    const h=amp*Math.cos(w*(sim.tAU+dtAU*.5));
+    const re=sim.re, im=sim.im;
+    phaseState(re,im,1,deltaS*dtAU*.5);
+    phaseState(re,im,2,deltaP*dtAU*.5);
+    rotatePair(re,im,0,2,h*field.d13*dtAU*.5);
+    rotatePair(re,im,1,2,h*field.d23*dtAU);
+    rotatePair(re,im,0,2,h*field.d13*dtAU*.5);
+    phaseState(re,im,1,deltaS*dtAU*.5);
+    phaseState(re,im,2,deltaP*dtAU*.5);
+    sim.tAU+=dtAU;
+  }
+  function advanceField(dt){
+    const target=field.tAU+(dt*field.speed/AU_TIME_FS);
+    let count=0;
+    while(field.tAU+1e-10<target && count++<600){
+      quantumStep(field,field.wl,field.amp,Math.min(STEP_AU,target-field.tAU));
+      if(field.tAU>=field.nextRecordAU){
+        const pop=populations();
+        field.history.push({t:field.tAU*AU_TIME_FS,p:pop[2],s:pop[1]});
+        if(field.history.length>380)field.history.shift();
+        field.nextRecordAU=field.tAU+.075/AU_TIME_FS; // one sample per 0.075 femtosecond
+      }
+    }
+  }
+  function scanResponse(){
+    field.run=false;field.showScan=true;field.scan=[];
+    const lo=95/Z**2,hi=164/Z**2;
+    let best=null;
+    for(let j=0;j<=34;j++){
+      const wl=lo+(hi-lo)*j/34;
+      const sim={tAU:0,re:[1,0,0],im:[0,0,0]};
+      const target=4.0/AU_TIME_FS;
+      let maximum=0;
+      while(sim.tAU<target-1e-8){
+        quantumStep(sim,wl,field.amp,Math.min(STEP_AU,target-sim.tAU));
+        const p=sim.re[2]**2+sim.im[2]**2;
+        if(p>maximum)maximum=p;
+      }
+      const point={wl,p:maximum};
+      field.scan.push(point);
+      if(!best||maximum>best.p)best=point;
+    }
+    field.best=best;dirty=true;
+  }
+  function setWavelengthFromX(x){
+    const min=90/Z**2,max=170/Z**2,lo=24,hi=W-24;
+    field.wl=Math.round((min+(max-min)*Math.max(0,Math.min(1,(x-lo)/(hi-lo))))*100)/100;
+    field.run=false;resetField();save();
+  }
+  function dynamicDensity(r,costh){
+    const t=1/Math.sqrt(4*Math.PI);
+    const s1=sample(states['1s'],r)*t,s2=sample(states['2s'],r)*t;
+    const p=sample(states['2p'],r)*t*Math.sqrt(3)*costh;
+    const re=field.re[0]*s1+field.re[1]*s2+field.re[2]*p;
+    const im=field.im[0]*s1+field.im[1]*s2+field.im[2]*p;
+    return re*re+im*im;
+  }
+  function rebuildDynamicCloud(){
+    const size=240,half=size/2,values=new Float32Array(size*size);
+    const radius=14/Z;
+    let peak=0;
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      const xx=(x+.5-half)/half, yy=(y+.5-half)/half;
+      const rr=Math.hypot(xx,yy),r=rr*radius;
+      const d=rr>1?0:dynamicDensity(r,rr>1e-6?xx/rr:0);
+      const i=y*size+x;values[i]=d;peak=Math.max(peak,d);
+    }
+    for(let i=0;i<values.length;i++){
+      const k=peak?Math.min(1,Math.pow(values[i]/peak,.54)*1.05):0,o=i*4;
+      image.data[o]=Math.round(7+96*k);image.data[o+1]=Math.round(12+170*k);
+      image.data[o+2]=Math.round(24+216*k);image.data[o+3]=255;
+    }
+    ig.putImageData(image,0,0);dirty=false;
+  }
+  function fieldViewport(now){
+    viewport();const a=layout,x=a.x+13,w=a.w-26;
+    if(field.showScan){scanViewport();return;}
+    txt('REAL-TIME SCHRÖDINGER EVOLUTION',x,a.y+16,10,C.blue,'left',800);
+    const avail=Math.max(115,a.h-167);
+    const side=Math.min(a.w-28,avail);
+    const cx=W/2,cy=a.y+34+avail*.5;
+    g.save();round(a.x+1,a.y+1,a.w-2,a.h-2,15);g.clip();
+    for(let t=.25;t<=1;t+=.25){
+      g.beginPath();g.arc(cx,cy,side*.5*t,0,Math.PI*2);
+      g.strokeStyle='#34516d';g.setLineDash([2,6]);g.stroke();g.setLineDash([]);
+    }
+    if(dirty||(field.run&&now-field.seenImageAt>65)){
+      rebuildDynamicCloud();field.seenImageAt=now;
+    }
+    g.drawImage(imgCanvas,cx-side/2,cy-side/2,side,side);
+    const glow=g.createRadialGradient(cx,cy,0,cx,cy,12);
+    glow.addColorStop(0,'#ffe7aa');glow.addColorStop(1,'#ffb95c00');
+    g.fillStyle=glow;g.beginPath();g.arc(cx,cy,12,0,Math.PI*2);g.fill();
+    g.restore();
+    txt('P(1s) '+(populations()[0]*100).toFixed(1)+'%',x,a.y+a.h-140,10,C.blue);
+    txt('P(2p) '+(populations()[2]*100).toFixed(1)+'%',W-x,a.y+a.h-140,10,C.mint,'right');
+    const p=populations();
+    const rowY=a.y+a.h-119,bw=(w-10)/3;
+    [0,1,2].forEach((j)=>{
+      const xx=x+j*(bw+5);fillRect(xx,rowY,bw,6,3,'#22344b');
+      fillRect(xx,rowY,Math.max(.5,bw*Math.min(1,p[j])),6,3,[C.blue,C.violet,C.mint][j]);
+      txt(['1s','2s','2p'][j],xx,rowY+16,9,[C.blue,C.violet,C.mint][j]);
+    });
+    // Plot computed state populations against simulated physical time.
+    const gx=x+2,gy=a.y+a.h-76,gw=w-4,gh=51;
+    line(gx,gy+gh,gx+gw,gy+gh,C.line);
+    line(gx,gy+gh*.5,gx+gw,gy+gh*.5,'#26374d');
+    const hist=field.history;
+    if(hist.length>1){
+      const minT=hist[0].t,maxT=Math.max(hist[hist.length-1].t,minT+.01);
+      [[C.mint,'p'],[C.violet,'s']].forEach(([color,key])=>{
+        g.beginPath();
+        hist.forEach((p,i)=>{
+          const px=gx+(p.t-minT)/(maxT-minT)*gw;
+          const py=gy+gh*(1-Math.min(1,p[key]));
+          if(i===0)g.moveTo(px,py);else g.lineTo(px,py);
+        });g.lineWidth=1.5;g.strokeStyle=color;g.stroke();
+      });
+    }
+    txt('POPULATION / 0–100%',x,a.y+a.h-11,9,C.muted);
+    txt((field.tAU*AU_TIME_FS).toFixed(2)+' fs',W-x,a.y+a.h-11,10,C.gold,'right',800);
+  }
+  function scanViewport(){
+    const a=layout,x=a.x+20,w=a.w-40,y=a.y+68,h=Math.max(95,a.h-170);
+    txt('COMPUTED RESONANCE SWEEP',x,a.y+20,12,C.mint,'left',800);
+    txt('MAXIMUM 2p POPULATION / 4 fs PULSE',x,a.y+39,9,C.muted);
+    const curve=field.scan;let max=0;
+    for(const point of curve)max=Math.max(max,point.p);
+    line(x,y+h,x+w,y+h,C.line,1.5);line(x,y,x,y+h,C.line);
+    for(let i=0;i<=4;i++){
+      const yy=y+h-i*h/4;
+      line(x,yy,x+w,yy,'#22324a');
+      txt((i*25)+'%',x-3,yy,8,C.muted,'right');
+    }
+    if(curve.length){
+      g.beginPath();curve.forEach((p,i)=>{
+        const xx=x+i/(curve.length-1)*w,yy=y+h-Math.min(1,p.p)*h;
+        if(!i)g.moveTo(xx,yy);else g.lineTo(xx,yy);
+      });g.strokeStyle=C.mint;g.lineWidth=2.4;g.stroke();
+    }
+    const resonance=resonantWavelength();
+    const cursorX=x+((resonance-95/Z**2)/(69/Z**2))*w;
+    line(cursorX,y,cursorX,y+h,C.gold,1.25);
+    txt('EXPECTED',Math.min(x+w-3,cursorX+4),y+10,9,C.gold,'right');
+    txt((95/Z**2).toFixed(1)+' nm',x,y+h+16,9,C.muted);
+    txt((164/Z**2).toFixed(1)+' nm',x+w,y+h+16,9,C.muted,'right');
+    if(field.best){
+      const yy=Math.min(a.y+a.h-62,y+h+41);
+      txt('MEASURED PEAK: '+field.best.wl.toFixed(2)+' nm',x,yy,12,C.mint,'left',750);
+      txt('SOLVER RESONANCE: '+resonance.toFixed(2)+' nm',x,yy+21,11,C.gold);
+      txt('Field strength '+field.amp.toFixed(3)+' a.u.  •  finite pulse bandwidth',x,Math.min(a.y+a.h-12,yy+42),9,C.muted);
+    }
+  }
+  function fieldControls(){
+    const a=layout,y=a.bottom,p=14,gap=7,w=W-28;
+    txt('DRIVE WAVELENGTH',p,y+8,10,C.muted,'left',800);
+    txt(field.wl.toFixed(2)+' nm',W-p,y+8,12,C.gold,'right',800);
+    const lo=90/Z**2,hi=170/Z**2,trackY=y+41;
+    line(24,trackY,W-24,trackY,'#37516d',5);
+    const resonance=resonantWavelength(),rx=24+(resonance-lo)/(hi-lo)*(W-48);
+    line(rx,trackY-13,rx,trackY+13,C.gold,2);
+    const knobX=24+(field.wl-lo)/(hi-lo)*(W-48);
+    g.fillStyle=C.blue;g.beginPath();g.arc(knobX,trackY,10,0,Math.PI*2);g.fill();
+    txt(lo.toFixed(0),p,y+63,9,C.muted);
+    txt(hi.toFixed(0),W-p,y+63,9,C.muted,'right');
+    activeHits.push({x:10,y:y+17,w:W-20,h:49,drag:true,cb:(xp)=>{setWavelengthFromX(xp);}});
+    const row1=y+74,bw=(w-2*gap)/3;
+    button(p,row1,bw,37,'RESONANCE',false,()=>{
+      field.wl=resonantWavelength();resetField();field.run=true;save();
+    });
+    button(p+bw+gap,row1,bw,37,'OFF TARGET',false,()=>{
+      field.wl=155/Z**2;resetField();field.run=true;save();
+    });
+    button(p+2*(bw+gap),row1,bw,37,field.showScan?'NEW SCAN':'SCAN λ',field.showScan,()=>scanResponse());
+    const row2=row1+46;
+    button(p,row2,bw,39,field.run?'Ⅱ PAUSE':'▶ DRIVE',field.run,()=>{
+      if(field.showScan)field.showScan=false;field.run=!field.run;dirty=true;
+    });
+    button(p+bw+gap,row2,bw,39,'RESET',false,()=>{resetField();field.run=false;});
+    button(p+2*(bw+gap),row2,bw,39,'F '+field.amp.toFixed(3),false,()=>{
+      const a=[.008,.012,.02,.035],i=a.indexOf(field.amp);
+      field.amp=a[(i+1)%a.length];resetField();save();
+    });
+    const row3=row2+49;
+    txt('TIME '+(field.tAU*AU_TIME_FS).toFixed(2)+' fs',p,row3,10,C.ink,'left',750);
+    txt('NORM '+fieldNorm().toFixed(6),W-p,row3,10,C.mint,'right',750);
+    const row4=row3+21;
+    txt('1s→2p  d = '+field.d13.toFixed(4)+' a₀',p,row4,10,C.blue);
+    txt('1s→2s  d = 0 (parity)',W-p,row4,10,C.gold,'right');
+    txt('CLASSICAL ELECTRIC FIELD  •  NO PHOTON EMISSION',p,row4+22,9,C.muted);
+  }
+
   function spectrumView(){
     viewport();const a=layout;
     const sx=a.x+20,ex=a.x+a.w-25, yTop=a.y+66, yBot=a.y+a.h-73;
@@ -269,15 +509,16 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('MODEL LIMITS: Fixed nucleus, one electron, nonrelativistic Coulomb field. No proton substructure, QED, photons, or spontaneous emission.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 2: H(t) = H₀ − E(t)z, E(t)=F cos(ωt). Solved dipole integrals. Fixed proton; 3-state basis; classical field. No QED or photon emission.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
+    if(tab==='FIELD'){fieldControls();return;}
     if(tab==='METHOD'){
       txt('EXPERIMENT CONTROLS',p,y+10,11,C.muted,'left',800);
       const rowY=y+26,bw=(W-28-gap*2)/3;
-      button(p,rowY,bw,41,'HYDROGEN',Z===1,()=>{Z=1;viewRadius=mode==='1s'?8:18;recalc();save();});
-      button(p+bw+gap,rowY,bw,41,'He+ ION',Z===2,()=>{Z=2;viewRadius=mode==='1s'?4:9;recalc();save();});
+      button(p,rowY,bw,41,'HYDROGEN',Z===1,()=>{Z=1;field.wl=null;viewRadius=mode==='1s'?8:18;recalc();save();});
+      button(p+bw+gap,rowY,bw,41,'He+ ION',Z===2,()=>{Z=2;field.wl=null;viewRadius=mode==='1s'?4:9;recalc();save();});
       button(p+2*(bw+gap),rowY,bw,41,'RETURN',false,()=>{tab='ATOM';save();});
       let ty=rowY+59;
       const es=['1s','2s','2p'];
@@ -300,7 +541,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     button(p,row2,bw2,40,running?'Ⅱ PAUSE':'▶ PLAY',running,()=>{running=!running;});
     button(p+bw2+gap,row2,bw2,40,'RESET t',false,()=>{timeFs=0;dirty=true;});
     button(p+2*(bw2+gap),row2,bw2,40,Z===1?'Z = 1  H':'Z = 2  He+',true,()=>{
-      Z=Z===1?2:1;viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;recalc();save();
+      Z=Z===1?2:1;field.wl=null;viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;recalc();save();
     });
     const row3=row2+51,bw3=(W-28-gap*2)/3;
     button(p,row3,bw3,38,'ZOOM −',false,()=>{viewRadius=Math.min(30/Z,viewRadius*1.35);dirty=true;});
@@ -317,10 +558,12 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   }
   function render(now){
     const dt=Math.min(.06,Math.max(0,(now-lastTime)/1000||0));lastTime=now;
-    if(running&&mode==='MIX')timeFs+=dt*speed;
+    if(tab==='FIELD'&&field.run&&!field.showScan)advanceField(dt);
+    if(tab==='ATOM'&&running&&mode==='MIX')timeFs+=dt*speed;
     g.clearRect(0,0,W,H);g.fillStyle=C.bg;g.fillRect(0,0,W,H);
     activeHits=[];calcLayout();header();
     if(tab==='ATOM')atomView(now);
+    else if(tab==='FIELD')fieldViewport(now);
     else if(tab==='SPECTRUM')spectrumView();
     else methodView();
     controls();
@@ -331,10 +574,18 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
     for(let i=activeHits.length-1;i>=0;i--){
       const h=activeHits[i];if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){
-        h.cb();break;
+        h.cb(x,y);
+        if(h.drag){sliderDrag=true;try{canvas.setPointerCapture(e.pointerId);}catch(_){}}
+        break;
       }
     }
   },{passive:false});
+  canvas.addEventListener('pointermove',e=>{
+    if(!sliderDrag)return;
+    const rect=canvas.getBoundingClientRect();setWavelengthFromX(e.clientX-rect.left);
+  },{passive:false});
+  canvas.addEventListener('pointerup',()=>{sliderDrag=false;});
+  canvas.addEventListener('pointercancel',()=>{sliderDrag=false;});
   window.addEventListener('resize',resize);
   document.addEventListener('visibilitychange',()=>{lastTime=0;});
   recalc();resize();requestAnimationFrame(render);
