@@ -8,11 +8,14 @@ const root=path.join(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const ext=fs.readFileSync(path.join(root,'supervisor-inference.js'),'utf8');
 const recovery=fs.readFileSync(path.join(root,'recovery-loop.js'),'utf8');
+const learning=fs.readFileSync(path.join(root,'learning-lab.js'),'utf8');
 const found=html.match(/<script>\s*([\s\S]*?)<\/script>/);
 assert(found,'Main CellCanvas script should exist');
 const starter=html.match(/<script id="starterWeights" type="application\/json">([\s\S]*?)<\/script>/);
 assert(starter,'Starter weights should exist');
 const elements=new Map();
+const localStore=new Map();
+const localStorage={getItem(k){return localStore.get(k)??null;},setItem(k,v){localStore.set(k,String(v));},removeItem(k){localStore.delete(k);}};
 function el(key){
  if(!elements.has(key)){
   const ctx2d=new Proxy({canvas:{width:512,height:512}}, {get:(o,k)=> k in o?o[k]:(()=>{})});
@@ -23,18 +26,19 @@ function el(key){
  return elements.get(key);
 }
 const document={getElementById:el,querySelector:s=>el(s),querySelectorAll:()=>[],createElement:s=>el('created-'+s+'-'+elements.size),title:''};
-const sandbox=vm.createContext({document,console,Math,JSON,Map,Set,Array,Object,Number,Promise,Date,
+const sandbox=vm.createContext({document,console,Math,JSON,Map,Set,Array,Object,Number,Promise,Date,localStorage,
  setTimeout(){return 0;},clearTimeout(){},Blob:class{},URL:{createObjectURL(){return ''},revokeObjectURL(){}}});
 vm.runInContext(found[1],sandbox,{filename:'cellcanvas/index.html'});
 vm.runInContext(ext,sandbox,{filename:'supervisor-inference.js'});
 vm.runInContext(recovery,sandbox,{filename:'recovery-loop.js'});
+vm.runInContext(learning,sandbox,{filename:'learning-lab.js'});
 const model=vm.runInContext('model',sandbox);
 assert(model.neighborBrain,'Predictor constructed');
 assert.equal(model.neighborBrain.inputs,24);
 assert.equal(model.neighborBrain.outputs,4);
 assert.equal(model.neighborExamples,3500,'Warm start performed');
 assert.equal(model.inferMode,'cautious');
-assert(document.title.includes('v0.4'));
+assert(document.title.includes('v0.5'));
 assert.equal(model.recoveryBrain.weights.flat().length,40);
 assert.equal(model.recoverySamples,4500);
 assert.equal(model.neighborBrain.weights.flat().length,96);
@@ -110,4 +114,24 @@ assert(challenge.attempts>0,'Stall Challenge must invoke supervisor recovery');
 assert(challenge.success,'Stall Challenge should recover the cross pattern');
 el('stallChallenge').onclick();
 assert.equal(model.stallChallenge,false,'Challenge switch should restore normal mode');
-console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed,solidDispute,rescue,noRescue,challenge},null,2));
+// v0.5: train on varied masked images and verify the on-device checkpoint.
+const beginExamples=model.neighborExamples,beginWeights=JSON.stringify(model.neighborBrain.weights);
+model.practiceMaskedPixels(320);
+assert(model.neighborExamples>beginExamples+320,'New masked examples must count separately');
+assert.notEqual(JSON.stringify(model.neighborBrain.weights),beginWeights,'New lessons should update predictor weights');
+const currentTarget=model.target.map(row=>row.slice());
+el('saveLocalNow').onclick();
+const saved=JSON.parse(localStorage.getItem('wrkman.cellcanvas.autosave.v5'));
+assert.equal(saved.version,5);
+assert.equal(saved.brain.format,'cellcanvas.v4');
+assert.equal(saved.brain.neighborExamples,model.neighborExamples);
+assert.deepEqual(saved.target,currentTarget);
+assert(saved.learning.bestScore>=0&&saved.learning.bestScore<=1,'Validation should track a bounded score');
+el('autoToggle').onclick();
+assert(el('autoToggle').textContent.includes('ON'));
+el('autoToggle').onclick();
+assert(el('autoToggle').textContent.includes('OFF'));
+el('learnEvaluate').onclick();
+const autosave={brainSamples:saved.brain.neighborExamples,
+  holdout:saved.learning.bestScore,bytes:localStorage.getItem('wrkman.cellcanvas.autosave.v5').length};
+console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed,solidDispute,rescue,noRescue,challenge,autosave},null,2));
