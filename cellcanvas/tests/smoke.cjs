@@ -141,4 +141,40 @@ el('learnEvaluate').onclick();
 const trainedHoldout=Number(el('holdout').textContent.replace('%',''));
 const learningCheck={baselineHoldout,priorHoldout,trainedHoldout,improvement:trainedHoldout-baselineHoldout};
 assert(Number.isFinite(trainedHoldout),'Validation must yield a numeric score');
-console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed,solidDispute,rescue,noRescue,challenge,autosave,learningCheck},null,2));
+// Simulate a second browser page using the same localStorage to prove restoration.
+const restoredCells=new Map(),queued=[];
+function el2(key){
+ if(!restoredCells.has(key)){
+  const ctx2d=new Proxy({canvas:{width:512,height:512}},{get:(o,k)=> k in o?o[k]:(()=>{})});
+  const obj={id:key,style:{},textContent:'',innerHTML:'',value:key==='speed'?'5':'84',dataset:{},classList:{add(){},remove(){},toggle(){}},parentElement:{insertBefore(){}},appendChild(){},addEventListener(){},setPointerCapture(){},getContext(){return ctx2d;},getBoundingClientRect(){return {left:0,top:0,width:512,height:512}}};
+  if(key==='starterWeights')obj.textContent=starter[1];
+  restoredCells.set(key,obj);
+ }
+ return restoredCells.get(key);
+}
+const document2={getElementById:el2,querySelector:s=>el2(s),querySelectorAll:()=>[],createElement:t=>el2('created-'+t+'-'+restoredCells.size),title:'',hidden:false,addEventListener(){}};
+const sandbox2=vm.createContext({document:document2,console,Math,JSON,Map,Set,Array,Object,Number,Promise,Date,localStorage,
+ setTimeout(fn,delay){queued.push({fn,delay});return queued.length;},clearTimeout(){},Blob:class{},URL:{createObjectURL(){return ''},revokeObjectURL(){}}});
+vm.runInContext(found[1],sandbox2,{filename:'reloaded-index.html'});
+vm.runInContext(ext,sandbox2,{filename:'reloaded-supervisor-inference.js'});
+vm.runInContext(recovery,sandbox2,{filename:'reloaded-recovery-loop.js'});
+vm.runInContext(learning,sandbox2,{filename:'reloaded-learning-lab.js'});
+const model2=vm.runInContext('model',sandbox2);
+assert.equal(model2.neighborExamples,saved.brain.neighborExamples,'Brain sample count survives reload');
+assert.equal(JSON.stringify(model2.neighborBrain.weights),JSON.stringify(saved.brain.neighborBrain.weights),'Weights survive reload');
+assert.equal(JSON.stringify(model2.target),JSON.stringify(saved.target),'Drawing survives reload');
+const preAuto=model2.neighborExamples;
+el2('autoToggle').onclick();
+const firstAuto=queued.find(t=>t.delay===400);
+assert(firstAuto,'Auto trainer should schedule a browser timer');
+firstAuto.fn();
+assert(model2.neighborExamples>preAuto,'Auto trainer should make progress during active session');
+const pausedAt=model2.neighborExamples;
+document2.hidden=true;
+const pausedLoop=queued.filter(t=>t.delay===150).at(-1);
+assert(pausedLoop,'Auto trainer should reschedule itself');
+pausedLoop.fn();
+assert.equal(model2.neighborExamples,pausedAt,'Auto trainer should pause on hidden tab');
+el2('autoToggle').onclick();
+const restored={weights:4*24,startedAt:preAuto,afterAuto:model2.neighborExamples,autoPaused:true};
+console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed,solidDispute,rescue,noRescue,challenge,autosave,learningCheck,restored},null,2));
