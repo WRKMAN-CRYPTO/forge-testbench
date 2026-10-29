@@ -208,17 +208,6 @@ function patrol(m,t,i){
  m.commCooldown.set(k,{sig,tick:m.ticks});
  send(m,'worker-'+(i+1),'supervisor-'+(i%2+1),'OBSERVATION',r,1);
 }
-function reportWork(m,before){
- for(let i=0;i<4;i++){
-   const t=m.teams[i],at=key(t.x,t.y),beforeInfo=before[i];
-   const known=m.messages.get(at);
-   if(known===undefined||!t.goal===false){} // intentionally no behavior; retained below
-   if(beforeInfo.paint===m.paint_actions)continue;
-   if(beforeInfo.pos!==at||beforeInfo.pixel===m.canvas[t.y][t.x])continue;
-   if(known===undefined||known!==m.canvas[t.y][t.x])continue;
-   send(m,'worker-'+(i+1),'supervisor-'+(i%2+1),'PAINTED',{x:t.x,y:t.y,color:known},1);
- }
-}
 P.reset=function(){
  previousReset.call(this);ensure(this);
  this.commQueue=[];this.commLog=[];this.commTickets.clear();this.commCooldown.clear();
