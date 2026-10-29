@@ -115,6 +115,7 @@ assert(challenge.success,'Stall Challenge should recover the cross pattern');
 el('stallChallenge').onclick();
 assert.equal(model.stallChallenge,false,'Challenge switch should restore normal mode');
 // v0.5: train on varied masked images and verify the on-device checkpoint.
+const baselineHoldout=Number(el('holdout').textContent.replace('%',''));
 const beginExamples=model.neighborExamples,beginWeights=JSON.stringify(model.neighborBrain.weights);
 model.practiceMaskedPixels(320);
 assert(model.neighborExamples>beginExamples+320,'New masked examples must count separately');
@@ -134,4 +135,10 @@ assert(el('autoToggle').textContent.includes('OFF'));
 el('learnEvaluate').onclick();
 const autosave={brainSamples:saved.brain.neighborExamples,
   holdout:saved.learning.bestScore,bytes:localStorage.getItem('wrkman.cellcanvas.autosave.v5').length};
-console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed,solidDispute,rescue,noRescue,challenge,autosave},null,2));
+const priorHoldout=Number(el('holdout').textContent.replace('%',''));
+model.practiceMaskedPixels(500);
+el('learnEvaluate').onclick();
+const trainedHoldout=Number(el('holdout').textContent.replace('%',''));
+const learningCheck={baselineHoldout,priorHoldout,trainedHoldout,improvement:trainedHoldout-baselineHoldout};
+assert(Number.isFinite(trainedHoldout),'Validation must yield a numeric score');
+console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed,solidDispute,rescue,noRescue,challenge,autosave,learningCheck},null,2));
