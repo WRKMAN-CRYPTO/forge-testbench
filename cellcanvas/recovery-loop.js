@@ -5,7 +5,7 @@
 (()=>{
 'use strict';
 const P=Organism.prototype;
-const parentReset=P.reset, parentStep=P.step, parentTrain=P.train;
+const parentReset=P.reset, parentStep=P.step, parentTrain=P.train, parentAudits=P.chooseAudits;
 const parentSave=P.serialize, parentLoad=P.load, parentGuess=P.inferNeighbors;
 const ACTIONS=['WAIT','VERIFY','RECONSIDER','EXPLORE'], FEATURES=10;
 const $s=id=>document.getElementById(id);
@@ -81,6 +81,15 @@ function ensure(m){
  if(m.lastProgressTick===undefined)m.lastProgressTick=0;
  if(m.lastRecoveryTick===undefined)m.lastRecoveryTick=-100;
 }
+// A reproducible isolation test: routine audits are disabled, but recovery
+// supervisors retain authority to request designer rescans independently.
+P.chooseAudits=function(){
+ if(this.stallChallenge){
+   if(this.initial_done)this.inferNeighbors();
+   return;
+ }
+ return parentAudits.call(this);
+};
 P.reset=function(){
  parentReset.call(this);ensure(this);
  this.idleTicks=0;this.lastProgressTick=0;this.lastRecoveryTick=-100;
@@ -220,6 +229,7 @@ ensure(model);teachRecovery(model,4500);model.reset();
 const options=document.querySelector('.options');
 const el=document.createElement('div');el.className='group';
 el.innerHTML='<h3>SUPERVISOR RECOVERY · v0.4</h3>'+
+ '<div class="controls"><button id="stallChallenge">▶ STALL CHALLENGE</button></div>'+ 
  '<div class="controls"><button id="recoverToggle">RECOVERY · ON</button>'+
  '<button id="recoveryTrain">TRAIN RECOVERY +2K</button></div>'+
  '<div class="controls" style="margin-top:8px">'+
@@ -248,11 +258,31 @@ function updateRecoveryPanel(){
  $s('recoveryUseful').textContent=m.recoveryUseful;
  $s('recoveryFailed').textContent=m.recoveryFailed;
  $s('recoverToggle').textContent='RECOVERY · '+(m.recoveryEnabled?'ON':'OFF');
+ $s('stallChallenge').textContent=m.stallChallenge?'✕ END STALL CHALLENGE':'▶ STALL CHALLENGE';
  $s('stallLimit').textContent=m.stallThreshold+' ticks';
  $s('recoveryActivity').textContent=m.recoveryLog.length?
    m.recoveryLog.slice(0,4).map(e=>'t'+e.tick+' '+e.action+': '+e.detail+' ('+e.outcome+')').join('\n'):
-   'No recovery needed yet. Try hard forgetting + audits off to observe a stall.';
+   'No recovery needed yet. Press STALL CHALLENGE for a controlled breakdown.';
 }
+$s('stallChallenge').onclick=()=>{
+ pause();
+ if(!model.stallChallenge){
+   model._preChallenge={forget:model.forget_mode,audits:model.audit_enabled,infer:model.inferMode,
+     recovery:model.recoveryEnabled,threshold:model.stallThreshold,errors:model.designErrors};
+   model.stallChallenge=true;model.forget_mode='hard';model.audit_enabled=true;
+   model.inferMode='off';model.recoveryEnabled=true;model.stallThreshold=12;model.designErrors=false;
+   model.newPicture(shape('cross',model.rng));
+   status('Stall challenge loaded. Designers omit packets; routine audits are suspended. Press PLAY to see whether the recovery policy can independently restart work.');
+ }else{
+   const p=model._preChallenge||{};
+   model.stallChallenge=false;model.forget_mode=p.forget||'adaptive';
+   model.audit_enabled=p.audits??true;model.inferMode=p.infer||'cautious';
+   model.recoveryEnabled=p.recovery??true;model.stallThreshold=p.threshold||28;
+   model.designErrors=p.errors??false;model.newPicture(shape('heart'));
+   status('Exited stall challenge. Normal designer and auditor behavior restored.');
+ }
+ render();
+};
 $s('recoverToggle').onclick=()=>{model.recoveryEnabled=!model.recoveryEnabled;restart('Recovery policy '+(model.recoveryEnabled?'enabled':'disabled')+'.');updateRecoveryPanel();};
 $s('stallSlider').oninput=e=>{model.stallThreshold=Number(e.target.value);updateRecoveryPanel();};
 $s('recoveryTrain').onclick=async()=>{if(busy)return;pause();recoveryTraining=true;for(let i=0;i<2000;i+=200){teachRecovery(model,200);await new Promise(r=>setTimeout(r,0));}
