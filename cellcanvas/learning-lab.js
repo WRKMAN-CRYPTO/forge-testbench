@@ -354,9 +354,12 @@ if(typeof window!=='undefined'){
 if(typeof document.addEventListener==='function'){
  document.addEventListener('visibilitychange',()=>{if(document.hidden)saveNow(true);updateLearningUI();});
 }
-document.querySelector('h1').innerHTML='CELLCANVAS <span style="color:var(--mint)">v0.5</span>';
-document.title='CellCanvas v0.5 | Learning Lab • Forge Testbench';
-document.querySelector('.header p').textContent='The little image-making colony now saves its brain locally and practices on new, deliberately incomplete patterns. See whether additional lessons actually improve prediction.';
+const radioAvailable=!!model.commBrain;
+document.querySelector('h1').innerHTML='CELLCANVAS <span style="color:var(--mint)">'+(radioAvailable?'v0.6':'v0.5')+'</span>';
+document.title=radioAvailable?'CellCanvas v0.6 | Colony Radio • Forge Testbench':'CellCanvas v0.5 | Learning Lab • Forge Testbench';
+document.querySelector('.header p').textContent=radioAvailable?
+ 'Communication experiment: workers observe the actual canvas, supervisors question designers, and replies become corrected work orders. Your brain and drawing autosave locally.':
+ 'The little image-making colony now saves its brain locally and practices on new, deliberately incomplete patterns. See whether additional lessons actually improve prediction.';
 render();
 autoTimer=setTimeout(autoLoop,400);
 })();
