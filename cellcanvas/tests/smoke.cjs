@@ -60,7 +60,7 @@ model.run(400);
 const solo={wrong:model.wrong,guesses:model.guessesMade};
 assert(solo.guesses>0,'Supervisors should propose pixels even when audits are switched off');
 const brain=model.serialize();
-assert.equal(brain.format,'cellcanvas.v4');
+assert.equal(brain.format,'cellcanvas.v6');
 assert.equal(brain.recoveryBrain.weights.length,4);
 assert.equal(brain.neighborBrain.weights.length,4);
 model.load(brain);
