@@ -97,4 +97,17 @@ model.run(500);
 const noRescue={wrong:model.wrong,attempts:model.recoveryCount};
 assert.equal(noRescue.attempts,0,'Recovery off must really disable interventions');
 assert(noRescue.wrong>0,'With original auditing suppressed, omissions should remain');
-console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed,solidDispute,rescue,noRescue},null,2));
+// The user-facing one-tap experiment must visibly reproduce a stalled colony.
+model.rng=vm.runInContext('randomGenerator(19)',sandbox);
+el('stallChallenge').onclick();
+assert.equal(model.stallChallenge,true);
+assert.equal(model.audit_enabled,true);
+assert.equal(model.inferMode,'off');
+assert.equal(model.forget_mode,'hard');
+const challengeSuccess=model.run(500);
+const challenge={success:challengeSuccess,wrong:model.wrong,attempts:model.recoveryCount,useful:model.recoveryUseful};
+assert(challenge.attempts>0,'Stall Challenge must invoke supervisor recovery');
+assert(challenge.success,'Stall Challenge should recover the cross pattern');
+el('stallChallenge').onclick();
+assert.equal(model.stallChallenge,false,'Challenge switch should restore normal mode');
+console.log(JSON.stringify({PASS:true,noInference,supervised,solo,disputed,solidDispute,rescue,noRescue,challenge},null,2));
