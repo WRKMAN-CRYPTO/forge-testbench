@@ -108,6 +108,32 @@ function sampleFromPicture(pic,rand,forcePositive=false){
  return {features:pixelFeatures(x,y,visible),answer:pic[y][x]};
 }
 function addCase(c){if(!c)return;recentCases.push(c);if(recentCases.length>MAX_CASES)recentCases.shift();}
+// Learning from actual colony corrections, not merely synthetic pictures.
+// Capture what the supervisor knew before a due designer rescan. The trainer
+// receives the verified response ONLY after the designer sends it.
+const originalDesignerTick=P.designerTick;
+P.designerTick=function(){
+ const records=[];
+ for(const [y,due] of this.pending_scans){
+  if(this.ticks<due)continue;
+  const known=new Array(256).fill(0);
+  for(const [k,c] of this.messages)if(!this.tentative.has(k))known[k]=c;
+  for(let x=0;x<16;x++){
+   const k=y*16+x;
+   if(this.tentative.has(k)||this.suspected.has(k)){
+    records.push({k,features:pixelFeatures(x,y,known)});
+   }
+  }
+ }
+ const result=originalDesignerTick.call(this);
+ for(const r of records)if(this.messages.has(r.k)){
+    const label=this.messages.get(r.k);
+    if(Number.isInteger(label)&&label>=0&&label<=3)
+      addCase({features:r.features,answer:label,origin:'verified rescan'});
+ }
+ return result;
+};
+
 let sourcePic=null,sourceLeft=0;
 function nextCase(){
  const rand=trainRng;
@@ -139,6 +165,7 @@ function batch(n){
  }
  autoTrained+=n;
 }
+P.practiceMaskedPixels=function(n=24){batch(Math.min(500,Math.max(1,Math.floor(n))));};
 function evaluate(){
  // Fixed holdout set, never used for training. Does not test full-image success.
  const rr=rng(7461831);
@@ -294,10 +321,11 @@ pane.innerHTML='<h3>LEARNING LAB · v0.5</h3>'+
  'Held-out score tests predicted pixel colors from partial neighbor information, not overall image success.</div>'+
  '<p class="tinyhint">AUTOSAVE is on when browser storage is available: it keeps your drawing, brain weights, settings and lesson history on this device. The current simulation restarts after reload. AUTO-TRAIN runs only while this tab is open and visible, pauses when hidden, and resumes when you return. Download SAVE BRAIN for an independent backup.</p>';
 document.querySelector('.options').appendChild(pane);
+const hadExistingSave=storageOK&&!!localStorage.getItem(STORE);
 const didLoad=storageOK&&loadSave();
 if(lastScore===null){scoreTest();}
 if(didLoad){status('Restored your saved CellCanvas drawing and learned weights. Workshop reset to start of the picture.');}
-else if(storageOK){status('v0.5 ready. Browser autosave enabled. Turn on AUTO-TRAIN for continued practice while this tab is visible.');}
+else if(storageOK){status(hadExistingSave?'The stored checkpoint was invalid. Starter brain retained. Download SAVE BRAIN for portable backups.':'v0.5 ready. Browser autosave enabled. Turn on AUTO-TRAIN for continued practice while this tab is visible.');}
 else{status('v0.5 ready. Local storage blocked; use SAVE BRAIN for manual backups.');}
 $t('autoToggle').onclick=()=>{
  trainingOn=!trainingOn;
@@ -329,5 +357,5 @@ document.querySelector('h1').innerHTML='CELLCANVAS <span style="color:var(--mint
 document.title='CellCanvas v0.5 | Learning Lab • Forge Testbench';
 document.querySelector('.header p').textContent='The little image-making colony now saves its brain locally and practices on new, deliberately incomplete patterns. See whether additional lessons actually improve prediction.';
 render();
-if(quiet())autoTimer=setTimeout(autoLoop,400);
+autoTimer=setTimeout(autoLoop,400);
 })();
