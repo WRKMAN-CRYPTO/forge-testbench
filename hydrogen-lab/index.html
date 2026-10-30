@@ -235,7 +235,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.5',W-15,23,10,C.muted,'right',650);
+    txt('v0.5.1',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -1321,6 +1321,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       if(wave.magnetic!==0)
         txt('B '+wave.magnetic.toFixed(3)+' a.u.   ZEEMAN ΔE/m = '+
           wave.zeemanSplittingEV.toFixed(3)+' eV',x+17,y+147,10,C.violet,'left',700);
+      drawSpinBloch(Math.max(70,w-77),154);
       txt('SWIPE UP / DOWN TO TILT THE CAMERA',x+17,y+180,10,C.muted,'left',750);
       txt('RAY-MARCHED ψ  ·  '+volume.sampleCount.toLocaleString()+' INTEGRATION STEPS',x+17,y+198,9,C.gold,'left',700);
       txt('YAW '+(volume.yaw*180/Math.PI|0)+'°  ·  TILT '+(volume.pitch*180/Math.PI|0)+'°',
@@ -1357,6 +1358,24 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       wavePixels.data[p+3]=255;
     }
     waveCtx.putImageData(wavePixels,0,0);
+  }
+  // Bloch-vector visualization of spin expectation, not a spinning particle.
+  function drawSpinBloch(cx,cy){
+    const v=wave.spinVec,R=24;
+    g.save();g.lineWidth=1.2;g.strokeStyle='rgba(181,160,255,.67)';
+    g.beginPath();g.arc(cx,cy,R,0,Math.PI*2);g.stroke();
+    g.beginPath();g.ellipse(cx,cy,R,8,0,0,Math.PI*2);g.stroke();
+    g.strokeStyle='rgba(137,155,184,.42)';
+    g.beginPath();g.moveTo(cx-R-5,cy);g.lineTo(cx+R+5,cy);g.stroke();
+    g.beginPath();g.moveTo(cx,cy-R-5);g.lineTo(cx,cy+R+5);g.stroke();
+    const px=cx+v[0]*R*.85,py=cy-v[1]*R*.85-v[2]*R*.16;
+    g.lineWidth=2.5;g.strokeStyle=C.violet;
+    g.beginPath();g.moveTo(cx,cy);g.lineTo(px,py);g.stroke();
+    g.fillStyle=v[2]>=0?'#d7b7ff':'#f4be6e';
+    g.beginPath();g.arc(px,py,4,0,Math.PI*2);g.fill();
+    txt('SPIN',cx,cy-R-14,10,C.violet,'center',800);
+    txt('Sz '+v[2].toFixed(2),cx,cy+R+12,10,C.violet,'center',750);
+    g.restore();
   }
   function waveViewport(now){
     viewport();const a=layout,x=a.x+13,w=a.w-26;
@@ -1417,8 +1436,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     });g.stroke();
     txt('r=0',x,graphY+graphH+11,9,C.muted);
     txt('r='+rGrid[N-1].toFixed(1)+' a₀',W-x,graphY+graphH+11,9,C.muted,'right');
-    txt('2p+ '+(wave.targetPlus*100).toFixed(1)+'%   2p− '+(wave.targetMinus*100).toFixed(1)+'%',
-      x,a.y+a.h-28,10,C.blue,'left',750);
+    txt(waveStateReadout(),x,a.y+a.h-28,10,C.blue,'left',750);
     txt('Lz '+wave.lz.toFixed(2)+' ħ',W-x,a.y+a.h-28,10,C.mint,'right',750);
     txt('LEFT '+(wave.norm*100).toFixed(1)+'%  LOST '+(wave.lost*100).toFixed(1)+'%',x,a.y+a.h-11,10,C.gold);
     txt((wave.tAU*AU_TIME_FS).toFixed(2)+' fs',W-x,a.y+a.h-11,10,C.ink,'right');
@@ -1464,6 +1482,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       p,y+207,9,wave.magnetic?C.violet:C.muted,'left',650);
     txt('REMAIN '+(wave.norm*100).toFixed(1)+'%',p,y+230,10,C.mint,'left',750);
     txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-p,y+230,10,C.gold,'right',750);
+    button(W-105,y+182,90,22,'SPIN '+wave.spinPreset,false,()=>nextSpinPreset(),C.violet);
   }
 
   function waveAdvancedControls(){
@@ -1507,7 +1526,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       wave.boundaryMode==='REFLECT',()=>setWaveBoundary('REFLECT'),C.blue);
     button(p+2*(bw3+gap),yy(228),bw3,hh(34),'ABSORB',
       wave.boundaryMode==='ABSORB',()=>setWaveBoundary('ABSORB'),C.mint);
-    txt('ADVANCED LAB  ·  MORE TOOLS',p,yy(278),9,C.muted,'left',650);
+    button(p+bw3+gap,yy(264),bw3,hh(28),'SPIN '+wave.spinPreset,false,
+      ()=>nextSpinPreset(),C.violet);
+    txt('ADVANCED LAB',p,yy(278),9,C.muted,'left',650);
   }
 
   function fieldControls(){
@@ -1603,7 +1624,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('PHASE 5A: Orbital Zeeman model adds H_B = B Lz/2 in atomic units to seven (l,m) channels. D4 superpositions precess because m=+2 and m=−2 acquire opposite phases. FLOW includes field-induced advective flux. B=0.020 a.u. ≈ 4701 T is an exaggerated demonstration field. The quadratic diamagnetic term B²(x²+y²)/8 and electron spin are not modeled; this is not a complete magnetic atom.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 5B: An independent spin-1/2 spinor evolves under the Pauli Zeeman Hamiltonian Hspin = g B σz/4 (atomic units). The Bloch indicator displays spin expectation values, not a spinning electron. Spin changes the total Zeeman energy, but does not alter the orbital density in this factorized model. Spin-orbit, hyperfine, diamagnetism and spin-changing RF drives are not yet included; B=0.020 a.u. is a deliberately large demonstration field.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
@@ -1805,7 +1826,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     button(18,lowerY,90,40,immersivePlayState()?'Ⅱ PAUSE':'▶ PLAY',
       immersivePlayState(),()=>toggleImmersivePlay(),C.mint);
     if(tab==='WAVE'&&wave.slice==='3D'){
-      button(18,H-139,112,32,'TILT CAMERA',false,()=>nextCameraAngle(),C.mint);
+      button(18,H-139,112,32,'SPIN '+wave.spinPreset,false,()=>nextSpinPreset(),C.violet);
       button(139,H-139,112,32,'MAG '+magneticLabel(),wave.magnetic!==0,
         ()=>nextWaveMagnetic(),C.violet);
     }
@@ -1820,8 +1841,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(tab==='WAVE'){
       txt('LEFT '+(wave.norm*100).toFixed(1)+'%',W-18,lowerY+54,10,C.mint,'right',700);
       txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-18,lowerY-25,10,C.gold,'right',700);
-      txt('2p+ '+(wave.targetPlus*100).toFixed(1)+'%  2p− '+(wave.targetMinus*100).toFixed(1)+'%',
-        18,lowerY-25,10,C.blue,'left',700);
+      txt(waveStateReadout(),18,lowerY-25,10,C.blue,'left',700);
       if(wave.boundaryMode==='REFLECT'&&wave.boundary>.01){
         const warningY=wave.viewMode!=='DENSITY'?181:141;
         fillRect(W*.5-111,warningY,222,27,7,'rgba(75,42,31,.84)');
