@@ -912,6 +912,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(azimuthal<.001)return 'AXIAL SYMMETRY · TILT TO CHANGE THE VIEW';
     const nz=[pop(3),pop(4),pop(5),pop(6)].filter(v=>v>.001).length;
     if(nz===1)return 'AXIAL DENSITY · TILT TO SEE ITS SHAPE';
+    if(wave.magnetic!==0&&(wave.setup==='D4'||wave.setup==='P MIX'))
+      return 'MAGNETIC PRECESSION · CLOUD ROTATES WITHOUT CAMERA';
     if(wave.setup==='D4'&&wave.drive==='OFF')return 'D4 · FOUR LOBES · ROTATE TO REVEAL SHAPE';
     return 'SUPERPOSITION · SHAPE VARIES WITH ANGLE';
   }
@@ -925,7 +927,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     if(wave.slice==='XZ'&&(Math.abs(wave.lz)>.08||wave.magnetic!==0))return {active:true,outOfPlane:true,
       message:'FLOW OUT OF PLANE · USE XY / 3D'};
-    return {active:true,message:'CURRENT DETECTED · VECTORS SHOWN'};
+    return {active:true,message:wave.magnetic?
+      'MAGNETIC CURRENT · CALCULATED VECTORS':'CURRENT DETECTED · VECTORS SHOWN'};
   }
   function flowLegend(x,y){
     txt('PROBABILITY CURRENT  j = Im(ψ* ∇ψ)',x,y,9,C.ink,'left',700);
@@ -1761,7 +1764,11 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(tab==='FIELD'&&field.run&&!field.showScan)advanceField(dt);
     if(tab==='ATOM'&&running&&mode==='MIX')timeFs+=dt*speed;
     if(tab==='WAVE'&&wave.running){
-      for(let i=0;i<wave.steps;i++)waveOneStep();
+      // Fast-forward the exact magnetic-channel phases with more of the
+      // existing norm-preserving CN steps per rendered frame, because the
+      // 3D volume renderer is more expensive on phones.
+      const quantumSteps=wave.magnetic?Math.max(32,wave.steps*3):wave.steps;
+      for(let i=0;i<quantumSteps;i++)waveOneStep();
       waveStats();
     }
     g.clearRect(0,0,W,H);g.fillStyle=C.bg;g.fillRect(0,0,W,H);
