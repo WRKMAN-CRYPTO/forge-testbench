@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | Orbital Zeeman Laboratory</title>
+<title>HYDROGEN // Emergence Lab | Electron Spin Laboratory</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -45,7 +45,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     re:[], im:[], boundary:0, cachedAt:0, norm:1, overlap:1,
     charge:[], seenEpoch:0, energy:0,
     boundaryMode:'REFLECT', lost:0, absorberStart:0, viewMode:'DENSITY', slice:'XY',
-    polarization:'Z',targetPlus:0,targetMinus:0,targetZero:0,lz:0,advanced:false,magnetic:0
+    polarization:'Z',targetPlus:0,targetMinus:0,targetZero:0,lz:0,advanced:false,magnetic:0,
+    spinPreset:'X+',spin:{ar:Math.SQRT1_2,ai:0,br:Math.SQRT1_2,bi:0},
+    spinVec:[1,0,0],spinEnergy:0
   };
   // Channels (l,m), radial Hamiltonians depend on l, not m.
   // Add m=±2 components of l=2; all channels use the same radial CN solver.
@@ -56,6 +58,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   const WAVE_COUPLINGS=[1/Math.sqrt(3),2/Math.sqrt(15)];
   const MAG_DEMO_FIELD=.020; // atomic units, ~4701 T, exaggerated for visibility
   const TESLA_PER_AU=235051.756758;
+  const ELECTRON_G=2.00231930436256;
   const waveImageCanvas=document.createElement('canvas');
   waveImageCanvas.width=200;waveImageCanvas.height=200;
   const waveCtx=waveImageCanvas.getContext('2d');
@@ -93,10 +96,12 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(typeof saved.waveAdvanced==='boolean')wave.advanced=saved.waveAdvanced;
     if([0,MAG_DEMO_FIELD,-MAG_DEMO_FIELD].includes(saved.waveMagnetic))
       wave.magnetic=saved.waveMagnetic;
+    if(['X+','Z+','Z-','Y+'].includes(saved.waveSpinPreset))
+      wave.spinPreset=saved.waveSpinPreset;
     if(['DENSITY','PHASE','FLOW'].includes(saved.waveView))wave.viewMode=saved.waveView;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
   }catch(e){}
-  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice,wavePolarization:wave.polarization,waveAdvanced:wave.advanced,waveMagnetic:wave.magnetic}));}catch(e){}}
+  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice,wavePolarization:wave.polarization,waveAdvanced:wave.advanced,waveMagnetic:wave.magnetic,waveSpinPreset:wave.spinPreset}));}catch(e){}}
   function normalize(u){
     let n=0;for(let i=0;i<N;i++)n+=u[i]*u[i];
     n=Math.sqrt(n*DR);for(let i=0;i<N;i++)u[i]/=n;
@@ -634,7 +639,72 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     setWaveMagnetic(wave.magnetic===0?MAG_DEMO_FIELD:
       wave.magnetic>0?-MAG_DEMO_FIELD:0);
   }
+  // A factorized spinor (alpha|up>+beta|down>) times the orbital psi.
+  // No spin-orbit, hyperfine, or spin-dependent spatial coupling yet.
+  function initializeSpin(){
+    const q=Math.SQRT1_2,p=wave.spinPreset;
+    wave.spin=p==='Z+'?{ar:1,ai:0,br:0,bi:0}:
+      p==='Z-'?{ar:0,ai:0,br:1,bi:0}:
+      p==='Y+'?{ar:q,ai:0,br:0,bi:q}:
+      {ar:q,ai:0,br:q,bi:0};
+    spinStats();
+  }
+  function setSpinPreset(p){
+    if(!['X+','Z+','Z-','Y+'].includes(p))return;
+    wave.spinPreset=p;initializeSpin();save();
+  }
+  function nextSpinPreset(){
+    const all=['X+','Z+','Z-','Y+'];
+    setSpinPreset(all[(all.indexOf(wave.spinPreset)+1)%all.length]);
+  }
+  function spinStats(){
+    const s=wave.spin;
+    const cr=s.ar*s.br+s.ai*s.bi;
+    const ci=s.ar*s.bi-s.ai*s.br;
+    const x=2*cr,y=2*ci;
+    const z=s.ar*s.ar+s.ai*s.ai-s.br*s.br-s.bi*s.bi;
+    wave.spinVec=[x,y,z];
+    wave.spinEnergy=ELECTRON_G*wave.magnetic*z*HARTREE_EV/4;
+    return {x,y,z,norm:s.ar*s.ar+s.ai*s.ai+s.br*s.br+s.bi*s.bi};
+  }
+  function waveSpinStep(){
+    if(!wave.magnetic)return;
+    // Hspin = g B sigma_z/4 (atomic units).
+    const theta=ELECTRON_G*wave.magnetic*wave.dtAU/4;
+    const c=Math.cos(theta),si=Math.sin(theta),s=wave.spin;
+    const ar=s.ar,ai=s.ai,br=s.br,bi=s.bi;
+    s.ar=c*ar+si*ai;s.ai=c*ai-si*ar;
+    s.br=c*br-si*bi;s.bi=c*bi+si*br;
+  }
+  function spinReadout(){
+    const v=wave.spinVec;
+    return 'Sx '+v[0].toFixed(2)+'  Sy '+v[1].toFixed(2)+'  Sz '+v[2].toFixed(2);
+  }
+  function waveBoundOverlap(ch,key){
+    const u=wave.re[ch],v=wave.im[ch],ref=states[key].u;
+    let re=0,im=0;
+    for(let i=0;i<N;i++){re+=u[i]*ref[i]*DR;im+=v[i]*ref[i]*DR;}
+    return re*re+im*im;
+  }
+  function waveStateReadout(){
+    const per=p=>(100*p).toFixed(1)+'%';
+    switch(wave.setup){
+      case 'D4':return '3d m+2 '+per(waveBoundOverlap(5,'3d'))+
+        '  /  m−2 '+per(waveBoundOverlap(6,'3d'));
+      case 'P MIX':return '2p m+1 '+per(wave.targetPlus)+
+        '  /  m−1 '+per(wave.targetMinus);
+      case 'P+':return '2p m+1 '+per(wave.targetPlus);
+      case 'P-':return '2p m−1 '+per(wave.targetMinus);
+      case 'DIPOLE':return '1s '+per(wave.overlap)+
+        '  / 2p m0 '+per(wave.targetZero);
+      case 'BREATH':return '1s '+per(wave.overlap)+
+        '  / 2s '+per(waveBoundOverlap(0,'2s'));
+      case 'GROUND':return '1s '+per(wave.overlap);
+      default:return '1s OVERLAP '+per(wave.overlap)+'  ·  PACKET';
+    }
+  }
   function waveOneStep(){
+    waveSpinStep();
     waveMagneticHalfStep();
     if(wave.boundaryMode==='ABSORB')waveAbsorbingHalfStep();
     for(let l=0;l<WAVE_CHANNELS.length;l++)waveRadialStep(l);
@@ -699,11 +769,12 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const totalLz=pm-mm+2*dp-2*dm;
     wave.lz=norm>1e-12?totalLz/norm:0;
-    wave.energy=(e+wave.magnetic*.5*totalLz)*HARTREE_EV;
+    const spin=spinStats();
+    wave.energy=(e+wave.magnetic*.5*totalLz)*HARTREE_EV+wave.spinEnergy;
     wave.zeemanSplittingEV=wave.magnetic*.5*HARTREE_EV;
     return {norm,boundary,ground:wave.overlap,energy:wave.energy,
       p0:wave.targetZero,pPlus:wave.targetPlus,pMinus:wave.targetMinus,lz:wave.lz,
-      deltaEm:wave.zeemanSplittingEV};
+      deltaEm:wave.zeemanSplittingEV,spin,spinEnergy:wave.spinEnergy};
   }
   function initializeWave(){
     wave.re=Array.from({length:WAVE_CHANNELS.length},()=>new Float64Array(N));
@@ -734,6 +805,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     norm=Math.sqrt(norm);
     for(let l=0;l<WAVE_CHANNELS.length;l++)for(let i=0;i<N;i++)wave.re[l][i]/=norm;
     wave.tAU=0;wave.cachedAt=0;wave.running=false;volume.dirty=true;volume.at=0;
+    initializeSpin();
     wave.lost=0;wave.boundary=0;
     wave.wavelength=resonantWavelength();
     waveBuildMatrix();initializeAbsorber();waveStats();
