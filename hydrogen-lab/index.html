@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | Phase Color</title>
+<title>HYDROGEN // Emergence Lab | Probability Flow</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -73,7 +73,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if([2,8,16].includes(saved.waveSteps))wave.steps=saved.waveSteps;
     if([.008,.025,.06].includes(saved.waveStrength))wave.strength=saved.waveStrength;
     if(['REFLECT','ABSORB'].includes(saved.waveBoundary))wave.boundaryMode=saved.waveBoundary;
-    if(['DENSITY','PHASE'].includes(saved.waveView))wave.viewMode=saved.waveView;
+    if(['DENSITY','PHASE','FLOW'].includes(saved.waveView))wave.viewMode=saved.waveView;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
   }catch(e){}
   function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode}));}catch(e){}}
@@ -209,7 +209,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.3.3',W-15,23,10,C.muted,'right',650);
+    txt('v0.3.4',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -637,10 +637,86 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const z=waveComplex(r,c);return z[0]*z[0]+z[1]*z[1];
   }
   function setWaveView(mode){
-    if(mode!=='DENSITY'&&mode!=='PHASE')return;
+    if(!['DENSITY','PHASE','FLOW'].includes(mode))return;
     wave.viewMode=mode;
     wave.cachedAt=0;immersiveDirty=true;immersiveAt=0;
     save();
+  }
+  function nextWaveView(){
+    setWaveView(wave.viewMode==='DENSITY'?'PHASE':wave.viewMode==='PHASE'?'FLOW':'DENSITY');
+  }
+  // Physical probability current in atomic units is
+  // j = Im(conjugate(psi) grad psi). It is a flux density rather than
+  // a path followed by an individual electron.
+  // For the 3D axisymmetric m=0 state, evaluate its meridional (x,y) slice.
+  function waveComplexAt(x,y){
+    const r=Math.hypot(x,y);
+    return waveComplex(r,r>1e-12?x/r:0);
+  }
+  function probabilityCurrent(x,y){
+    const h=DR*.8;
+    const p=waveComplexAt(x,y);
+    const l=waveComplexAt(x-h,y),r=waveComplexAt(x+h,y);
+    const u=waveComplexAt(x,y-h),d=waveComplexAt(x,y+h);
+    const dxRe=(r[0]-l[0])/(2*h),dxIm=(r[1]-l[1])/(2*h);
+    const dyRe=(d[0]-u[0])/(2*h),dyIm=(d[1]-u[1])/(2*h);
+    return {jx:p[0]*dxIm-p[1]*dxRe,
+      jy:p[0]*dyIm-p[1]*dyRe,
+      rho:p[0]*p[0]+p[1]*p[1]};
+  }
+  // Sample flux on the visible screen at a common physical scale in x,y.
+  // Arrow lengths are normalized within the view, with low flux suppressed.
+  function drawProbabilityFlow(x,y,w,h,halfWidthAU,now,compact=false){
+    const nX=Math.max(5,Math.min(18,Math.round(w/(compact?20:29))));
+    const nY=Math.max(5,Math.min(25,Math.round(h/(compact?20:34))));
+    const samples=[];let maxJ=0,maxRho=0;
+    const dx=w/nX,dy=h/nY;
+    for(let row=0;row<nY;row++)for(let col=0;col<nX;col++){
+      const sx=x+(col+.5)*dx,sy=y+(row+.5)*dy;
+      const px=(sx-(x+w*.5))/ (w*.5)*halfWidthAU;
+      const py=(sy-(y+h*.5))/ (w*.5)*halfWidthAU;
+      const j=probabilityCurrent(px,py);
+      const mag=Math.hypot(j.jx,j.jy);
+      samples.push({sx,sy,px,py,j,mag});
+      if(mag>maxJ)maxJ=mag;
+      if(j.rho>maxRho)maxRho=j.rho;
+    }
+    if(maxJ<1e-9||maxRho<1e-12)return 0;
+    const gate=Math.max(maxJ*.013,1e-9),radius=Math.min(dx,dy)*.43;
+    let visible=0;
+    g.save();g.lineWidth=compact?1.3:1.65;g.lineCap='round';g.lineJoin='round';
+    for(const p of samples){
+      if(p.mag<gate||p.j.rho<maxRho*.00035)continue;
+      const weight=Math.min(1,Math.sqrt(p.mag/maxJ));
+      const len=radius*(.30+.70*weight);
+      const vx=p.j.jx/p.mag,vy=p.j.jy/p.mag;
+      const headX=p.sx+vx*len,headY=p.sy+vy*len;
+      const tailX=p.sx-vx*len,tailY=p.sy-vy*len;
+      const radial=p.px*p.j.jx+p.py*p.j.jy;
+      const color=radial>p.mag*.02?'#8cf5d6':radial<-p.mag*.02?'#ffc07b':'#bdadff';
+      g.globalAlpha=Math.min(.93,.20+.72*weight);
+      g.strokeStyle=color;g.fillStyle=color;
+      g.beginPath();g.moveTo(tailX,tailY);g.lineTo(headX,headY);g.stroke();
+      const headSize=Math.min(5,Math.max(2,len*.33));
+      g.beginPath();
+      g.moveTo(headX,headY);
+      g.lineTo(headX-vx*headSize-vy*headSize*.45,headY-vy*headSize+vx*headSize*.45);
+      g.lineTo(headX-vx*headSize+vy*headSize*.45,headY-vy*headSize-vx*headSize*.45);
+      g.closePath();g.fill();
+      if(!compact){
+        const t=(now*.00042+p.sx*.0031+p.sy*.0017)%1;
+        const dotX=tailX+(headX-tailX)*t,dotY=tailY+(headY-tailY)*t;
+        g.globalAlpha=Math.min(.9,.3+weight*.6);
+        g.beginPath();g.arc(dotX,dotY,1.45,0,Math.PI*2);g.fill();
+      }
+      visible++;
+    }
+    g.restore();
+    return visible;
+  }
+  function flowLegend(x,y){
+    txt('PROBABILITY CURRENT  j = Im(ψ* ∇ψ)',x,y,9,C.ink,'left',700);
+    txt('MINT  OUTWARD    GOLD  INWARD',x,y+17,9,C.mint,'left',650);
   }
   function phaseIndex(re,im){
     const phi=Math.atan2(im,re)+states['1s'].E*wave.tAU;
@@ -707,8 +783,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function waveViewport(now){
     viewport();const a=layout,x=a.x+13,w=a.w-26;
     txt('SPATIAL WAVEFUNCTION / r, θ',x,a.y+17,10,C.blue,'left',750);
-    button(a.x+10,a.y+33,107,28,wave.viewMode==='PHASE'?'COLOR: PHASE':'COLOR: DENSITY',
-      wave.viewMode==='PHASE',()=>setWaveView(wave.viewMode==='PHASE'?'DENSITY':'PHASE'),C.mint);
+    button(a.x+10,a.y+33,108,28,'VIEW: '+wave.viewMode,
+      wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
     const middleH=Math.max(104,a.h-185);
     const side=Math.min(a.w-26,middleH);
     const cx=W/2,cy=a.y+34+middleH/2;
@@ -719,11 +795,13 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     if(!wave.cachedAt||now-wave.cachedAt>95){waveCloud();wave.cachedAt=now;}
     g.drawImage(waveImageCanvas,cx-side/2,cy-side/2,side,side);
+    if(wave.viewMode==='FLOW')drawProbabilityFlow(cx-side/2,cy-side/2,side,side,14/Z,now,true);
     g.fillStyle=C.gold;g.beginPath();g.arc(cx,cy,2.2,0,Math.PI*2);g.fill();
     g.restore();
     button(a.x+a.w-92,a.y+7,80,28,'EXPAND',false,()=>setImmersive(true),C.mint);
     const barY=a.y+a.h-133;
     if(wave.viewMode==='PHASE')txt('HUE = PHASE   ·   LIGHT = DENSITY',x,barY-29,9,C.mint,'left',700);
+    if(wave.viewMode==='FLOW')txt('ARROWS: MINT OUT  ·  GOLD IN  ·  VIOLET SIDE',x,barY-29,9,C.mint,'left',700);
     txt('RADIAL PROBABILITY  ·  |u(r)|²',x,barY-12,9,C.muted,'left',700);
     const graphX=x,graphY=barY+5,graphW=w,graphH=55;
     if(wave.boundaryMode==='ABSORB'){
@@ -886,7 +964,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('WAVE DISPLAY: DENSITY shows |ψ|²; PHASE colors arg(ψ) after removing ground-state global phase. Hue is not directly observable, and near-zero amplitude has undefined phase. REFLECT conserves norm; ABSORB removes outgoing amplitude. Both remain numerical models.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('WAVE DISPLAY: DENSITY shows |ψ|², PHASE colors relative arg(ψ), and FLOW draws direction of probability current j = Im(ψ*∇ψ) in atomic units. Arrow lengths are locally scaled for visibility, not particle paths. REFLECT and ABSORB retain their behavior.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
@@ -1036,6 +1114,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     g.imageSmoothingEnabled=true;
     g.drawImage(immersiveCanvas,0,0,W,H);
+    if(tab==='WAVE'&&wave.viewMode==='FLOW'){
+      drawProbabilityFlow(0,0,W,H,immersiveZoom/Z,now);
+    }
     const cx=W/2,cy=H/2;
     // Rings mark distance rather than separate electron orbits.
     g.save();g.setLineDash([3,9]);
@@ -1054,9 +1135,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(tab==='WAVE'){
       button(W-173,15,155,36,wave.boundaryMode==='ABSORB'?'WALL: ABSORB':'WALL: REFLECT',
         true,()=>setWaveBoundary(wave.boundaryMode==='ABSORB'?'REFLECT':'ABSORB'),C.mint);
-      button(18,66,132,34,wave.viewMode==='PHASE'?'SHOW DENSITY':'SHOW PHASE',
-        wave.viewMode==='PHASE',()=>setWaveView(wave.viewMode==='PHASE'?'DENSITY':'PHASE'),C.mint);
+      button(18,66,132,34,'VIEW: '+wave.viewMode,
+        wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
       if(wave.viewMode==='PHASE')phaseLegend(18,125,154);
+      else if(wave.viewMode==='FLOW')flowLegend(18,125);
       else txt('WAVE / '+wave.setup+'  ·  '+wave.boundaryMode,18,113,10,C.muted,'left',750);
     }else{
       txt(tab==='FIELD'?'FIELD / DRIVE':'ATOM / '+mode,W-18,25,11,C.ink,'right',800);
@@ -1078,7 +1160,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       txt('LEFT '+(wave.norm*100).toFixed(1)+'%',W-18,lowerY+54,10,C.mint,'right',700);
       txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-18,lowerY-25,10,C.gold,'right',700);
       if(wave.boundaryMode==='REFLECT'&&wave.boundary>.01){
-        const warningY=wave.viewMode==='PHASE'?181:141;
+        const warningY=wave.viewMode!=='DENSITY'?181:141;
         fillRect(W*.5-111,warningY,222,27,7,'rgba(75,42,31,.84)');
         txt('NUMERICAL WALL REFLECTION',W*.5,warningY+13,9,'#ffcf91','center',800);
       }
