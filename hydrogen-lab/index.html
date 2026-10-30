@@ -48,8 +48,11 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     polarization:'Z',targetPlus:0,targetMinus:0,targetZero:0,lz:0
   };
   // Channels (l,m), radial Hamiltonians depend on l, not m.
-  const WAVE_CHANNELS=[{l:0,m:0},{l:1,m:0},{l:2,m:0},{l:1,m:1},{l:1,m:-1}];
+  // Add m=±2 components of l=2; all channels use the same radial CN solver.
+  const WAVE_CHANNELS=[{l:0,m:0},{l:1,m:0},{l:2,m:0},
+    {l:1,m:1},{l:1,m:-1},{l:2,m:2},{l:2,m:-2}];
   const Y11=Math.sqrt(3/(8*Math.PI));
+  const Y22=Math.sqrt(15/(32*Math.PI));
   const WAVE_COUPLINGS=[1/Math.sqrt(3),2/Math.sqrt(15)];
   const waveImageCanvas=document.createElement('canvas');
   waveImageCanvas.width=200;waveImageCanvas.height=200;
@@ -78,7 +81,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(typeof saved.wl==='number'&&Number.isFinite(saved.wl))field.wl=saved.wl;
     if([.008,.012,.02,.035].includes(saved.amp))field.amp=saved.amp;
     if([1,4,12].includes(saved.fsSpeed))field.speed=saved.fsSpeed;
-    if(['GROUND','BREATH','DIPOLE','SHELL','P+','P-','P MIX'].includes(saved.waveSetup))wave.setup=saved.waveSetup;
+    if(['GROUND','BREATH','DIPOLE','SHELL','P+','P-','P MIX','D4'].includes(saved.waveSetup))wave.setup=saved.waveSetup;
     if(['OFF','RESONANCE','DETUNED','PULSE'].includes(saved.waveDrive))wave.drive=saved.waveDrive;
     if([2,8,16].includes(saved.waveSteps))wave.steps=saved.waveSteps;
     if([.008,.025,.06].includes(saved.waveStrength))wave.strength=saved.waveStrength;
@@ -109,7 +112,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       den[i]=i?d-off*cp[i-1]:d;
       cp[i]=off/den[i];
       // A broad initial packet, not a pre-programmed hydrogen orbital.
-      u[i]=(l===1?r*r:r)*Math.exp(-Math.pow(r/(lower?8/Z:4/Z),2));
+      u[i]=Math.pow(r,l+1)*Math.exp(-Math.pow(r/(lower?8/Z:4/Z),2));
     }
     if(lower)projectOut(u,lower);
     normalize(u);
@@ -134,7 +137,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const s1=solve(0,220,null);
     const s2=solve(0,310,s1.u);
     const p2=solve(1,250,null);
-    states={'1s':s1,'2s':s2,'2p':p2};
+    const d3=solve(2,380,null);
+    states={'1s':s1,'2s':s2,'2p':p2,'3d':d3};
     field.d13=0;field.d23=0;
     for(let i=0;i<N;i++){
       field.d13+=s1.u[i]*p2.u[i]*rGrid[i]*DR/Math.sqrt(3);
@@ -647,12 +651,14 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     wave.targetZero=waveTargetProb(1);
     wave.targetPlus=waveTargetProb(3);
     wave.targetMinus=waveTargetProb(4);
-    let pm=0,mm=0;
+    let pm=0,mm=0,dp=0,dm=0;
     for(let i=0;i<N;i++){
       pm+=(wave.re[3][i]**2+wave.im[3][i]**2)*DR;
       mm+=(wave.re[4][i]**2+wave.im[4][i]**2)*DR;
+      dp+=(wave.re[5][i]**2+wave.im[5][i]**2)*DR;
+      dm+=(wave.re[6][i]**2+wave.im[6][i]**2)*DR;
     }
-    wave.lz=norm>1e-12?(pm-mm)/norm:0;
+    wave.lz=norm>1e-12?(pm-mm+2*dp-2*dm)/norm:0;
     return {norm,boundary,ground:wave.overlap,energy:wave.energy,
       p0:wave.targetZero,pPlus:wave.targetPlus,pMinus:wave.targetMinus,lz:wave.lz};
   }
@@ -675,6 +681,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       if(wave.setup==='P MIX'){
         wave.re[3][i]=states['2p'].u[i]/Math.sqrt(2);
         wave.re[4][i]=states['2p'].u[i]/Math.sqrt(2);
+      }
+      if(wave.setup==='D4'){
+        wave.re[5][i]=states['3d'].u[i]/Math.sqrt(2);
+        wave.re[6][i]=states['3d'].u[i]/Math.sqrt(2);
       }
     }
     let norm=0;for(let l=0;l<WAVE_CHANNELS.length;l++)for(let i=0;i<N;i++)norm+=wave.re[l][i]**2*DR;
@@ -708,6 +718,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const r=Math.hypot(x,y,z),c=r>1e-12?z/r:0;
     const a=waveSample(0,r),b=waveSample(1,r),d=waveSample(2,r);
     const plus=waveSample(3,r),minus=waveSample(4,r);
+    const dPlus=waveSample(5,r),dMinus=waveSample(6,r);
     const y0=.28209479177,y1=.4886025119*c,y2=.31539156525*(3*c*c-1);
     let rr=a[0]*y0+b[0]*y1+d[0]*y2;
     let ii=a[1]*y0+b[1]*y1+d[1]*y2;
@@ -715,6 +726,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       const k=Y11/r;
       rr+=k*(-plus[0]*x+plus[1]*y+minus[0]*x+minus[1]*y);
       ii+=k*(-plus[0]*y-plus[1]*x-minus[0]*y+minus[1]*x);
+      const k2=Y22/(r*r),xx=x*x-y*y,xy=2*x*y;
+      // Y2±2 = sqrt(15/(32π))*(x±iy)^2/r².
+      rr+=k2*(dPlus[0]*xx-dPlus[1]*xy+dMinus[0]*xx+dMinus[1]*xy);
+      ii+=k2*(dPlus[0]*xy+dPlus[1]*xx-dMinus[0]*xy+dMinus[1]*xx);
     }
     return [rr,ii];
   }
@@ -1168,11 +1183,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     txt('CHOOSE A WAVEFUNCTION',p,yy(9),10,C.muted,'left',750);
     ['GROUND','BREATH','DIPOLE','SHELL'].forEach((v,i)=>
       button(p+i*(bw+gap),yy(19),bw,hh(35),v,wave.setup===v,()=>waveChangeSetup(v)));
-    ['P+ ↻','P- ↺','P MIX','RESET'].forEach((label,i)=>{
-      const preset=['P+','P-','P MIX'][i];
-      button(p+i*(bw+gap),yy(61),bw,hh(34),label,i===3?false:wave.setup===preset,()=>{
-        if(i===3)initializeWave();else waveChangeSetup(preset);
-      });
+    ['P+ ↻','P- ↺','P MIX','D4 ✣'].forEach((label,i)=>{
+      const preset=['P+','P-','P MIX','D4'][i];
+      button(p+i*(bw+gap),yy(61),bw,hh(34),label,wave.setup===preset,
+        ()=>waveChangeSetup(preset));
     });
     txt('ELECTRIC FIELD  ·  POLARIZATION '+wave.polarization,p,yy(101),10,C.muted,'left',750);
     ['OFF','RESONANCE','DETUNED','PULSE'].forEach((v,i)=>
@@ -1297,7 +1311,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('PHASE 4C: 3D volume projection samples complex ψ(x,y,z) from five spherical-harmonic channels; drag to orbit. Brightness integrates sampled |ψ|², PHASE colors relative argument, and FLOW projects three-dimensional probability currents. The radial solver still uses a truncated angular basis, NOT an unrestricted 3D Cartesian grid.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 4C+: Seven (l,m) channels now include 3d, m=+2 and m=-2. The D4 preset superposes these into a genuine four-lobed x²−y² orbital. EXPLORE 3D opens immersive drag-to-orbit sampling. This remains a truncated spherical-harmonic solver, not a full Cartesian 3D grid; transverse field coupling to d states is not yet implemented.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
