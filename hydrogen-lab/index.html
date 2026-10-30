@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | Smooth Quantum Volume</title>
+<title>HYDROGEN // Emergence Lab | Flow Diagnostics</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -45,7 +45,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     re:[], im:[], boundary:0, cachedAt:0, norm:1, overlap:1,
     charge:[], seenEpoch:0, energy:0,
     boundaryMode:'REFLECT', lost:0, absorberStart:0, viewMode:'DENSITY', slice:'XY',
-    polarization:'Z',targetPlus:0,targetMinus:0,targetZero:0,lz:0
+    polarization:'Z',targetPlus:0,targetMinus:0,targetZero:0,lz:0,advanced:false
   };
   // Channels (l,m), radial Hamiltonians depend on l, not m.
   // Add m=±2 components of l=2; all channels use the same radial CN solver.
@@ -88,10 +88,11 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(['REFLECT','ABSORB'].includes(saved.waveBoundary))wave.boundaryMode=saved.waveBoundary;
     if(['XY','XZ','3D'].includes(saved.waveSlice))wave.slice=saved.waveSlice;
     if(['Z','X','SIGMA+','SIGMA-'].includes(saved.wavePolarization))wave.polarization=saved.wavePolarization;
+    if(typeof saved.waveAdvanced==='boolean')wave.advanced=saved.waveAdvanced;
     if(['DENSITY','PHASE','FLOW'].includes(saved.waveView))wave.viewMode=saved.waveView;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
   }catch(e){}
-  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice,wavePolarization:wave.polarization}));}catch(e){}}
+  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice,wavePolarization:wave.polarization,waveAdvanced:wave.advanced}));}catch(e){}}
   function normalize(u){
     let n=0;for(let i=0;i<N;i++)n+=u[i]*u[i];
     n=Math.sqrt(n*DR);for(let i=0;i<N;i++)u[i]/=n;
@@ -225,7 +226,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.4.4',W-15,23,10,C.muted,'right',650);
+    txt('v0.4.5',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -826,16 +827,54 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       g.lineTo(headX-vx*headSize-vy*headSize*.45,headY-vy*headSize+vx*headSize*.45);
       g.lineTo(headX-vx*headSize+vy*headSize*.45,headY-vy*headSize-vx*headSize*.45);
       g.closePath();g.fill();
-      if(!compact){
-        const t=(now*.00042+p.sx*.0031+p.sy*.0017)%1;
-        const dotX=tailX+(headX-tailX)*t,dotY=tailY+(headY-tailY)*t;
-        g.globalAlpha=Math.min(.9,.3+weight*.6);
-        g.beginPath();g.arc(dotX,dotY,1.45,0,Math.PI*2);g.fill();
-      }
+      // Animated ink follows a stationary current vector. It is a direction
+      // indicator, not an electron trajectory.
+      const t=(now*.00048+p.sx*.0031+p.sy*.0017)%1;
+      const dotX=tailX+(headX-tailX)*t,dotY=tailY+(headY-tailY)*t;
+      g.globalAlpha=Math.min(.96,.34+weight*.62);
+      g.beginPath();g.arc(dotX,dotY,compact?1.3:1.75,0,Math.PI*2);g.fill();
       visible++;
     }
     g.restore();
     return visible;
+  }
+  // Diagnose the current in 3D, not only in the chosen projection.
+  // When it is zero, an empty FLOW view is a legitimate quantum result.
+  function currentMagnitude3D(){
+    let peak=0;
+    for(const r0 of [1.8,3.2,5.2,7.2]){
+      const r=r0/Z;
+      for(const zf of [-.42,.24]){
+        const z=r*zf,radial=r*Math.sqrt(1-zf*zf);
+        for(let k=0;k<6;k++){
+          const a=2*Math.PI*k/6;
+          const q=waveCurrentXYZ(radial*Math.cos(a),radial*Math.sin(a),z);
+          peak=Math.max(peak,Math.hypot(q.jx,q.jy,q.jz));
+        }
+      }
+    }
+    return peak;
+  }
+  function symmetryMessage(){
+    const pop=ch=>{
+      let v=0;const re=wave.re[ch],im=wave.im[ch];
+      for(let i=0;i<N;i++)v+=(re[i]*re[i]+im[i]*im[i])*DR;
+      return v;
+    };
+    const azimuthal=pop(3)+pop(4)+pop(5)+pop(6);
+    if(azimuthal<.001)return 'AXIALLY SYMMETRIC · TURNING AROUND Z CHANGES LITTLE';
+    const nz=[pop(3),pop(4),pop(5),pop(6)].filter(v=>v>.001).length;
+    if(nz===1)return 'SINGLE m STATE · DENSITY IS AXIALLY SYMMETRIC';
+    if(wave.setup==='D4'&&wave.drive==='OFF')return 'D4 HAS FOUR LOBES · ROTATE TO REVEAL SHAPE';
+    return 'ANGLE-DEPENDENT SUPERPOSITION · ROTATE TO EXPLORE';
+  }
+  function flowStatus(){
+    const current=currentMagnitude3D();
+    if(current<1e-10)return {active:false,
+      message:'NO CURRENT IN THIS STATE · EVOLVE OR APPLY A FIELD'};
+    if(wave.slice==='XZ'&&Math.abs(wave.lz)>.08)return {active:true,
+      message:'CIRCULATION POINTS OUT OF THIS SLICE · USE XY OR 3D'};
+    return {active:true,message:'CURRENT PRESENT · ARROWS SHOW DIRECTION'};
   }
   function flowLegend(x,y){
     txt('PROBABILITY CURRENT  j = Im(ψ* ∇ψ)',x,y,9,C.ink,'left',700);
@@ -1070,7 +1109,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         }
       }
     }
-    if(max<1e-11)return 0;
+    volume.flowMax=max;
+    if(max<1e-11){volume.flowCount=0;return 0;}
     const scale=w/(2*radius),arrows=[];
     for(const p of pts){
       if(p.mag<max*.011||p.j.rho<1e-7)continue;
@@ -1078,14 +1118,14 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       const dir=volumeCamera(p.j.jx/p.mag,p.j.jy/p.mag,p.j.jz/p.mag);
       const px=x+w*.5+pos[0]*scale,py=y+h*.5-pos[1]*scale;
       if(px<x+12||px>x+w-12||py<y+12||py>y+h-12)continue;
-      const len=Math.min(14,Math.max(4,Math.sqrt(p.mag/max)*15));
+      const len=Math.min(19,Math.max(6,Math.sqrt(p.mag/max)*20));
       const d=Math.hypot(dir[0],dir[1]);
       if(d<.14)continue;
       const radial=p.vx*p.j.jx+p.vy*p.j.jy+p.z*p.j.jz;
       const color=radial>p.mag*.03?'#7febd8':radial<-p.mag*.03?'#f4be6e':'#c5a4ff';
-      arrows.push({px,py,dx:dir[0]/d,dy:-dir[1]/d,len,color,alpha:Math.min(.85,.22+.7*Math.sqrt(p.mag/max))});
+      arrows.push({px,py,dx:dir[0]/d,dy:-dir[1]/d,len,color,alpha:Math.min(.96,.40+.65*Math.sqrt(p.mag/max))});
     }
-    g.save();g.lineWidth=1.45;g.lineCap='round';
+    g.save();g.lineWidth=1.8;g.lineCap='round';
     for(const q of arrows){
       const ax=q.px-q.dx*q.len*.5,ay=q.py-q.dy*q.len*.5;
       const bx=q.px+q.dx*q.len*.5,by=q.py+q.dy*q.len*.5;
@@ -1094,8 +1134,15 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       g.beginPath();g.moveTo(bx,by);
       g.lineTo(bx-q.dx*4-q.dy*2,by-q.dy*4+q.dx*2);
       g.lineTo(bx-q.dx*4+q.dy*2,by-q.dy*4-q.dx*2);g.closePath();g.fill();
+      // Flowing tracer animates the calculated vector direction, even while
+      // the wavefunction is stationary. Not a tracked electron.
+      const t=(now*.00055+q.px*.0021+q.py*.00089)%1;
+      const xx=ax+(bx-ax)*t,yy=ay+(by-ay)*t;
+      g.globalAlpha=Math.min(1,q.alpha+.14);
+      g.beginPath();g.arc(xx,yy,1.95,0,Math.PI*2);g.fill();
     }
     g.restore();
+    volume.flowCount=arrows.length;
     return arrows.length;
   }
   function drawWaveVolume(x,y,w,h,now,compact){
@@ -1125,6 +1172,21 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     g.restore();
     if(!compact){
+      if(wave.viewMode==='FLOW'){
+        const status=flowStatus();
+        if(!status.active||volume.flowCount===0){
+          fillRect(x+13,y+233,Math.max(230,Math.min(w-26,340)),51,9,
+            'rgba(11,18,33,.91)','rgba(116,200,255,.36)');
+          txt(status.active?'CURRENT EXISTS · TURN CAMERA':'NO PROBABILITY CURRENT',
+            x+23,y+250,11,status.active?C.mint:C.gold,'left',800);
+          txt(status.active?'Flow points toward / away from you':'REAL STANDING WAVE · EVOLVE OR DRIVE',
+            x+23,y+271,9,C.muted,'left',650);
+        }else{
+          txt('MOVING DOTS SHOW DIRECTION, NOT ELECTRONS',
+            x+17,y+241,9,C.mint,'left',700);
+        }
+      }
+      txt(symmetryMessage(),x+17,y+165,9,C.gold,'left',700);
       txt('SWIPE UP / DOWN TO TILT THE CAMERA',x+17,y+180,10,C.muted,'left',750);
       txt('RAY-MARCHED ψ  ·  '+volume.sampleCount.toLocaleString()+' INTEGRATION STEPS',x+17,y+198,9,C.gold,'left',700);
       txt('YAW '+(volume.yaw*180/Math.PI|0)+'°  ·  TILT '+(volume.pitch*180/Math.PI|0)+'°',
@@ -1191,9 +1253,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const barY=a.y+a.h-133;
     if(wave.viewMode==='PHASE')txt('HUE = PHASE   ·   LIGHT = DENSITY',x,barY-29,9,C.mint,'left',700);
     if(wave.slice==='3D')txt('3D VOLUME  ·  DRAG TO ORBIT',x,barY-40,9,C.gold,'left',700);
-    if(wave.viewMode==='FLOW')txt(wave.slice==='XY'?
-      'ARROWS: MINT OUT  ·  GOLD IN  ·  VIOLET ORBIT':
-      'XZ SLICE: CIRCULATION MAY POINT OFF-SCREEN',x,barY-29,9,C.mint,'left',700);
+    if(wave.viewMode==='FLOW'){
+      const status=flowStatus();
+      txt(status.message,x,barY-29,9,status.active?C.mint:C.gold,'left',700);
+    }
     txt('RADIAL PROBABILITY  ·  |u(r)|²',x,barY-12,9,C.muted,'left',700);
     const graphX=x,graphY=barY+5,graphW=w,graphH=55;
     if(wave.boundaryMode==='ABSORB'){
@@ -1234,6 +1297,38 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
   }
   function waveControls(){
+    if(wave.advanced){waveAdvancedControls();return;}
+    const y=layout.bottom,p=14,gap=7,w=W-28;
+    const bw3=(w-2*gap)/3;
+    const presets=[
+      ['GROUND','GROUND'],['P+','P+ ↻'],['P-','P- ↺'],
+      ['D4','D4 ✣'],['P MIX','P MIX'],['SHELL','SHELL']
+    ];
+    txt('QUANTUM STATES',p,y+9,10,C.muted,'left',750);
+    for(let k=0;k<presets.length;k++){
+      const row=Math.floor(k/3),col=k%3;
+      const name=presets[k][0],label=presets[k][1];
+      button(p+col*(bw3+gap),y+22+row*47,bw3,40,
+        label,wave.setup===name,()=>waveChangeSetup(name));
+    }
+    const y3=y+123;
+    button(p,y3,bw3,45,wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,
+      ()=>{wave.running=!wave.running;},C.mint);
+    button(p+bw3+gap,y3,bw3,45,'RESET',false,()=>initializeWave());
+    button(p+2*(bw3+gap),y3,bw3,45,'MORE ⚙',false,()=>{
+      wave.advanced=true;save();
+    },C.blue);
+    const status=flowStatus();
+    const isFlow=wave.viewMode==='FLOW';
+    txt(isFlow?status.message:symmetryMessage(),p,y+186,9,
+      isFlow?(status.active?C.mint:C.gold):C.blue,'left',700);
+    txt('FIELD '+wave.drive+'  /  '+wave.polarization+'  ·  WALL '+wave.boundaryMode,
+      p,y+207,9,C.muted,'left',650);
+    txt('REMAIN '+(wave.norm*100).toFixed(1)+'%',p,y+230,10,C.mint,'left',750);
+    txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-p,y+230,10,C.gold,'right',750);
+  }
+
+  function waveAdvancedControls(){
     const y=layout.bottom,p=14,gap=6,w=W-28,bw=(w-3*gap)/4;
     const k=Math.min(1,Math.max(.72,(H-y-4)/295));
     const yy=n=>y+Math.round(n*k),hh=n=>Math.round(n*k);
@@ -1271,8 +1366,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       wave.boundaryMode==='REFLECT',()=>setWaveBoundary('REFLECT'),C.blue);
     button(p+2*(bw3+gap),yy(228),bw3,hh(34),'ABSORB',
       wave.boundaryMode==='ABSORB',()=>setWaveBoundary('ABSORB'),C.mint);
-    txt('REMAIN '+(wave.norm*100).toFixed(1)+'%',p,yy(278),10,C.mint,'left',750);
-    txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-p,yy(278),10,C.gold,'right',750);
+    button(p,yy(266),Math.min(120,w*.40),hh(27),'← SIMPLE',false,()=>{
+      wave.advanced=false;save();
+    },C.mint);
+    txt('ADVANCED LAB',W-p,yy(278),9,C.muted,'right',650);
   }
 
   function fieldControls(){
@@ -1368,7 +1465,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('PHASE 4D: The 3D renderer numerically integrates |ψ(x,y,z)|² along each camera ray. Phase view blends density-weighted colors through the depth of the cloud; it is not a direct phase measurement. Fast sampling during dragging, finer samples when paused. The seven-channel radial-angular Schrödinger solver is unchanged, not a Cartesian 3D grid.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 4D+: Seven spherical-harmonic channels. FLOW shows j = Im(ψ*∇ψ), with animated direction markers, not electron paths. Real stationary preparations can have zero current; rotationally symmetric density can look unchanged as the camera turns. Full 3D density remains a ray-marched projection, not a Cartesian 3D evolution solver. MORE reveals advanced experimental controls.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
@@ -1545,8 +1642,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     fillRect(9,9,W-18,49,12,'rgba(7,12,22,.72)','rgba(120,179,229,.25)');
     button(17,15,81,36,'← BACK',false,()=>setImmersive(false),C.mint);
     if(tab==='WAVE'){
-      button(W-173,15,155,36,wave.boundaryMode==='ABSORB'?'WALL: ABSORB':'WALL: REFLECT',
-        true,()=>setWaveBoundary(wave.boundaryMode==='ABSORB'?'REFLECT':'ABSORB'),C.mint);
+      txt('STATE '+wave.setup,W-20,32,11,C.gold,'right',800);
       button(18,66,132,34,'VIEW: '+wave.viewMode,
         wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
       button(155,66,108,34,wave.slice==='3D'?'3D → XY':'EXPLORE 3D',true,
@@ -1554,7 +1650,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       if(wave.viewMode==='PHASE')phaseLegend(18,125,154);
       else if(wave.viewMode==='FLOW'){
         flowLegend(18,125);
-        if(wave.slice==='XZ')txt('CIRCULAR FLOW MAY BE OFF-PLANE',18,168,9,C.gold);
+        const status=flowStatus();
+        if(wave.slice!=='3D')txt(status.message,18,169,9,status.active?C.mint:C.gold);
       }
       else txt('WAVE / '+wave.setup+'  ·  '+wave.boundaryMode,18,113,10,C.muted,'left',750);
     }else{
@@ -1564,9 +1661,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const lowerY=H-73;
     fillRect(9,lowerY-10,W-18,75,12,'rgba(7,12,22,.76)','rgba(120,179,229,.25)');
     if(tab==='WAVE'){
-      button(114,lowerY,Math.max(52,W-231),40,
-        W>335?'POL '+(wave.polarization==='SIGMA+'?'σ+':wave.polarization==='SIGMA-'?'σ−':wave.polarization):wave.polarization==='SIGMA+'?'σ+':wave.polarization==='SIGMA-'?'σ−':wave.polarization,
-        false,()=>nextWavePolarization(),C.gold);
+      txt('POL '+wave.polarization,Math.max(112,W*.50),lowerY+54,
+        9,C.muted,'center',650);
     }
     button(18,lowerY,90,40,immersivePlayState()?'Ⅱ PAUSE':'▶ PLAY',
       immersivePlayState(),()=>toggleImmersivePlay(),C.mint);
