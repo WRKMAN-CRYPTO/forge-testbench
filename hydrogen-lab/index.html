@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | Polarized Light</title>
+<title>HYDROGEN // Emergence Lab | 3D Quantum Volume</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -57,6 +57,13 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   const wavePixels=waveCtx.createImageData(200,200);
   let waveMatrix=null;
   const PHASE_TAU=2*Math.PI, phasePalette=new Uint8Array(360*3);
+  const volume={
+    yaw:.48,pitch:.40,dirty:true,samples:null,raster:null,ctx:null,pixels:null,
+    rw:0,rh:0,at:0,projectAt:0,drag:null,lastMode:'',
+    maxProjection:0,sampleCount:0
+  };
+  volume.raster=document.createElement('canvas');
+  volume.ctx=volume.raster.getContext('2d');
   // Smooth complex absorbing potential (CAP): H -> H - i eta(r)
   // Applied as exp[-eta(r) dt/2] before and after each Hermitian step.
   // Eta starts at 60% of the radial box and rises smoothly to its edge.
@@ -76,7 +83,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if([2,8,16].includes(saved.waveSteps))wave.steps=saved.waveSteps;
     if([.008,.025,.06].includes(saved.waveStrength))wave.strength=saved.waveStrength;
     if(['REFLECT','ABSORB'].includes(saved.waveBoundary))wave.boundaryMode=saved.waveBoundary;
-    if(['XY','XZ'].includes(saved.waveSlice))wave.slice=saved.waveSlice;
+    if(['XY','XZ','3D'].includes(saved.waveSlice))wave.slice=saved.waveSlice;
     if(['Z','X','SIGMA+','SIGMA-'].includes(saved.wavePolarization))wave.polarization=saved.wavePolarization;
     if(['DENSITY','PHASE','FLOW'].includes(saved.waveView))wave.viewMode=saved.waveView;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
@@ -214,7 +221,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.4.1',W-15,23,10,C.muted,'right',650);
+    txt('v0.4.2',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -673,7 +680,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     let norm=0;for(let l=0;l<WAVE_CHANNELS.length;l++)for(let i=0;i<N;i++)norm+=wave.re[l][i]**2*DR;
     norm=Math.sqrt(norm);
     for(let l=0;l<WAVE_CHANNELS.length;l++)for(let i=0;i<N;i++)wave.re[l][i]/=norm;
-    wave.tAU=0;wave.cachedAt=0;wave.running=false;
+    wave.tAU=0;wave.cachedAt=0;wave.running=false;volume.dirty=true;volume.at=0;
     wave.lost=0;wave.boundary=0;
     wave.wavelength=resonantWavelength();
     waveBuildMatrix();initializeAbsorber();waveStats();
@@ -720,7 +727,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function setWaveView(mode){
     if(!['DENSITY','PHASE','FLOW'].includes(mode))return;
     wave.viewMode=mode;
-    wave.cachedAt=0;immersiveDirty=true;immersiveAt=0;
+    wave.cachedAt=0;immersiveDirty=true;immersiveAt=0;volume.dirty=true;
     save();
   }
   function nextWaveView(){
@@ -734,9 +741,14 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     return wave.slice==='XY'?waveComplexXYZ(x,y,0):waveComplexXYZ(x,0,y);
   }
   function setWaveSlice(slice){
-    if(slice!=='XY'&&slice!=='XZ')return;
-    wave.slice=slice;wave.cachedAt=0;immersiveDirty=true;
+    if(!['XY','XZ','3D'].includes(slice))return;
+    wave.slice=slice;wave.cachedAt=0;immersiveDirty=true;volume.dirty=true;
+    if(slice==='3D')immersiveZoom=10;
     save();
+  }
+  function nextWaveSlice(){
+    const slices=['XY','XZ','3D'];
+    setWaveSlice(slices[(slices.indexOf(wave.slice)+1)%slices.length]);
   }
   function probabilityCurrent(x,y){
     const h=DR*.8;
@@ -835,6 +847,204 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     txt('0',x+w/2,y+16,9,C.ink,'center');
     txt('+π',x+w,y+16,9,C.muted,'right');
   }
+
+  // Phase 4C: sample the existing spherical-harmonic wavefunction at actual
+  // x,y,z positions. The displayed light is an accumulated volume projection:
+  // it is NOT a full Cartesian 3D evolution solver or an electron trajectory.
+  function volumePrepareSamples(){
+    const NR=42,NT=24,NP=44,R=Math.min(19/Z,rGrid[N-2]*.95);
+    const pts=[];const dOmega=4*Math.PI/(NT*NP);
+    for(let ir=0;ir<NR;ir++){
+      const u=(ir+.5)/NR,r=R*Math.pow(u,1.45);
+      const dr=R*1.45*Math.pow(u,.45)/NR;
+      const dVol=r*r*dr*dOmega;
+      for(let it=0;it<NT;it++){
+        const cz=1-2*(it+.5)/NT,sn=Math.sqrt(1-cz*cz);
+        const z=r*cz;
+        for(let ip=0;ip<NP;ip++){
+          const az=2*Math.PI*(ip+.5+((ir*17+it*13)%19)/28)/NP;
+          const x=r*sn*Math.cos(az),y=r*sn*Math.sin(az);
+          const psi=waveComplexXYZ(x,y,z);
+          const rho=psi[0]*psi[0]+psi[1]*psi[1];
+          const mass=rho*dVol;
+          if(mass<1e-17)continue;
+          pts.push(x,y,z,mass,
+            wave.viewMode==='PHASE'?phaseIndex(psi[0],psi[1]):0);
+        }
+      }
+    }
+    volume.samples=pts;
+    volume.sampleCount=pts.length/5;
+    volume.at=wave.tAU;
+    volume.dirty=false;
+  }
+  function volumeCamera(x,y,z){
+    const cy=Math.cos(volume.yaw),sy=Math.sin(volume.yaw);
+    const cp=Math.cos(volume.pitch),sp=Math.sin(volume.pitch);
+    const rx=cy*x-sy*y,ry=sy*x+cy*y;
+    return [rx,sp*ry+cp*z,cp*ry-sp*z];
+  }
+  function volumeRaster(w,h,radius,now,compact){
+    const cap=compact?18500:74000;
+    const rw=Math.max(90,Math.min(compact?155:208,Math.floor(w*.72),Math.floor(Math.sqrt(cap*w/h))));
+    const rh=Math.max(90,Math.round(rw*h/w));
+    if(volume.rw!==rw||volume.rh!==rh||!volume.pixels){
+      volume.rw=rw;volume.rh=rh;
+      volume.raster.width=rw;volume.raster.height=rh;
+      volume.pixels=volume.ctx.createImageData(rw,rh);
+    }
+    if(volume.dirty||!volume.samples||Math.abs(volume.at-wave.tAU)>(wave.running?1.5:1e-7)){
+      volumePrepareSamples();
+    }
+    const count=rw*rh;
+    const accum=new Float32Array(count);
+    const colors=wave.viewMode==='PHASE'?new Float32Array(count*3):null;
+    const pxScale=rw/(2*radius);
+    const sample=volume.samples;
+    let peak=0;
+    for(let i=0;i<sample.length;i+=5){
+      const q=volumeCamera(sample[i],sample[i+1],sample[i+2]);
+      const px=rw*.5+q[0]*pxScale,py=rh*.5-q[1]*pxScale;
+      const ix=Math.floor(px),iy=Math.floor(py);
+      if(ix<0||iy<0||ix>=rw-1||iy>=rh-1)continue;
+      // Near-side weighting gives volumetric depth cues but not fake rotation.
+      const mass=sample[i+3]*(1+.28*q[2]/Math.max(1,radius));
+      if(mass<=0)continue;
+      const tx=px-ix,ty=py-iy;
+      const at=iy*rw+ix,idx=sample[i+4]*3;
+      const splat=(j,wg)=>{
+        const v=mass*wg;accum[j]+=v;
+        if(colors){
+          colors[j*3]+=v*phasePalette[idx];
+          colors[j*3+1]+=v*phasePalette[idx+1];
+          colors[j*3+2]+=v*phasePalette[idx+2];
+        }
+      };
+      splat(at,(1-tx)*(1-ty));
+      splat(at+1,tx*(1-ty));
+      splat(at+rw,(1-tx)*ty);
+      splat(at+rw+1,tx*ty);
+    }
+    // Small separable-looking tent blur fills quadrature gaps without
+    // inventing information; the original 3D data supplied every value.
+    const smoothed=new Float32Array(count);
+    const smoothRGB=colors?new Float32Array(count*3):null;
+    for(let y=1;y<rh-1;y++)for(let x=1;x<rw-1;x++){
+      const j=y*rw+x;
+      const neighbors=[j,j-1,j+1,j-rw,j+rw];
+      for(let k=0;k<neighbors.length;k++){
+        const weight=k===0?.5:.125,n=neighbors[k];
+        smoothed[j]+=accum[n]*weight;
+        if(smoothRGB){
+          smoothRGB[j*3]+=colors[n*3]*weight;
+          smoothRGB[j*3+1]+=colors[n*3+1]*weight;
+          smoothRGB[j*3+2]+=colors[n*3+2]*weight;
+        }
+      }
+      if(smoothed[j]>peak)peak=smoothed[j];
+    }
+    const data=volume.pixels.data;
+    const inv=peak>1e-18?1/peak:0;
+    const dim=Math.sqrt(Math.max(0,wave.norm));
+    for(let j=0;j<count;j++){
+      const v=Math.min(1,Math.pow(smoothed[j]*inv,.58)*1.05*dim);
+      const d=j*4;
+      if(smoothRGB&&smoothed[j]>1e-22){
+        data[d]=Math.round(7+(smoothRGB[j*3]/smoothed[j]-7)*v);
+        data[d+1]=Math.round(11+(smoothRGB[j*3+1]/smoothed[j]-11)*v);
+        data[d+2]=Math.round(23+(smoothRGB[j*3+2]/smoothed[j]-23)*v);
+      }else{
+        data[d]=Math.round(7+78*v);
+        data[d+1]=Math.round(11+182*v);
+        data[d+2]=Math.round(23+215*v);
+      }
+      data[d+3]=255;
+    }
+    volume.ctx.putImageData(volume.pixels,0,0);
+    volume.maxProjection=peak;
+    volume.projectAt=now;
+  }
+  function waveCurrentXYZ(x,y,z){
+    const h=DR*.8,p=waveComplexXYZ(x,y,z);
+    const l=waveComplexXYZ(x-h,y,z),r=waveComplexXYZ(x+h,y,z);
+    const b=waveComplexXYZ(x,y-h,z),t=waveComplexXYZ(x,y+h,z);
+    const f=waveComplexXYZ(x,y,z-h),k=waveComplexXYZ(x,y,z+h);
+    const comp=(lo,hi)=>p[0]*(hi[1]-lo[1])/(2*h)-p[1]*(hi[0]-lo[0])/(2*h);
+    return {jx:comp(l,r),jy:comp(b,t),jz:comp(f,k),
+      rho:p[0]*p[0]+p[1]*p[1]};
+  }
+  function drawVolumeFlow(x,y,w,h,radius,now){
+    const pts=[];let max=0;
+    for(const r of [1.7,2.8,4.2,6.1,8.2]){
+      const rr=r/Z;
+      for(const zPart of [-.52,0,.52]){
+        const z=rr*zPart,radial=rr*Math.sqrt(1-zPart*zPart);
+        for(let i=0;i<14;i++){
+          const a=2*Math.PI*(i+(zPart+.52)*.22)/14;
+          const vx=radial*Math.cos(a),vy=radial*Math.sin(a);
+          const j=waveCurrentXYZ(vx,vy,z);
+          const mag=Math.hypot(j.jx,j.jy,j.jz);
+          if(mag>max)max=mag;
+          pts.push({vx,vy,z,j,mag});
+        }
+      }
+    }
+    if(max<1e-11)return 0;
+    const scale=w/(2*radius),arrows=[];
+    for(const p of pts){
+      if(p.mag<max*.011||p.j.rho<1e-7)continue;
+      const pos=volumeCamera(p.vx,p.vy,p.z);
+      const dir=volumeCamera(p.j.jx/p.mag,p.j.jy/p.mag,p.j.jz/p.mag);
+      const px=x+w*.5+pos[0]*scale,py=y+h*.5-pos[1]*scale;
+      if(px<x+12||px>x+w-12||py<y+12||py>y+h-12)continue;
+      const len=Math.min(14,Math.max(4,Math.sqrt(p.mag/max)*15));
+      const d=Math.hypot(dir[0],dir[1]);
+      if(d<.14)continue;
+      const radial=p.vx*p.j.jx+p.vy*p.j.jy+p.z*p.j.jz;
+      const color=radial>p.mag*.03?'#7febd8':radial<-p.mag*.03?'#f4be6e':'#c5a4ff';
+      arrows.push({px,py,dx:dir[0]/d,dy:-dir[1]/d,len,color,alpha:Math.min(.85,.22+.7*Math.sqrt(p.mag/max))});
+    }
+    g.save();g.lineWidth=1.45;g.lineCap='round';
+    for(const q of arrows){
+      const ax=q.px-q.dx*q.len*.5,ay=q.py-q.dy*q.len*.5;
+      const bx=q.px+q.dx*q.len*.5,by=q.py+q.dy*q.len*.5;
+      g.globalAlpha=q.alpha;g.strokeStyle=q.color;g.fillStyle=q.color;
+      g.beginPath();g.moveTo(ax,ay);g.lineTo(bx,by);g.stroke();
+      g.beginPath();g.moveTo(bx,by);
+      g.lineTo(bx-q.dx*4-q.dy*2,by-q.dy*4+q.dx*2);
+      g.lineTo(bx-q.dx*4+q.dy*2,by-q.dy*4-q.dx*2);g.closePath();g.fill();
+    }
+    g.restore();
+    return arrows.length;
+  }
+  function drawWaveVolume(x,y,w,h,now,compact){
+    g.save();
+    round(x,y,w,h,compact?9:0);g.clip();
+    g.fillStyle='#070c16';g.fillRect(x,y,w,h);
+    const radius=(compact?10:immersiveZoom)/Z;
+    // Physical ratios are preserved: height and width use equal Bohr/pixel.
+    volumeRaster(w,h,radius,now,compact);
+    g.imageSmoothingEnabled=true;
+    g.drawImage(volume.raster,x,y,w,h);
+    if(wave.viewMode==='FLOW')drawVolumeFlow(x,y,w,h,radius,now);
+    // Project the three spatial axes so camera rotation stays legible.
+    for(const axis of [
+      [1,0,0,'#f4be6e','X'],[0,1,0,'#7febd8','Y'],[0,0,1,'#b5a0ff','Z']
+    ]){
+      const v=volumeCamera(axis[0]*3.4/Z,axis[1]*3.4/Z,axis[2]*3.4/Z);
+      const cx=x+w*.5,cy=y+h*.5,scale=w/(2*radius);
+      const ex=cx+v[0]*scale,ey=cy-v[1]*scale;
+      g.globalAlpha=.48;g.strokeStyle=axis[3];g.lineWidth=1;
+      g.beginPath();g.moveTo(cx,cy);g.lineTo(ex,ey);g.stroke();
+      g.globalAlpha=.8;txt(axis[4],ex+3,ey-3,9,axis[3],'left',800);
+    }
+    g.restore();
+    if(!compact){
+      txt('DRAG TO ORBIT  ·  QUANTUM VOLUME',x+17,y+180,10,C.muted,'left',750);
+      txt('3D SAMPLES  ·  2D PROJECTION',x+17,y+198,9,C.gold,'left',700);
+    }
+  }
+
   function waveCloud(){
     const size=200,half=size/2,radius=14/Z,values=new Float32Array(size*size);
     const phases=wave.viewMode==='PHASE'?new Uint16Array(size*size):null;
@@ -870,12 +1080,16 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     txt('SPATIAL WAVEFUNCTION / ANGULAR CHANNELS',x,a.y+17,10,C.blue,'left',750);
     button(a.x+10,a.y+33,108,28,'VIEW: '+wave.viewMode,
       wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
-    button(a.x+124,a.y+33,87,28,'SLICE: '+wave.slice,true,
-      ()=>setWaveSlice(wave.slice==='XY'?'XZ':'XY'),C.blue);
+    button(a.x+124,a.y+33,108,28,wave.slice==='3D'?'VOLUME 3D':'SLICE: '+wave.slice,true,
+      ()=>nextWaveSlice(),C.blue);
     const middleH=Math.max(104,a.h-185);
     const side=Math.min(a.w-26,middleH);
     const cx=W/2,cy=a.y+34+middleH/2;
     g.save();round(a.x+1,a.y+1,a.w-2,a.h-2,14);g.clip();
+    if(wave.slice==='3D'){
+      g.restore();
+      drawWaveVolume(a.x+9,a.y+63,a.w-18,Math.max(105,a.h-201),now,true);
+    }else{
     for(let f=.25;f<=1;f+=.25){
       g.beginPath();g.arc(cx,cy,side*.5*f,0,Math.PI*2);
       g.strokeStyle='#354861';g.setLineDash([3,5]);g.stroke();g.setLineDash([]);
@@ -885,9 +1099,11 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(wave.viewMode==='FLOW')drawProbabilityFlow(cx-side/2,cy-side/2,side,side,14/Z,now,true);
     g.fillStyle=C.gold;g.beginPath();g.arc(cx,cy,2.2,0,Math.PI*2);g.fill();
     g.restore();
+    }
     button(a.x+a.w-92,a.y+7,80,28,'EXPAND',false,()=>setImmersive(true),C.mint);
     const barY=a.y+a.h-133;
     if(wave.viewMode==='PHASE')txt('HUE = PHASE   ·   LIGHT = DENSITY',x,barY-29,9,C.mint,'left',700);
+    if(wave.slice==='3D')txt('3D VOLUME  ·  DRAG TO ORBIT',x,barY-40,9,C.gold,'left',700);
     if(wave.viewMode==='FLOW')txt(wave.slice==='XY'?
       'ARROWS: MINT OUT  ·  GOLD IN  ·  VIOLET ORBIT':
       'XZ SLICE: CIRCULATION MAY POINT OFF-SCREEN',x,barY-29,9,C.mint,'left',700);
@@ -957,7 +1173,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     button(p,row,bw3,hh(34),wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,()=>{
       wave.running=!wave.running;
     });
-    button(p+bw3+gap,row,bw3,hh(34),'RESET',false,()=>initializeWave());
+    button(p+bw3+gap,row,bw3,hh(34),wave.slice==='3D'?'VIEW 2D':'RESET',false,()=>wave.slice==='3D'?setWaveSlice('XY'):initializeWave());
     button(p+2*(bw3+gap),row,bw3,hh(34),'×'+wave.steps+' STEP',false,()=>{
       wave.steps=wave.steps===2?8:wave.steps===8?16:2;save();
     });
@@ -1065,7 +1281,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('PHASE 4B: Classical z-polarized (π) field couples Δm=0. Rotating xy fields (σ+ and σ−) drive Δm=+1 or −1 from 1s via complex Hermitian dipole couplings. Linear x addresses both. The radial grid and finite 5-channel basis truncate higher-l transverse interactions. No quantized photons or spontaneous emission.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 4C: 3D volume projection samples complex ψ(x,y,z) from five spherical-harmonic channels; drag to orbit. Brightness integrates sampled |ψ|², PHASE colors relative argument, and FLOW projects three-dimensional probability currents. The radial solver still uses a truncated angular basis, NOT an unrestricted 3D Cartesian grid.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
@@ -1121,7 +1337,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     immersive=value;
     immersiveDirty=true;immersiveAt=0;
     if(value){
-      immersiveZoom=tab==='WAVE'?14:tab==='ATOM'?Math.max(5,viewRadius):14;
+      immersiveZoom=tab==='WAVE'?(wave.slice==='3D'?10:14):tab==='ATOM'?Math.max(5,viewRadius):14;
+      volume.dirty=true;
       if(typeof canvas.requestFullscreen==='function'){
         try{const promise=canvas.requestFullscreen();
           if(promise&&typeof promise.catch==='function')promise.catch(()=>{});
@@ -1210,12 +1427,17 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     g.fillStyle=gradient;g.fillRect(0,0,W,H);
     const animating=(tab==='WAVE'&&wave.running)||(tab==='FIELD'&&field.run)||
       (tab==='ATOM'&&running&&mode==='MIX');
-    if(immersiveDirty||(animating&&now-immersiveAt>80)){
-      redrawImmersive();immersiveAt=now;
+    if(wave.slice!=='3D'||tab!=='WAVE'){
+      if(immersiveDirty||(animating&&now-immersiveAt>80)){
+        redrawImmersive();immersiveAt=now;
+      }
     }
-    g.imageSmoothingEnabled=true;
-    g.drawImage(immersiveCanvas,0,0,W,H);
-    if(tab==='WAVE'&&wave.viewMode==='FLOW'){
+    if(!(tab==='WAVE'&&wave.slice==='3D')){
+      g.imageSmoothingEnabled=true;g.drawImage(immersiveCanvas,0,0,W,H);
+    }
+    if(tab==='WAVE'&&wave.slice==='3D'){
+      drawWaveVolume(0,0,W,H,now,false);
+    }else if(tab==='WAVE'&&wave.viewMode==='FLOW'){
       drawProbabilityFlow(0,0,W,H,immersiveZoom/Z,now);
     }
     const cx=W/2,cy=H/2;
@@ -1238,8 +1460,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         true,()=>setWaveBoundary(wave.boundaryMode==='ABSORB'?'REFLECT':'ABSORB'),C.mint);
       button(18,66,132,34,'VIEW: '+wave.viewMode,
         wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
-      button(155,66,108,34,'SLICE: '+wave.slice,true,
-        ()=>setWaveSlice(wave.slice==='XY'?'XZ':'XY'),C.blue);
+      button(155,66,108,34,wave.slice==='3D'?'VOLUME 3D':'SLICE: '+wave.slice,true,
+        ()=>nextWaveSlice(),C.blue);
       if(wave.viewMode==='PHASE')phaseLegend(18,125,154);
       else if(wave.viewMode==='FLOW'){
         flowLegend(18,125);
@@ -1260,10 +1482,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     button(18,lowerY,90,40,immersivePlayState()?'Ⅱ PAUSE':'▶ PLAY',
       immersivePlayState(),()=>toggleImmersivePlay(),C.mint);
     button(W-108,lowerY,42,40,'−',false,()=>{
-      immersiveZoom=Math.min(30,immersiveZoom*1.34);immersiveDirty=true;
+      immersiveZoom=Math.min(30,immersiveZoom*1.34);immersiveDirty=true;volume.dirty=true;
     },C.blue);
     button(W-60,lowerY,42,40,'+',false,()=>{
-      immersiveZoom=Math.max(2.5,immersiveZoom/1.34);immersiveDirty=true;
+      immersiveZoom=Math.max(2.5,immersiveZoom/1.34);immersiveDirty=true;volume.dirty=true;
     },C.blue);
     const duration=tab==='WAVE'?wave.tAU*AU_TIME_FS:tab==='FIELD'?field.tAU*AU_TIME_FS:timeFs;
     txt(duration.toFixed(2)+' fs',18,lowerY+54,10,C.ink,'left',700);
@@ -1308,20 +1530,37 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   canvas.addEventListener('pointerdown',e=>{
     e.preventDefault();
     const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+    let hit=false;
     for(let i=activeHits.length-1;i>=0;i--){
       const h=activeHits[i];if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){
-        h.cb(x,y);
+        h.cb(x,y);hit=true;
         if(h.drag){sliderDrag=true;try{canvas.setPointerCapture(e.pointerId);}catch(_){}}
         break;
       }
     }
+    if(!hit&&tab==='WAVE'&&wave.slice==='3D'){
+      const inside=immersive?
+        y>112&&y<H-90:
+        x>=layout.x&&x<=layout.x+layout.w&&y>layout.y+62&&y<layout.y+layout.h-136;
+      if(inside){
+        volume.drag={id:e.pointerId,x,y};try{canvas.setPointerCapture(e.pointerId);}catch(_){}
+      }
+    }
   },{passive:false});
   canvas.addEventListener('pointermove',e=>{
+    if(volume.drag&&e.pointerId===volume.drag.id){
+      const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+      volume.yaw+=(x-volume.drag.x)*.012;
+      volume.pitch=Math.max(-1.4,Math.min(1.4,volume.pitch+(y-volume.drag.y)*.012));
+      volume.drag.x=x;volume.drag.y=y;
+      immersiveDirty=true;volume.projectAt=0;
+      return;
+    }
     if(!sliderDrag)return;
     const rect=canvas.getBoundingClientRect();setWavelengthFromX(e.clientX-rect.left);
   },{passive:false});
-  canvas.addEventListener('pointerup',()=>{sliderDrag=false;});
-  canvas.addEventListener('pointercancel',()=>{sliderDrag=false;});
+  canvas.addEventListener('pointerup',()=>{sliderDrag=false;volume.drag=null;});
+  canvas.addEventListener('pointercancel',()=>{sliderDrag=false;volume.drag=null;});
   document.addEventListener('fullscreenchange',()=>{
     if(!document.fullscreenElement&&immersive){setImmersive(false);}
     resize();
