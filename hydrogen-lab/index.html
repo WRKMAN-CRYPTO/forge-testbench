@@ -862,19 +862,24 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       return v;
     };
     const azimuthal=pop(3)+pop(4)+pop(5)+pop(6);
-    if(azimuthal<.001)return 'AXIALLY SYMMETRIC · TURNING AROUND Z CHANGES LITTLE';
+    if(pop(0)>.998)return 'SPHERICAL · ROTATION LEAVES SHAPE UNCHANGED';
+    if(azimuthal<.001)return 'AXIAL SYMMETRY · TILT TO CHANGE THE VIEW';
     const nz=[pop(3),pop(4),pop(5),pop(6)].filter(v=>v>.001).length;
-    if(nz===1)return 'SINGLE m STATE · DENSITY IS AXIALLY SYMMETRIC';
-    if(wave.setup==='D4'&&wave.drive==='OFF')return 'D4 HAS FOUR LOBES · ROTATE TO REVEAL SHAPE';
-    return 'ANGLE-DEPENDENT SUPERPOSITION · ROTATE TO EXPLORE';
+    if(nz===1)return 'AXIAL DENSITY · TILT TO SEE ITS SHAPE';
+    if(wave.setup==='D4'&&wave.drive==='OFF')return 'D4 · FOUR LOBES · ROTATE TO REVEAL SHAPE';
+    return 'SUPERPOSITION · SHAPE VARIES WITH ANGLE';
   }
   function flowStatus(){
     const current=currentMagnitude3D();
-    if(current<1e-10)return {active:false,
-      message:'NO CURRENT IN THIS STATE · EVOLVE OR APPLY A FIELD'};
-    if(wave.slice==='XZ'&&Math.abs(wave.lz)>.08)return {active:true,
-      message:'CIRCULATION POINTS OUT OF THIS SLICE · USE XY OR 3D'};
-    return {active:true,message:'CURRENT PRESENT · ARROWS SHOW DIRECTION'};
+    if(current<1e-10){
+      const stationary=wave.drive==='OFF'&&
+        ['GROUND','P MIX','D4','P+','P-'].includes(wave.setup);
+      return {active:false,stationary,
+        message:stationary?'CURRENT ≈ 0 · TRY P+ OR P-':'CURRENT ≈ 0 NOW · EVOLVE'};
+    }
+    if(wave.slice==='XZ'&&Math.abs(wave.lz)>.08)return {active:true,outOfPlane:true,
+      message:'FLOW OUT OF PLANE · USE XY / 3D'};
+    return {active:true,message:'CURRENT DETECTED · VECTORS SHOWN'};
   }
   function flowLegend(x,y){
     txt('PROBABILITY CURRENT  j = Im(ψ* ∇ψ)',x,y,9,C.ink,'left',700);
@@ -1179,7 +1184,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
             'rgba(11,18,33,.91)','rgba(116,200,255,.36)');
           txt(status.active?'CURRENT EXISTS · TURN CAMERA':'NO PROBABILITY CURRENT',
             x+23,y+250,11,status.active?C.mint:C.gold,'left',800);
-          txt(status.active?'Flow points toward / away from you':'REAL STANDING WAVE · EVOLVE OR DRIVE',
+          txt(status.active?'Flow points toward / away from you':
+            status.stationary?'STATIONARY WAVE · TRY P+ OR P-':
+            'INITIAL CURRENT ZERO · PRESS EVOLVE',
             x+23,y+271,9,C.muted,'left',650);
         }else{
           txt('MOVING DOTS SHOW DIRECTION, NOT ELECTRONS',
