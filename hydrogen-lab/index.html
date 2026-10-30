@@ -58,7 +58,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   let waveMatrix=null;
   const PHASE_TAU=2*Math.PI, phasePalette=new Uint8Array(360*3);
   const volume={
-    yaw:.48,pitch:.40,dirty:true,samples:null,raster:null,ctx:null,pixels:null,
+    yaw:.48,pitch:.85,dirty:true,samples:null,raster:null,ctx:null,pixels:null,
     rw:0,rh:0,at:0,projectAt:0,drag:null,lastMode:'',
     maxProjection:0,sampleCount:0
   };
@@ -221,7 +221,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.4.2',W-15,23,10,C.muted,'right',650);
+    txt('v0.4.3',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -748,7 +748,18 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   }
   function nextWaveSlice(){
     const slices=['XY','3D','XZ'];
-    setWaveSlice(slices[(slices.indexOf(wave.slice)+1)%slices.length]);
+    const next=slices[(slices.indexOf(wave.slice)+1)%slices.length];
+    setWaveSlice(next);
+    if(next==='3D'&&!immersive)setImmersive(true);
+  }
+  function open3D(){
+    setWaveSlice('3D');
+    if(!immersive)setImmersive(true);
+  }
+  function nextCameraAngle(){
+    volume.yaw+=Math.PI/5;
+    volume.pitch=volume.pitch>.75?.22:1.05;
+    volume.projectAt=0;immersiveDirty=true;
   }
   function probabilityCurrent(x,y){
     const h=DR*.8;
@@ -852,7 +863,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   // x,y,z positions. The displayed light is an accumulated volume projection:
   // it is NOT a full Cartesian 3D evolution solver or an electron trajectory.
   function volumePrepareSamples(){
-    const NR=36,NT=20,NP=38,R=Math.min(19/Z,rGrid[N-2]*.95);
+    const NR=25,NT=16,NP=32,R=Math.min(19/Z,rGrid[N-2]*.95);
     const pts=[];const dOmega=4*Math.PI/(NT*NP);
     for(let ir=0;ir<NR;ir++){
       const u=(ir+.5)/NR,r=R*Math.pow(u,1.45);
@@ -1042,8 +1053,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     g.restore();
     if(!compact){
-      txt('DRAG TO ORBIT  ·  QUANTUM VOLUME',x+17,y+180,10,C.muted,'left',750);
-      txt('3D SAMPLES  ·  2D PROJECTION',x+17,y+198,9,C.gold,'left',700);
+      txt('SWIPE UP / DOWN TO TILT THE CAMERA',x+17,y+180,10,C.muted,'left',750);
+      txt('3D WAVEFUNCTION  ·  '+volume.sampleCount.toLocaleString()+' SAMPLES',x+17,y+198,9,C.gold,'left',700);
+      txt('YAW '+(volume.yaw*180/Math.PI|0)+'°  ·  TILT '+(volume.pitch*180/Math.PI|0)+'°',
+        x+17,y+216,9,C.blue,'left',650);
     }
   }
 
@@ -1082,8 +1095,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     txt('SPATIAL WAVEFUNCTION / ANGULAR CHANNELS',x,a.y+17,10,C.blue,'left',750);
     button(a.x+10,a.y+33,108,28,'VIEW: '+wave.viewMode,
       wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
-    button(a.x+124,a.y+33,108,28,wave.slice==='3D'?'VOLUME 3D':wave.slice==='XY'?'XY → 3D':'SLICE: XZ',true,
-      ()=>nextWaveSlice(),C.blue);
+    button(a.x+124,a.y+33,108,28,wave.slice==='3D'?'3D OPEN':'EXPLORE 3D',wave.slice==='3D',
+      ()=>wave.slice==='3D'?setImmersive(true):open3D(),C.blue);
     const middleH=Math.max(104,a.h-185);
     const side=Math.min(a.w-26,middleH);
     const cx=W/2,cy=a.y+34+middleH/2;
@@ -1175,7 +1188,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     button(p,row,bw3,hh(34),wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,()=>{
       wave.running=!wave.running;
     });
-    button(p+bw3+gap,row,bw3,hh(34),wave.slice==='3D'?'VIEW 2D':'RESET',false,()=>wave.slice==='3D'?setWaveSlice('XY'):initializeWave());
+    button(p+bw3+gap,row,bw3,hh(34),wave.slice==='3D'?'VIEW 2D':'3D VIEW',false,
+      ()=>wave.slice==='3D'?setWaveSlice('XY'):open3D());
     button(p+2*(bw3+gap),row,bw3,hh(34),'×'+wave.steps+' STEP',false,()=>{
       wave.steps=wave.steps===2?8:wave.steps===8?16:2;save();
     });
@@ -1464,8 +1478,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         true,()=>setWaveBoundary(wave.boundaryMode==='ABSORB'?'REFLECT':'ABSORB'),C.mint);
       button(18,66,132,34,'VIEW: '+wave.viewMode,
         wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
-      button(155,66,108,34,wave.slice==='3D'?'VOLUME 3D':wave.slice==='XY'?'XY → 3D':'SLICE: XZ',true,
-        ()=>nextWaveSlice(),C.blue);
+      button(155,66,108,34,wave.slice==='3D'?'3D → XY':'EXPLORE 3D',true,
+        ()=>wave.slice==='3D'?setWaveSlice('XY'):open3D(),C.blue);
       if(wave.viewMode==='PHASE')phaseLegend(18,125,154);
       else if(wave.viewMode==='FLOW'){
         flowLegend(18,125);
@@ -1485,6 +1499,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     button(18,lowerY,90,40,immersivePlayState()?'Ⅱ PAUSE':'▶ PLAY',
       immersivePlayState(),()=>toggleImmersivePlay(),C.mint);
+    if(tab==='WAVE'&&wave.slice==='3D'){
+      button(18,H-139,112,32,'TILT CAMERA',false,()=>nextCameraAngle(),C.mint);
+    }
     button(W-108,lowerY,42,40,'−',false,()=>{
       immersiveZoom=Math.min(30,immersiveZoom*1.34);immersiveDirty=true;volume.dirty=true;
     },C.blue);
