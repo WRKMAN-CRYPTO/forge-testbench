@@ -743,7 +743,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   }
   function flowLegend(x,y){
     txt('PROBABILITY CURRENT  j = Im(ψ* ∇ψ)',x,y,9,C.ink,'left',700);
-    txt('MINT  OUTWARD    GOLD  INWARD',x,y+17,9,C.mint,'left',650);
+    txt('MINT OUT  ·  GOLD IN  ·  VIOLET ORBIT',x,y+17,9,C.mint,'left',650);
   }
   function phaseIndex(re,im){
     const phi=Math.atan2(im,re)+states['1s'].E*wave.tAU;
@@ -809,9 +809,11 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   }
   function waveViewport(now){
     viewport();const a=layout,x=a.x+13,w=a.w-26;
-    txt('SPATIAL WAVEFUNCTION / r, θ',x,a.y+17,10,C.blue,'left',750);
+    txt('SPATIAL WAVEFUNCTION / ANGULAR CHANNELS',x,a.y+17,10,C.blue,'left',750);
     button(a.x+10,a.y+33,108,28,'VIEW: '+wave.viewMode,
       wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
+    button(a.x+124,a.y+33,87,28,'SLICE: '+wave.slice,true,
+      ()=>setWaveSlice(wave.slice==='XY'?'XZ':'XY'),C.blue);
     const middleH=Math.max(104,a.h-185);
     const side=Math.min(a.w-26,middleH);
     const cx=W/2,cy=a.y+34+middleH/2;
@@ -828,7 +830,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     button(a.x+a.w-92,a.y+7,80,28,'EXPAND',false,()=>setImmersive(true),C.mint);
     const barY=a.y+a.h-133;
     if(wave.viewMode==='PHASE')txt('HUE = PHASE   ·   LIGHT = DENSITY',x,barY-29,9,C.mint,'left',700);
-    if(wave.viewMode==='FLOW')txt('ARROWS: MINT OUT  ·  GOLD IN  ·  VIOLET SIDE',x,barY-29,9,C.mint,'left',700);
+    if(wave.viewMode==='FLOW')txt(wave.slice==='XY'?
+      'ARROWS: MINT OUT  ·  GOLD IN  ·  VIOLET ORBIT':
+      'XZ SLICE: CIRCULATION MAY POINT OFF-SCREEN',x,barY-29,9,C.mint,'left',700);
     txt('RADIAL PROBABILITY  ·  |u(r)|²',x,barY-12,9,C.muted,'left',700);
     const graphX=x,graphY=barY+5,graphW=w,graphH=55;
     if(wave.boundaryMode==='ABSORB'){
@@ -868,34 +872,43 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
   }
   function waveControls(){
-    const y=layout.bottom,p=14,gap=7,w=W-28,bw=(w-3*gap)/4;
-    txt('INITIAL WAVEFUNCTION',p,y+8,10,C.muted,'left',750);
+    const y=layout.bottom,p=14,gap=6,w=W-28,bw=(w-3*gap)/4;
+    const k=Math.min(1,Math.max(.72,(H-y-4)/295));
+    const yy=n=>y+Math.round(n*k),hh=n=>Math.round(n*k);
+    txt('CHOOSE A WAVEFUNCTION',p,yy(9),10,C.muted,'left',750);
     ['GROUND','BREATH','DIPOLE','SHELL'].forEach((v,i)=>
-      button(p+i*(bw+gap),y+24,bw,39,v,wave.setup===v,()=>waveChangeSetup(v)));
-    txt('ELECTRIC FIELD',p,y+77,10,C.muted,'left',750);
+      button(p+i*(bw+gap),yy(19),bw,hh(35),v,wave.setup===v,()=>waveChangeSetup(v)));
+    ['P+ ↻','P- ↺','P MIX','RESET'].forEach((label,i)=>{
+      const preset=['P+','P-','P MIX'][i];
+      button(p+i*(bw+gap),yy(61),bw,hh(34),label,i===3?false:wave.setup===preset,()=>{
+        if(i===3)initializeWave();else waveChangeSetup(preset);
+      });
+    });
+    txt('ELECTRIC FIELD  ·  Z POLARIZED',p,yy(108),10,C.muted,'left',750);
     ['OFF','RESONANCE','DETUNED','PULSE'].forEach((v,i)=>
-      button(p+i*(bw+gap),y+93,bw,39,v,wave.drive===v,()=>{
+      button(p+i*(bw+gap),yy(119),bw,hh(33),v,wave.drive===v,()=>{
         wave.drive=v;wave.wavelength=v==='DETUNED'?155/Z**2:resonantWavelength();
         wave.cachedAt=0;save();
       }));
-    const bw3=(w-2*gap)/3,row=y+142;
-    button(p,row,bw3,40,wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,()=>{
+    const bw3=(w-2*gap)/3,row=yy(162);
+    button(p,row,bw3,hh(36),wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,()=>{
       wave.running=!wave.running;
     });
-    button(p+bw3+gap,row,bw3,40,'RESET',false,()=>initializeWave());
-    button(p+2*(bw3+gap),row,bw3,40,'×'+wave.steps+' STEP',false,()=>{
+    button(p+bw3+gap,row,bw3,hh(36),'SLICE '+wave.slice,true,
+      ()=>setWaveSlice(wave.slice==='XY'?'XZ':'XY'));
+    button(p+2*(bw3+gap),row,bw3,hh(36),'×'+wave.steps+' STEP',false,()=>{
       wave.steps=wave.steps===2?8:wave.steps===8?16:2;save();
     });
-    button(p,row+48,bw3,36,'FIELD '+wave.strength.toFixed(3),false,()=>{
+    button(p,yy(205),bw3,hh(36),'FIELD '+wave.strength.toFixed(3),false,()=>{
       wave.strength=wave.strength===.008?.025:wave.strength===.025?.06:.008;save();
     });
-    button(p+bw3+gap,row+48,bw3,36,'REFLECT',wave.boundaryMode==='REFLECT',()=>setWaveBoundary('REFLECT'),C.blue);
-    button(p+2*(bw3+gap),row+48,bw3,36,'ABSORB',wave.boundaryMode==='ABSORB',()=>setWaveBoundary('ABSORB'),C.mint);
-    const yy=row+94;
-    txt('REMAIN '+(wave.norm*100).toFixed(2)+'%',p,yy,10,C.mint,'left',750);
-    txt('ESCAPED '+(wave.lost*100).toFixed(2)+'%',W-p,yy,10,C.gold,'right',750);
-    txt('SWITCH BOUNDARY TO RESTART SAME EXPERIMENT',p,yy+18,9,C.muted);
-    txt('3 ANGULAR CHANNELS  ·  '+N+' RADIAL CELLS',p,yy+34,9,C.muted);
+    button(p+bw3+gap,yy(205),bw3,hh(36),'REFLECT',
+      wave.boundaryMode==='REFLECT',()=>setWaveBoundary('REFLECT'),C.blue);
+    button(p+2*(bw3+gap),yy(205),bw3,hh(36),'ABSORB',
+      wave.boundaryMode==='ABSORB',()=>setWaveBoundary('ABSORB'),C.mint);
+    txt('REMAIN '+(wave.norm*100).toFixed(2)+'%',p,yy(258),10,C.mint,'left',750);
+    txt('ESCAPED '+(wave.lost*100).toFixed(2)+'%',W-p,yy(258),10,C.gold,'right',750);
+    txt('5 ANGULAR CHANNELS  ·  '+N+' RADIAL CELLS',p,yy(278),9,C.muted);
   }
 
   function fieldControls(){
@@ -991,7 +1004,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('WAVE DISPLAY: DENSITY shows |ψ|², PHASE colors relative arg(ψ), and FLOW draws direction of probability current j = Im(ψ*∇ψ) in atomic units. Arrow lengths are locally scaled for visibility, not particle paths. REFLECT and ABSORB retain their behavior.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 4: (l,m) channels include m=+1 and m=-1, producing opposite orbital probability currents. XY and XZ slices evaluate normalized spherical harmonics; flow arrows are in-plane only. The z-polarized drive currently couples m=0 channels. This is a truncated angular model, not a full 3D spatial grid.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
@@ -1164,8 +1177,13 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         true,()=>setWaveBoundary(wave.boundaryMode==='ABSORB'?'REFLECT':'ABSORB'),C.mint);
       button(18,66,132,34,'VIEW: '+wave.viewMode,
         wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
+      button(155,66,108,34,'SLICE: '+wave.slice,true,
+        ()=>setWaveSlice(wave.slice==='XY'?'XZ':'XY'),C.blue);
       if(wave.viewMode==='PHASE')phaseLegend(18,125,154);
-      else if(wave.viewMode==='FLOW')flowLegend(18,125);
+      else if(wave.viewMode==='FLOW'){
+        flowLegend(18,125);
+        if(wave.slice==='XZ')txt('CIRCULAR FLOW MAY BE OFF-PLANE',18,168,9,C.gold);
+      }
       else txt('WAVE / '+wave.setup+'  ·  '+wave.boundaryMode,18,113,10,C.muted,'left',750);
     }else{
       txt(tab==='FIELD'?'FIELD / DRIVE':'ATOM / '+mode,W-18,25,11,C.ink,'right',800);
