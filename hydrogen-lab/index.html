@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | Flow Diagnostics</title>
+<title>HYDROGEN // Emergence Lab | Orbital Zeeman Laboratory</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -45,7 +45,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     re:[], im:[], boundary:0, cachedAt:0, norm:1, overlap:1,
     charge:[], seenEpoch:0, energy:0,
     boundaryMode:'REFLECT', lost:0, absorberStart:0, viewMode:'DENSITY', slice:'XY',
-    polarization:'Z',targetPlus:0,targetMinus:0,targetZero:0,lz:0,advanced:false
+    polarization:'Z',targetPlus:0,targetMinus:0,targetZero:0,lz:0,advanced:false,magnetic:0
   };
   // Channels (l,m), radial Hamiltonians depend on l, not m.
   // Add m=±2 components of l=2; all channels use the same radial CN solver.
@@ -54,6 +54,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   const Y11=Math.sqrt(3/(8*Math.PI));
   const Y22=Math.sqrt(15/(32*Math.PI));
   const WAVE_COUPLINGS=[1/Math.sqrt(3),2/Math.sqrt(15)];
+  const MAG_DEMO_FIELD=.020; // atomic units, ~4701 T, exaggerated for visibility
+  const TESLA_PER_AU=235051.756758;
   const waveImageCanvas=document.createElement('canvas');
   waveImageCanvas.width=200;waveImageCanvas.height=200;
   const waveCtx=waveImageCanvas.getContext('2d');
@@ -89,10 +91,12 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(['XY','XZ','3D'].includes(saved.waveSlice))wave.slice=saved.waveSlice;
     if(['Z','X','SIGMA+','SIGMA-'].includes(saved.wavePolarization))wave.polarization=saved.wavePolarization;
     if(typeof saved.waveAdvanced==='boolean')wave.advanced=saved.waveAdvanced;
+    if([0,MAG_DEMO_FIELD,-MAG_DEMO_FIELD].includes(saved.waveMagnetic))
+      wave.magnetic=saved.waveMagnetic;
     if(['DENSITY','PHASE','FLOW'].includes(saved.waveView))wave.viewMode=saved.waveView;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
   }catch(e){}
-  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice,wavePolarization:wave.polarization,waveAdvanced:wave.advanced}));}catch(e){}}
+  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice,wavePolarization:wave.polarization,waveAdvanced:wave.advanced,waveMagnetic:wave.magnetic}));}catch(e){}}
   function normalize(u){
     let n=0;for(let i=0;i<N;i++)n+=u[i]*u[i];
     n=Math.sqrt(n*DR);for(let i=0;i<N;i++)u[i]/=n;
@@ -226,7 +230,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.4.5',W-15,23,10,C.muted,'right',650);
+    txt('v0.5',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -598,7 +602,40 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     save();
   }
 
+  // First-order orbital Zeeman term H_B = B Lz/2 in atomic units.
+  // Each (l,m) channel acquires the exact phase exp(-i m B dt/2).
+  // Strang splitting preserves norm and handles simultaneous electric driving.
+  // This intentionally omits B² rho²/8 and electron spin.
+  function waveMagneticHalfStep(){
+    if(wave.magnetic===0)return;
+    const base=-wave.magnetic*wave.dtAU*.25;
+    for(let ch=0;ch<WAVE_CHANNELS.length;ch++){
+      const m=WAVE_CHANNELS[ch].m;
+      if(!m)continue;
+      const theta=base*m,c=Math.cos(theta),ss=Math.sin(theta);
+      const u=wave.re[ch],v=wave.im[ch];
+      for(let i=0;i<N;i++){
+        const a=u[i],b=v[i];
+        u[i]=c*a-ss*b;v[i]=ss*a+c*b;
+      }
+    }
+  }
+  function magneticLabel(){
+    return wave.magnetic===0?'OFF':wave.magnetic>0?'+B':'−B';
+  }
+  function setWaveMagnetic(B){
+    if(![0,MAG_DEMO_FIELD,-MAG_DEMO_FIELD].includes(B))return;
+    wave.magnetic=B;
+    wave.cachedAt=0;immersiveDirty=true;volume.projectAt=0;
+    if(B!==0)wave.running=true;
+    save();
+  }
+  function nextWaveMagnetic(){
+    setWaveMagnetic(wave.magnetic===0?MAG_DEMO_FIELD:
+      wave.magnetic>0?-MAG_DEMO_FIELD:0);
+  }
   function waveOneStep(){
+    waveMagneticHalfStep();
     if(wave.boundaryMode==='ABSORB')waveAbsorbingHalfStep();
     for(let l=0;l<WAVE_CHANNELS.length;l++)waveRadialStep(l);
     const e=waveFieldVector(wave.tAU+wave.dtAU/2);
@@ -624,6 +661,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     for(let l=0;l<WAVE_CHANNELS.length;l++)waveRadialStep(l);
     if(wave.boundaryMode==='ABSORB')waveAbsorbingHalfStep();
+    waveMagneticHalfStep();
     wave.tAU+=wave.dtAU;
   }
   function waveStats(){
@@ -659,9 +697,13 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       dp+=(wave.re[5][i]**2+wave.im[5][i]**2)*DR;
       dm+=(wave.re[6][i]**2+wave.im[6][i]**2)*DR;
     }
-    wave.lz=norm>1e-12?(pm-mm+2*dp-2*dm)/norm:0;
+    const totalLz=pm-mm+2*dp-2*dm;
+    wave.lz=norm>1e-12?totalLz/norm:0;
+    wave.energy=(e+wave.magnetic*.5*totalLz)*HARTREE_EV;
+    wave.zeemanSplittingEV=wave.magnetic*.5*HARTREE_EV;
     return {norm,boundary,ground:wave.overlap,energy:wave.energy,
-      p0:wave.targetZero,pPlus:wave.targetPlus,pMinus:wave.targetMinus,lz:wave.lz};
+      p0:wave.targetZero,pPlus:wave.targetPlus,pMinus:wave.targetMinus,lz:wave.lz,
+      deltaEm:wave.zeemanSplittingEV};
   }
   function initializeWave(){
     wave.re=Array.from({length:WAVE_CHANNELS.length},()=>new Float64Array(N));
@@ -784,9 +826,13 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const u=waveComplexAt(x,y-h),d=waveComplexAt(x,y+h);
     const dxRe=(r[0]-l[0])/(2*h),dxIm=(r[1]-l[1])/(2*h);
     const dyRe=(d[0]-u[0])/(2*h),dyIm=(d[1]-u[1])/(2*h);
-    return {jx:p[0]*dxIm-p[1]*dxRe,
-      jy:p[0]*dyIm-p[1]*dyRe,
-      rho:p[0]*p[0]+p[1]*p[1]};
+    const rho=p[0]*p[0]+p[1]*p[1];
+    // For H = H0 + (B/2)Lz, continuity has an extra advective
+    // flux rho*(B/2)*(-y,x,0) in the transverse xy plane.
+    const B=wave.slice==='XY'?wave.magnetic*.5:0;
+    return {jx:p[0]*dxIm-p[1]*dxRe-B*y*rho,
+      jy:p[0]*dyIm-p[1]*dyRe+B*x*rho,
+      rho};
   }
   // Sample flux on the visible screen at a common physical scale in x,y.
   // Arrow lengths are normalized within the view, with low flux suppressed.
@@ -877,13 +923,14 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       return {active:false,stationary,
         message:stationary?'CURRENT ≈ 0 · TRY P+ OR P-':'CURRENT ≈ 0 NOW · EVOLVE'};
     }
-    if(wave.slice==='XZ'&&Math.abs(wave.lz)>.08)return {active:true,outOfPlane:true,
+    if(wave.slice==='XZ'&&(Math.abs(wave.lz)>.08||wave.magnetic!==0))return {active:true,outOfPlane:true,
       message:'FLOW OUT OF PLANE · USE XY / 3D'};
     return {active:true,message:'CURRENT DETECTED · VECTORS SHOWN'};
   }
   function flowLegend(x,y){
     txt('PROBABILITY CURRENT  j = Im(ψ* ∇ψ)',x,y,9,C.ink,'left',700);
-    txt('MINT OUT  ·  GOLD IN  ·  VIOLET ORBIT',x,y+17,9,C.mint,'left',650);
+    txt(wave.magnetic?'B FIELD: TOTAL CURRENT · MINT/GOLD/VIOLET':
+      'MINT OUT  ·  GOLD IN  ·  VIOLET ORBIT',x,y+17,9,C.mint,'left',650);
   }
   function phaseIndex(re,im){
     const phi=Math.atan2(im,re)+states['1s'].E*wave.tAU;
@@ -1095,8 +1142,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const b=waveComplexXYZ(x,y-h,z),t=waveComplexXYZ(x,y+h,z);
     const f=waveComplexXYZ(x,y,z-h),k=waveComplexXYZ(x,y,z+h);
     const comp=(lo,hi)=>p[0]*(hi[1]-lo[1])/(2*h)-p[1]*(hi[0]-lo[0])/(2*h);
-    return {jx:comp(l,r),jy:comp(b,t),jz:comp(f,k),
-      rho:p[0]*p[0]+p[1]*p[1]};
+    const rho=p[0]*p[0]+p[1]*p[1],B=wave.magnetic*.5;
+    return {jx:comp(l,r)-B*y*rho,
+      jy:comp(b,t)+B*x*rho,
+      jz:comp(f,k),rho};
   }
   function drawVolumeFlow(x,y,w,h,radius,now){
     const pts=[];let max=0;
@@ -1194,6 +1243,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         }
       }
       txt(symmetryMessage(),x+17,y+165,9,C.gold,'left',700);
+      if(wave.magnetic!==0)
+        txt('B '+wave.magnetic.toFixed(3)+' a.u.   ZEEMAN ΔE/m = '+
+          wave.zeemanSplittingEV.toFixed(3)+' eV',x+17,y+147,10,C.violet,'left',700);
       txt('SWIPE UP / DOWN TO TILT THE CAMERA',x+17,y+180,10,C.muted,'left',750);
       txt('RAY-MARCHED ψ  ·  '+volume.sampleCount.toLocaleString()+' INTEGRATION STEPS',x+17,y+198,9,C.gold,'left',700);
       txt('YAW '+(volume.yaw*180/Math.PI|0)+'°  ·  TILT '+(volume.pitch*180/Math.PI|0)+'°',
@@ -1309,7 +1361,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const bw3=(w-2*gap)/3;
     const presets=[
       ['GROUND','GROUND'],['P+','P+ ↻'],['P-','P- ↺'],
-      ['D4','D4 ✣'],['P MIX','P MIX'],['SHELL','SHELL']
+      ['D4','D4 ✣'],['P MIX','P MIX']
     ];
     txt('QUANTUM STATES',p,y+9,10,C.muted,'left',750);
     for(let k=0;k<presets.length;k++){
@@ -1318,6 +1370,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       button(p+col*(bw3+gap),y+22+row*47,bw3,40,
         label,wave.setup===name,()=>waveChangeSetup(name));
     }
+    button(p+2*(bw3+gap),y+69,bw3,40,'MAG '+magneticLabel(),
+      wave.magnetic!==0,()=>nextWaveMagnetic(),C.violet);
     const y3=y+123;
     button(p,y3,bw3,45,wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,
       ()=>{wave.running=!wave.running;},C.mint);
@@ -1329,8 +1383,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const isFlow=wave.viewMode==='FLOW';
     txt(isFlow?status.message:symmetryMessage(),p,y+186,9,
       isFlow?(status.active?C.mint:C.gold):C.blue,'left',700);
-    txt('FIELD '+wave.drive+'  /  '+wave.polarization+'  ·  WALL '+wave.boundaryMode,
-      p,y+207,9,C.muted,'left',650);
+    txt(wave.magnetic?'B = '+wave.magnetic.toFixed(3)+' a.u. ≈ '+
+      Math.round(Math.abs(wave.magnetic)*TESLA_PER_AU).toLocaleString()+' T  ·  ORBITAL MODEL':
+      'LIGHT '+wave.drive+' / '+wave.polarization+'  ·  MAGNET OFF',
+      p,y+207,9,wave.magnetic?C.violet:C.muted,'left',650);
     txt('REMAIN '+(wave.norm*100).toFixed(1)+'%',p,y+230,10,C.mint,'left',750);
     txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-p,y+230,10,C.gold,'right',750);
   }
@@ -1472,7 +1528,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('PHASE 4D+: Seven spherical-harmonic channels. FLOW shows j = Im(ψ*∇ψ), with animated direction markers, not electron paths. Real stationary preparations can have zero current; rotationally symmetric density can look unchanged as the camera turns. Full 3D density remains a ray-marched projection, not a Cartesian 3D evolution solver. MORE reveals advanced experimental controls.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 5A: Orbital Zeeman model adds H_B = B Lz/2 in atomic units to seven (l,m) channels. D4 superpositions precess because m=+2 and m=−2 acquire opposite phases. FLOW includes field-induced advective flux. B=0.020 a.u. ≈ 4701 T is an exaggerated demonstration field. The quadratic diamagnetic term B²(x²+y²)/8 and electron spin are not modeled; this is not a complete magnetic atom.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
@@ -1675,6 +1731,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       immersivePlayState(),()=>toggleImmersivePlay(),C.mint);
     if(tab==='WAVE'&&wave.slice==='3D'){
       button(18,H-139,112,32,'TILT CAMERA',false,()=>nextCameraAngle(),C.mint);
+      button(139,H-139,112,32,'MAG '+magneticLabel(),wave.magnetic!==0,
+        ()=>nextWaveMagnetic(),C.violet);
     }
     button(W-108,lowerY,42,40,'−',false,()=>{
       immersiveZoom=Math.min(30,immersiveZoom*1.34);immersiveDirty=true;volume.dirty=true;
