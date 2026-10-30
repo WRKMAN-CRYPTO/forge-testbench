@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | Boundary Experiments</title>
+<title>HYDROGEN // Emergence Lab | Phase Color</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -44,7 +44,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     tAU:0, dtAU:.15, wavelength:0,
     re:[], im:[], boundary:0, cachedAt:0, norm:1, overlap:1,
     charge:[], seenEpoch:0, energy:0,
-    boundaryMode:'REFLECT', lost:0, absorberStart:0
+    boundaryMode:'REFLECT', lost:0, absorberStart:0, viewMode:'DENSITY'
   };
   const WAVE_LMAX=2;
   const WAVE_COUPLINGS=[1/Math.sqrt(3),2/Math.sqrt(15)];
@@ -53,6 +53,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   const waveCtx=waveImageCanvas.getContext('2d');
   const wavePixels=waveCtx.createImageData(200,200);
   let waveMatrix=null;
+  const PHASE_TAU=2*Math.PI, phasePalette=new Uint8Array(360*3);
   // Smooth complex absorbing potential (CAP): H -> H - i eta(r)
   // Applied as exp[-eta(r) dt/2] before and after each Hermitian step.
   // Eta starts at 60% of the radial box and rises smoothly to its edge.
@@ -72,9 +73,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if([2,8,16].includes(saved.waveSteps))wave.steps=saved.waveSteps;
     if([.008,.025,.06].includes(saved.waveStrength))wave.strength=saved.waveStrength;
     if(['REFLECT','ABSORB'].includes(saved.waveBoundary))wave.boundaryMode=saved.waveBoundary;
+    if(['DENSITY','PHASE'].includes(saved.waveView))wave.viewMode=saved.waveView;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
   }catch(e){}
-  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode}));}catch(e){}}
+  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode}));}catch(e){}}
   function normalize(u){
     let n=0;for(let i=0;i<N;i++)n+=u[i]*u[i];
     n=Math.sqrt(n*DR);for(let i=0;i<N;i++)u[i]/=n;
@@ -207,7 +209,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.3.2',W-15,23,10,C.muted,'right',650);
+    txt('v0.3.3',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -622,27 +624,82 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const f=r/DR-1,i=Math.floor(f),a=f-i;
     return [(u[i]*(1-a)+u[i+1]*a)/r,(v[i]*(1-a)+v[i+1]*a)/r];
   }
-  function waveDensity(r,c){
+  // The local phase is the argument of a complex wavefunction in a reference
+  // frame rotating with the calculated 1s energy. Multiplication by a global
+  // phase does not change observables; removing the trivial ground-state
+  // rotation makes stationary 1s appear as stationary color.
+  function waveComplex(r,c){
     const a=waveSample(0,r),b=waveSample(1,r),d=waveSample(2,r);
     const y0=.28209479177,y1=.4886025119*c,y2=.31539156525*(3*c*c-1);
-    const rr=a[0]*y0+b[0]*y1+d[0]*y2;
-    const ii=a[1]*y0+b[1]*y1+d[1]*y2;
-    return rr*rr+ii*ii;
+    return [a[0]*y0+b[0]*y1+d[0]*y2, a[1]*y0+b[1]*y1+d[1]*y2];
+  }
+  function waveDensity(r,c){
+    const z=waveComplex(r,c);return z[0]*z[0]+z[1]*z[1];
+  }
+  function setWaveView(mode){
+    if(mode!=='DENSITY'&&mode!=='PHASE')return;
+    wave.viewMode=mode;
+    wave.cachedAt=0;immersiveDirty=true;immersiveAt=0;
+    save();
+  }
+  function phaseIndex(re,im){
+    const phi=Math.atan2(im,re)+states['1s'].E*wave.tAU;
+    let f=(phi/PHASE_TAU+.5)%1;
+    if(f<0)f+=1;
+    return Math.min(359,Math.floor(f*360));
+  }
+  function makePhasePalette(){
+    // Cyclic HSV palette. Opposite complex phases receive opposite hues.
+    // The palette wraps smoothly at +/-pi.
+    for(let i=0;i<360;i++){
+      const h=((i/360+.52)%1)*6,sector=Math.floor(h),f=h-sector;
+      const q=1-.88*f,t=1-.88*(1-f),p=.12;
+      const rgb=sector===0?[1,t,p]:sector===1?[q,1,p]:
+        sector===2?[p,1,t]:sector===3?[p,q,1]:
+        sector===4?[t,p,1]:[1,p,q];
+      for(let k=0;k<3;k++)phasePalette[i*3+k]=Math.round(rgb[k]*255);
+    }
+  }
+  makePhasePalette();
+  function phaseLegend(x,y,w){
+    if(wave.viewMode!=='PHASE')return;
+    txt('ARG(ψ)  /  RELATIVE PHASE',x,y-13,9,C.muted,'left',700);
+    const n=72,cell=w/n;
+    for(let k=0;k<n;k++){
+      const p=phasePalette.subarray(Math.floor(k*360/n)*3,Math.floor(k*360/n)*3+3);
+      g.fillStyle='rgb('+p[0]+','+p[1]+','+p[2]+')';
+      g.fillRect(x+k*cell,y,cell+1,6);
+    }
+    txt('−π',x,y+16,9,C.muted);
+    txt('0',x+w/2,y+16,9,C.ink,'center');
+    txt('+π',x+w,y+16,9,C.muted,'right');
   }
   function waveCloud(){
     const size=200,half=size/2,radius=14/Z,values=new Float32Array(size*size);
+    const phases=wave.viewMode==='PHASE'?new Uint16Array(size*size):null;
     let peak=0;
     for(let y=0;y<size;y++)for(let x=0;x<size;x++){
       const xx=(x+.5-half)/half,yy=(y+.5-half)/half;
       const rNorm=Math.hypot(xx,yy),r=rNorm*radius;
-      const d=rNorm>1?0:waveDensity(r,rNorm>1e-6?xx/rNorm:0);
-      const j=y*size+x;values[j]=d;peak=Math.max(peak,d);
+      const z=rNorm>1?[0,0]:waveComplex(r,rNorm>1e-6?xx/rNorm:0);
+      const d=z[0]*z[0]+z[1]*z[1],j=y*size+x;
+      values[j]=d;peak=Math.max(peak,d);
+      if(phases)phases[j]=phaseIndex(z[0],z[1]);
     }
+    const dim=Math.sqrt(Math.max(0,wave.norm));
     for(let j=0;j<values.length;j++){
-      const k=peak?Math.min(1,Math.pow(values[j]/peak,.52)*1.1*Math.sqrt(Math.max(0,wave.norm))):0;
-      const p=j*4;wavePixels.data[p]=Math.round(7+80*k);
-      wavePixels.data[p+1]=Math.round(12+184*k);
-      wavePixels.data[p+2]=Math.round(24+229*k);
+      const k=peak?Math.min(1,Math.pow(values[j]/peak,.52)*1.1*dim):0;
+      const p=j*4;
+      if(phases){
+        const index=phases[j]*3;
+        wavePixels.data[p]=Math.round(6+(phasePalette[index]-6)*k);
+        wavePixels.data[p+1]=Math.round(11+(phasePalette[index+1]-11)*k);
+        wavePixels.data[p+2]=Math.round(23+(phasePalette[index+2]-23)*k);
+      }else{
+        wavePixels.data[p]=Math.round(7+80*k);
+        wavePixels.data[p+1]=Math.round(12+184*k);
+        wavePixels.data[p+2]=Math.round(24+229*k);
+      }
       wavePixels.data[p+3]=255;
     }
     waveCtx.putImageData(wavePixels,0,0);
@@ -650,6 +707,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function waveViewport(now){
     viewport();const a=layout,x=a.x+13,w=a.w-26;
     txt('SPATIAL WAVEFUNCTION / r, θ',x,a.y+17,10,C.blue,'left',750);
+    button(a.x+10,a.y+33,107,28,wave.viewMode==='PHASE'?'COLOR: PHASE':'COLOR: DENSITY',
+      wave.viewMode==='PHASE',()=>setWaveView(wave.viewMode==='PHASE'?'DENSITY':'PHASE'),C.mint);
     const middleH=Math.max(104,a.h-185);
     const side=Math.min(a.w-26,middleH);
     const cx=W/2,cy=a.y+34+middleH/2;
@@ -664,6 +723,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     g.restore();
     button(a.x+a.w-92,a.y+7,80,28,'EXPAND',false,()=>setImmersive(true),C.mint);
     const barY=a.y+a.h-133;
+    if(wave.viewMode==='PHASE')txt('HUE = PHASE   ·   LIGHT = DENSITY',x,barY-29,9,C.mint,'left',700);
     txt('RADIAL PROBABILITY  ·  |u(r)|²',x,barY-12,9,C.muted,'left',700);
     const graphX=x,graphY=barY+5,graphW=w,graphH=55;
     if(wave.boundaryMode==='ABSORB'){
@@ -826,7 +886,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('BOUNDARY TEST: REFLECT conserves norm in a finite box. ABSORB uses a smooth complex absorbing potential beyond 60% of the radial box. Remaining norm falls as outgoing probability is removed. This is a numerical approximation, not an infinite universe.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('WAVE DISPLAY: DENSITY shows |ψ|²; PHASE colors arg(ψ) after removing ground-state global phase. Hue is not directly observable, and near-zero amplitude has undefined phase. REFLECT conserves norm; ABSORB removes outgoing amplitude. Both remain numerical models.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
@@ -923,6 +983,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       immersivePixels=immersiveCtx.createImageData(rw,rh);
     }
     const vals=new Float32Array(rw*rh);
+    const phaseMap=tab==='WAVE'&&wave.viewMode==='PHASE'?new Uint16Array(rw*rh):null;
     let peak=0;const halfW=rw*.5,halfH=rh*.5;
     for(let y=0;y<rh;y++){
       const py=(y+.5-halfH)/halfW;
@@ -930,7 +991,12 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         const px=(x+.5-halfW)/halfW;
         const rr=Math.hypot(px,py);
         const r=rr*immersiveZoom/Z;
-        const d=immersiveDensity(r,rr>1e-6?px/rr:0);
+        let d=0;
+        if(phaseMap){
+          const z=waveComplex(r,rr>1e-6?px/rr:0);
+          d=z[0]*z[0]+z[1]*z[1];
+          phaseMap[y*rw+x]=phaseIndex(z[0],z[1]);
+        }else d=immersiveDensity(r,rr>1e-6?px/rr:0);
         const v=Math.max(0,Number.isFinite(d)?d:0);
         vals[y*rw+x]=v;
         if(v>peak)peak=v;
@@ -942,9 +1008,16 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       const brightness=tab==='WAVE'?Math.sqrt(Math.max(0,wave.norm)):1;
       const v=Math.min(1,Math.pow(vals[j]*inv,.48)*1.10*brightness);
       const p=j*4;
-      immersivePixels.data[p]=Math.round(6+(tint[0]-6)*v);
-      immersivePixels.data[p+1]=Math.round(11+(tint[1]-11)*v);
-      immersivePixels.data[p+2]=Math.round(23+(tint[2]-23)*v);
+      if(phaseMap){
+        const c=phaseMap[j]*3;
+        immersivePixels.data[p]=Math.round(6+(phasePalette[c]-6)*v);
+        immersivePixels.data[p+1]=Math.round(11+(phasePalette[c+1]-11)*v);
+        immersivePixels.data[p+2]=Math.round(23+(phasePalette[c+2]-23)*v);
+      }else{
+        immersivePixels.data[p]=Math.round(6+(tint[0]-6)*v);
+        immersivePixels.data[p+1]=Math.round(11+(tint[1]-11)*v);
+        immersivePixels.data[p+2]=Math.round(23+(tint[2]-23)*v);
+      }
       immersivePixels.data[p+3]=255;
     }
     immersiveCtx.putImageData(immersivePixels,0,0);
@@ -981,7 +1054,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(tab==='WAVE'){
       button(W-173,15,155,36,wave.boundaryMode==='ABSORB'?'WALL: ABSORB':'WALL: REFLECT',
         true,()=>setWaveBoundary(wave.boundaryMode==='ABSORB'?'REFLECT':'ABSORB'),C.mint);
-      txt('WAVE / '+wave.setup+'  ·  BOUNDARY COMPARISON',18,78,10,C.muted,'left',750);
+      button(18,66,132,34,wave.viewMode==='PHASE'?'SHOW DENSITY':'SHOW PHASE',
+        wave.viewMode==='PHASE',()=>setWaveView(wave.viewMode==='PHASE'?'DENSITY':'PHASE'),C.mint);
+      if(wave.viewMode==='PHASE')phaseLegend(18,125,154);
+      else txt('WAVE / '+wave.setup+'  ·  '+wave.boundaryMode,18,113,10,C.muted,'left',750);
     }else{
       txt(tab==='FIELD'?'FIELD / DRIVE':'ATOM / '+mode,W-18,25,11,C.ink,'right',800);
       txt('QUANTUM DENSITY',W-18,43,9,C.muted,'right',650);
@@ -1002,8 +1078,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       txt('LEFT '+(wave.norm*100).toFixed(1)+'%',W-18,lowerY+54,10,C.mint,'right',700);
       txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-18,lowerY-25,10,C.gold,'right',700);
       if(wave.boundaryMode==='REFLECT'&&wave.boundary>.01){
-        fillRect(W*.5-111,96,222,27,7,'rgba(75,42,31,.84)');
-        txt('NUMERICAL WALL REFLECTION',W*.5,109,9,'#ffcf91','center',800);
+        const warningY=wave.viewMode==='PHASE'?181:141;
+        fillRect(W*.5-111,warningY,222,27,7,'rgba(75,42,31,.84)');
+        txt('NUMERICAL WALL REFLECTION',W*.5,warningY+13,9,'#ffcf91','center',800);
       }
     }else if(tab==='FIELD')txt('2p '+(populations()[2]*100).toFixed(1)+'%',W-18,lowerY+54,10,C.mint,'right',750);
     else txt('SCALE '+immersiveZoom.toFixed(1)+' a₀',W-18,lowerY+54,10,C.muted,'right',700);
