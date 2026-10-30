@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | 3D Quantum Volume</title>
+<title>HYDROGEN // Emergence Lab | Smooth Quantum Volume</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -225,7 +225,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.4.3',W-15,23,10,C.muted,'right',650);
+    txt('v0.4.4',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -877,118 +877,137 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   // Phase 4C: sample the existing spherical-harmonic wavefunction at actual
   // x,y,z positions. The displayed light is an accumulated volume projection:
   // it is NOT a full Cartesian 3D evolution solver or an electron trajectory.
-  function volumePrepareSamples(){
-    const NR=25,NT=16,NP=32,R=Math.min(19/Z,rGrid[N-2]*.95);
-    const pts=[];const dOmega=4*Math.PI/(NT*NP);
-    for(let ir=0;ir<NR;ir++){
-      const u=(ir+.5)/NR,r=R*Math.pow(u,1.45);
-      const dr=R*1.45*Math.pow(u,.45)/NR;
-      const dVol=r*r*dr*dOmega;
-      for(let it=0;it<NT;it++){
-        const cz=1-2*(it+.5)/NT,sn=Math.sqrt(1-cz*cz);
-        const z=r*cz;
-        for(let ip=0;ip<NP;ip++){
-          const az=2*Math.PI*(ip+.5+((ir*17+it*13)%19)/28)/NP;
-          const x=r*sn*Math.cos(az),y=r*sn*Math.sin(az);
-          const psi=waveComplexXYZ(x,y,z);
-          const rho=psi[0]*psi[0]+psi[1]*psi[1];
-          const mass=rho*dVol;
-          if(mass<1e-17)continue;
-          pts.push(x,y,z,mass,
-            wave.viewMode==='PHASE'?phaseIndex(psi[0],psi[1]):0);
-        }
-      }
-    }
-    volume.samples=pts;
-    volume.sampleCount=pts.length/5;
-    volume.at=wave.tAU;
-    volume.dirty=false;
-  }
+  // Phase 4D: smooth orthographic ray integration, with no discrete cloud
+  // particles or image-space splatting. Each pixel integrates actual |psi|^2
+  // along a camera ray through the 3D spherical-harmonic wavefunction.
+  // The radial/time propagator is untouched. This is a visualization, not
+  // a full Cartesian 3D numerical Schrödinger solver.
   function volumeCamera(x,y,z){
     const cy=Math.cos(volume.yaw),sy=Math.sin(volume.yaw);
     const cp=Math.cos(volume.pitch),sp=Math.sin(volume.pitch);
     const rx=cy*x-sy*y,ry=sy*x+cy*y;
     return [rx,sp*ry+cp*z,cp*ry-sp*z];
   }
+  // Allocation-free hot-path evaluation of the same normalized Y_l^m
+  // expansion as waveComplexXYZ. Results are written into a reusable pair.
+  function rayWaveXYZ(x,y,z,out){
+    const r=Math.hypot(x,y,z);
+    if(r>=rGrid[N-1]||!Number.isFinite(r)){
+      out[0]=0;out[1]=0;return;
+    }
+    const c=r>1e-10?z/r:0;
+    const y0=.28209479177,y1=.4886025119*c;
+    const y2=.31539156525*(3*c*c-1);
+    const small=r<DR, ri=small?0:Math.min(N-2,Math.floor(r/DR-1));
+    const blend=small?0:r/DR-1-ri;
+    const invr=r>=DR?1/r:0;
+    const sample=(ch)=>{
+      const ur=wave.re[ch],ui=wave.im[ch];
+      if(small){
+        const l=WAVE_CHANNELS[ch].l;
+        const q=l===0?1/DR:l===1?r/(DR*DR):r*r/(DR*DR*DR);
+        out[ch*2+2]=ur[0]*q;
+        out[ch*2+3]=ui[0]*q;
+      }else{
+        out[ch*2+2]=(ur[ri]*(1-blend)+ur[ri+1]*blend)*invr;
+        out[ch*2+3]=(ui[ri]*(1-blend)+ui[ri+1]*blend)*invr;
+      }
+    };
+    // Avoid allocating 7 temporary pairs for every volume step.
+    for(let ch=0;ch<7;ch++)sample(ch);
+    let re=out[2]*y0+out[4]*y1+out[6]*y2;
+    let im=out[3]*y0+out[5]*y1+out[7]*y2;
+    if(r>1e-9){
+      const k=Y11/r;
+      const pr=out[8],pi=out[9],mr=out[10],mi=out[11];
+      re+=k*(-pr*x+pi*y+mr*x+mi*y);
+      im+=k*(-pr*y-pi*x-mr*y+mi*x);
+      const k2=Y22/(r*r),xx=x*x-y*y,xy=2*x*y;
+      re+=k2*(out[12]*xx-out[13]*xy+out[14]*xx+out[15]*xy);
+      im+=k2*(out[12]*xy+out[13]*xx-out[14]*xy+out[15]*xx);
+    }
+    out[0]=re;out[1]=im;
+  }
   function volumeRaster(w,h,radius,now,compact){
-    const cap=compact?18500:74000;
-    const rw=Math.max(90,Math.min(compact?155:208,Math.floor(w*.72),Math.floor(Math.sqrt(cap*w/h))));
-    const rh=Math.max(90,Math.round(rw*h/w));
+    const moving=!!volume.drag,fast=compact||moving||wave.running;
+    const targetW=compact?106:moving?95:wave.running?102:135;
+    const rw=Math.max(80,Math.min(targetW,Math.floor(w*.64)));
+    const rh=Math.max(80,Math.round(rw*h/w));
     if(volume.rw!==rw||volume.rh!==rh||!volume.pixels){
       volume.rw=rw;volume.rh=rh;
       volume.raster.width=rw;volume.raster.height=rh;
       volume.pixels=volume.ctx.createImageData(rw,rh);
     }
-    if(volume.dirty||!volume.samples||Math.abs(volume.at-wave.tAU)>(wave.running?1.5:1e-7)){
-      volumePrepareSamples();
-    }
-    const count=rw*rh;
-    const accum=new Float32Array(count);
-    const colors=wave.viewMode==='PHASE'?new Float32Array(count*3):null;
-    const pxScale=rw/(2*radius);
-    const sample=volume.samples;
-    let peak=0;
-    for(let i=0;i<sample.length;i+=5){
-      const q=volumeCamera(sample[i],sample[i+1],sample[i+2]);
-      const px=rw*.5+q[0]*pxScale,py=rh*.5-q[1]*pxScale;
-      const ix=Math.floor(px),iy=Math.floor(py);
-      if(ix<0||iy<0||ix>=rw-1||iy>=rh-1)continue;
-      // Near-side weighting gives volumetric depth cues but not fake rotation.
-      const mass=sample[i+3]*(1+.28*q[2]/Math.max(1,radius));
-      if(mass<=0)continue;
-      const tx=px-ix,ty=py-iy;
-      const at=iy*rw+ix,idx=sample[i+4]*3;
-      const splat=(j,wg)=>{
-        const v=mass*wg;accum[j]+=v;
-        if(colors){
-          colors[j*3]+=v*phasePalette[idx];
-          colors[j*3+1]+=v*phasePalette[idx+1];
-          colors[j*3+2]+=v*phasePalette[idx+2];
-        }
-      };
-      splat(at,(1-tx)*(1-ty));
-      splat(at+1,tx*(1-ty));
-      splat(at+rw,(1-tx)*ty);
-      splat(at+rw+1,tx*ty);
-    }
-    // Small separable-looking tent blur fills quadrature gaps without
-    // inventing information; the original 3D data supplied every value.
-    const smoothed=new Float32Array(count);
-    const smoothRGB=colors?new Float32Array(count*3):null;
-    for(let y=1;y<rh-1;y++)for(let x=1;x<rw-1;x++){
-      const j=y*rw+x;
-      const neighbors=[j,j-1,j+1,j-rw,j+rw];
-      for(let k=0;k<neighbors.length;k++){
-        const weight=k===0?.5:.125,n=neighbors[k];
-        smoothed[j]+=accum[n]*weight;
-        if(smoothRGB){
-          smoothRGB[j*3]+=colors[n*3]*weight;
-          smoothRGB[j*3+1]+=colors[n*3+1]*weight;
-          smoothRGB[j*3+2]+=colors[n*3+2]*weight;
-        }
-      }
-      if(smoothed[j]>peak)peak=smoothed[j];
-    }
     const data=volume.pixels.data;
-    const inv=peak>1e-18?1/peak:0;
-    const dim=Math.sqrt(Math.max(0,wave.norm));
-    for(let j=0;j<count;j++){
-      const v=Math.min(1,Math.pow(smoothed[j]*inv,.58)*1.05*dim);
-      const d=j*4;
-      if(smoothRGB&&smoothed[j]>1e-22){
-        data[d]=Math.round(7+(smoothRGB[j*3]/smoothed[j]-7)*v);
-        data[d+1]=Math.round(11+(smoothRGB[j*3+1]/smoothed[j]-11)*v);
-        data[d+2]=Math.round(23+(smoothRGB[j*3+2]/smoothed[j]-23)*v);
-      }else{
-        data[d]=Math.round(7+78*v);
-        data[d+1]=Math.round(11+182*v);
-        data[d+2]=Math.round(23+215*v);
+    const phasing=wave.viewMode==='PHASE';
+    const mass=new Float32Array(rw*rh);
+    const rgb=phasing?new Float32Array(rw*rh*3):null;
+    const cy=Math.cos(volume.yaw),sy=Math.sin(volume.yaw);
+    const cp=Math.cos(volume.pitch),sp=Math.sin(volume.pitch);
+    const R=Math.min(rGrid[N-2],Math.max(12/Z,Math.min(22/Z,radius*1.65)));
+    const R2=R*R,invW=2*radius/rw;
+    const n=compact?34:moving?26:wave.running?32:48;
+    const scratch=new Float64Array(16);
+    let peak=0,raySteps=0;
+    for(let py=0;py<rh;py++){
+      const screenV=(rh*.5-py-.5)*invW;
+      for(let px=0;px<rw;px++){
+        const screenU=(px+.5-rw*.5)*invW;
+        const p2=screenU*screenU+screenV*screenV,j=py*rw+px;
+        if(p2>=R2)continue;
+        const depth=Math.sqrt(R2-p2);
+        const step=2/n;
+        let sum=0,cR=0,cG=0,cB=0;
+        // A symmetric monotone reparameterization places more samples
+        // near the center. The Jacobian gives the correct integration weight.
+        for(let z=0;z<n;z++){
+          const t=-1+(z+.5)*step;
+          const tcube=t*t*t;
+          const q=depth*(.40*t+.60*tcube);
+          const dz=depth*(.40+1.80*t*t)*step;
+          const ry=sp*screenV+cp*q;
+          const wz=cp*screenV-sp*q;
+          const wx=cy*screenU+sy*ry,wy=-sy*screenU+cy*ry;
+          rayWaveXYZ(wx,wy,wz,scratch);
+          const re=scratch[0],im=scratch[1],density=re*re+im*im;
+          if(density<=1e-24)continue;
+          const weight=density*dz;
+          sum+=weight;
+          if(phasing){
+            const index=phaseIndex(re,im)*3;
+            cR+=weight*phasePalette[index];
+            cG+=weight*phasePalette[index+1];
+            cB+=weight*phasePalette[index+2];
+          }
+        }
+        raySteps+=n;mass[j]=sum;
+        if(rgb){rgb[j*3]=cR;rgb[j*3+1]=cG;rgb[j*3+2]=cB;}
+        if(sum>peak)peak=sum;
       }
-      data[d+3]=255;
+    }
+    const inv=peak>1e-22?1/peak:0;
+    const dim=Math.sqrt(Math.max(0,wave.norm));
+    for(let i=0;i<rw*rh;i++){
+      const pop=mass[i],v=Math.min(1,Math.pow(pop*inv,.56)*1.12*dim),p=i*4;
+      if(rgb&&pop>1e-22){
+        const scale=v/pop;
+        data[p]=Math.round(6+(rgb[i*3]/pop-6)*v);
+        data[p+1]=Math.round(11+(rgb[i*3+1]/pop-11)*v);
+        data[p+2]=Math.round(23+(rgb[i*3+2]/pop-23)*v);
+      }else{
+        data[p]=Math.round(6+76*v);
+        data[p+1]=Math.round(11+187*v);
+        data[p+2]=Math.round(23+220*v);
+      }
+      data[p+3]=255;
     }
     volume.ctx.putImageData(volume.pixels,0,0);
     volume.maxProjection=peak;
-    volume.projectAt=now;
+    volume.sampleCount=raySteps;
+    volume.at=wave.tAU;volume.projectAt=now;
+    volume.lastMode=wave.viewMode;
+    volume.lastRadius=radius;
+    volume.dirty=false;
   }
   function waveCurrentXYZ(x,y,z){
     const h=DR*.8,p=waveComplexXYZ(x,y,z);
@@ -1049,7 +1068,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     g.fillStyle='#070c16';g.fillRect(x,y,w,h);
     const radius=(compact?10:immersiveZoom)/Z;
     // Physical ratios are preserved: height and width use equal Bohr/pixel.
-    if(volume.dirty||!volume.projectAt||now-volume.projectAt>(wave.running?125:200)){
+    if(volume.dirty||!volume.projectAt||volume.lastMode!==wave.viewMode||
+       volume.lastRadius!==radius||volume.drag||
+       (wave.running&&now-volume.projectAt>210&&Math.abs(wave.tAU-volume.at)>1)){
       volumeRaster(w,h,radius,now,compact);
     }
     g.imageSmoothingEnabled=true;
@@ -1069,7 +1090,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     g.restore();
     if(!compact){
       txt('SWIPE UP / DOWN TO TILT THE CAMERA',x+17,y+180,10,C.muted,'left',750);
-      txt('3D WAVEFUNCTION  ·  '+volume.sampleCount.toLocaleString()+' SAMPLES',x+17,y+198,9,C.gold,'left',700);
+      txt('RAY-MARCHED ψ  ·  '+volume.sampleCount.toLocaleString()+' INTEGRATION STEPS',x+17,y+198,9,C.gold,'left',700);
       txt('YAW '+(volume.yaw*180/Math.PI|0)+'°  ·  TILT '+(volume.pitch*180/Math.PI|0)+'°',
         x+17,y+216,9,C.blue,'left',650);
     }
@@ -1311,7 +1332,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('PHASE 4C+: Seven (l,m) channels now include 3d, m=+2 and m=-2. The D4 preset superposes these into a genuine four-lobed x²−y² orbital. EXPLORE 3D opens immersive drag-to-orbit sampling. This remains a truncated spherical-harmonic solver, not a full Cartesian 3D grid; transverse field coupling to d states is not yet implemented.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 4D: The 3D renderer numerically integrates |ψ(x,y,z)|² along each camera ray. Phase view blends density-weighted colors through the depth of the cloud; it is not a direct phase measurement. Fast sampling during dragging, finer samples when paused. The seven-channel radial-angular Schrödinger solver is unchanged, not a Cartesian 3D grid.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
@@ -1594,8 +1615,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(!sliderDrag)return;
     const rect=canvas.getBoundingClientRect();setWavelengthFromX(e.clientX-rect.left);
   },{passive:false});
-  canvas.addEventListener('pointerup',()=>{sliderDrag=false;volume.drag=null;});
-  canvas.addEventListener('pointercancel',()=>{sliderDrag=false;volume.drag=null;});
+  canvas.addEventListener('pointerup',()=>{sliderDrag=false;if(volume.drag)volume.projectAt=0;volume.drag=null;});
+  canvas.addEventListener('pointercancel',()=>{sliderDrag=false;if(volume.drag)volume.projectAt=0;volume.drag=null;});
   document.addEventListener('fullscreenchange',()=>{
     if(!document.fullscreenElement&&immersive){setImmersive(false);}
     resize();
