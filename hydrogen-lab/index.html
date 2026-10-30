@@ -1202,8 +1202,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     button(p,row,bw3,hh(34),wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,()=>{
       wave.running=!wave.running;
     });
-    button(p+bw3+gap,row,bw3,hh(34),wave.slice==='3D'?'VIEW 2D':'3D VIEW',false,
-      ()=>wave.slice==='3D'?setWaveSlice('XY'):open3D());
+    button(p+bw3+gap,row,bw3,hh(34),wave.slice==='3D'?'VIEW 2D':'RESET',false,
+      ()=>wave.slice==='3D'?setWaveSlice('XY'):initializeWave());
     button(p+2*(bw3+gap),row,bw3,hh(34),'×'+wave.steps+' STEP',false,()=>{
       wave.steps=wave.steps===2?8:wave.steps===8?16:2;save();
     });
