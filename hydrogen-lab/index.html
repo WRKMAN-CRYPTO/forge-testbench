@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | Probability Flow</title>
+<title>HYDROGEN // Emergence Lab | Orbital Circulation</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -44,9 +44,11 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     tAU:0, dtAU:.15, wavelength:0,
     re:[], im:[], boundary:0, cachedAt:0, norm:1, overlap:1,
     charge:[], seenEpoch:0, energy:0,
-    boundaryMode:'REFLECT', lost:0, absorberStart:0, viewMode:'DENSITY'
+    boundaryMode:'REFLECT', lost:0, absorberStart:0, viewMode:'DENSITY', slice:'XY'
   };
-  const WAVE_LMAX=2;
+  // Channels (l,m), radial Hamiltonians depend on l, not m.
+  const WAVE_CHANNELS=[{l:0,m:0},{l:1,m:0},{l:2,m:0},{l:1,m:1},{l:1,m:-1}];
+  const Y11=Math.sqrt(3/(8*Math.PI));
   const WAVE_COUPLINGS=[1/Math.sqrt(3),2/Math.sqrt(15)];
   const waveImageCanvas=document.createElement('canvas');
   waveImageCanvas.width=200;waveImageCanvas.height=200;
@@ -73,10 +75,11 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if([2,8,16].includes(saved.waveSteps))wave.steps=saved.waveSteps;
     if([.008,.025,.06].includes(saved.waveStrength))wave.strength=saved.waveStrength;
     if(['REFLECT','ABSORB'].includes(saved.waveBoundary))wave.boundaryMode=saved.waveBoundary;
+    if(['XY','XZ'].includes(saved.waveSlice))wave.slice=saved.waveSlice;
     if(['DENSITY','PHASE','FLOW'].includes(saved.waveView))wave.viewMode=saved.waveView;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
   }catch(e){}
-  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode}));}catch(e){}}
+  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice}));}catch(e){}}
   function normalize(u){
     let n=0;for(let i=0;i<N;i++)n+=u[i]*u[i];
     n=Math.sqrt(n*DR);for(let i=0;i<N;i++)u[i]/=n;
@@ -209,7 +212,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.3.4',W-15,23,10,C.muted,'right',650);
+    txt('v0.4',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -461,7 +464,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function waveBuildMatrix(){
     const sub=-(1/(2*DR*DR)),h=wave.dtAU/4; // CN for half of a full split step
     waveMatrix=[];
-    for(let l=0;l<=WAVE_LMAX;l++){
+    for(let ch=0;ch<WAVE_CHANNELS.length;ch++){
+      const l=WAVE_CHANNELS[ch].l;
       const inverseRe=new Float64Array(N),inverseIm=new Float64Array(N);
       const cRe=new Float64Array(N),cIm=new Float64Array(N);
       const diag=new Float64Array(N),bi=h*sub;
@@ -529,7 +533,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
   }
   function waveAbsorbingHalfStep(){
-    for(let l=0;l<=WAVE_LMAX;l++){
+    for(let l=0;l<WAVE_CHANNELS.length;l++){
       const u=wave.re[l],v=wave.im[l];
       for(let i=0;i<N;i++){
         u[i]*=absorberHalf[i];
@@ -548,7 +552,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
 
   function waveOneStep(){
     if(wave.boundaryMode==='ABSORB')waveAbsorbingHalfStep();
-    for(let l=0;l<=WAVE_LMAX;l++)waveRadialStep(l);
+    for(let l=0;l<WAVE_CHANNELS.length;l++)waveRadialStep(l);
     const f=waveFieldStrength(wave.tAU+wave.dtAU/2);
     if(f!==0){
       for(let i=0;i<N;i++){
@@ -558,13 +562,13 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         waveRotate(0,1,t*WAVE_COUPLINGS[0]/2,i);
       }
     }
-    for(let l=0;l<=WAVE_LMAX;l++)waveRadialStep(l);
+    for(let l=0;l<WAVE_CHANNELS.length;l++)waveRadialStep(l);
     if(wave.boundaryMode==='ABSORB')waveAbsorbingHalfStep();
     wave.tAU+=wave.dtAU;
   }
   function waveStats(){
     let norm=0,boundary=0,groundRe=0,groundIm=0,e=0;
-    for(let l=0;l<=WAVE_LMAX;l++){
+    for(let l=0;l<WAVE_CHANNELS.length;l++){
       const u=wave.re[l],v=wave.im[l],D=waveMatrix[l].diag;
       for(let i=0;i<N;i++){
         const pop=u[i]*u[i]+v[i]*v[i];
@@ -588,8 +592,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     return {norm,boundary,ground:wave.overlap,energy:wave.energy};
   }
   function initializeWave(){
-    wave.re=Array.from({length:WAVE_LMAX+1},()=>new Float64Array(N));
-    wave.im=Array.from({length:WAVE_LMAX+1},()=>new Float64Array(N));
+    wave.re=Array.from({length:WAVE_CHANNELS.length},()=>new Float64Array(N));
+    wave.im=Array.from({length:WAVE_CHANNELS.length},()=>new Float64Array(N));
     const a=wave.re[0],b=wave.re[1];
     for(let i=0;i<N;i++){
       if(wave.setup==='GROUND')a[i]=states['1s'].u[i];
@@ -599,13 +603,18 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         b[i]=states['2p'].u[i]/Math.sqrt(2);
       }
       if(wave.setup==='SHELL'){
-        const r=rGrid[i];
-        a[i]=r*Math.exp(-.5*((r-5/Z)/(.85/Z))**2);
+        const r=rGrid[i];a[i]=r*Math.exp(-.5*((r-5/Z)/(.85/Z))**2);
+      }
+      if(wave.setup==='P+')wave.re[3][i]=states['2p'].u[i];
+      if(wave.setup==='P-')wave.re[4][i]=states['2p'].u[i];
+      if(wave.setup==='P MIX'){
+        wave.re[3][i]=states['2p'].u[i]/Math.sqrt(2);
+        wave.re[4][i]=states['2p'].u[i]/Math.sqrt(2);
       }
     }
-    let norm=0;for(let l=0;l<=WAVE_LMAX;l++)for(let i=0;i<N;i++)norm+=wave.re[l][i]**2*DR;
+    let norm=0;for(let l=0;l<WAVE_CHANNELS.length;l++)for(let i=0;i<N;i++)norm+=wave.re[l][i]**2*DR;
     norm=Math.sqrt(norm);
-    for(let l=0;l<=WAVE_LMAX;l++)for(let i=0;i<N;i++)wave.re[l][i]/=norm;
+    for(let l=0;l<WAVE_CHANNELS.length;l++)for(let i=0;i<N;i++)wave.re[l][i]/=norm;
     wave.tAU=0;wave.cachedAt=0;wave.running=false;
     wave.lost=0;wave.boundary=0;
     wave.wavelength=resonantWavelength();
@@ -618,7 +627,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(r>=rGrid[N-1]||r<0)return [0,0];
     const u=wave.re[channel],v=wave.im[channel];
     if(r<DR){
-      const q=channel===0?1/DR:channel===1?r/(DR*DR):r*r/(DR*DR*DR);
+      const l=WAVE_CHANNELS[channel].l;
+      const q=l===0?1/DR:l===1?r/(DR*DR):r*r/(DR*DR*DR);
       return [u[0]*q,v[0]*q];
     }
     const f=r/DR-1,i=Math.floor(f),a=f-i;
@@ -628,10 +638,23 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   // frame rotating with the calculated 1s energy. Multiplication by a global
   // phase does not change observables; removing the trivial ground-state
   // rotation makes stationary 1s appear as stationary color.
-  function waveComplex(r,c){
+  // Complex Y_1^±1 harmonics give opposite phase winding around z.
+  function waveComplexXYZ(x,y,z){
+    const r=Math.hypot(x,y,z),c=r>1e-12?z/r:0;
     const a=waveSample(0,r),b=waveSample(1,r),d=waveSample(2,r);
+    const plus=waveSample(3,r),minus=waveSample(4,r);
     const y0=.28209479177,y1=.4886025119*c,y2=.31539156525*(3*c*c-1);
-    return [a[0]*y0+b[0]*y1+d[0]*y2, a[1]*y0+b[1]*y1+d[1]*y2];
+    let rr=a[0]*y0+b[0]*y1+d[0]*y2;
+    let ii=a[1]*y0+b[1]*y1+d[1]*y2;
+    if(r>1e-9){
+      const k=Y11/r;
+      rr+=k*(-plus[0]*x+plus[1]*y+minus[0]*x+minus[1]*y);
+      ii+=k*(-plus[0]*y-plus[1]*x-minus[0]*y+minus[1]*x);
+    }
+    return [rr,ii];
+  }
+  function waveComplex(r,c){
+    return waveComplexXYZ(r*Math.sqrt(Math.max(0,1-c*c)),0,r*c);
   }
   function waveDensity(r,c){
     const z=waveComplex(r,c);return z[0]*z[0]+z[1]*z[1];
@@ -650,8 +673,12 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   // a path followed by an individual electron.
   // For the 3D axisymmetric m=0 state, evaluate its meridional (x,y) slice.
   function waveComplexAt(x,y){
-    const r=Math.hypot(x,y);
-    return waveComplex(r,r>1e-12?x/r:0);
+    return wave.slice==='XY'?waveComplexXYZ(x,y,0):waveComplexXYZ(x,0,y);
+  }
+  function setWaveSlice(slice){
+    if(slice!=='XY'&&slice!=='XZ')return;
+    wave.slice=slice;wave.cachedAt=0;immersiveDirty=true;
+    save();
   }
   function probabilityCurrent(x,y){
     const h=DR*.8;
@@ -757,7 +784,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     for(let y=0;y<size;y++)for(let x=0;x<size;x++){
       const xx=(x+.5-half)/half,yy=(y+.5-half)/half;
       const rNorm=Math.hypot(xx,yy),r=rNorm*radius;
-      const z=rNorm>1?[0,0]:waveComplex(r,rNorm>1e-6?xx/rNorm:0);
+      const z=rNorm>1?[0,0]:waveComplexAt(xx*radius,yy*radius);
       const d=z[0]*z[0]+z[1]*z[1],j=y*size+x;
       values[j]=d;peak=Math.max(peak,d);
       if(phases)phases[j]=phaseIndex(z[0],z[1]);
@@ -816,7 +843,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     for(let j=0;j<bins;j++){
       let q=0;
       const first=Math.floor(j*N/bins),last=Math.floor((j+1)*N/bins);
-      for(let i=first;i<last;i++)for(let l=0;l<=WAVE_LMAX;l++)
+      for(let i=first;i<last;i++)for(let l=0;l<WAVE_CHANNELS.length;l++)
         q+=wave.re[l][i]**2+wave.im[l][i]**2;
       q/=Math.max(1,last-first);
       plots[j]=q;max=Math.max(max,q);
@@ -1070,10 +1097,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         const rr=Math.hypot(px,py);
         const r=rr*immersiveZoom/Z;
         let d=0;
-        if(phaseMap){
-          const z=waveComplex(r,rr>1e-6?px/rr:0);
+        if(tab==='WAVE'){
+          const z=waveComplexAt(px*immersiveZoom/Z,py*immersiveZoom/Z);
           d=z[0]*z[0]+z[1]*z[1];
-          phaseMap[y*rw+x]=phaseIndex(z[0],z[1]);
+          if(phaseMap)phaseMap[y*rw+x]=phaseIndex(z[0],z[1]);
         }else d=immersiveDensity(r,rr>1e-6?px/rr:0);
         const v=Math.max(0,Number.isFinite(d)?d:0);
         vals[y*rw+x]=v;
