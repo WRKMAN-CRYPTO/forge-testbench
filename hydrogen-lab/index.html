@@ -742,7 +742,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function setWaveView(mode){
     if(!['DENSITY','PHASE','FLOW'].includes(mode))return;
     wave.viewMode=mode;
-    wave.cachedAt=0;immersiveDirty=true;immersiveAt=0;volume.dirty=true;
+    wave.cachedAt=0;immersiveDirty=true;immersiveAt=0;volume.projectAt=0;
     save();
   }
   function nextWaveView(){
@@ -890,6 +890,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   }
   // Allocation-free hot-path evaluation of the same normalized Y_l^m
   // expansion as waveComplexXYZ. Results are written into a reusable pair.
+  // Reuse the exact seven-channel spherical-harmonic wavefunction without
+  // allocating a temporary vector or closure on each voxel sample.
   function rayWaveXYZ(x,y,z,out){
     const r=Math.hypot(x,y,z);
     if(r>=rGrid[N-1]||!Number.isFinite(r)){
@@ -898,28 +900,19 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const c=r>1e-10?z/r:0;
     const y0=.28209479177,y1=.4886025119*c;
     const y2=.31539156525*(3*c*c-1);
-    const small=r<DR, ri=small?0:Math.min(N-2,Math.floor(r/DR-1));
-    const blend=small?0:r/DR-1-ri;
-    const invr=r>=DR?1/r:0;
-    const sample=(ch)=>{
+    const small=r<DR,ri=small?0:Math.min(N-2,Math.floor(r/DR-1));
+    const blend=small?0:r/DR-1-ri,invr=small?0:1/r;
+    for(let ch=0;ch<7;ch++){
       const ur=wave.re[ch],ui=wave.im[ch];
-      if(small){
-        const l=WAVE_CHANNELS[ch].l;
-        const q=l===0?1/DR:l===1?r/(DR*DR):r*r/(DR*DR*DR);
-        out[ch*2+2]=ur[0]*q;
-        out[ch*2+3]=ui[0]*q;
-      }else{
-        out[ch*2+2]=(ur[ri]*(1-blend)+ur[ri+1]*blend)*invr;
-        out[ch*2+3]=(ui[ri]*(1-blend)+ui[ri+1]*blend)*invr;
-      }
-    };
-    // Avoid allocating 7 temporary pairs for every volume step.
-    for(let ch=0;ch<7;ch++)sample(ch);
+      const q=WAVE_CHANNELS[ch].l===0?1/DR:
+        WAVE_CHANNELS[ch].l===1?r/(DR*DR):r*r/(DR*DR*DR);
+      out[2+ch*2]=small?ur[0]*q:(ur[ri]*(1-blend)+ur[ri+1]*blend)*invr;
+      out[3+ch*2]=small?ui[0]*q:(ui[ri]*(1-blend)+ui[ri+1]*blend)*invr;
+    }
     let re=out[2]*y0+out[4]*y1+out[6]*y2;
     let im=out[3]*y0+out[5]*y1+out[7]*y2;
     if(r>1e-9){
-      const k=Y11/r;
-      const pr=out[8],pi=out[9],mr=out[10],mi=out[11];
+      const k=Y11/r,pr=out[8],pi=out[9],mr=out[10],mi=out[11];
       re+=k*(-pr*x+pi*y+mr*x+mi*y);
       im+=k*(-pr*y-pi*x-mr*y+mi*x);
       const k2=Y22/(r*r),xx=x*x-y*y,xy=2*x*y;
@@ -928,27 +921,76 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     out[0]=re;out[1]=im;
   }
+  // Cache complex psi in a regular Cartesian 3D texture at the current time.
+  // Camera ray marches use trilinear interpolation, not point splats.
+  function prepareVolumeGrid(radius){
+    const n=49,size=n*n*n;
+    if(!volume.realGrid||volume.realGrid.length!==size){
+      volume.realGrid=new Float32Array(size);
+      volume.imagGrid=new Float32Array(size);
+    }
+    const re=volume.realGrid,im=volume.imagGrid;
+    const spacing=2*radius/(n-1),scratch=new Float64Array(16);
+    let idx=0;
+    for(let k=0;k<n;k++){
+      const z=-radius+k*spacing;
+      for(let j=0;j<n;j++){
+        const y=-radius+j*spacing;
+        for(let i=0;i<n;i++){
+          const x=-radius+i*spacing;
+          rayWaveXYZ(x,y,z,scratch);
+          re[idx]=scratch[0];im[idx]=scratch[1];idx++;
+        }
+      }
+    }
+    volume.gridSize=n;volume.gridRadius=radius;
+    volume.gridScale=(n-1)/(2*radius);
+    volume.gridAt=wave.tAU;volume.dirty=false;
+    volume.gridRebuilds=(volume.gridRebuilds||0)+1;
+  }
+  function gridWaveXYZ(x,y,z,out){
+    const n=volume.gridSize,s=volume.gridScale,R=volume.gridRadius;
+    const fx=(x+R)*s,fy=(y+R)*s,fz=(z+R)*s;
+    if(fx<0||fy<0||fz<0||fx>n-1||fy>n-1||fz>n-1){
+      out[0]=0;out[1]=0;return;
+    }
+    const ix=Math.min(n-2,Math.floor(fx)),tx=fx-ix;
+    const iy=Math.min(n-2,Math.floor(fy)),ty=fy-iy;
+    const iz=Math.min(n-2,Math.floor(fz)),tz=fz-iz;
+    const n2=n*n,b=ix+n*(iy+n*iz),re=volume.realGrid,im=volume.imagGrid;
+    const wy0=1-ty,wz0=1-tz,wx0=1-tx;
+    const w000=wx0*wy0*wz0,w100=tx*wy0*wz0,
+      w010=wx0*ty*wz0,w110=tx*ty*wz0,
+      w001=wx0*wy0*tz,w101=tx*wy0*tz,
+      w011=wx0*ty*tz,w111=tx*ty*tz;
+    out[0]=re[b]*w000+re[b+1]*w100+re[b+n]*w010+re[b+n+1]*w110+
+      re[b+n2]*w001+re[b+n2+1]*w101+re[b+n2+n]*w011+re[b+n2+n+1]*w111;
+    out[1]=im[b]*w000+im[b+1]*w100+im[b+n]*w010+im[b+n+1]*w110+
+      im[b+n2]*w001+im[b+n2+1]*w101+im[b+n2+n]*w011+im[b+n2+n+1]*w111;
+  }
   function volumeRaster(w,h,radius,now,compact){
-    const moving=!!volume.drag,fast=compact||moving||wave.running;
-    const targetW=compact?106:moving?95:wave.running?102:135;
-    const rw=Math.max(80,Math.min(targetW,Math.floor(w*.64)));
-    const rh=Math.max(80,Math.round(rw*h/w));
+    const moving=!!volume.drag;
+    const targetW=compact?100:moving?85:wave.running?94:125;
+    const rw=Math.max(75,Math.min(targetW,Math.floor(w*.62)));
+    const rh=Math.max(75,Math.round(rw*h/w));
     if(volume.rw!==rw||volume.rh!==rh||!volume.pixels){
       volume.rw=rw;volume.rh=rh;
       volume.raster.width=rw;volume.raster.height=rh;
       volume.pixels=volume.ctx.createImageData(rw,rh);
     }
-    const data=volume.pixels.data;
-    const phasing=wave.viewMode==='PHASE';
+    const data=volume.pixels.data,phasing=wave.viewMode==='PHASE';
     const mass=new Float32Array(rw*rh);
     const rgb=phasing?new Float32Array(rw*rh*3):null;
     const cy=Math.cos(volume.yaw),sy=Math.sin(volume.yaw);
     const cp=Math.cos(volume.pitch),sp=Math.sin(volume.pitch);
-    const R=Math.min(rGrid[N-2],Math.max(12/Z,Math.min(22/Z,radius*1.65)));
-    const R2=R*R,invW=2*radius/rw;
-    const n=compact?34:moving?26:wave.running?32:48;
-    const scratch=new Float64Array(16);
-    let peak=0,raySteps=0;
+    const R=Math.min(rGrid[N-2],Math.max(11/Z,Math.min(21/Z,radius*1.45)));
+    if(!volume.realGrid||volume.dirty||volume.gridRadius!==R||
+      Math.abs(volume.gridAt-wave.tAU)>(wave.running?2.2:.0001)){
+      prepareVolumeGrid(R);
+    }
+    const R2=R*R,invW=2*radius/rw,n=compact?30:moving?22:wave.running?26:40;
+    const scratch=new Float64Array(2);
+    let peak=0,steps=0;
     for(let py=0;py<rh;py++){
       const screenV=(rh*.5-py-.5)*invW;
       for(let px=0;px<rw;px++){
@@ -958,39 +1000,35 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         const depth=Math.sqrt(R2-p2);
         const step=2/n;
         let sum=0,cR=0,cG=0,cB=0;
-        // A symmetric monotone reparameterization places more samples
-        // near the center. The Jacobian gives the correct integration weight.
         for(let z=0;z<n;z++){
           const t=-1+(z+.5)*step;
-          const tcube=t*t*t;
-          const q=depth*(.40*t+.60*tcube);
-          const dz=depth*(.40+1.80*t*t)*step;
+          const q=depth*(.4*t+.6*t*t*t);
+          const dz=depth*(.4+1.8*t*t)*step;
           const ry=sp*screenV+cp*q;
           const wz=cp*screenV-sp*q;
           const wx=cy*screenU+sy*ry,wy=-sy*screenU+cy*ry;
-          rayWaveXYZ(wx,wy,wz,scratch);
-          const re=scratch[0],im=scratch[1],density=re*re+im*im;
+          gridWaveXYZ(wx,wy,wz,scratch);
+          const re=scratch[0],im=scratch[1];
+          const density=re*re+im*im;
           if(density<=1e-24)continue;
           const weight=density*dz;
           sum+=weight;
           if(phasing){
-            const index=phaseIndex(re,im)*3;
-            cR+=weight*phasePalette[index];
-            cG+=weight*phasePalette[index+1];
-            cB+=weight*phasePalette[index+2];
+            const idx=phaseIndex(re,im)*3;
+            cR+=weight*phasePalette[idx];
+            cG+=weight*phasePalette[idx+1];
+            cB+=weight*phasePalette[idx+2];
           }
         }
-        raySteps+=n;mass[j]=sum;
+        steps+=n;mass[j]=sum;
         if(rgb){rgb[j*3]=cR;rgb[j*3+1]=cG;rgb[j*3+2]=cB;}
         if(sum>peak)peak=sum;
       }
     }
-    const inv=peak>1e-22?1/peak:0;
-    const dim=Math.sqrt(Math.max(0,wave.norm));
+    const inv=peak>1e-22?1/peak:0,dim=Math.sqrt(Math.max(0,wave.norm));
     for(let i=0;i<rw*rh;i++){
       const pop=mass[i],v=Math.min(1,Math.pow(pop*inv,.56)*1.12*dim),p=i*4;
       if(rgb&&pop>1e-22){
-        const scale=v/pop;
         data[p]=Math.round(6+(rgb[i*3]/pop-6)*v);
         data[p+1]=Math.round(11+(rgb[i*3+1]/pop-11)*v);
         data[p+2]=Math.round(23+(rgb[i*3+2]/pop-23)*v);
@@ -1002,11 +1040,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       data[p+3]=255;
     }
     volume.ctx.putImageData(volume.pixels,0,0);
-    volume.maxProjection=peak;
-    volume.sampleCount=raySteps;
+    volume.maxProjection=peak;volume.sampleCount=steps;
     volume.at=wave.tAU;volume.projectAt=now;
-    volume.lastMode=wave.viewMode;
-    volume.lastRadius=radius;
+    volume.lastMode=wave.viewMode;volume.lastRadius=radius;
     volume.dirty=false;
   }
   function waveCurrentXYZ(x,y,z){
