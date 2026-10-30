@@ -970,7 +970,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   }
   function volumeRaster(w,h,radius,now,compact){
     const moving=!!volume.drag;
-    const targetW=compact?100:moving?85:wave.running?94:125;
+    const targetW=compact?94:moving?76:wave.running?86:112;
     const rw=Math.max(75,Math.min(targetW,Math.floor(w*.62)));
     const rh=Math.max(75,Math.round(rw*h/w));
     if(volume.rw!==rw||volume.rh!==rh||!volume.pixels){
@@ -988,7 +988,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       Math.abs(volume.gridAt-wave.tAU)>(wave.running?2.2:.0001)){
       prepareVolumeGrid(R);
     }
-    const R2=R*R,invW=2*radius/rw,n=compact?30:moving?22:wave.running?26:40;
+    const R2=R*R,invW=2*radius/rw,n=compact?28:moving?18:wave.running?22:34;
     const scratch=new Float64Array(2);
     let peak=0,steps=0;
     for(let py=0;py<rh;py++){
