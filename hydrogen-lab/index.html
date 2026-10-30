@@ -1373,8 +1373,11 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     g.beginPath();g.moveTo(cx,cy);g.lineTo(px,py);g.stroke();
     g.fillStyle=v[2]>=0?'#d7b7ff':'#f4be6e';
     g.beginPath();g.arc(px,py,4,0,Math.PI*2);g.fill();
-    txt('SPIN',cx,cy-R-14,10,C.violet,'center',800);
-    txt('Sz '+v[2].toFixed(2),cx,cy+R+12,10,C.violet,'center',750);
+    txt('SPIN 1/2',cx,cy-R-14,10,C.violet,'center',800);
+    txt('Sx '+v[0].toFixed(2)+'  Sy '+v[1].toFixed(2),
+      cx,cy+R+12,9,C.violet,'center',750);
+    txt('Sz '+v[2].toFixed(2)+'  ·  '+wave.spinPreset,
+      cx,cy+R+25,9,C.violet,'center',700);
     g.restore();
   }
   function waveViewport(now){
