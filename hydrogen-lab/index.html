@@ -1339,7 +1339,10 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const y=layout.bottom,p=14,gap=6,w=W-28,bw=(w-3*gap)/4;
     const k=Math.min(1,Math.max(.72,(H-y-4)/295));
     const yy=n=>y+Math.round(n*k),hh=n=>Math.round(n*k);
-    txt('CHOOSE A WAVEFUNCTION',p,yy(9),10,C.muted,'left',750);
+    txt('EXPERIMENT SETTINGS',p,yy(9),10,C.muted,'left',750);
+    button(W-104,y,90,18,'← SIMPLE',false,()=>{
+      wave.advanced=false;save();
+    },C.mint);
     ['GROUND','BREATH','DIPOLE','SHELL'].forEach((v,i)=>
       button(p+i*(bw+gap),yy(19),bw,hh(35),v,wave.setup===v,()=>waveChangeSetup(v)));
     ['P+ ↻','P- ↺','P MIX','D4 ✣'].forEach((label,i)=>{
@@ -1373,10 +1376,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       wave.boundaryMode==='REFLECT',()=>setWaveBoundary('REFLECT'),C.blue);
     button(p+2*(bw3+gap),yy(228),bw3,hh(34),'ABSORB',
       wave.boundaryMode==='ABSORB',()=>setWaveBoundary('ABSORB'),C.mint);
-    button(p,yy(266),Math.min(120,w*.40),hh(27),'← SIMPLE',false,()=>{
-      wave.advanced=false;save();
-    },C.mint);
-    txt('ADVANCED LAB',W-p,yy(278),9,C.muted,'right',650);
+    txt('ADVANCED LAB  ·  MORE TOOLS',p,yy(278),9,C.muted,'left',650);
   }
 
   function fieldControls(){
