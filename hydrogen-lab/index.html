@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | Phase 2</title>
+<title>HYDROGEN // Emergence Lab | Phase 3</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -34,19 +34,36 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   const field={wl:null,amp:.02,run:false,speed:4,tAU:0,re:[1,0,0],im:[0,0,0],
     history:[],scan:[],showScan:false,d13:0,d23:0,nextRecordAU:0,seenImageAt:0};
   const STEP_AU=.075;
+  const wave={
+    setup:'GROUND',drive:'OFF',strength:.025,steps:8,running:false,
+    tAU:0, dtAU:.15, wavelength:0,
+    re:[], im:[], boundary:0, cachedAt:0, norm:1, overlap:1,
+    charge:[], seenEpoch:0, energy:0
+  };
+  const WAVE_LMAX=2;
+  const WAVE_COUPLINGS=[1/Math.sqrt(3),2/Math.sqrt(15)];
+  const waveImageCanvas=document.createElement('canvas');
+  waveImageCanvas.width=200;waveImageCanvas.height=200;
+  const waveCtx=waveImageCanvas.getContext('2d');
+  const wavePixels=waveCtx.createImageData(200,200);
+  let waveMatrix=null;
   const C={bg:'#070c16',panel:'#0e1729',line:'#26354d',ink:'#e9f3ff',
     muted:'#889bb8',blue:'#74c8ff',mint:'#7febd8',gold:'#f4be6e',violet:'#b5a0ff'};
   try{const saved=JSON.parse(localStorage.getItem('hydrogen-emergence-v1')||'{}');
     if(saved.Z===1||saved.Z===2)Z=saved.Z;
     if(['1s','2s','2p','MIX'].includes(saved.mode))mode=saved.mode;
     if([.25,1,4].includes(saved.speed))speed=saved.speed;
-    if(['ATOM','FIELD','SPECTRUM','METHOD'].includes(saved.tab))tab=saved.tab;
+    if(['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].includes(saved.tab))tab=saved.tab;
     if(typeof saved.wl==='number'&&Number.isFinite(saved.wl))field.wl=saved.wl;
     if([.008,.012,.02,.035].includes(saved.amp))field.amp=saved.amp;
     if([1,4,12].includes(saved.fsSpeed))field.speed=saved.fsSpeed;
+    if(['GROUND','BREATH','DIPOLE','SHELL'].includes(saved.waveSetup))wave.setup=saved.waveSetup;
+    if(['OFF','RESONANCE','DETUNED','PULSE'].includes(saved.waveDrive))wave.drive=saved.waveDrive;
+    if([2,8,16].includes(saved.waveSteps))wave.steps=saved.waveSteps;
+    if([.008,.025,.06].includes(saved.waveStrength))wave.strength=saved.waveStrength;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
   }catch(e){}
-  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed}));}catch(e){}}
+  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength}));}catch(e){}}
   function normalize(u){
     let n=0;for(let i=0;i<N;i++)n+=u[i]*u[i];
     n=Math.sqrt(n*DR);for(let i=0;i<N;i++)u[i]/=n;
@@ -102,6 +119,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(field.wl===null)field.wl=resonance;
     field.wl=Math.max(90/Z**2,Math.min(170/Z**2,field.wl));
     resetField();
+    initializeWave();
     timeFs=0;dirty=true;lastImageAt=0;
   }
   function sample(state,r){
@@ -178,16 +196,16 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.2',W-15,23,10,C.muted,'right',650);
+    txt('v0.3',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
-    const p=14,gap=6,bw=(W-28-18)/4;
-    ['ATOM','FIELD','SPECTRUM','METHOD'].forEach((a,i)=>{
+    const p=14,gap=5,bw=(W-28-20)/5;
+    ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
       button(p+i*(bw+gap),53,bw,37,a,tab===a,()=>{tab=a;dirty=true;save();},tab===a?C.mint:null);
     });
   }
   function calcLayout(){
     const top=103;
-    const bottomHeight=Math.min(302,Math.max(248,H*.35));
+    const bottomHeight=Math.min(310,Math.max(262,H*.35));
     const vh=Math.max(215,H-top-bottomHeight-10);
     const panelX=13,panelW=W-26;
     layout={x:panelX,y:top,w:panelW,h:vh,bottom:top+vh+9};
@@ -416,6 +434,253 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
       txt('Field strength '+field.amp.toFixed(3)+' a.u.  •  finite pulse bandwidth',x,Math.min(a.y+a.h-12,yy+42),9,C.muted);
     }
   }
+
+  // Phase 3: fully spatial radial propagation, not an orbital-state animation.
+  // Axisymmetric 3D hydrogen expansion:
+  // ψ(r,θ,t) = Σ_l=0..2 u_l(r,t) Y_l0(θ) / r .
+  // Each radial channel has N=660 grid points, l-dependent kinetic +
+  // centrifugal + Coulomb potential; Crank-Nicolson steps are exactly unitary
+  // on the discrete grid. The field couples adjacent l with the computed
+  // angular matrix elements of cos(θ). Strang split is globally O(dt²).
+  // Fixed proton, m=0, angular l<=2 and finite reflecting radial boundary.
+  function waveBuildMatrix(){
+    const sub=-(1/(2*DR*DR)),h=wave.dtAU/4; // CN for half of a full split step
+    waveMatrix=[];
+    for(let l=0;l<=WAVE_LMAX;l++){
+      const inverseRe=new Float64Array(N),inverseIm=new Float64Array(N);
+      const cRe=new Float64Array(N),cIm=new Float64Array(N);
+      const diag=new Float64Array(N),bi=h*sub;
+      for(let i=0;i<N;i++){
+        const r=rGrid[i],v=1/(DR*DR)+l*(l+1)/(2*r*r)-Z/r;
+        diag[i]=v;
+        const dRe=1+(i?bi*cIm[i-1]:0);
+        const dIm=h*v-(i?bi*cRe[i-1]:0);
+        const scale=1/(dRe*dRe+dIm*dIm);
+        inverseRe[i]=dRe*scale;inverseIm[i]=-dIm*scale;
+        cRe[i]=-bi*inverseIm[i];cIm[i]=bi*inverseRe[i];
+      }
+      waveMatrix.push({diag,inverseRe,inverseIm,cRe,cIm,bi,h,
+        dRe:new Float64Array(N),dIm:new Float64Array(N)});
+    }
+  }
+  function waveRadialStep(channel){
+    const m=waveMatrix[channel],u=wave.re[channel],v=wave.im[channel];
+    const h=m.h,bi=m.bi;
+    const dR=m.dRe,dI=m.dIm;
+    for(let i=0;i<N;i++){
+      const dl=m.diag[i];
+      let rr=u[i]+h*dl*v[i],ii=v[i]-h*dl*u[i];
+      if(i){rr+=bi*v[i-1];ii-=bi*u[i-1];}
+      if(i<N-1){rr+=bi*v[i+1];ii-=bi*u[i+1];}
+      if(i){rr+=bi*dI[i-1];ii-=bi*dR[i-1];}
+      dR[i]=rr*m.inverseRe[i]-ii*m.inverseIm[i];
+      dI[i]=rr*m.inverseIm[i]+ii*m.inverseRe[i];
+    }
+    let nr=0,ni=0;
+    for(let i=N-1;i>=0;i--){
+      const rr=dR[i],ii=dI[i];
+      if(i<N-1){
+        nr=rr-m.cRe[i]*nr+m.cIm[i]*ni;
+        ni=ii-m.cRe[i]*ni-m.cIm[i]*(rr-m.cRe[i]*nr+m.cIm[i]*ni); // overwritten below
+      }
+    }
+    // Standard complex Thomas back substitution, one cell at a time.
+    for(let i=N-1;i>=0;i--){
+      let rr=dR[i],ii=dI[i];
+      if(i<N-1){
+        rr-=m.cRe[i]*u[i+1]-m.cIm[i]*v[i+1];
+        ii-=m.cRe[i]*v[i+1]+m.cIm[i]*u[i+1];
+      }
+      u[i]=rr;v[i]=ii;
+    }
+  }
+  function waveRotate(a,b,theta,i){
+    const ar=wave.re[a][i],ai=wave.im[a][i];
+    const br=wave.re[b][i],bi=wave.im[b][i];
+    const c=Math.cos(theta),ss=Math.sin(theta);
+    wave.re[a][i]=c*ar+ss*bi;
+    wave.im[a][i]=c*ai-ss*br;
+    wave.re[b][i]=c*br+ss*ai;
+    wave.im[b][i]=c*bi-ss*ar;
+  }
+  function waveFieldStrength(t){
+    if(wave.drive==='OFF')return 0;
+    if(wave.drive==='PULSE'&&t*AU_TIME_FS>2)return 0;
+    const frequency=HC_EV_NM/(wave.wavelength*HARTREE_EV);
+    return wave.strength*Math.cos(frequency*t);
+  }
+  function waveOneStep(){
+    for(let l=0;l<=WAVE_LMAX;l++)waveRadialStep(l);
+    const f=waveFieldStrength(wave.tAU+wave.dtAU/2);
+    if(f!==0){
+      for(let i=0;i<N;i++){
+        const t=-f*rGrid[i]*wave.dtAU;
+        waveRotate(0,1,t*WAVE_COUPLINGS[0]/2,i);
+        waveRotate(1,2,t*WAVE_COUPLINGS[1],i);
+        waveRotate(0,1,t*WAVE_COUPLINGS[0]/2,i);
+      }
+    }
+    for(let l=0;l<=WAVE_LMAX;l++)waveRadialStep(l);
+    wave.tAU+=wave.dtAU;
+  }
+  function waveStats(){
+    let norm=0,boundary=0,groundRe=0,groundIm=0,e=0;
+    for(let l=0;l<=WAVE_LMAX;l++){
+      const u=wave.re[l],v=wave.im[l],D=waveMatrix[l].diag;
+      for(let i=0;i<N;i++){
+        const pop=u[i]*u[i]+v[i]*v[i];
+        norm+=pop*DR;
+        if(rGrid[i]>rGrid[N-1]-5)boundary+=pop*DR;
+        e+=D[i]*pop*DR;
+        if(i<N-1){
+          const k=-1/(2*DR*DR);
+          e+=2*k*(u[i]*u[i+1]+v[i]*v[i+1])*DR;
+        }
+        if(l===0){
+          const p=states['1s'].u[i]*DR;
+          groundRe+=p*u[i];groundIm+=p*v[i];
+        }
+      }
+    }
+    wave.norm=norm;wave.boundary=boundary;
+    wave.overlap=groundRe*groundRe+groundIm*groundIm;
+    wave.energy=e*HARTREE_EV;
+    return {norm,boundary,ground:wave.overlap,energy:wave.energy};
+  }
+  function initializeWave(){
+    wave.re=Array.from({length:WAVE_LMAX+1},()=>new Float64Array(N));
+    wave.im=Array.from({length:WAVE_LMAX+1},()=>new Float64Array(N));
+    const a=wave.re[0],b=wave.re[1];
+    for(let i=0;i<N;i++){
+      if(wave.setup==='GROUND')a[i]=states['1s'].u[i];
+      if(wave.setup==='BREATH')a[i]=(states['1s'].u[i]+states['2s'].u[i])/Math.sqrt(2);
+      if(wave.setup==='DIPOLE'){
+        a[i]=states['1s'].u[i]/Math.sqrt(2);
+        b[i]=states['2p'].u[i]/Math.sqrt(2);
+      }
+      if(wave.setup==='SHELL'){
+        const r=rGrid[i];
+        a[i]=r*Math.exp(-.5*((r-5/Z)/(.85/Z))**2);
+      }
+    }
+    let norm=0;for(let l=0;l<=WAVE_LMAX;l++)for(let i=0;i<N;i++)norm+=wave.re[l][i]**2*DR;
+    norm=Math.sqrt(norm);
+    for(let l=0;l<=WAVE_LMAX;l++)for(let i=0;i<N;i++)wave.re[l][i]/=norm;
+    wave.tAU=0;wave.cachedAt=0;wave.running=false;
+    wave.wavelength=resonantWavelength();
+    waveBuildMatrix();waveStats();
+  }
+  function waveChangeSetup(next){
+    wave.setup=next;initializeWave();save();
+  }
+  function waveSample(channel,r){
+    if(r>=rGrid[N-1]||r<0)return [0,0];
+    const u=wave.re[channel],v=wave.im[channel];
+    if(r<DR){
+      const q=channel===0?1/DR:r/(DR*DR);
+      return [u[0]*q,v[0]*q];
+    }
+    const f=r/DR-1,i=Math.floor(f),a=f-i;
+    return [(u[i]*(1-a)+u[i+1]*a)/r,(v[i]*(1-a)+v[i+1]*a)/r];
+  }
+  function waveDensity(r,c){
+    const a=waveSample(0,r),b=waveSample(1,r),d=waveSample(2,r);
+    const y0=.28209479177,y1=.4886025119*c,y2=.31539156525*(3*c*c-1);
+    const rr=a[0]*y0+b[0]*y1+d[0]*y2;
+    const ii=a[1]*y0+b[1]*y1+d[1]*y2;
+    return rr*rr+ii*ii;
+  }
+  function waveCloud(){
+    const size=200,half=size/2,radius=14/Z,values=new Float32Array(size*size);
+    let peak=0;
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      const xx=(x+.5-half)/half,yy=(y+.5-half)/half;
+      const rNorm=Math.hypot(xx,yy),r=rNorm*radius;
+      const d=rNorm>1?0:waveDensity(r,rNorm>1e-6?xx/rNorm:0);
+      const j=y*size+x;values[j]=d;peak=Math.max(peak,d);
+    }
+    for(let j=0;j<values.length;j++){
+      const k=peak?Math.min(1,Math.pow(values[j]/peak,.52)*1.1):0;
+      const p=j*4;wavePixels.data[p]=Math.round(7+80*k);
+      wavePixels.data[p+1]=Math.round(12+184*k);
+      wavePixels.data[p+2]=Math.round(24+229*k);
+      wavePixels.data[p+3]=255;
+    }
+    waveCtx.putImageData(wavePixels,0,0);
+  }
+  function waveViewport(now){
+    viewport();const a=layout,x=a.x+13,w=a.w-26;
+    txt('SPATIAL WAVEFUNCTION / r, θ',x,a.y+17,10,C.blue,'left',750);
+    const middleH=Math.max(104,a.h-185);
+    const side=Math.min(a.w-26,middleH);
+    const cx=W/2,cy=a.y+34+middleH/2;
+    g.save();round(a.x+1,a.y+1,a.w-2,a.h-2,14);g.clip();
+    for(let f=.25;f<=1;f+=.25){
+      g.beginPath();g.arc(cx,cy,side*.5*f,0,Math.PI*2);
+      g.strokeStyle='#354861';g.setLineDash([3,5]);g.stroke();g.setLineDash([]);
+    }
+    if(!wave.cachedAt||now-wave.cachedAt>95){waveCloud();wave.cachedAt=now;}
+    g.drawImage(waveImageCanvas,cx-side/2,cy-side/2,side,side);
+    g.fillStyle=C.gold;g.beginPath();g.arc(cx,cy,2.2,0,Math.PI*2);g.fill();
+    g.restore();
+    const barY=a.y+a.h-133;
+    txt('RADIAL PROBABILITY  ·  |u(r)|²',x,barY-12,9,C.muted,'left',700);
+    const graphX=x,graphY=barY+5,graphW=w,graphH=55;
+    line(graphX,graphY+graphH,graphX+graphW,graphY+graphH,C.line);
+    let max=0;
+    const bins=100,plots=new Float32Array(bins);
+    for(let j=0;j<bins;j++){
+      let q=0;
+      const first=Math.floor(j*N/bins),last=Math.floor((j+1)*N/bins);
+      for(let i=first;i<last;i++)for(let l=0;l<=WAVE_LMAX;l++)
+        q+=wave.re[l][i]**2+wave.im[l][i]**2;
+      q/=Math.max(1,last-first);
+      plots[j]=q;max=Math.max(max,q);
+    }
+    g.strokeStyle=C.mint;g.lineWidth=1.7;g.beginPath();
+    plots.forEach((val,i)=>{
+      const px=graphX+i/(bins-1)*graphW,py=graphY+graphH-(max?val/max:0)*(graphH-3);
+      if(i===0)g.moveTo(px,py);else g.lineTo(px,py);
+    });g.stroke();
+    txt('r=0',x,graphY+graphH+11,9,C.muted);
+    txt('r='+rGrid[N-1].toFixed(1)+' a₀',W-x,graphY+graphH+11,9,C.muted,'right');
+    txt('GROUND OVERLAP',x,a.y+a.h-28,9,C.muted);
+    txt((wave.overlap*100).toFixed(2)+'%',W-x,a.y+a.h-28,11,C.blue,'right',800);
+    txt('E '+wave.energy.toFixed(3)+' eV',x,a.y+a.h-11,10,C.gold);
+    txt((wave.tAU*AU_TIME_FS).toFixed(3)+' fs',W-x,a.y+a.h-11,10,C.ink,'right');
+    if(wave.boundary>.01){
+      fillRect(x, a.y+44, w,25,5,'#482b20');
+      txt('WAVE REACHING NUMERICAL WALL',W/2,a.y+57,9,'#ffd099','center',800);
+    }
+  }
+  function waveControls(){
+    const y=layout.bottom,p=14,gap=7,w=W-28,bw=(w-3*gap)/4;
+    txt('INITIAL WAVEFUNCTION',p,y+8,10,C.muted,'left',750);
+    ['GROUND','BREATH','DIPOLE','SHELL'].forEach((v,i)=>
+      button(p+i*(bw+gap),y+24,bw,39,v,wave.setup===v,()=>waveChangeSetup(v)));
+    txt('ELECTRIC FIELD',p,y+77,10,C.muted,'left',750);
+    ['OFF','RESONANCE','DETUNED','PULSE'].forEach((v,i)=>
+      button(p+i*(bw+gap),y+93,bw,39,v,wave.drive===v,()=>{
+        wave.drive=v;wave.wavelength=v==='DETUNED'?155/Z**2:resonantWavelength();
+        wave.cachedAt=0;save();
+      }));
+    const bw3=(w-2*gap)/3,row=y+142;
+    button(p,row,bw3,40,wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,()=>{
+      wave.running=!wave.running;
+    });
+    button(p+bw3+gap,row,bw3,40,'RESET',false,()=>initializeWave());
+    button(p+2*(bw3+gap),row,bw3,40,'×'+wave.steps+' STEP',false,()=>{
+      wave.steps=wave.steps===2?8:wave.steps===8?16:2;save();
+    });
+    button(p,row+48,bw3,36,'FIELD '+wave.strength.toFixed(3),false,()=>{
+      wave.strength=wave.strength===.008?.025:wave.strength===.025?.06:.008;save();
+    });
+    txt('NORM '+wave.norm.toFixed(6),W-p,row+65,11,C.mint,'right',750);
+    const yy=row+98;
+    txt('3 ANGULAR CHANNELS  ·  '+N+' RADIAL CELLS',p,yy,9,C.muted);
+    txt('NO PHOTONS  ·  REFLECTING OUTER WALL',p,yy+17,9,C.gold);
+  }
+
   function fieldControls(){
     const a=layout,y=a.bottom,p=14,gap=7,w=W-28;
     txt('DRIVE WAVELENGTH',p,y+8,10,C.muted,'left',800);
@@ -509,11 +774,12 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('PHASE 2: H(t) = H₀ − E(t)z, E(t)=F cos(ωt). Solved dipole integrals. Fixed proton; 3-state basis; classical field. No QED or photon emission.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 3: Direct Crank-Nicolson evolution on radial grid. Angular modes l=0,1,2 (m=0), Coulomb potential and classical dipole field. Fixed proton, reflecting wall. No quantized photons.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
     if(tab==='FIELD'){fieldControls();return;}
+    if(tab==='WAVE'){waveControls();return;}
     if(tab==='METHOD'){
       txt('EXPERIMENT CONTROLS',p,y+10,11,C.muted,'left',800);
       const rowY=y+26,bw=(W-28-gap*2)/3;
@@ -560,10 +826,15 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     const dt=Math.min(.06,Math.max(0,(now-lastTime)/1000||0));lastTime=now;
     if(tab==='FIELD'&&field.run&&!field.showScan)advanceField(dt);
     if(tab==='ATOM'&&running&&mode==='MIX')timeFs+=dt*speed;
+    if(tab==='WAVE'&&wave.running){
+      for(let i=0;i<wave.steps;i++)waveOneStep();
+      waveStats();
+    }
     g.clearRect(0,0,W,H);g.fillStyle=C.bg;g.fillRect(0,0,W,H);
     activeHits=[];calcLayout();header();
     if(tab==='ATOM')atomView(now);
     else if(tab==='FIELD')fieldViewport(now);
+    else if(tab==='WAVE')waveViewport(now);
     else if(tab==='SPECTRUM')spectrumView();
     else methodView();
     controls();
