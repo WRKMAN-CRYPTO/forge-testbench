@@ -1,0 +1,1669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070c16">
+<title>HYDROGEN // Emergence Lab | Smooth Quantum Volume</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
+#lab{display:block;position:absolute;left:0;right:0;top:env(safe-area-inset-top,0px);width:100%;height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#lab:fullscreen{top:0;width:100%;height:100%;background:#070c16}
+</style>
+</head>
+<body><canvas id="lab" aria-label="Interactive hydrogen quantum mechanics laboratory"></canvas>
+<script>
+'use strict';
+(function(){
+  // Atomic units: a0 = 1, electron mass = 1, hbar = 1, e = 1.
+  // The radial function u(r) = r R(r) obeys
+  // [-1/2 d²/dr² + l(l+1)/(2r²) - Z/r] u = E u,
+  // u(0)=u(Rmax)=0. Finite differences; ground states by inverse imaginary time,
+  // excited 2s by orthogonalization against the computed 1s solution.
+  const HARTREE_EV=27.211386245988, BOHR_NM=0.05291772109;
+  const PLANCK_EV_FS=4.135667696, HC_EV_NM=1239.841984, AU_TIME_FS=0.02418884326505;
+  const N=660, DR=0.045, DT=0.8;
+  const canvas=document.getElementById('lab'), g=canvas.getContext('2d',{alpha:false});
+  const imgCanvas=document.createElement('canvas');imgCanvas.width=240;imgCanvas.height=240;
+  const ig=imgCanvas.getContext('2d'), image=ig.createImageData(240,240);
+  const rGrid=new Float32Array(N), baseKinetic=1/(DR*DR), off=-DT*.5/(DR*DR);
+  for(let i=0;i<N;i++)rGrid[i]=(i+1)*DR;
+  let W=390,H=800,DPR=1,activeHits=[],tab='ATOM',mode='1s',Z=1;
+  let timeFs=0,speed=1,running=true,viewRadius=8,contrast=1.05,states=null;
+  let dirty=true,lastImageAt=0,lastTime=0,layout={},sliderDrag=false;
+  let immersive=false,immersiveZoom=14,immersiveDirty=true,immersiveAt=0;
+  const immersiveCanvas=document.createElement('canvas');
+  const immersiveCtx=immersiveCanvas.getContext('2d');
+  let immersivePixels=null,immersiveRasterW=0,immersiveRasterH=0;
+  const field={wl:null,amp:.02,run:false,speed:4,tAU:0,re:[1,0,0],im:[0,0,0],
+    history:[],scan:[],showScan:false,d13:0,d23:0,nextRecordAU:0,seenImageAt:0};
+  const STEP_AU=.075;
+  const wave={
+    setup:'GROUND',drive:'OFF',strength:.025,steps:8,running:false,
+    tAU:0, dtAU:.15, wavelength:0,
+    re:[], im:[], boundary:0, cachedAt:0, norm:1, overlap:1,
+    charge:[], seenEpoch:0, energy:0,
+    boundaryMode:'REFLECT', lost:0, absorberStart:0, viewMode:'DENSITY', slice:'XY',
+    polarization:'Z',targetPlus:0,targetMinus:0,targetZero:0,lz:0
+  };
+  // Channels (l,m), radial Hamiltonians depend on l, not m.
+  // Add m=±2 components of l=2; all channels use the same radial CN solver.
+  const WAVE_CHANNELS=[{l:0,m:0},{l:1,m:0},{l:2,m:0},
+    {l:1,m:1},{l:1,m:-1},{l:2,m:2},{l:2,m:-2}];
+  const Y11=Math.sqrt(3/(8*Math.PI));
+  const Y22=Math.sqrt(15/(32*Math.PI));
+  const WAVE_COUPLINGS=[1/Math.sqrt(3),2/Math.sqrt(15)];
+  const waveImageCanvas=document.createElement('canvas');
+  waveImageCanvas.width=200;waveImageCanvas.height=200;
+  const waveCtx=waveImageCanvas.getContext('2d');
+  const wavePixels=waveCtx.createImageData(200,200);
+  let waveMatrix=null;
+  const PHASE_TAU=2*Math.PI, phasePalette=new Uint8Array(360*3);
+  const volume={
+    yaw:.48,pitch:.85,dirty:true,samples:null,raster:null,ctx:null,pixels:null,
+    rw:0,rh:0,at:0,projectAt:0,drag:null,lastMode:'',
+    maxProjection:0,sampleCount:0
+  };
+  volume.raster=document.createElement('canvas');
+  volume.ctx=volume.raster.getContext('2d');
+  // Smooth complex absorbing potential (CAP): H -> H - i eta(r)
+  // Applied as exp[-eta(r) dt/2] before and after each Hermitian step.
+  // Eta starts at 60% of the radial box and rises smoothly to its edge.
+  const absorberEta=new Float64Array(N), absorberHalf=new Float64Array(N);
+  const C={bg:'#070c16',panel:'#0e1729',line:'#26354d',ink:'#e9f3ff',
+    muted:'#889bb8',blue:'#74c8ff',mint:'#7febd8',gold:'#f4be6e',violet:'#b5a0ff'};
+  try{const saved=JSON.parse(localStorage.getItem('hydrogen-emergence-v1')||'{}');
+    if(saved.Z===1||saved.Z===2)Z=saved.Z;
+    if(['1s','2s','2p','MIX'].includes(saved.mode))mode=saved.mode;
+    if([.25,1,4].includes(saved.speed))speed=saved.speed;
+    if(['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].includes(saved.tab))tab=saved.tab;
+    if(typeof saved.wl==='number'&&Number.isFinite(saved.wl))field.wl=saved.wl;
+    if([.008,.012,.02,.035].includes(saved.amp))field.amp=saved.amp;
+    if([1,4,12].includes(saved.fsSpeed))field.speed=saved.fsSpeed;
+    if(['GROUND','BREATH','DIPOLE','SHELL','P+','P-','P MIX','D4'].includes(saved.waveSetup))wave.setup=saved.waveSetup;
+    if(['OFF','RESONANCE','DETUNED','PULSE'].includes(saved.waveDrive))wave.drive=saved.waveDrive;
+    if([2,8,16].includes(saved.waveSteps))wave.steps=saved.waveSteps;
+    if([.008,.025,.06].includes(saved.waveStrength))wave.strength=saved.waveStrength;
+    if(['REFLECT','ABSORB'].includes(saved.waveBoundary))wave.boundaryMode=saved.waveBoundary;
+    if(['XY','XZ','3D'].includes(saved.waveSlice))wave.slice=saved.waveSlice;
+    if(['Z','X','SIGMA+','SIGMA-'].includes(saved.wavePolarization))wave.polarization=saved.wavePolarization;
+    if(['DENSITY','PHASE','FLOW'].includes(saved.waveView))wave.viewMode=saved.waveView;
+    viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
+  }catch(e){}
+  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice,wavePolarization:wave.polarization}));}catch(e){}}
+  function normalize(u){
+    let n=0;for(let i=0;i<N;i++)n+=u[i]*u[i];
+    n=Math.sqrt(n*DR);for(let i=0;i<N;i++)u[i]/=n;
+  }
+  function projectOut(u,v){
+    let d=0;for(let i=0;i<N;i++)d+=u[i]*v[i];
+    d*=DR;for(let i=0;i<N;i++)u[i]-=d*v[i];
+  }
+  function solve(l,steps,lower){
+    const v=new Float64Array(N),di=new Float64Array(N),den=new Float64Array(N);
+    const cp=new Float64Array(N),temp=new Float64Array(N),next=new Float64Array(N);
+    let u=new Float64Array(N);
+    for(let i=0;i<N;i++){
+      const r=rGrid[i];
+      v[i]=l*(l+1)/ (2*r*r)-Z/r;
+      di[i]=baseKinetic+v[i];
+      const d=1+DT*di[i];
+      den[i]=i?d-off*cp[i-1]:d;
+      cp[i]=off/den[i];
+      // A broad initial packet, not a pre-programmed hydrogen orbital.
+      u[i]=Math.pow(r,l+1)*Math.exp(-Math.pow(r/(lower?8/Z:4/Z),2));
+    }
+    if(lower)projectOut(u,lower);
+    normalize(u);
+    for(let step=0;step<steps;step++){
+      temp[0]=u[0]/den[0];
+      for(let i=1;i<N;i++)temp[i]=(u[i]-off*temp[i-1])/den[i];
+      next[N-1]=temp[N-1];
+      for(let i=N-2;i>=0;i--)next[i]=temp[i]-cp[i]*next[i+1];
+      if(lower)projectOut(next,lower);
+      normalize(next);
+      const swap=u;u=new Float64Array(next); // keep backward solve buffer independent
+    }
+    // Fix an arbitrary global wavefunction sign for repeatable interference pictures.
+    if(u[2]<0){for(let i=0;i<N;i++)u[i]=-u[i];}
+    let energy=0;
+    for(let i=0;i<N;i++)energy+=di[i]*u[i]*u[i];
+    for(let i=0;i<N-1;i++)energy+=2*(-.5*baseKinetic)*u[i]*u[i+1];
+    energy*=DR;
+    return {u,E:energy,l};
+  }
+  function recalc(){
+    const s1=solve(0,220,null);
+    const s2=solve(0,310,s1.u);
+    const p2=solve(1,250,null);
+    const d3=solve(2,380,null);
+    states={'1s':s1,'2s':s2,'2p':p2,'3d':d3};
+    field.d13=0;field.d23=0;
+    for(let i=0;i<N;i++){
+      field.d13+=s1.u[i]*p2.u[i]*rGrid[i]*DR/Math.sqrt(3);
+      field.d23+=s2.u[i]*p2.u[i]*rGrid[i]*DR/Math.sqrt(3);
+    }
+    const resonance=HC_EV_NM/((p2.E-s1.E)*HARTREE_EV);
+    if(field.wl===null)field.wl=resonance;
+    field.wl=Math.max(90/Z**2,Math.min(170/Z**2,field.wl));
+    resetField();
+    initializeWave();
+    timeFs=0;dirty=true;lastImageAt=0;
+  }
+  function sample(state,r){
+    // Interpolate u/r. Use the regular small-r limit for l=0.
+    if(r>rGrid[N-1])return 0;
+    if(r<DR){
+      if(state.l===1)return (state.u[0]/(DR*DR))*r;
+      return state.u[0]/DR;
+    }
+    const x=r/DR-1,i=Math.floor(x),f=x-i;
+    const a=state.u[Math.min(N-1,i)],b=state.u[Math.min(N-1,i+1)];
+    return (a+(b-a)*f)/r;
+  }
+  function density(r,costh,phi){
+    const t=1/Math.sqrt(4*Math.PI);
+    const a=sample(states['1s'],r)*t;
+    if(mode==='1s')return a*a;
+    const b=sample(states['2s'],r)*t;
+    if(mode==='2s')return b*b;
+    const p=sample(states['2p'],r)*t*Math.sqrt(3)*costh;
+    if(mode==='2p')return p*p;
+    return .5*(a*a+p*p)+a*p*Math.cos(phi);
+  }
+  function rebuildCloud(){
+    const size=240,half=size/2,values=new Float32Array(size*size);
+    const delta=(states['2p'].E-states['1s'].E)*HARTREE_EV;
+    const phase=2*Math.PI*delta*timeFs/PLANCK_EV_FS;
+    let peak=0;
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      const xx=(x-half+.5)/half, yy=(y-half+.5)/half;
+      const rr=Math.sqrt(xx*xx+yy*yy),r=rr*viewRadius;
+      const d=rr>1?0:density(r,rr>.00001?xx/rr:0,phase);
+      const i=y*size+x;values[i]=d;peak=Math.max(peak,d);
+    }
+    const col=mode==='1s'?[82,174,255]:mode==='2s'?[165,133,255]:mode==='2p'?[104,236,209]:[111,189,255];
+    for(let i=0;i<values.length;i++){
+      let k=peak>0?Math.pow(values[i]/peak,.52)*contrast:0;
+      k=Math.min(1,Math.max(0,k));
+      const o=i*4;
+      image.data[o]=Math.round(7*(1-k)+col[0]*k);
+      image.data[o+1]=Math.round(12*(1-k)+col[1]*k);
+      image.data[o+2]=Math.round(24*(1-k)+col[2]*k);
+      image.data[o+3]=255;
+    }
+    ig.putImageData(image,0,0);dirty=false;
+  }
+  function resize(){
+    DPR=Math.min(2,window.devicePixelRatio||1);
+    const rect=canvas.getBoundingClientRect();
+    W=Math.max(250,rect.width);H=Math.max(430,rect.height);
+    canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
+    g.setTransform(DPR,0,0,DPR,0,0);dirty=true;immersiveDirty=true;volume.projectAt=0;
+  }
+  function round(x,y,w,h,r=10){
+    g.beginPath();g.roundRect(x,y,w,h,r);
+  }
+  function fillRect(x,y,w,h,r,color,stroke){
+    round(x,y,w,h,r);g.fillStyle=color;g.fill();
+    if(stroke){g.strokeStyle=stroke;g.lineWidth=1;g.stroke();}
+  }
+  function line(x1,y1,x2,y2,color,width=1){
+    g.strokeStyle=color;g.lineWidth=width;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();
+  }
+  function txt(s,x,y,size=12,color=C.ink,align='left',weight=500){
+    g.fillStyle=color;g.font=weight+' '+size+'px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+    g.textAlign=align;g.textBaseline='middle';g.fillText(String(s),x,y);
+  }
+  function button(x,y,w,h,title,chosen,cb,color){
+    const bg=chosen?'#193751':'#111e33', edge=chosen?'#69bced':C.line;
+    fillRect(x,y,w,h,9,bg,edge);
+    txt(title,x+w/2,y+h/2,Math.min(12,Math.max(10,w/7)),color||(chosen?C.blue:C.ink),'center',700);
+    activeHits.push({x,y,w,h,cb});
+  }
+  function header(){
+    txt('HYDROGEN',15,23,17,C.ink,'left',900);
+    txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
+    txt('v0.4.4',W-15,23,10,C.muted,'right',650);
+    line(14,44,W-14,44,C.line);
+    const p=14,gap=5,bw=(W-28-20)/5;
+    ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
+      button(p+i*(bw+gap),53,bw,37,a,tab===a,()=>{tab=a;dirty=true;save();},tab===a?C.mint:null);
+    });
+  }
+  function calcLayout(){
+    const top=103;
+    const bottomHeight=Math.min(310,Math.max(262,H*.35));
+    const vh=Math.max(215,H-top-bottomHeight-10);
+    const panelX=13,panelW=W-26;
+    layout={x:panelX,y:top,w:panelW,h:vh,bottom:top+vh+9};
+  }
+  function viewport(){
+    const a=layout;
+    fillRect(a.x,a.y,a.w,a.h,16,C.panel,C.line);
+    g.save();round(a.x+1,a.y+1,a.w-2,a.h-2,15);g.clip();
+    const grad=g.createRadialGradient(W*.5,a.y+a.h*.48,10,W*.5,a.y+a.h*.48,a.w*.65);
+    grad.addColorStop(0,'#102342');grad.addColorStop(.55,'#0a1628');grad.addColorStop(1,'#0a101e');
+    g.fillStyle=grad;g.fillRect(a.x+1,a.y+1,a.w-2,a.h-2);
+    for(let xx=a.x+24;xx<a.x+a.w;xx+=35)line(xx,a.y,xx,a.y+a.h,'#17243b',.65);
+    for(let yy=a.y+20;yy<a.y+a.h;yy+=35)line(a.x,yy,a.x+a.w,yy,'#17243b',.65);
+    g.restore();
+  }
+  function atomView(now){
+    viewport();const a=layout;
+    const side=Math.min(a.w-16,a.h-10);
+    const cx=W/2,cy=a.y+a.h*.54;
+    g.save();round(a.x+1,a.y+1,a.w-2,a.h-2,15);g.clip();
+    [0.25,.5,.75,1].forEach(fr=>{
+      g.beginPath();g.arc(cx,cy,side*.5*fr,0,Math.PI*2);
+      g.strokeStyle=fr===1?'#35506a':'#263c56';g.lineWidth=.75;
+      g.setLineDash([3,6]);g.stroke();g.setLineDash([]);
+    });
+    if(dirty||(mode==='MIX'&&running&&now-lastImageAt>46)){
+      rebuildCloud();lastImageAt=now;
+    }
+    g.imageSmoothingEnabled=true;
+    g.drawImage(imgCanvas,cx-side/2,cy-side/2,side,side);
+    const glow=g.createRadialGradient(cx,cy,0,cx,cy,16);
+    glow.addColorStop(0,'#fff3c1');glow.addColorStop(.18,'#f6bf70');glow.addColorStop(1,'rgba(246,171,70,0)');
+    g.fillStyle=glow;g.beginPath();g.arc(cx,cy,16,0,Math.PI*2);g.fill();
+    g.fillStyle='#ffecc6';g.beginPath();g.arc(cx,cy,2.1,0,Math.PI*2);g.fill();
+    g.restore();
+    txt('PROBABILITY DENSITY / CROSS SECTION',a.x+12,a.y+17,9,C.muted);
+    button(a.x+a.w-92,a.y+29,80,27,'EXPAND',false,()=>setImmersive(true),C.mint);
+    const E=mode==='MIX'?(states['1s'].E+states['2p'].E)*.5:states[mode].E;
+    txt(mode==='MIX'?'SUPERPOSITION':mode.toUpperCase()+' EIGENSTATE',a.x+12,a.y+35,12,mode==='2s'?C.violet:C.mint,'left',700);
+    fillRect(a.x+10,a.y+a.h-47,a.w-20,34,8,'rgba(7,13,25,.85)','#263f57');
+    txt('E = '+(E*HARTREE_EV).toFixed(4)+' eV',a.x+20,a.y+a.h-30,12,C.ink,'left',650);
+    txt((viewRadius*BOHR_NM).toFixed(2)+' nm view',a.x+a.w-20,a.y+a.h-30,10,C.muted,'right');
+  }
+
+  // The light is a classical time-dependent field, not a quantized photon.
+  // z has angular parity: 1s ↔ 2s = 0; 1s ↔ 2p and 2s ↔ 2p from radial integrals.
+  // Propagate the 3-state Schrödinger equation using symmetric unitary operator splitting.
+  // This conserves norm to floating-point precision, unlike an explicit Euler update.
+  function resonantWavelength(){
+    return HC_EV_NM/((states['2p'].E-states['1s'].E)*HARTREE_EV);
+  }
+  function resetField(){
+    field.re=[1,0,0];field.im=[0,0,0];field.tAU=0;
+    field.nextRecordAU=0;field.history=[{t:0,p:0,s:0}];field.showScan=false;
+    dirty=true;field.seenImageAt=0;
+  }
+  function fieldNorm(){
+    let s=0;for(let i=0;i<3;i++)s+=field.re[i]**2+field.im[i]**2;return s;
+  }
+  function populations(){
+    return field.re.map((v,i)=>v*v+field.im[i]*field.im[i]);
+  }
+  function rotatePair(re,im,i,j,theta){
+    const c=Math.cos(theta),s=Math.sin(theta);
+    const ar=re[i],ai=im[i],br=re[j],bi=im[j];
+    re[i]=c*ar+s*bi;im[i]=c*ai-s*br;
+    re[j]=c*br+s*ai;im[j]=c*bi-s*ar;
+  }
+  function phaseState(re,im,i,angle){
+    const c=Math.cos(angle),s=Math.sin(angle),r=re[i],v=im[i];
+    re[i]=c*r+s*v;im[i]=c*v-s*r;
+  }
+  function quantumStep(sim,wl,amp,dtAU){
+    const w=HC_EV_NM/(wl*HARTREE_EV);
+    const deltaS=states['2s'].E-states['1s'].E;
+    const deltaP=states['2p'].E-states['1s'].E;
+    const h=amp*Math.cos(w*(sim.tAU+dtAU*.5));
+    const re=sim.re, im=sim.im;
+    phaseState(re,im,1,deltaS*dtAU*.5);
+    phaseState(re,im,2,deltaP*dtAU*.5);
+    rotatePair(re,im,0,2,h*field.d13*dtAU*.5);
+    rotatePair(re,im,1,2,h*field.d23*dtAU);
+    rotatePair(re,im,0,2,h*field.d13*dtAU*.5);
+    phaseState(re,im,1,deltaS*dtAU*.5);
+    phaseState(re,im,2,deltaP*dtAU*.5);
+    sim.tAU+=dtAU;
+  }
+  function advanceField(dt){
+    const target=field.tAU+(dt*field.speed/AU_TIME_FS);
+    let count=0;
+    while(field.tAU+1e-10<target && count++<600){
+      quantumStep(field,field.wl,field.amp,Math.min(STEP_AU,target-field.tAU));
+      if(field.tAU>=field.nextRecordAU){
+        const pop=populations();
+        field.history.push({t:field.tAU*AU_TIME_FS,p:pop[2],s:pop[1]});
+        if(field.history.length>380)field.history.shift();
+        field.nextRecordAU=field.tAU+.075/AU_TIME_FS; // one sample per 0.075 femtosecond
+      }
+    }
+  }
+  function scanResponse(){
+    field.run=false;field.showScan=true;field.scan=[];
+    const lo=95/Z**2,hi=164/Z**2;
+    let best=null;
+    for(let j=0;j<=34;j++){
+      const wl=lo+(hi-lo)*j/34;
+      const sim={tAU:0,re:[1,0,0],im:[0,0,0]};
+      const target=4.0/AU_TIME_FS;
+      let maximum=0;
+      while(sim.tAU<target-1e-8){
+        quantumStep(sim,wl,field.amp,Math.min(STEP_AU,target-sim.tAU));
+        const p=sim.re[2]**2+sim.im[2]**2;
+        if(p>maximum)maximum=p;
+      }
+      const point={wl,p:maximum};
+      field.scan.push(point);
+      if(!best||maximum>best.p)best=point;
+    }
+    field.best=best;dirty=true;
+  }
+  function setWavelengthFromX(x){
+    const min=90/Z**2,max=170/Z**2,lo=24,hi=W-24;
+    field.wl=Math.round((min+(max-min)*Math.max(0,Math.min(1,(x-lo)/(hi-lo))))*100)/100;
+    field.run=false;resetField();save();
+  }
+  function dynamicDensity(r,costh){
+    const t=1/Math.sqrt(4*Math.PI);
+    const s1=sample(states['1s'],r)*t,s2=sample(states['2s'],r)*t;
+    const p=sample(states['2p'],r)*t*Math.sqrt(3)*costh;
+    const re=field.re[0]*s1+field.re[1]*s2+field.re[2]*p;
+    const im=field.im[0]*s1+field.im[1]*s2+field.im[2]*p;
+    return re*re+im*im;
+  }
+  function rebuildDynamicCloud(){
+    const size=240,half=size/2,values=new Float32Array(size*size);
+    const radius=14/Z;
+    let peak=0;
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      const xx=(x+.5-half)/half, yy=(y+.5-half)/half;
+      const rr=Math.hypot(xx,yy),r=rr*radius;
+      const d=rr>1?0:dynamicDensity(r,rr>1e-6?xx/rr:0);
+      const i=y*size+x;values[i]=d;peak=Math.max(peak,d);
+    }
+    for(let i=0;i<values.length;i++){
+      const k=peak?Math.min(1,Math.pow(values[i]/peak,.54)*1.05):0,o=i*4;
+      image.data[o]=Math.round(7+96*k);image.data[o+1]=Math.round(12+170*k);
+      image.data[o+2]=Math.round(24+216*k);image.data[o+3]=255;
+    }
+    ig.putImageData(image,0,0);dirty=false;
+  }
+  function fieldViewport(now){
+    viewport();const a=layout,x=a.x+13,w=a.w-26;
+    if(field.showScan){scanViewport();return;}
+    txt('REAL-TIME SCHRÖDINGER EVOLUTION',x,a.y+16,10,C.blue,'left',800);
+    button(a.x+a.w-91,a.y+29,80,28,'EXPAND',false,()=>setImmersive(true),C.mint);
+    const avail=Math.max(115,a.h-167);
+    const side=Math.min(a.w-28,avail);
+    const cx=W/2,cy=a.y+34+avail*.5;
+    g.save();round(a.x+1,a.y+1,a.w-2,a.h-2,15);g.clip();
+    for(let t=.25;t<=1;t+=.25){
+      g.beginPath();g.arc(cx,cy,side*.5*t,0,Math.PI*2);
+      g.strokeStyle='#34516d';g.setLineDash([2,6]);g.stroke();g.setLineDash([]);
+    }
+    if(dirty||(field.run&&now-field.seenImageAt>65)){
+      rebuildDynamicCloud();field.seenImageAt=now;
+    }
+    g.drawImage(imgCanvas,cx-side/2,cy-side/2,side,side);
+    const glow=g.createRadialGradient(cx,cy,0,cx,cy,12);
+    glow.addColorStop(0,'#ffe7aa');glow.addColorStop(1,'#ffb95c00');
+    g.fillStyle=glow;g.beginPath();g.arc(cx,cy,12,0,Math.PI*2);g.fill();
+    g.restore();
+    txt('P(1s) '+(populations()[0]*100).toFixed(1)+'%',x,a.y+a.h-140,10,C.blue);
+    txt('P(2p) '+(populations()[2]*100).toFixed(1)+'%',W-x,a.y+a.h-140,10,C.mint,'right');
+    const p=populations();
+    const rowY=a.y+a.h-119,bw=(w-10)/3;
+    [0,1,2].forEach((j)=>{
+      const xx=x+j*(bw+5);fillRect(xx,rowY,bw,6,3,'#22344b');
+      fillRect(xx,rowY,Math.max(.5,bw*Math.min(1,p[j])),6,3,[C.blue,C.violet,C.mint][j]);
+      txt(['1s','2s','2p'][j],xx,rowY+16,9,[C.blue,C.violet,C.mint][j]);
+    });
+    // Plot computed state populations against simulated physical time.
+    const gx=x+2,gy=a.y+a.h-76,gw=w-4,gh=51;
+    line(gx,gy+gh,gx+gw,gy+gh,C.line);
+    line(gx,gy+gh*.5,gx+gw,gy+gh*.5,'#26374d');
+    const hist=field.history;
+    if(hist.length>1){
+      const minT=hist[0].t,maxT=Math.max(hist[hist.length-1].t,minT+.01);
+      [[C.mint,'p'],[C.violet,'s']].forEach(([color,key])=>{
+        g.beginPath();
+        hist.forEach((p,i)=>{
+          const px=gx+(p.t-minT)/(maxT-minT)*gw;
+          const py=gy+gh*(1-Math.min(1,p[key]));
+          if(i===0)g.moveTo(px,py);else g.lineTo(px,py);
+        });g.lineWidth=1.5;g.strokeStyle=color;g.stroke();
+      });
+    }
+    txt('POPULATION / 0–100%',x,a.y+a.h-11,9,C.muted);
+    txt((field.tAU*AU_TIME_FS).toFixed(2)+' fs',W-x,a.y+a.h-11,10,C.gold,'right',800);
+  }
+  function scanViewport(){
+    const a=layout,x=a.x+20,w=a.w-40,y=a.y+68,h=Math.max(95,a.h-170);
+    txt('COMPUTED RESONANCE SWEEP',x,a.y+20,12,C.mint,'left',800);
+    txt('MAXIMUM 2p POPULATION / 4 fs PULSE',x,a.y+39,9,C.muted);
+    const curve=field.scan;let max=0;
+    for(const point of curve)max=Math.max(max,point.p);
+    line(x,y+h,x+w,y+h,C.line,1.5);line(x,y,x,y+h,C.line);
+    for(let i=0;i<=4;i++){
+      const yy=y+h-i*h/4;
+      line(x,yy,x+w,yy,'#22324a');
+      txt((i*25)+'%',x-3,yy,8,C.muted,'right');
+    }
+    if(curve.length){
+      g.beginPath();curve.forEach((p,i)=>{
+        const xx=x+i/(curve.length-1)*w,yy=y+h-Math.min(1,p.p)*h;
+        if(!i)g.moveTo(xx,yy);else g.lineTo(xx,yy);
+      });g.strokeStyle=C.mint;g.lineWidth=2.4;g.stroke();
+    }
+    const resonance=resonantWavelength();
+    const cursorX=x+((resonance-95/Z**2)/(69/Z**2))*w;
+    line(cursorX,y,cursorX,y+h,C.gold,1.25);
+    txt('EXPECTED',Math.min(x+w-3,cursorX+4),y+10,9,C.gold,'right');
+    txt((95/Z**2).toFixed(1)+' nm',x,y+h+16,9,C.muted);
+    txt((164/Z**2).toFixed(1)+' nm',x+w,y+h+16,9,C.muted,'right');
+    if(field.best){
+      const yy=Math.min(a.y+a.h-62,y+h+41);
+      txt('MEASURED PEAK: '+field.best.wl.toFixed(2)+' nm',x,yy,12,C.mint,'left',750);
+      txt('SOLVER RESONANCE: '+resonance.toFixed(2)+' nm',x,yy+21,11,C.gold);
+      txt('Field strength '+field.amp.toFixed(3)+' a.u.  •  finite pulse bandwidth',x,Math.min(a.y+a.h-12,yy+42),9,C.muted);
+    }
+  }
+
+  // Phase 3: fully spatial radial propagation, not an orbital-state animation.
+  // Axisymmetric 3D hydrogen expansion:
+  // ψ(r,θ,t) = Σ_l=0..2 u_l(r,t) Y_l0(θ) / r .
+  // Each radial channel has N=660 grid points, l-dependent kinetic +
+  // centrifugal + Coulomb potential; Crank-Nicolson steps are exactly unitary
+  // on the discrete grid. The field couples adjacent l with the computed
+  // angular matrix elements of cos(θ). Strang split is globally O(dt²).
+  // Fixed proton, m=0, angular l<=2 and finite reflecting radial boundary.
+  function waveBuildMatrix(){
+    const sub=-(1/(2*DR*DR)),h=wave.dtAU/4; // CN for half of a full split step
+    waveMatrix=[];
+    for(let ch=0;ch<WAVE_CHANNELS.length;ch++){
+      const l=WAVE_CHANNELS[ch].l;
+      const inverseRe=new Float64Array(N),inverseIm=new Float64Array(N);
+      const cRe=new Float64Array(N),cIm=new Float64Array(N);
+      const diag=new Float64Array(N),bi=h*sub;
+      for(let i=0;i<N;i++){
+        const r=rGrid[i],v=1/(DR*DR)+l*(l+1)/(2*r*r)-Z/r;
+        diag[i]=v;
+        const dRe=1+(i?bi*cIm[i-1]:0);
+        const dIm=h*v-(i?bi*cRe[i-1]:0);
+        const scale=1/(dRe*dRe+dIm*dIm);
+        inverseRe[i]=dRe*scale;inverseIm[i]=-dIm*scale;
+        cRe[i]=-bi*inverseIm[i];cIm[i]=bi*inverseRe[i];
+      }
+      waveMatrix.push({diag,inverseRe,inverseIm,cRe,cIm,bi,h,
+        dRe:new Float64Array(N),dIm:new Float64Array(N)});
+    }
+  }
+  function waveRadialStep(channel){
+    const m=waveMatrix[channel],u=wave.re[channel],v=wave.im[channel];
+    const h=m.h,bi=m.bi;
+    const dR=m.dRe,dI=m.dIm;
+    for(let i=0;i<N;i++){
+      const dl=m.diag[i];
+      let rr=u[i]+h*dl*v[i],ii=v[i]-h*dl*u[i];
+      if(i){rr+=bi*v[i-1];ii-=bi*u[i-1];}
+      if(i<N-1){rr+=bi*v[i+1];ii-=bi*u[i+1];}
+      if(i){rr+=bi*dI[i-1];ii-=bi*dR[i-1];}
+      dR[i]=rr*m.inverseRe[i]-ii*m.inverseIm[i];
+      dI[i]=rr*m.inverseIm[i]+ii*m.inverseRe[i];
+    }
+    // Standard complex Thomas back substitution, one cell at a time.
+    for(let i=N-1;i>=0;i--){
+      let rr=dR[i],ii=dI[i];
+      if(i<N-1){
+        rr-=m.cRe[i]*u[i+1]-m.cIm[i]*v[i+1];
+        ii-=m.cRe[i]*v[i+1]+m.cIm[i]*u[i+1];
+      }
+      u[i]=rr;v[i]=ii;
+    }
+  }
+  function waveRotate(a,b,theta,i){
+    const ar=wave.re[a][i],ai=wave.im[a][i];
+    const br=wave.re[b][i],bi=wave.im[b][i];
+    const c=Math.cos(theta),ss=Math.sin(theta);
+    wave.re[a][i]=c*ar+ss*bi;
+    wave.im[a][i]=c*ai-ss*br;
+    wave.re[b][i]=c*br+ss*ai;
+    wave.im[b][i]=c*bi-ss*ar;
+  }
+  function waveFieldVector(t){
+    if(wave.drive==='OFF'||(wave.drive==='PULSE'&&t*AU_TIME_FS>2))
+      return [0,0,0];
+    const frequency=HC_EV_NM/(wave.wavelength*HARTREE_EV),a=frequency*t;
+    const cos=wave.strength*Math.cos(a);
+    if(wave.polarization==='Z')return [0,0,cos];
+    if(wave.polarization==='X')return [cos,0,0];
+    if(wave.polarization==='SIGMA+')return [cos,wave.strength*Math.sin(a),0];
+    return [cos,-wave.strength*Math.sin(a),0];
+  }
+  // Exact norm-preserving 2x2 exponential for complex Hermitian coupling
+  // H_ab = vr + i vi, H_ba = vr - i vi, at one radial cell.
+  function waveComplexRotate(a,b,vr,vi,dt,i){
+    const omega=Math.hypot(vr,vi);
+    if(omega<1e-14)return;
+    const c=Math.cos(omega*dt),q=Math.sin(omega*dt)/omega;
+    const ar=wave.re[a][i],ai=wave.im[a][i];
+    const br=wave.re[b][i],bi=wave.im[b][i];
+    wave.re[a][i]=c*ar+q*(vr*bi+vi*br);
+    wave.im[a][i]=c*ai-q*(vr*br-vi*bi);
+    wave.re[b][i]=c*br+q*(vr*ai-vi*ar);
+    wave.im[b][i]=c*bi-q*(vr*ar+vi*ai);
+  }
+  function setWavePolarization(polarization){
+    if(!['Z','X','SIGMA+','SIGMA-'].includes(polarization))return;
+    if(polarization===wave.polarization)return;
+    wave.polarization=polarization;
+    initializeWave(); // same initial wavefunction for fair polarization comparisons
+    immersiveDirty=true;save();
+  }
+  function nextWavePolarization(){
+    const options=['Z','X','SIGMA+','SIGMA-'];
+    setWavePolarization(options[(options.indexOf(wave.polarization)+1)%options.length]);
+  }
+  function waveTargetProb(ch){
+    const u=wave.re[ch],v=wave.im[ch],ref=states['2p'].u;
+    let re=0,im=0;
+    for(let i=0;i<N;i++){re+=ref[i]*u[i]*DR;im+=ref[i]*v[i]*DR;}
+    return re*re+im*im;
+  }
+
+  function initializeAbsorber(){
+    // The numerical boundary remains at finite r. The CAP is not a literal
+    // infinity: it suppresses outgoing probability before the reflecting wall.
+    const rMax=rGrid[N-1],start=.60*rMax;
+    wave.absorberStart=start;
+    for(let i=0;i<N;i++){
+      const x=Math.max(0,(rGrid[i]-start)/(rMax-start));
+      absorberEta[i]=.50*x*x*x;
+      absorberHalf[i]=Math.exp(-absorberEta[i]*wave.dtAU*.5);
+    }
+  }
+  function waveAbsorbingHalfStep(){
+    for(let l=0;l<WAVE_CHANNELS.length;l++){
+      const u=wave.re[l],v=wave.im[l];
+      for(let i=0;i<N;i++){
+        u[i]*=absorberHalf[i];
+        v[i]*=absorberHalf[i];
+      }
+    }
+  }
+  function setWaveBoundary(mode){
+    if(mode!== 'REFLECT'&&mode!== 'ABSORB')return;
+    // Reset to exactly the same initial state to allow controlled A/B testing.
+    wave.boundaryMode=mode;
+    initializeWave();
+    immersiveDirty=true;
+    save();
+  }
+
+  function waveOneStep(){
+    if(wave.boundaryMode==='ABSORB')waveAbsorbingHalfStep();
+    for(let l=0;l<WAVE_CHANNELS.length;l++)waveRadialStep(l);
+    const e=waveFieldVector(wave.tAU+wave.dtAU/2);
+    if(e[2]!==0){
+      // z-polarized pi transition: Δm=0, preserves old m=0 propagation.
+      for(let i=0;i<N;i++){
+        const t=-e[2]*rGrid[i]*wave.dtAU;
+        waveRotate(0,1,t*WAVE_COUPLINGS[0]/2,i);
+        waveRotate(1,2,t*WAVE_COUPLINGS[1],i);
+        waveRotate(0,1,t*WAVE_COUPLINGS[0]/2,i);
+      }
+    }else if(e[0]!==0||e[1]!==0){
+      // In the five-channel truncation only 1s <-> (l=1,m=±1)
+      // transverse dipole elements are retained; other Δl=±1 channels
+      // require a larger basis. Spherical harmonic Condon-Shortley sign:
+      // H_0,+ = -r(Ex+iEy)/sqrt(6), H_0,- = r(Ex-iEy)/sqrt(6).
+      for(let i=0;i<N;i++){
+        const q=rGrid[i]/Math.sqrt(6);
+        waveComplexRotate(0,3,-q*e[0],-q*e[1],wave.dtAU*.5,i);
+        waveComplexRotate(0,4, q*e[0],-q*e[1],wave.dtAU,i);
+        waveComplexRotate(0,3,-q*e[0],-q*e[1],wave.dtAU*.5,i);
+      }
+    }
+    for(let l=0;l<WAVE_CHANNELS.length;l++)waveRadialStep(l);
+    if(wave.boundaryMode==='ABSORB')waveAbsorbingHalfStep();
+    wave.tAU+=wave.dtAU;
+  }
+  function waveStats(){
+    let norm=0,boundary=0,groundRe=0,groundIm=0,e=0;
+    for(let l=0;l<WAVE_CHANNELS.length;l++){
+      const u=wave.re[l],v=wave.im[l],D=waveMatrix[l].diag;
+      for(let i=0;i<N;i++){
+        const pop=u[i]*u[i]+v[i]*v[i];
+        norm+=pop*DR;
+        if(rGrid[i]>rGrid[N-1]-5)boundary+=pop*DR;
+        e+=D[i]*pop*DR;
+        if(i<N-1){
+          const k=-1/(2*DR*DR);
+          e+=2*k*(u[i]*u[i+1]+v[i]*v[i+1])*DR;
+        }
+        if(l===0){
+          const p=states['1s'].u[i]*DR;
+          groundRe+=p*u[i];groundIm+=p*v[i];
+        }
+      }
+    }
+    wave.norm=norm;wave.boundary=boundary;
+    wave.lost=Math.max(0,1-norm);
+    wave.overlap=groundRe*groundRe+groundIm*groundIm;
+    wave.energy=e*HARTREE_EV;
+    wave.targetZero=waveTargetProb(1);
+    wave.targetPlus=waveTargetProb(3);
+    wave.targetMinus=waveTargetProb(4);
+    let pm=0,mm=0,dp=0,dm=0;
+    for(let i=0;i<N;i++){
+      pm+=(wave.re[3][i]**2+wave.im[3][i]**2)*DR;
+      mm+=(wave.re[4][i]**2+wave.im[4][i]**2)*DR;
+      dp+=(wave.re[5][i]**2+wave.im[5][i]**2)*DR;
+      dm+=(wave.re[6][i]**2+wave.im[6][i]**2)*DR;
+    }
+    wave.lz=norm>1e-12?(pm-mm+2*dp-2*dm)/norm:0;
+    return {norm,boundary,ground:wave.overlap,energy:wave.energy,
+      p0:wave.targetZero,pPlus:wave.targetPlus,pMinus:wave.targetMinus,lz:wave.lz};
+  }
+  function initializeWave(){
+    wave.re=Array.from({length:WAVE_CHANNELS.length},()=>new Float64Array(N));
+    wave.im=Array.from({length:WAVE_CHANNELS.length},()=>new Float64Array(N));
+    const a=wave.re[0],b=wave.re[1];
+    for(let i=0;i<N;i++){
+      if(wave.setup==='GROUND')a[i]=states['1s'].u[i];
+      if(wave.setup==='BREATH')a[i]=(states['1s'].u[i]+states['2s'].u[i])/Math.sqrt(2);
+      if(wave.setup==='DIPOLE'){
+        a[i]=states['1s'].u[i]/Math.sqrt(2);
+        b[i]=states['2p'].u[i]/Math.sqrt(2);
+      }
+      if(wave.setup==='SHELL'){
+        const r=rGrid[i];a[i]=r*Math.exp(-.5*((r-5/Z)/(.85/Z))**2);
+      }
+      if(wave.setup==='P+')wave.re[3][i]=states['2p'].u[i];
+      if(wave.setup==='P-')wave.re[4][i]=states['2p'].u[i];
+      if(wave.setup==='P MIX'){
+        wave.re[3][i]=states['2p'].u[i]/Math.sqrt(2);
+        wave.re[4][i]=states['2p'].u[i]/Math.sqrt(2);
+      }
+      if(wave.setup==='D4'){
+        wave.re[5][i]=states['3d'].u[i]/Math.sqrt(2);
+        wave.re[6][i]=states['3d'].u[i]/Math.sqrt(2);
+      }
+    }
+    let norm=0;for(let l=0;l<WAVE_CHANNELS.length;l++)for(let i=0;i<N;i++)norm+=wave.re[l][i]**2*DR;
+    norm=Math.sqrt(norm);
+    for(let l=0;l<WAVE_CHANNELS.length;l++)for(let i=0;i<N;i++)wave.re[l][i]/=norm;
+    wave.tAU=0;wave.cachedAt=0;wave.running=false;volume.dirty=true;volume.at=0;
+    wave.lost=0;wave.boundary=0;
+    wave.wavelength=resonantWavelength();
+    waveBuildMatrix();initializeAbsorber();waveStats();
+  }
+  function waveChangeSetup(next){
+    wave.setup=next;initializeWave();save();
+  }
+  function waveSample(channel,r){
+    if(r>=rGrid[N-1]||r<0)return [0,0];
+    const u=wave.re[channel],v=wave.im[channel];
+    if(r<DR){
+      const l=WAVE_CHANNELS[channel].l;
+      const q=l===0?1/DR:l===1?r/(DR*DR):r*r/(DR*DR*DR);
+      return [u[0]*q,v[0]*q];
+    }
+    const f=r/DR-1,i=Math.floor(f),a=f-i;
+    return [(u[i]*(1-a)+u[i+1]*a)/r,(v[i]*(1-a)+v[i+1]*a)/r];
+  }
+  // The local phase is the argument of a complex wavefunction in a reference
+  // frame rotating with the calculated 1s energy. Multiplication by a global
+  // phase does not change observables; removing the trivial ground-state
+  // rotation makes stationary 1s appear as stationary color.
+  // Complex Y_1^±1 harmonics give opposite phase winding around z.
+  function waveComplexXYZ(x,y,z){
+    const r=Math.hypot(x,y,z),c=r>1e-12?z/r:0;
+    const a=waveSample(0,r),b=waveSample(1,r),d=waveSample(2,r);
+    const plus=waveSample(3,r),minus=waveSample(4,r);
+    const dPlus=waveSample(5,r),dMinus=waveSample(6,r);
+    const y0=.28209479177,y1=.4886025119*c,y2=.31539156525*(3*c*c-1);
+    let rr=a[0]*y0+b[0]*y1+d[0]*y2;
+    let ii=a[1]*y0+b[1]*y1+d[1]*y2;
+    if(r>1e-9){
+      const k=Y11/r;
+      rr+=k*(-plus[0]*x+plus[1]*y+minus[0]*x+minus[1]*y);
+      ii+=k*(-plus[0]*y-plus[1]*x-minus[0]*y+minus[1]*x);
+      const k2=Y22/(r*r),xx=x*x-y*y,xy=2*x*y;
+      // Y2±2 = sqrt(15/(32π))*(x±iy)^2/r².
+      rr+=k2*(dPlus[0]*xx-dPlus[1]*xy+dMinus[0]*xx+dMinus[1]*xy);
+      ii+=k2*(dPlus[0]*xy+dPlus[1]*xx-dMinus[0]*xy+dMinus[1]*xx);
+    }
+    return [rr,ii];
+  }
+  function waveComplex(r,c){
+    return waveComplexXYZ(r*Math.sqrt(Math.max(0,1-c*c)),0,r*c);
+  }
+  function waveDensity(r,c){
+    const z=waveComplex(r,c);return z[0]*z[0]+z[1]*z[1];
+  }
+  function setWaveView(mode){
+    if(!['DENSITY','PHASE','FLOW'].includes(mode))return;
+    wave.viewMode=mode;
+    wave.cachedAt=0;immersiveDirty=true;immersiveAt=0;volume.projectAt=0;
+    save();
+  }
+  function nextWaveView(){
+    setWaveView(wave.viewMode==='DENSITY'?'PHASE':wave.viewMode==='PHASE'?'FLOW':'DENSITY');
+  }
+  // Physical probability current in atomic units is
+  // j = Im(conjugate(psi) grad psi). It is a flux density rather than
+  // a path followed by an individual electron.
+  // For the 3D axisymmetric m=0 state, evaluate its meridional (x,y) slice.
+  function waveComplexAt(x,y){
+    return wave.slice==='XY'?waveComplexXYZ(x,y,0):waveComplexXYZ(x,0,y);
+  }
+  function setWaveSlice(slice){
+    if(!['XY','XZ','3D'].includes(slice))return;
+    wave.slice=slice;wave.cachedAt=0;immersiveDirty=true;volume.dirty=true;
+    if(slice==='3D')immersiveZoom=10;
+    save();
+  }
+  function nextWaveSlice(){
+    const slices=['XY','3D','XZ'];
+    const next=slices[(slices.indexOf(wave.slice)+1)%slices.length];
+    setWaveSlice(next);
+    if(next==='3D'&&!immersive)setImmersive(true);
+  }
+  function open3D(){
+    setWaveSlice('3D');
+    if(!immersive)setImmersive(true);
+  }
+  function nextCameraAngle(){
+    volume.yaw+=Math.PI/5;
+    volume.pitch=volume.pitch>.75?.22:1.05;
+    volume.projectAt=0;immersiveDirty=true;
+  }
+  function probabilityCurrent(x,y){
+    const h=DR*.8;
+    const p=waveComplexAt(x,y);
+    const l=waveComplexAt(x-h,y),r=waveComplexAt(x+h,y);
+    const u=waveComplexAt(x,y-h),d=waveComplexAt(x,y+h);
+    const dxRe=(r[0]-l[0])/(2*h),dxIm=(r[1]-l[1])/(2*h);
+    const dyRe=(d[0]-u[0])/(2*h),dyIm=(d[1]-u[1])/(2*h);
+    return {jx:p[0]*dxIm-p[1]*dxRe,
+      jy:p[0]*dyIm-p[1]*dyRe,
+      rho:p[0]*p[0]+p[1]*p[1]};
+  }
+  // Sample flux on the visible screen at a common physical scale in x,y.
+  // Arrow lengths are normalized within the view, with low flux suppressed.
+  function drawProbabilityFlow(x,y,w,h,halfWidthAU,now,compact=false){
+    const nX=Math.max(5,Math.min(18,Math.round(w/(compact?20:29))));
+    const nY=Math.max(5,Math.min(25,Math.round(h/(compact?20:34))));
+    const samples=[];let maxJ=0,maxRho=0;
+    const dx=w/nX,dy=h/nY;
+    for(let row=0;row<nY;row++)for(let col=0;col<nX;col++){
+      const sx=x+(col+.5)*dx,sy=y+(row+.5)*dy;
+      const px=(sx-(x+w*.5))/ (w*.5)*halfWidthAU;
+      const py=(sy-(y+h*.5))/ (w*.5)*halfWidthAU;
+      const j=probabilityCurrent(px,py);
+      const mag=Math.hypot(j.jx,j.jy);
+      samples.push({sx,sy,px,py,j,mag});
+      if(mag>maxJ)maxJ=mag;
+      if(j.rho>maxRho)maxRho=j.rho;
+    }
+    if(maxJ<1e-9||maxRho<1e-12)return 0;
+    const gate=Math.max(maxJ*.013,1e-9),radius=Math.min(dx,dy)*.43;
+    let visible=0;
+    g.save();g.lineWidth=compact?1.3:1.65;g.lineCap='round';g.lineJoin='round';
+    for(const p of samples){
+      if(p.mag<gate||p.j.rho<maxRho*.00035)continue;
+      const weight=Math.min(1,Math.sqrt(p.mag/maxJ));
+      const len=radius*(.30+.70*weight);
+      const vx=p.j.jx/p.mag,vy=p.j.jy/p.mag;
+      const headX=p.sx+vx*len,headY=p.sy+vy*len;
+      const tailX=p.sx-vx*len,tailY=p.sy-vy*len;
+      const radial=p.px*p.j.jx+p.py*p.j.jy;
+      const color=radial>p.mag*.02?'#8cf5d6':radial<-p.mag*.02?'#ffc07b':'#bdadff';
+      g.globalAlpha=Math.min(.93,.20+.72*weight);
+      g.strokeStyle=color;g.fillStyle=color;
+      g.beginPath();g.moveTo(tailX,tailY);g.lineTo(headX,headY);g.stroke();
+      const headSize=Math.min(5,Math.max(2,len*.33));
+      g.beginPath();
+      g.moveTo(headX,headY);
+      g.lineTo(headX-vx*headSize-vy*headSize*.45,headY-vy*headSize+vx*headSize*.45);
+      g.lineTo(headX-vx*headSize+vy*headSize*.45,headY-vy*headSize-vx*headSize*.45);
+      g.closePath();g.fill();
+      if(!compact){
+        const t=(now*.00042+p.sx*.0031+p.sy*.0017)%1;
+        const dotX=tailX+(headX-tailX)*t,dotY=tailY+(headY-tailY)*t;
+        g.globalAlpha=Math.min(.9,.3+weight*.6);
+        g.beginPath();g.arc(dotX,dotY,1.45,0,Math.PI*2);g.fill();
+      }
+      visible++;
+    }
+    g.restore();
+    return visible;
+  }
+  function flowLegend(x,y){
+    txt('PROBABILITY CURRENT  j = Im(ψ* ∇ψ)',x,y,9,C.ink,'left',700);
+    txt('MINT OUT  ·  GOLD IN  ·  VIOLET ORBIT',x,y+17,9,C.mint,'left',650);
+  }
+  function phaseIndex(re,im){
+    const phi=Math.atan2(im,re)+states['1s'].E*wave.tAU;
+    let f=(phi/PHASE_TAU+.5)%1;
+    if(f<0)f+=1;
+    return Math.min(359,Math.floor(f*360));
+  }
+  function makePhasePalette(){
+    // Cyclic HSV palette. Opposite complex phases receive opposite hues.
+    // The palette wraps smoothly at +/-pi.
+    for(let i=0;i<360;i++){
+      const h=((i/360+.52)%1)*6,sector=Math.floor(h),f=h-sector;
+      const q=1-.88*f,t=1-.88*(1-f),p=.12;
+      const rgb=sector===0?[1,t,p]:sector===1?[q,1,p]:
+        sector===2?[p,1,t]:sector===3?[p,q,1]:
+        sector===4?[t,p,1]:[1,p,q];
+      for(let k=0;k<3;k++)phasePalette[i*3+k]=Math.round(rgb[k]*255);
+    }
+  }
+  makePhasePalette();
+  function phaseLegend(x,y,w){
+    if(wave.viewMode!=='PHASE')return;
+    txt('ARG(ψ)  /  RELATIVE PHASE',x,y-13,9,C.muted,'left',700);
+    const n=72,cell=w/n;
+    for(let k=0;k<n;k++){
+      const p=phasePalette.subarray(Math.floor(k*360/n)*3,Math.floor(k*360/n)*3+3);
+      g.fillStyle='rgb('+p[0]+','+p[1]+','+p[2]+')';
+      g.fillRect(x+k*cell,y,cell+1,6);
+    }
+    txt('−π',x,y+16,9,C.muted);
+    txt('0',x+w/2,y+16,9,C.ink,'center');
+    txt('+π',x+w,y+16,9,C.muted,'right');
+  }
+
+  // Phase 4C: sample the existing spherical-harmonic wavefunction at actual
+  // x,y,z positions. The displayed light is an accumulated volume projection:
+  // it is NOT a full Cartesian 3D evolution solver or an electron trajectory.
+  // Phase 4D: smooth orthographic ray integration, with no discrete cloud
+  // particles or image-space splatting. Each pixel integrates actual |psi|^2
+  // along a camera ray through the 3D spherical-harmonic wavefunction.
+  // The radial/time propagator is untouched. This is a visualization, not
+  // a full Cartesian 3D numerical Schrödinger solver.
+  function volumeCamera(x,y,z){
+    const cy=Math.cos(volume.yaw),sy=Math.sin(volume.yaw);
+    const cp=Math.cos(volume.pitch),sp=Math.sin(volume.pitch);
+    const rx=cy*x-sy*y,ry=sy*x+cy*y;
+    return [rx,sp*ry+cp*z,cp*ry-sp*z];
+  }
+  // Allocation-free hot-path evaluation of the same normalized Y_l^m
+  // expansion as waveComplexXYZ. Results are written into a reusable pair.
+  // Reuse the exact seven-channel spherical-harmonic wavefunction without
+  // allocating a temporary vector or closure on each voxel sample.
+  function rayWaveXYZ(x,y,z,out){
+    const r=Math.hypot(x,y,z);
+    if(r>=rGrid[N-1]||!Number.isFinite(r)){
+      out[0]=0;out[1]=0;return;
+    }
+    const c=r>1e-10?z/r:0;
+    const y0=.28209479177,y1=.4886025119*c;
+    const y2=.31539156525*(3*c*c-1);
+    const small=r<DR,ri=small?0:Math.min(N-2,Math.floor(r/DR-1));
+    const blend=small?0:r/DR-1-ri,invr=small?0:1/r;
+    for(let ch=0;ch<7;ch++){
+      const ur=wave.re[ch],ui=wave.im[ch];
+      const q=WAVE_CHANNELS[ch].l===0?1/DR:
+        WAVE_CHANNELS[ch].l===1?r/(DR*DR):r*r/(DR*DR*DR);
+      out[2+ch*2]=small?ur[0]*q:(ur[ri]*(1-blend)+ur[ri+1]*blend)*invr;
+      out[3+ch*2]=small?ui[0]*q:(ui[ri]*(1-blend)+ui[ri+1]*blend)*invr;
+    }
+    let re=out[2]*y0+out[4]*y1+out[6]*y2;
+    let im=out[3]*y0+out[5]*y1+out[7]*y2;
+    if(r>1e-9){
+      const k=Y11/r,pr=out[8],pi=out[9],mr=out[10],mi=out[11];
+      re+=k*(-pr*x+pi*y+mr*x+mi*y);
+      im+=k*(-pr*y-pi*x-mr*y+mi*x);
+      const k2=Y22/(r*r),xx=x*x-y*y,xy=2*x*y;
+      re+=k2*(out[12]*xx-out[13]*xy+out[14]*xx+out[15]*xy);
+      im+=k2*(out[12]*xy+out[13]*xx-out[14]*xy+out[15]*xx);
+    }
+    out[0]=re;out[1]=im;
+  }
+  // Cache complex psi in a regular Cartesian 3D texture at the current time.
+  // Camera ray marches use trilinear interpolation, not point splats.
+  function prepareVolumeGrid(radius){
+    const n=49,size=n*n*n;
+    if(!volume.realGrid||volume.realGrid.length!==size){
+      volume.realGrid=new Float32Array(size);
+      volume.imagGrid=new Float32Array(size);
+    }
+    const re=volume.realGrid,im=volume.imagGrid;
+    const spacing=2*radius/(n-1),scratch=new Float64Array(16);
+    let idx=0;
+    for(let k=0;k<n;k++){
+      const z=-radius+k*spacing;
+      for(let j=0;j<n;j++){
+        const y=-radius+j*spacing;
+        for(let i=0;i<n;i++){
+          const x=-radius+i*spacing;
+          rayWaveXYZ(x,y,z,scratch);
+          re[idx]=scratch[0];im[idx]=scratch[1];idx++;
+        }
+      }
+    }
+    volume.gridSize=n;volume.gridRadius=radius;
+    volume.gridScale=(n-1)/(2*radius);
+    volume.gridAt=wave.tAU;volume.dirty=false;
+    volume.gridRebuilds=(volume.gridRebuilds||0)+1;
+  }
+  function gridWaveXYZ(x,y,z,out){
+    const n=volume.gridSize,s=volume.gridScale,R=volume.gridRadius;
+    const fx=(x+R)*s,fy=(y+R)*s,fz=(z+R)*s;
+    if(fx<0||fy<0||fz<0||fx>n-1||fy>n-1||fz>n-1){
+      out[0]=0;out[1]=0;return;
+    }
+    const ix=Math.min(n-2,Math.floor(fx)),tx=fx-ix;
+    const iy=Math.min(n-2,Math.floor(fy)),ty=fy-iy;
+    const iz=Math.min(n-2,Math.floor(fz)),tz=fz-iz;
+    const n2=n*n,b=ix+n*(iy+n*iz),re=volume.realGrid,im=volume.imagGrid;
+    const wy0=1-ty,wz0=1-tz,wx0=1-tx;
+    const w000=wx0*wy0*wz0,w100=tx*wy0*wz0,
+      w010=wx0*ty*wz0,w110=tx*ty*wz0,
+      w001=wx0*wy0*tz,w101=tx*wy0*tz,
+      w011=wx0*ty*tz,w111=tx*ty*tz;
+    out[0]=re[b]*w000+re[b+1]*w100+re[b+n]*w010+re[b+n+1]*w110+
+      re[b+n2]*w001+re[b+n2+1]*w101+re[b+n2+n]*w011+re[b+n2+n+1]*w111;
+    out[1]=im[b]*w000+im[b+1]*w100+im[b+n]*w010+im[b+n+1]*w110+
+      im[b+n2]*w001+im[b+n2+1]*w101+im[b+n2+n]*w011+im[b+n2+n+1]*w111;
+  }
+  function volumeRaster(w,h,radius,now,compact){
+    const moving=!!volume.drag;
+    const targetW=compact?94:moving?76:wave.running?86:112;
+    const rw=Math.max(75,Math.min(targetW,Math.floor(w*.62)));
+    const rh=Math.max(75,Math.round(rw*h/w));
+    if(volume.rw!==rw||volume.rh!==rh||!volume.pixels){
+      volume.rw=rw;volume.rh=rh;
+      volume.raster.width=rw;volume.raster.height=rh;
+      volume.pixels=volume.ctx.createImageData(rw,rh);
+    }
+    const data=volume.pixels.data,phasing=wave.viewMode==='PHASE';
+    const mass=new Float32Array(rw*rh);
+    const rgb=phasing?new Float32Array(rw*rh*3):null;
+    const cy=Math.cos(volume.yaw),sy=Math.sin(volume.yaw);
+    const cp=Math.cos(volume.pitch),sp=Math.sin(volume.pitch);
+    const R=Math.min(rGrid[N-2],Math.max(11/Z,Math.min(21/Z,radius*1.45)));
+    if(!volume.realGrid||volume.dirty||volume.gridRadius!==R||
+      Math.abs(volume.gridAt-wave.tAU)>(wave.running?2.2:.0001)){
+      prepareVolumeGrid(R);
+    }
+    const R2=R*R,invW=2*radius/rw,n=compact?28:moving?18:wave.running?22:34;
+    const scratch=new Float64Array(2);
+    let peak=0,steps=0;
+    for(let py=0;py<rh;py++){
+      const screenV=(rh*.5-py-.5)*invW;
+      for(let px=0;px<rw;px++){
+        const screenU=(px+.5-rw*.5)*invW;
+        const p2=screenU*screenU+screenV*screenV,j=py*rw+px;
+        if(p2>=R2)continue;
+        const depth=Math.sqrt(R2-p2);
+        const step=2/n;
+        let sum=0,cR=0,cG=0,cB=0;
+        for(let z=0;z<n;z++){
+          const t=-1+(z+.5)*step;
+          const q=depth*(.4*t+.6*t*t*t);
+          const dz=depth*(.4+1.8*t*t)*step;
+          const ry=sp*screenV+cp*q;
+          const wz=cp*screenV-sp*q;
+          const wx=cy*screenU+sy*ry,wy=-sy*screenU+cy*ry;
+          gridWaveXYZ(wx,wy,wz,scratch);
+          const re=scratch[0],im=scratch[1];
+          const density=re*re+im*im;
+          if(density<=1e-24)continue;
+          const weight=density*dz;
+          sum+=weight;
+          if(phasing){
+            const idx=phaseIndex(re,im)*3;
+            cR+=weight*phasePalette[idx];
+            cG+=weight*phasePalette[idx+1];
+            cB+=weight*phasePalette[idx+2];
+          }
+        }
+        steps+=n;mass[j]=sum;
+        if(rgb){rgb[j*3]=cR;rgb[j*3+1]=cG;rgb[j*3+2]=cB;}
+        if(sum>peak)peak=sum;
+      }
+    }
+    const inv=peak>1e-22?1/peak:0,dim=Math.sqrt(Math.max(0,wave.norm));
+    for(let i=0;i<rw*rh;i++){
+      const pop=mass[i],v=Math.min(1,Math.pow(pop*inv,.56)*1.12*dim),p=i*4;
+      if(rgb&&pop>1e-22){
+        data[p]=Math.round(6+(rgb[i*3]/pop-6)*v);
+        data[p+1]=Math.round(11+(rgb[i*3+1]/pop-11)*v);
+        data[p+2]=Math.round(23+(rgb[i*3+2]/pop-23)*v);
+      }else{
+        data[p]=Math.round(6+76*v);
+        data[p+1]=Math.round(11+187*v);
+        data[p+2]=Math.round(23+220*v);
+      }
+      data[p+3]=255;
+    }
+    volume.ctx.putImageData(volume.pixels,0,0);
+    volume.maxProjection=peak;volume.sampleCount=steps;
+    volume.at=wave.tAU;volume.projectAt=now;
+    volume.lastMode=wave.viewMode;volume.lastRadius=radius;
+    volume.dirty=false;
+  }
+  function waveCurrentXYZ(x,y,z){
+    const h=DR*.8,p=waveComplexXYZ(x,y,z);
+    const l=waveComplexXYZ(x-h,y,z),r=waveComplexXYZ(x+h,y,z);
+    const b=waveComplexXYZ(x,y-h,z),t=waveComplexXYZ(x,y+h,z);
+    const f=waveComplexXYZ(x,y,z-h),k=waveComplexXYZ(x,y,z+h);
+    const comp=(lo,hi)=>p[0]*(hi[1]-lo[1])/(2*h)-p[1]*(hi[0]-lo[0])/(2*h);
+    return {jx:comp(l,r),jy:comp(b,t),jz:comp(f,k),
+      rho:p[0]*p[0]+p[1]*p[1]};
+  }
+  function drawVolumeFlow(x,y,w,h,radius,now){
+    const pts=[];let max=0;
+    for(const r of [1.7,2.8,4.2,6.1,8.2]){
+      const rr=r/Z;
+      for(const zPart of [-.52,0,.52]){
+        const z=rr*zPart,radial=rr*Math.sqrt(1-zPart*zPart);
+        for(let i=0;i<14;i++){
+          const a=2*Math.PI*(i+(zPart+.52)*.22)/14;
+          const vx=radial*Math.cos(a),vy=radial*Math.sin(a);
+          const j=waveCurrentXYZ(vx,vy,z);
+          const mag=Math.hypot(j.jx,j.jy,j.jz);
+          if(mag>max)max=mag;
+          pts.push({vx,vy,z,j,mag});
+        }
+      }
+    }
+    if(max<1e-11)return 0;
+    const scale=w/(2*radius),arrows=[];
+    for(const p of pts){
+      if(p.mag<max*.011||p.j.rho<1e-7)continue;
+      const pos=volumeCamera(p.vx,p.vy,p.z);
+      const dir=volumeCamera(p.j.jx/p.mag,p.j.jy/p.mag,p.j.jz/p.mag);
+      const px=x+w*.5+pos[0]*scale,py=y+h*.5-pos[1]*scale;
+      if(px<x+12||px>x+w-12||py<y+12||py>y+h-12)continue;
+      const len=Math.min(14,Math.max(4,Math.sqrt(p.mag/max)*15));
+      const d=Math.hypot(dir[0],dir[1]);
+      if(d<.14)continue;
+      const radial=p.vx*p.j.jx+p.vy*p.j.jy+p.z*p.j.jz;
+      const color=radial>p.mag*.03?'#7febd8':radial<-p.mag*.03?'#f4be6e':'#c5a4ff';
+      arrows.push({px,py,dx:dir[0]/d,dy:-dir[1]/d,len,color,alpha:Math.min(.85,.22+.7*Math.sqrt(p.mag/max))});
+    }
+    g.save();g.lineWidth=1.45;g.lineCap='round';
+    for(const q of arrows){
+      const ax=q.px-q.dx*q.len*.5,ay=q.py-q.dy*q.len*.5;
+      const bx=q.px+q.dx*q.len*.5,by=q.py+q.dy*q.len*.5;
+      g.globalAlpha=q.alpha;g.strokeStyle=q.color;g.fillStyle=q.color;
+      g.beginPath();g.moveTo(ax,ay);g.lineTo(bx,by);g.stroke();
+      g.beginPath();g.moveTo(bx,by);
+      g.lineTo(bx-q.dx*4-q.dy*2,by-q.dy*4+q.dx*2);
+      g.lineTo(bx-q.dx*4+q.dy*2,by-q.dy*4-q.dx*2);g.closePath();g.fill();
+    }
+    g.restore();
+    return arrows.length;
+  }
+  function drawWaveVolume(x,y,w,h,now,compact){
+    g.save();
+    round(x,y,w,h,compact?9:0);g.clip();
+    g.fillStyle='#070c16';g.fillRect(x,y,w,h);
+    const radius=(compact?10:immersiveZoom)/Z;
+    // Physical ratios are preserved: height and width use equal Bohr/pixel.
+    if(volume.dirty||!volume.projectAt||volume.lastMode!==wave.viewMode||
+       volume.lastRadius!==radius||volume.drag||
+       (wave.running&&now-volume.projectAt>210&&Math.abs(wave.tAU-volume.at)>1)){
+      volumeRaster(w,h,radius,now,compact);
+    }
+    g.imageSmoothingEnabled=true;
+    g.drawImage(volume.raster,x,y,w,h);
+    if(wave.viewMode==='FLOW')drawVolumeFlow(x,y,w,h,radius,now);
+    // Project the three spatial axes so camera rotation stays legible.
+    for(const axis of [
+      [1,0,0,'#f4be6e','X'],[0,1,0,'#7febd8','Y'],[0,0,1,'#b5a0ff','Z']
+    ]){
+      const v=volumeCamera(axis[0]*3.4/Z,axis[1]*3.4/Z,axis[2]*3.4/Z);
+      const cx=x+w*.5,cy=y+h*.5,scale=w/(2*radius);
+      const ex=cx+v[0]*scale,ey=cy-v[1]*scale;
+      g.globalAlpha=.48;g.strokeStyle=axis[3];g.lineWidth=1;
+      g.beginPath();g.moveTo(cx,cy);g.lineTo(ex,ey);g.stroke();
+      g.globalAlpha=.8;txt(axis[4],ex+3,ey-3,9,axis[3],'left',800);
+    }
+    g.restore();
+    if(!compact){
+      txt('SWIPE UP / DOWN TO TILT THE CAMERA',x+17,y+180,10,C.muted,'left',750);
+      txt('RAY-MARCHED ψ  ·  '+volume.sampleCount.toLocaleString()+' INTEGRATION STEPS',x+17,y+198,9,C.gold,'left',700);
+      txt('YAW '+(volume.yaw*180/Math.PI|0)+'°  ·  TILT '+(volume.pitch*180/Math.PI|0)+'°',
+        x+17,y+216,9,C.blue,'left',650);
+    }
+  }
+
+  function waveCloud(){
+    const size=200,half=size/2,radius=14/Z,values=new Float32Array(size*size);
+    const phases=wave.viewMode==='PHASE'?new Uint16Array(size*size):null;
+    let peak=0;
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      const xx=(x+.5-half)/half,yy=(y+.5-half)/half;
+      const rNorm=Math.hypot(xx,yy),r=rNorm*radius;
+      const z=rNorm>1?[0,0]:waveComplexAt(xx*radius,yy*radius);
+      const d=z[0]*z[0]+z[1]*z[1],j=y*size+x;
+      values[j]=d;peak=Math.max(peak,d);
+      if(phases)phases[j]=phaseIndex(z[0],z[1]);
+    }
+    const dim=Math.sqrt(Math.max(0,wave.norm));
+    for(let j=0;j<values.length;j++){
+      const k=peak?Math.min(1,Math.pow(values[j]/peak,.52)*1.1*dim):0;
+      const p=j*4;
+      if(phases){
+        const index=phases[j]*3;
+        wavePixels.data[p]=Math.round(6+(phasePalette[index]-6)*k);
+        wavePixels.data[p+1]=Math.round(11+(phasePalette[index+1]-11)*k);
+        wavePixels.data[p+2]=Math.round(23+(phasePalette[index+2]-23)*k);
+      }else{
+        wavePixels.data[p]=Math.round(7+80*k);
+        wavePixels.data[p+1]=Math.round(12+184*k);
+        wavePixels.data[p+2]=Math.round(24+229*k);
+      }
+      wavePixels.data[p+3]=255;
+    }
+    waveCtx.putImageData(wavePixels,0,0);
+  }
+  function waveViewport(now){
+    viewport();const a=layout,x=a.x+13,w=a.w-26;
+    txt('SPATIAL WAVEFUNCTION / ANGULAR CHANNELS',x,a.y+17,10,C.blue,'left',750);
+    button(a.x+10,a.y+33,108,28,'VIEW: '+wave.viewMode,
+      wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
+    button(a.x+124,a.y+33,108,28,wave.slice==='3D'?'3D OPEN':'EXPLORE 3D',wave.slice==='3D',
+      ()=>wave.slice==='3D'?setImmersive(true):open3D(),C.blue);
+    const middleH=Math.max(104,a.h-185);
+    const side=Math.min(a.w-26,middleH);
+    const cx=W/2,cy=a.y+34+middleH/2;
+    g.save();round(a.x+1,a.y+1,a.w-2,a.h-2,14);g.clip();
+    if(wave.slice==='3D'){
+      g.restore();
+      drawWaveVolume(a.x+9,a.y+63,a.w-18,Math.max(105,a.h-201),now,true);
+    }else{
+    for(let f=.25;f<=1;f+=.25){
+      g.beginPath();g.arc(cx,cy,side*.5*f,0,Math.PI*2);
+      g.strokeStyle='#354861';g.setLineDash([3,5]);g.stroke();g.setLineDash([]);
+    }
+    if(!wave.cachedAt||now-wave.cachedAt>95){waveCloud();wave.cachedAt=now;}
+    g.drawImage(waveImageCanvas,cx-side/2,cy-side/2,side,side);
+    if(wave.viewMode==='FLOW')drawProbabilityFlow(cx-side/2,cy-side/2,side,side,14/Z,now,true);
+    g.fillStyle=C.gold;g.beginPath();g.arc(cx,cy,2.2,0,Math.PI*2);g.fill();
+    g.restore();
+    }
+    button(a.x+a.w-92,a.y+7,80,28,'EXPAND',false,()=>setImmersive(true),C.mint);
+    const barY=a.y+a.h-133;
+    if(wave.viewMode==='PHASE')txt('HUE = PHASE   ·   LIGHT = DENSITY',x,barY-29,9,C.mint,'left',700);
+    if(wave.slice==='3D')txt('3D VOLUME  ·  DRAG TO ORBIT',x,barY-40,9,C.gold,'left',700);
+    if(wave.viewMode==='FLOW')txt(wave.slice==='XY'?
+      'ARROWS: MINT OUT  ·  GOLD IN  ·  VIOLET ORBIT':
+      'XZ SLICE: CIRCULATION MAY POINT OFF-SCREEN',x,barY-29,9,C.mint,'left',700);
+    txt('RADIAL PROBABILITY  ·  |u(r)|²',x,barY-12,9,C.muted,'left',700);
+    const graphX=x,graphY=barY+5,graphW=w,graphH=55;
+    if(wave.boundaryMode==='ABSORB'){
+      const startX=graphX+graphW*wave.absorberStart/rGrid[N-1];
+      g.fillStyle='rgba(244,190,110,.07)';
+      g.fillRect(startX,graphY,Math.max(0,graphX+graphW-startX),graphH);
+      line(startX,graphY,startX,graphY+graphH,'rgba(244,190,110,.45)');
+    }
+    line(graphX,graphY+graphH,graphX+graphW,graphY+graphH,C.line);
+    let max=0;
+    const bins=100,plots=new Float32Array(bins);
+    for(let j=0;j<bins;j++){
+      let q=0;
+      const first=Math.floor(j*N/bins),last=Math.floor((j+1)*N/bins);
+      for(let i=first;i<last;i++)for(let l=0;l<WAVE_CHANNELS.length;l++)
+        q+=wave.re[l][i]**2+wave.im[l][i]**2;
+      q/=Math.max(1,last-first);
+      plots[j]=q;max=Math.max(max,q);
+    }
+    g.strokeStyle=C.mint;g.lineWidth=1.7;g.beginPath();
+    plots.forEach((val,i)=>{
+      const px=graphX+i/(bins-1)*graphW,py=graphY+graphH-(max?val/max:0)*(graphH-3);
+      if(i===0)g.moveTo(px,py);else g.lineTo(px,py);
+    });g.stroke();
+    txt('r=0',x,graphY+graphH+11,9,C.muted);
+    txt('r='+rGrid[N-1].toFixed(1)+' a₀',W-x,graphY+graphH+11,9,C.muted,'right');
+    txt('2p+ '+(wave.targetPlus*100).toFixed(1)+'%   2p− '+(wave.targetMinus*100).toFixed(1)+'%',
+      x,a.y+a.h-28,10,C.blue,'left',750);
+    txt('Lz '+wave.lz.toFixed(2)+' ħ',W-x,a.y+a.h-28,10,C.mint,'right',750);
+    txt('LEFT '+(wave.norm*100).toFixed(1)+'%  LOST '+(wave.lost*100).toFixed(1)+'%',x,a.y+a.h-11,10,C.gold);
+    txt((wave.tAU*AU_TIME_FS).toFixed(2)+' fs',W-x,a.y+a.h-11,10,C.ink,'right');
+    if(wave.boundary>.01&&wave.boundaryMode==='REFLECT'){
+      fillRect(x, a.y+44, w,25,5,'#482b20');
+      txt('WAVE REACHING REFLECTING WALL',W/2,a.y+57,9,'#ffd099','center',800);
+    }else if(wave.lost>.01&&wave.boundaryMode==='ABSORB'){
+      fillRect(x,a.y+44,w,25,5,'rgba(23,73,66,.9)');
+      txt('OUTGOING PROBABILITY ABSORBED',W/2,a.y+57,9,'#91ffe1','center',800);
+    }
+  }
+  function waveControls(){
+    const y=layout.bottom,p=14,gap=6,w=W-28,bw=(w-3*gap)/4;
+    const k=Math.min(1,Math.max(.72,(H-y-4)/295));
+    const yy=n=>y+Math.round(n*k),hh=n=>Math.round(n*k);
+    txt('CHOOSE A WAVEFUNCTION',p,yy(9),10,C.muted,'left',750);
+    ['GROUND','BREATH','DIPOLE','SHELL'].forEach((v,i)=>
+      button(p+i*(bw+gap),yy(19),bw,hh(35),v,wave.setup===v,()=>waveChangeSetup(v)));
+    ['P+ ↻','P- ↺','P MIX','D4 ✣'].forEach((label,i)=>{
+      const preset=['P+','P-','P MIX','D4'][i];
+      button(p+i*(bw+gap),yy(61),bw,hh(34),label,wave.setup===preset,
+        ()=>waveChangeSetup(preset));
+    });
+    txt('ELECTRIC FIELD  ·  POLARIZATION '+wave.polarization,p,yy(101),10,C.muted,'left',750);
+    ['OFF','RESONANCE','DETUNED','PULSE'].forEach((v,i)=>
+      button(p+i*(bw+gap),yy(113),bw,hh(28),v,wave.drive===v,()=>{
+        wave.drive=v;wave.wavelength=v==='DETUNED'?155/Z**2:resonantWavelength();
+        wave.cachedAt=0;save();
+      }));
+    ['Z','X','SIGMA+','SIGMA-'].forEach((v,i)=>
+      button(p+i*(bw+gap),yy(149),bw,hh(28),
+        v==='SIGMA+'?'σ+':v==='SIGMA-'?'σ−':v==='Z'?'π / Z':'LIN X',
+        wave.polarization===v,()=>setWavePolarization(v),C.mint));
+    const bw3=(w-2*gap)/3,row=yy(188);
+    button(p,row,bw3,hh(34),wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,()=>{
+      wave.running=!wave.running;
+    });
+    button(p+bw3+gap,row,bw3,hh(34),wave.slice==='3D'?'VIEW 2D':'RESET',false,
+      ()=>wave.slice==='3D'?setWaveSlice('XY'):initializeWave());
+    button(p+2*(bw3+gap),row,bw3,hh(34),'×'+wave.steps+' STEP',false,()=>{
+      wave.steps=wave.steps===2?8:wave.steps===8?16:2;save();
+    });
+    button(p,yy(228),bw3,hh(34),'FIELD '+wave.strength.toFixed(3),false,()=>{
+      wave.strength=wave.strength===.008?.025:wave.strength===.025?.06:.008;save();
+    });
+    button(p+bw3+gap,yy(228),bw3,hh(34),'REFLECT',
+      wave.boundaryMode==='REFLECT',()=>setWaveBoundary('REFLECT'),C.blue);
+    button(p+2*(bw3+gap),yy(228),bw3,hh(34),'ABSORB',
+      wave.boundaryMode==='ABSORB',()=>setWaveBoundary('ABSORB'),C.mint);
+    txt('REMAIN '+(wave.norm*100).toFixed(1)+'%',p,yy(278),10,C.mint,'left',750);
+    txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-p,yy(278),10,C.gold,'right',750);
+  }
+
+  function fieldControls(){
+    const a=layout,y=a.bottom,p=14,gap=7,w=W-28;
+    txt('DRIVE WAVELENGTH',p,y+8,10,C.muted,'left',800);
+    txt(field.wl.toFixed(2)+' nm',W-p,y+8,12,C.gold,'right',800);
+    const lo=90/Z**2,hi=170/Z**2,trackY=y+41;
+    line(24,trackY,W-24,trackY,'#37516d',5);
+    const resonance=resonantWavelength(),rx=24+(resonance-lo)/(hi-lo)*(W-48);
+    line(rx,trackY-13,rx,trackY+13,C.gold,2);
+    const knobX=24+(field.wl-lo)/(hi-lo)*(W-48);
+    g.fillStyle=C.blue;g.beginPath();g.arc(knobX,trackY,10,0,Math.PI*2);g.fill();
+    txt(lo.toFixed(0),p,y+63,9,C.muted);
+    txt(hi.toFixed(0),W-p,y+63,9,C.muted,'right');
+    activeHits.push({x:10,y:y+17,w:W-20,h:49,drag:true,cb:(xp)=>{setWavelengthFromX(xp);}});
+    const row1=y+74,bw=(w-2*gap)/3;
+    button(p,row1,bw,37,'RESONANCE',false,()=>{
+      field.wl=resonantWavelength();resetField();field.run=true;save();
+    });
+    button(p+bw+gap,row1,bw,37,'OFF TARGET',false,()=>{
+      field.wl=155/Z**2;resetField();field.run=true;save();
+    });
+    button(p+2*(bw+gap),row1,bw,37,field.showScan?'NEW SCAN':'SCAN λ',field.showScan,()=>scanResponse());
+    const row2=row1+46;
+    button(p,row2,bw,39,field.run?'Ⅱ PAUSE':'▶ DRIVE',field.run,()=>{
+      if(field.showScan)field.showScan=false;field.run=!field.run;dirty=true;
+    });
+    button(p+bw+gap,row2,bw,39,'RESET',false,()=>{resetField();field.run=false;});
+    button(p+2*(bw+gap),row2,bw,39,'F '+field.amp.toFixed(3),false,()=>{
+      const a=[.008,.012,.02,.035],i=a.indexOf(field.amp);
+      field.amp=a[(i+1)%a.length];resetField();save();
+    });
+    const row3=row2+49;
+    txt('TIME '+(field.tAU*AU_TIME_FS).toFixed(2)+' fs',p,row3,10,C.ink,'left',750);
+    txt('NORM '+fieldNorm().toFixed(6),W-p,row3,10,C.mint,'right',750);
+    const row4=row3+21;
+    txt('1s→2p  d = '+field.d13.toFixed(4)+' a₀',p,row4,10,C.blue);
+    txt('1s→2s  d = 0 (parity)',W-p,row4,10,C.gold,'right');
+    txt('CLASSICAL ELECTRIC FIELD  •  NO PHOTON EMISSION',p,row4+22,9,C.muted);
+  }
+
+  function spectrumView(){
+    viewport();const a=layout;
+    const sx=a.x+20,ex=a.x+a.w-25, yTop=a.y+66, yBot=a.y+a.h-73;
+    const E1=states['1s'].E*HARTREE_EV,E2s=states['2s'].E*HARTREE_EV,E2p=states['2p'].E*HARTREE_EV;
+    const gap=E2p-E1,wave=HC_EV_NM/gap;
+    txt('SOLVED ENERGY LEVELS',sx,a.y+24,11,C.blue,'left',750);
+    const levels=[
+      {name:'2p',E:E2p,y:yTop,col:C.mint},
+      {name:'2s',E:E2s,y:yTop+42,col:C.violet},
+      {name:'1s',E:E1,y:yBot,col:C.blue}
+    ];
+    levels.forEach(l=>{
+      const lineStart=sx+36,lineEnd=Math.min(ex-30,sx+a.w*.58);
+      line(lineStart,l.y,lineEnd,l.y,l.col,2);
+      txt(l.name,sx,l.y,12,l.col,'left',750);
+      txt(l.E.toFixed(4)+' eV',lineEnd+8,l.y,10,C.ink,'left',600);
+    });
+    if(yBot>yTop+76){
+      const arrowX=Math.min(ex-12,sx+a.w*.77);
+      line(arrowX,yTop+5,arrowX,yBot-7,C.gold,2);
+      line(arrowX,yBot-7,arrowX-5,yBot-18,C.gold,2);
+      line(arrowX,yBot-7,arrowX+5,yBot-18,C.gold,2);
+    }
+    fillRect(a.x+11,a.y+a.h-59,a.w-22,48,10,'#15243b','#34465f');
+    txt('2p → 1s  /  ALLOWED E1 TRANSITION',a.x+19,a.y+a.h-43,10,C.gold,'left',700);
+    txt(gap.toFixed(4)+' eV   •   '+wave.toFixed(2)+' nm',a.x+19,a.y+a.h-24,12,C.ink,'left',700);
+  }
+  function wrapped(s,x,y,maxWidth,spacing,size,color){
+    const words=s.split(' ');let lineText='',yy=y;
+    for(const word of words){
+      const test=lineText?lineText+' '+word:word;
+      g.font='500 '+size+'px ui-monospace, SFMono-Regular, Menlo, monospace';
+      if(g.measureText(test).width>maxWidth&&lineText){
+        txt(lineText,x,yy,size,color);yy+=spacing;lineText=word;
+      }else lineText=test;
+    }
+    if(lineText){txt(lineText,x,yy,size,color);yy+=spacing;}
+    return yy;
+  }
+  function methodView(){
+    viewport();const a=layout,x=a.x+17,w=a.w-34;
+    let y=a.y+24,fs=W<345?10:11,dy=W<345?15:17;
+    txt('THE EQUATION, NOT AN ANIMATION',x,y,11,C.mint,'left',800);y+=31;
+    y=wrapped('Radial Schrödinger equation in atomic units:',x,y,w,dy,fs,C.ink)+5;
+    y=wrapped('H = −½ d²/dr² + l(l+1)/(2r²) − Z/r',x,y,w,dy,fs,C.gold)+13;
+    y=wrapped('A finite-difference Hamiltonian evolves broad initial wave packets in imaginary time. No orbital energy or shape is supplied.',x,y,w,dy,fs,C.ink)+13;
+    y=wrapped('2s is found by keeping its solution orthogonal to the computed 1s. The display is a two-dimensional slice of |ψ|².',x,y,w,dy,fs,C.ink)+13;
+    if(y<a.y+a.h-60){
+      txt('GRID: '+N+' RADIAL CELLS  •  Δr = '+DR+' a₀',x,y,10,C.blue);y+=19;
+      txt('BOUNDARIES: u(0) = u(Rmax) = 0',x,y,10,C.blue);y+=19;
+      txt('Rmax: '+(N+1)*DR+' a₀',x,y,10,C.muted);y+=17;
+    }
+    const footerH=55;
+    fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
+    wrapped('PHASE 4D: The 3D renderer numerically integrates |ψ(x,y,z)|² along each camera ray. Phase view blends density-weighted colors through the depth of the cloud; it is not a direct phase measurement. Fast sampling during dragging, finer samples when paused. The seven-channel radial-angular Schrödinger solver is unchanged, not a Cartesian 3D grid.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+  }
+  function controls(){
+    const a=layout,y=a.bottom,p=14,gap=7;
+    if(tab==='FIELD'){fieldControls();return;}
+    if(tab==='WAVE'){waveControls();return;}
+    if(tab==='METHOD'){
+      txt('EXPERIMENT CONTROLS',p,y+10,11,C.muted,'left',800);
+      const rowY=y+26,bw=(W-28-gap*2)/3;
+      button(p,rowY,bw,41,'HYDROGEN',Z===1,()=>{Z=1;field.wl=null;viewRadius=mode==='1s'?8:18;recalc();save();});
+      button(p+bw+gap,rowY,bw,41,'He+ ION',Z===2,()=>{Z=2;field.wl=null;viewRadius=mode==='1s'?4:9;recalc();save();});
+      button(p+2*(bw+gap),rowY,bw,41,'RETURN',false,()=>{tab='ATOM';save();});
+      let ty=rowY+59;
+      const es=['1s','2s','2p'];
+      es.forEach((s,i)=>{
+        const ref=-Z*Z/(2*(s==='1s'?1:4));
+        const calc=states[s].E,err=Math.abs((calc-ref)/ref)*100;
+        txt(s+': '+(calc*HARTREE_EV).toFixed(5)+' eV',p,ty+i*23,12,s==='1s'?C.blue:s==='2s'?C.violet:C.mint);
+        txt('error '+err.toFixed(3)+'%',W-p,ty+i*23,11,C.muted,'right');
+      });
+      return;
+    }
+    txt(tab==='ATOM'?'CHOOSE A QUANTUM STATE':'RUN A QUANTUM EXPERIMENT',p,y+10,10,C.muted,'left',800);
+    const labels=['1s','2s','2p','MIX'],bw=(W-28-gap*3)/4,rowY=y+24;
+    labels.forEach((s,i)=>button(p+i*(bw+gap),rowY,bw,43,s,mode===s,()=>{
+      mode=s;viewRadius=(s==='1s'?8:s==='MIX'?14:20)/Z;dirty=true;
+      if(s==='MIX'){timeFs=0;running=true;}save();
+      if(tab==='SPECTRUM')tab='ATOM';
+    }));
+    const row2=rowY+52,bw2=(W-28-gap*2)/3;
+    button(p,row2,bw2,40,running?'Ⅱ PAUSE':'▶ PLAY',running,()=>{running=!running;});
+    button(p+bw2+gap,row2,bw2,40,'RESET t',false,()=>{timeFs=0;dirty=true;});
+    button(p+2*(bw2+gap),row2,bw2,40,Z===1?'Z = 1  H':'Z = 2  He+',true,()=>{
+      Z=Z===1?2:1;field.wl=null;viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;recalc();save();
+    });
+    const row3=row2+51,bw3=(W-28-gap*2)/3;
+    button(p,row3,bw3,38,'ZOOM −',false,()=>{viewRadius=Math.min(30/Z,viewRadius*1.35);dirty=true;});
+    button(p+bw3+gap,row3,bw3,38,'ZOOM +',false,()=>{viewRadius=Math.max(2/Z,viewRadius/1.35);dirty=true;});
+    button(p+2*(bw3+gap),row3,bw3,38,'TIME ×'+speed,false,()=>{
+      speed=speed===.25?1:speed===1?4:.25;save();
+    });
+    const row4=row3+50;
+    const E=mode==='MIX'?(states['1s'].E+states['2p'].E)*.5:states[mode].E;
+    txt('SOLVED E',p,row4,10,C.muted,'left',750);
+    txt((E*HARTREE_EV).toFixed(5)+' eV',W-p,row4,12,C.ink,'right',750);
+    txt(mode==='MIX'?'COHERENT BEATING • '+timeFs.toFixed(3)+' fs':'NO CLASSICAL ELECTRON ORBIT',p,row4+23,10,C.mint,'left',650);
+    if(tab==='SPECTRUM')txt('Photons are not simulated.',W-p,row4+23,9,C.gold,'right');
+  }
+
+  // Immersive view is an undistorted, viewport-filling physical slice.
+  // x and y use the SAME Bohr-radius-per-pixel, even on portrait screens.
+  // No physics data is rescaled or reshaped by the display geometry.
+  function setImmersive(value){
+    immersive=value;
+    immersiveDirty=true;immersiveAt=0;
+    if(value){
+      immersiveZoom=tab==='WAVE'?(wave.slice==='3D'?10:14):tab==='ATOM'?Math.max(5,viewRadius):14;
+      volume.dirty=true;
+      if(typeof canvas.requestFullscreen==='function'){
+        try{const promise=canvas.requestFullscreen();
+          if(promise&&typeof promise.catch==='function')promise.catch(()=>{});
+        }catch(_){}
+      }
+    }else if(document.fullscreenElement&&typeof document.exitFullscreen==='function'){
+      try{const promise=document.exitFullscreen();
+        if(promise&&typeof promise.catch==='function')promise.catch(()=>{});
+      }catch(_){}
+    }
+    lastTime=0;
+  }
+  function immersivePlayState(){
+    if(tab==='WAVE')return wave.running;
+    if(tab==='FIELD')return field.run;
+    return running;
+  }
+  function toggleImmersivePlay(){
+    if(tab==='WAVE')wave.running=!wave.running;
+    else if(tab==='FIELD')field.run=!field.run;
+    else running=!running;
+  }
+  function immersiveDensity(r,c){
+    if(tab==='WAVE')return waveDensity(r,c);
+    if(tab==='FIELD'){
+      if(field.showScan)return 0;
+      return dynamicDensity(r,c);
+    }
+    const omega=2*Math.PI*(states['2p'].E-states['1s'].E)*HARTREE_EV*timeFs/PLANCK_EV_FS;
+    return density(r,c,omega);
+  }
+  function redrawImmersive(){
+    const rw=Math.min(280,Math.max(175,Math.floor(W*.73)));
+    const rh=Math.max(200,Math.min(630,Math.round(rw*H/W)));
+    if(!immersivePixels||rw!==immersiveRasterW||rh!==immersiveRasterH){
+      immersiveRasterW=rw;immersiveRasterH=rh;
+      immersiveCanvas.width=rw;immersiveCanvas.height=rh;
+      immersivePixels=immersiveCtx.createImageData(rw,rh);
+    }
+    const vals=new Float32Array(rw*rh);
+    const phaseMap=tab==='WAVE'&&wave.viewMode==='PHASE'?new Uint16Array(rw*rh):null;
+    let peak=0;const halfW=rw*.5,halfH=rh*.5;
+    for(let y=0;y<rh;y++){
+      const py=(y+.5-halfH)/halfW;
+      for(let x=0;x<rw;x++){
+        const px=(x+.5-halfW)/halfW;
+        const rr=Math.hypot(px,py);
+        const r=rr*immersiveZoom/Z;
+        let d=0;
+        if(tab==='WAVE'){
+          const z=waveComplexAt(px*immersiveZoom/Z,py*immersiveZoom/Z);
+          d=z[0]*z[0]+z[1]*z[1];
+          if(phaseMap)phaseMap[y*rw+x]=phaseIndex(z[0],z[1]);
+        }else d=immersiveDensity(r,rr>1e-6?px/rr:0);
+        const v=Math.max(0,Number.isFinite(d)?d:0);
+        vals[y*rw+x]=v;
+        if(v>peak)peak=v;
+      }
+    }
+    const tint=tab==='WAVE'?[84,199,241]:tab==='FIELD'?[101,213,210]:[107,170,253];
+    const inv=peak>1e-24?1/peak:0;
+    for(let j=0;j<vals.length;j++){
+      const brightness=tab==='WAVE'?Math.sqrt(Math.max(0,wave.norm)):1;
+      const v=Math.min(1,Math.pow(vals[j]*inv,.48)*1.10*brightness);
+      const p=j*4;
+      if(phaseMap){
+        const c=phaseMap[j]*3;
+        immersivePixels.data[p]=Math.round(6+(phasePalette[c]-6)*v);
+        immersivePixels.data[p+1]=Math.round(11+(phasePalette[c+1]-11)*v);
+        immersivePixels.data[p+2]=Math.round(23+(phasePalette[c+2]-23)*v);
+      }else{
+        immersivePixels.data[p]=Math.round(6+(tint[0]-6)*v);
+        immersivePixels.data[p+1]=Math.round(11+(tint[1]-11)*v);
+        immersivePixels.data[p+2]=Math.round(23+(tint[2]-23)*v);
+      }
+      immersivePixels.data[p+3]=255;
+    }
+    immersiveCtx.putImageData(immersivePixels,0,0);
+    immersiveDirty=false;
+  }
+  function immersiveView(now){
+    // Wide and portrait screens reveal different amounts of the SAME slice.
+    const gradient=g.createRadialGradient(W*.5,H*.5,0,W*.5,H*.5,Math.max(W,H)*.72);
+    gradient.addColorStop(0,'#142744');
+    gradient.addColorStop(1,'#070c16');
+    g.fillStyle=gradient;g.fillRect(0,0,W,H);
+    const animating=(tab==='WAVE'&&wave.running)||(tab==='FIELD'&&field.run)||
+      (tab==='ATOM'&&running&&mode==='MIX');
+    if(wave.slice!=='3D'||tab!=='WAVE'){
+      if(immersiveDirty||(animating&&now-immersiveAt>80)){
+        redrawImmersive();immersiveAt=now;
+      }
+    }
+    if(!(tab==='WAVE'&&wave.slice==='3D')){
+      g.imageSmoothingEnabled=true;g.drawImage(immersiveCanvas,0,0,W,H);
+    }
+    if(tab==='WAVE'&&wave.slice==='3D'){
+      drawWaveVolume(0,0,W,H,now,false);
+    }else if(tab==='WAVE'&&wave.viewMode==='FLOW'){
+      drawProbabilityFlow(0,0,W,H,immersiveZoom/Z,now);
+    }
+    const cx=W/2,cy=H/2;
+    if(!(tab==='WAVE'&&wave.slice==='3D')){
+      // Static 2D reference rings do not belong on the rotated 3D volume.
+      g.save();g.setLineDash([3,9]);
+      for(let i=1;i<=3;i++){
+        const radius=i*W/8;
+        g.beginPath();g.arc(cx,cy,radius,0,2*Math.PI);
+        g.strokeStyle='rgba(122,187,231,.15)';g.lineWidth=1;g.stroke();
+      }
+      g.restore();
+      const glow=g.createRadialGradient(cx,cy,0,cx,cy,12);
+      glow.addColorStop(0,'rgba(255,240,188,.85)');
+      glow.addColorStop(1,'rgba(249,169,88,0)');
+      g.fillStyle=glow;g.beginPath();g.arc(cx,cy,12,0,2*Math.PI);g.fill();
+    }
+    fillRect(9,9,W-18,49,12,'rgba(7,12,22,.72)','rgba(120,179,229,.25)');
+    button(17,15,81,36,'← BACK',false,()=>setImmersive(false),C.mint);
+    if(tab==='WAVE'){
+      button(W-173,15,155,36,wave.boundaryMode==='ABSORB'?'WALL: ABSORB':'WALL: REFLECT',
+        true,()=>setWaveBoundary(wave.boundaryMode==='ABSORB'?'REFLECT':'ABSORB'),C.mint);
+      button(18,66,132,34,'VIEW: '+wave.viewMode,
+        wave.viewMode!=='DENSITY',()=>nextWaveView(),C.mint);
+      button(155,66,108,34,wave.slice==='3D'?'3D → XY':'EXPLORE 3D',true,
+        ()=>wave.slice==='3D'?setWaveSlice('XY'):open3D(),C.blue);
+      if(wave.viewMode==='PHASE')phaseLegend(18,125,154);
+      else if(wave.viewMode==='FLOW'){
+        flowLegend(18,125);
+        if(wave.slice==='XZ')txt('CIRCULAR FLOW MAY BE OFF-PLANE',18,168,9,C.gold);
+      }
+      else txt('WAVE / '+wave.setup+'  ·  '+wave.boundaryMode,18,113,10,C.muted,'left',750);
+    }else{
+      txt(tab==='FIELD'?'FIELD / DRIVE':'ATOM / '+mode,W-18,25,11,C.ink,'right',800);
+      txt('QUANTUM DENSITY',W-18,43,9,C.muted,'right',650);
+    }
+    const lowerY=H-73;
+    fillRect(9,lowerY-10,W-18,75,12,'rgba(7,12,22,.76)','rgba(120,179,229,.25)');
+    if(tab==='WAVE'){
+      button(114,lowerY,Math.max(52,W-231),40,
+        W>335?'POL '+(wave.polarization==='SIGMA+'?'σ+':wave.polarization==='SIGMA-'?'σ−':wave.polarization):wave.polarization==='SIGMA+'?'σ+':wave.polarization==='SIGMA-'?'σ−':wave.polarization,
+        false,()=>nextWavePolarization(),C.gold);
+    }
+    button(18,lowerY,90,40,immersivePlayState()?'Ⅱ PAUSE':'▶ PLAY',
+      immersivePlayState(),()=>toggleImmersivePlay(),C.mint);
+    if(tab==='WAVE'&&wave.slice==='3D'){
+      button(18,H-139,112,32,'TILT CAMERA',false,()=>nextCameraAngle(),C.mint);
+    }
+    button(W-108,lowerY,42,40,'−',false,()=>{
+      immersiveZoom=Math.min(30,immersiveZoom*1.34);immersiveDirty=true;volume.dirty=true;
+    },C.blue);
+    button(W-60,lowerY,42,40,'+',false,()=>{
+      immersiveZoom=Math.max(2.5,immersiveZoom/1.34);immersiveDirty=true;volume.dirty=true;
+    },C.blue);
+    const duration=tab==='WAVE'?wave.tAU*AU_TIME_FS:tab==='FIELD'?field.tAU*AU_TIME_FS:timeFs;
+    txt(duration.toFixed(2)+' fs',18,lowerY+54,10,C.ink,'left',700);
+    if(tab==='WAVE'){
+      txt('LEFT '+(wave.norm*100).toFixed(1)+'%',W-18,lowerY+54,10,C.mint,'right',700);
+      txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-18,lowerY-25,10,C.gold,'right',700);
+      txt('2p+ '+(wave.targetPlus*100).toFixed(1)+'%  2p− '+(wave.targetMinus*100).toFixed(1)+'%',
+        18,lowerY-25,10,C.blue,'left',700);
+      if(wave.boundaryMode==='REFLECT'&&wave.boundary>.01){
+        const warningY=wave.viewMode!=='DENSITY'?181:141;
+        fillRect(W*.5-111,warningY,222,27,7,'rgba(75,42,31,.84)');
+        txt('NUMERICAL WALL REFLECTION',W*.5,warningY+13,9,'#ffcf91','center',800);
+      }
+    }else if(tab==='FIELD')txt('2p '+(populations()[2]*100).toFixed(1)+'%',W-18,lowerY+54,10,C.mint,'right',750);
+    else txt('SCALE '+immersiveZoom.toFixed(1)+' a₀',W-18,lowerY+54,10,C.muted,'right',700);
+  }
+
+  function render(now){
+    const dt=Math.min(.06,Math.max(0,(now-lastTime)/1000||0));lastTime=now;
+    if(tab==='FIELD'&&field.run&&!field.showScan)advanceField(dt);
+    if(tab==='ATOM'&&running&&mode==='MIX')timeFs+=dt*speed;
+    if(tab==='WAVE'&&wave.running){
+      for(let i=0;i<wave.steps;i++)waveOneStep();
+      waveStats();
+    }
+    g.clearRect(0,0,W,H);g.fillStyle=C.bg;g.fillRect(0,0,W,H);
+    activeHits=[];
+    if(immersive){
+      immersiveView(now);
+      requestAnimationFrame(render);
+      return;
+    }
+    calcLayout();header();
+    if(tab==='ATOM')atomView(now);
+    else if(tab==='FIELD')fieldViewport(now);
+    else if(tab==='WAVE')waveViewport(now);
+    else if(tab==='SPECTRUM')spectrumView();
+    else methodView();
+    controls();
+    requestAnimationFrame(render);
+  }
+  canvas.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+    let hit=false;
+    for(let i=activeHits.length-1;i>=0;i--){
+      const h=activeHits[i];if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){
+        h.cb(x,y);hit=true;
+        if(h.drag){sliderDrag=true;try{canvas.setPointerCapture(e.pointerId);}catch(_){}}
+        break;
+      }
+    }
+    if(!hit&&tab==='WAVE'&&wave.slice==='3D'){
+      const inside=immersive?
+        y>112&&y<H-90:
+        x>=layout.x&&x<=layout.x+layout.w&&y>layout.y+62&&y<layout.y+layout.h-136;
+      if(inside){
+        volume.drag={id:e.pointerId,x,y};try{canvas.setPointerCapture(e.pointerId);}catch(_){}
+      }
+    }
+  },{passive:false});
+  canvas.addEventListener('pointermove',e=>{
+    if(volume.drag&&e.pointerId===volume.drag.id){
+      const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+      volume.yaw+=(x-volume.drag.x)*.012;
+      volume.pitch=Math.max(-1.4,Math.min(1.4,volume.pitch+(y-volume.drag.y)*.012));
+      volume.drag.x=x;volume.drag.y=y;
+      immersiveDirty=true;volume.projectAt=0;
+      return;
+    }
+    if(!sliderDrag)return;
+    const rect=canvas.getBoundingClientRect();setWavelengthFromX(e.clientX-rect.left);
+  },{passive:false});
+  canvas.addEventListener('pointerup',()=>{sliderDrag=false;if(volume.drag)volume.projectAt=0;volume.drag=null;});
+  canvas.addEventListener('pointercancel',()=>{sliderDrag=false;if(volume.drag)volume.projectAt=0;volume.drag=null;});
+  document.addEventListener('fullscreenchange',()=>{
+    if(!document.fullscreenElement&&immersive){setImmersive(false);}
+    resize();
+  });
+  window.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&immersive)setImmersive(false);
+  });
+  window.addEventListener('resize',resize);
+  document.addEventListener('visibilitychange',()=>{lastTime=0;});
+  recalc();resize();requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>
