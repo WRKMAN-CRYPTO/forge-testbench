@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070c16">
-<title>HYDROGEN // Emergence Lab | Orbital Circulation</title>
+<title>HYDROGEN // Emergence Lab | Polarized Light</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;overscroll-behavior:none}
@@ -44,7 +44,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     tAU:0, dtAU:.15, wavelength:0,
     re:[], im:[], boundary:0, cachedAt:0, norm:1, overlap:1,
     charge:[], seenEpoch:0, energy:0,
-    boundaryMode:'REFLECT', lost:0, absorberStart:0, viewMode:'DENSITY', slice:'XY'
+    boundaryMode:'REFLECT', lost:0, absorberStart:0, viewMode:'DENSITY', slice:'XY',
+    polarization:'Z',targetPlus:0,targetMinus:0,targetZero:0,lz:0
   };
   // Channels (l,m), radial Hamiltonians depend on l, not m.
   const WAVE_CHANNELS=[{l:0,m:0},{l:1,m:0},{l:2,m:0},{l:1,m:1},{l:1,m:-1}];
@@ -70,16 +71,17 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(typeof saved.wl==='number'&&Number.isFinite(saved.wl))field.wl=saved.wl;
     if([.008,.012,.02,.035].includes(saved.amp))field.amp=saved.amp;
     if([1,4,12].includes(saved.fsSpeed))field.speed=saved.fsSpeed;
-    if(['GROUND','BREATH','DIPOLE','SHELL'].includes(saved.waveSetup))wave.setup=saved.waveSetup;
+    if(['GROUND','BREATH','DIPOLE','SHELL','P+','P-','P MIX'].includes(saved.waveSetup))wave.setup=saved.waveSetup;
     if(['OFF','RESONANCE','DETUNED','PULSE'].includes(saved.waveDrive))wave.drive=saved.waveDrive;
     if([2,8,16].includes(saved.waveSteps))wave.steps=saved.waveSteps;
     if([.008,.025,.06].includes(saved.waveStrength))wave.strength=saved.waveStrength;
     if(['REFLECT','ABSORB'].includes(saved.waveBoundary))wave.boundaryMode=saved.waveBoundary;
     if(['XY','XZ'].includes(saved.waveSlice))wave.slice=saved.waveSlice;
+    if(['Z','X','SIGMA+','SIGMA-'].includes(saved.wavePolarization))wave.polarization=saved.wavePolarization;
     if(['DENSITY','PHASE','FLOW'].includes(saved.waveView))wave.viewMode=saved.waveView;
     viewRadius=(mode==='1s'?8:mode==='MIX'?14:20)/Z;
   }catch(e){}
-  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice}));}catch(e){}}
+  function save(){try{localStorage.setItem('hydrogen-emergence-v1',JSON.stringify({Z,mode,speed,tab,wl:field.wl,amp:field.amp,fsSpeed:field.speed,waveSetup:wave.setup,waveDrive:wave.drive,waveSteps:wave.steps,waveStrength:wave.strength,waveBoundary:wave.boundaryMode,waveView:wave.viewMode,waveSlice:wave.slice,wavePolarization:wave.polarization}));}catch(e){}}
   function normalize(u){
     let n=0;for(let i=0;i<N;i++)n+=u[i]*u[i];
     n=Math.sqrt(n*DR);for(let i=0;i<N;i++)u[i]/=n;
@@ -212,7 +214,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function header(){
     txt('HYDROGEN',15,23,17,C.ink,'left',900);
     txt('// EMERGENCE LAB',123,23,10,C.blue,'left',650);
-    txt('v0.4',W-15,23,10,C.muted,'right',650);
+    txt('v0.4.1',W-15,23,10,C.muted,'right',650);
     line(14,44,W-14,44,C.line);
     const p=14,gap=5,bw=(W-28-20)/5;
     ['ATOM','FIELD','WAVE','SPECTRUM','METHOD'].forEach((a,i)=>{
@@ -514,11 +516,45 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     wave.re[b][i]=c*br+ss*ai;
     wave.im[b][i]=c*bi-ss*ar;
   }
-  function waveFieldStrength(t){
-    if(wave.drive==='OFF')return 0;
-    if(wave.drive==='PULSE'&&t*AU_TIME_FS>2)return 0;
-    const frequency=HC_EV_NM/(wave.wavelength*HARTREE_EV);
-    return wave.strength*Math.cos(frequency*t);
+  function waveFieldVector(t){
+    if(wave.drive==='OFF'||(wave.drive==='PULSE'&&t*AU_TIME_FS>2))
+      return [0,0,0];
+    const frequency=HC_EV_NM/(wave.wavelength*HARTREE_EV),a=frequency*t;
+    const cos=wave.strength*Math.cos(a);
+    if(wave.polarization==='Z')return [0,0,cos];
+    if(wave.polarization==='X')return [cos,0,0];
+    if(wave.polarization==='SIGMA+')return [cos,wave.strength*Math.sin(a),0];
+    return [cos,-wave.strength*Math.sin(a),0];
+  }
+  // Exact norm-preserving 2x2 exponential for complex Hermitian coupling
+  // H_ab = vr + i vi, H_ba = vr - i vi, at one radial cell.
+  function waveComplexRotate(a,b,vr,vi,dt,i){
+    const omega=Math.hypot(vr,vi);
+    if(omega<1e-14)return;
+    const c=Math.cos(omega*dt),q=Math.sin(omega*dt)/omega;
+    const ar=wave.re[a][i],ai=wave.im[a][i];
+    const br=wave.re[b][i],bi=wave.im[b][i];
+    wave.re[a][i]=c*ar+q*(vr*bi+vi*br);
+    wave.im[a][i]=c*ai-q*(vr*br-vi*bi);
+    wave.re[b][i]=c*br+q*(vr*ai-vi*ar);
+    wave.im[b][i]=c*bi-q*(vr*ar+vi*ai);
+  }
+  function setWavePolarization(polarization){
+    if(!['Z','X','SIGMA+','SIGMA-'].includes(polarization))return;
+    if(polarization===wave.polarization)return;
+    wave.polarization=polarization;
+    initializeWave(); // same initial wavefunction for fair polarization comparisons
+    immersiveDirty=true;save();
+  }
+  function nextWavePolarization(){
+    const options=['Z','X','SIGMA+','SIGMA-'];
+    setWavePolarization(options[(options.indexOf(wave.polarization)+1)%options.length]);
+  }
+  function waveTargetProb(ch){
+    const u=wave.re[ch],v=wave.im[ch],ref=states['2p'].u;
+    let re=0,im=0;
+    for(let i=0;i<N;i++){re+=ref[i]*u[i]*DR;im+=ref[i]*v[i]*DR;}
+    return re*re+im*im;
   }
 
   function initializeAbsorber(){
@@ -553,13 +589,25 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
   function waveOneStep(){
     if(wave.boundaryMode==='ABSORB')waveAbsorbingHalfStep();
     for(let l=0;l<WAVE_CHANNELS.length;l++)waveRadialStep(l);
-    const f=waveFieldStrength(wave.tAU+wave.dtAU/2);
-    if(f!==0){
+    const e=waveFieldVector(wave.tAU+wave.dtAU/2);
+    if(e[2]!==0){
+      // z-polarized pi transition: Δm=0, preserves old m=0 propagation.
       for(let i=0;i<N;i++){
-        const t=-f*rGrid[i]*wave.dtAU;
+        const t=-e[2]*rGrid[i]*wave.dtAU;
         waveRotate(0,1,t*WAVE_COUPLINGS[0]/2,i);
         waveRotate(1,2,t*WAVE_COUPLINGS[1],i);
         waveRotate(0,1,t*WAVE_COUPLINGS[0]/2,i);
+      }
+    }else if(e[0]!==0||e[1]!==0){
+      // In the five-channel truncation only 1s <-> (l=1,m=±1)
+      // transverse dipole elements are retained; other Δl=±1 channels
+      // require a larger basis. Spherical harmonic Condon-Shortley sign:
+      // H_0,+ = -r(Ex+iEy)/sqrt(6), H_0,- = r(Ex-iEy)/sqrt(6).
+      for(let i=0;i<N;i++){
+        const q=rGrid[i]/Math.sqrt(6);
+        waveComplexRotate(0,3,-q*e[0],-q*e[1],wave.dtAU*.5,i);
+        waveComplexRotate(0,4, q*e[0],-q*e[1],wave.dtAU,i);
+        waveComplexRotate(0,3,-q*e[0],-q*e[1],wave.dtAU*.5,i);
       }
     }
     for(let l=0;l<WAVE_CHANNELS.length;l++)waveRadialStep(l);
@@ -589,7 +637,17 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     wave.lost=Math.max(0,1-norm);
     wave.overlap=groundRe*groundRe+groundIm*groundIm;
     wave.energy=e*HARTREE_EV;
-    return {norm,boundary,ground:wave.overlap,energy:wave.energy};
+    wave.targetZero=waveTargetProb(1);
+    wave.targetPlus=waveTargetProb(3);
+    wave.targetMinus=waveTargetProb(4);
+    let pm=0,mm=0;
+    for(let i=0;i<N;i++){
+      pm+=(wave.re[3][i]**2+wave.im[3][i]**2)*DR;
+      mm+=(wave.re[4][i]**2+wave.im[4][i]**2)*DR;
+    }
+    wave.lz=norm>1e-12?(pm-mm)/norm:0;
+    return {norm,boundary,ground:wave.overlap,energy:wave.energy,
+      p0:wave.targetZero,pPlus:wave.targetPlus,pMinus:wave.targetMinus,lz:wave.lz};
   }
   function initializeWave(){
     wave.re=Array.from({length:WAVE_CHANNELS.length},()=>new Float64Array(N));
@@ -859,8 +917,9 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     });g.stroke();
     txt('r=0',x,graphY+graphH+11,9,C.muted);
     txt('r='+rGrid[N-1].toFixed(1)+' a₀',W-x,graphY+graphH+11,9,C.muted,'right');
-    txt('GROUND OVERLAP',x,a.y+a.h-28,9,C.muted);
-    txt((wave.overlap*100).toFixed(2)+'%',W-x,a.y+a.h-28,11,C.blue,'right',800);
+    txt('2p+ '+(wave.targetPlus*100).toFixed(1)+'%   2p− '+(wave.targetMinus*100).toFixed(1)+'%',
+      x,a.y+a.h-28,10,C.blue,'left',750);
+    txt('Lz '+wave.lz.toFixed(2)+' ħ',W-x,a.y+a.h-28,10,C.mint,'right',750);
     txt('LEFT '+(wave.norm*100).toFixed(1)+'%  LOST '+(wave.lost*100).toFixed(1)+'%',x,a.y+a.h-11,10,C.gold);
     txt((wave.tAU*AU_TIME_FS).toFixed(2)+' fs',W-x,a.y+a.h-11,10,C.ink,'right');
     if(wave.boundary>.01&&wave.boundaryMode==='REFLECT'){
@@ -884,31 +943,33 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
         if(i===3)initializeWave();else waveChangeSetup(preset);
       });
     });
-    txt('ELECTRIC FIELD  ·  Z POLARIZED',p,yy(108),10,C.muted,'left',750);
+    txt('ELECTRIC FIELD  ·  POLARIZATION '+wave.polarization,p,yy(101),10,C.muted,'left',750);
     ['OFF','RESONANCE','DETUNED','PULSE'].forEach((v,i)=>
-      button(p+i*(bw+gap),yy(119),bw,hh(33),v,wave.drive===v,()=>{
+      button(p+i*(bw+gap),yy(113),bw,hh(28),v,wave.drive===v,()=>{
         wave.drive=v;wave.wavelength=v==='DETUNED'?155/Z**2:resonantWavelength();
         wave.cachedAt=0;save();
       }));
-    const bw3=(w-2*gap)/3,row=yy(162);
-    button(p,row,bw3,hh(36),wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,()=>{
+    ['Z','X','SIGMA+','SIGMA-'].forEach((v,i)=>
+      button(p+i*(bw+gap),yy(149),bw,hh(28),
+        v==='SIGMA+'?'σ+':v==='SIGMA-'?'σ−':v==='Z'?'π / Z':'LIN X',
+        wave.polarization===v,()=>setWavePolarization(v),C.mint));
+    const bw3=(w-2*gap)/3,row=yy(188);
+    button(p,row,bw3,hh(34),wave.running?'Ⅱ PAUSE':'▶ EVOLVE',wave.running,()=>{
       wave.running=!wave.running;
     });
-    button(p+bw3+gap,row,bw3,hh(36),'SLICE '+wave.slice,true,
-      ()=>setWaveSlice(wave.slice==='XY'?'XZ':'XY'));
-    button(p+2*(bw3+gap),row,bw3,hh(36),'×'+wave.steps+' STEP',false,()=>{
+    button(p+bw3+gap,row,bw3,hh(34),'RESET',false,()=>initializeWave());
+    button(p+2*(bw3+gap),row,bw3,hh(34),'×'+wave.steps+' STEP',false,()=>{
       wave.steps=wave.steps===2?8:wave.steps===8?16:2;save();
     });
-    button(p,yy(205),bw3,hh(36),'FIELD '+wave.strength.toFixed(3),false,()=>{
+    button(p,yy(228),bw3,hh(34),'FIELD '+wave.strength.toFixed(3),false,()=>{
       wave.strength=wave.strength===.008?.025:wave.strength===.025?.06:.008;save();
     });
-    button(p+bw3+gap,yy(205),bw3,hh(36),'REFLECT',
+    button(p+bw3+gap,yy(228),bw3,hh(34),'REFLECT',
       wave.boundaryMode==='REFLECT',()=>setWaveBoundary('REFLECT'),C.blue);
-    button(p+2*(bw3+gap),yy(205),bw3,hh(36),'ABSORB',
+    button(p+2*(bw3+gap),yy(228),bw3,hh(34),'ABSORB',
       wave.boundaryMode==='ABSORB',()=>setWaveBoundary('ABSORB'),C.mint);
-    txt('REMAIN '+(wave.norm*100).toFixed(2)+'%',p,yy(258),10,C.mint,'left',750);
-    txt('ESCAPED '+(wave.lost*100).toFixed(2)+'%',W-p,yy(258),10,C.gold,'right',750);
-    txt('5 ANGULAR CHANNELS  ·  '+N+' RADIAL CELLS',p,yy(278),9,C.muted);
+    txt('REMAIN '+(wave.norm*100).toFixed(1)+'%',p,yy(278),10,C.mint,'left',750);
+    txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-p,yy(278),10,C.gold,'right',750);
   }
 
   function fieldControls(){
@@ -1004,7 +1065,7 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const footerH=55;
     fillRect(a.x+10,a.y+a.h-footerH-9,a.w-20,footerH,9,'#18243b','#34415b');
-    wrapped('PHASE 4: (l,m) channels include m=+1 and m=-1, producing opposite orbital probability currents. XY and XZ slices evaluate normalized spherical harmonics; flow arrows are in-plane only. The z-polarized drive currently couples m=0 channels. This is a truncated angular model, not a full 3D spatial grid.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
+    wrapped('PHASE 4B: Classical z-polarized (π) field couples Δm=0. Rotating xy fields (σ+ and σ−) drive Δm=+1 or −1 from 1s via complex Hermitian dipole couplings. Linear x addresses both. The radial grid and finite 5-channel basis truncate higher-l transverse interactions. No quantized photons or spontaneous emission.',a.x+18,a.y+a.h-footerH+1,a.w-36,14,10,C.gold);
   }
   function controls(){
     const a=layout,y=a.bottom,p=14,gap=7;
@@ -1191,6 +1252,11 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     }
     const lowerY=H-73;
     fillRect(9,lowerY-10,W-18,75,12,'rgba(7,12,22,.76)','rgba(120,179,229,.25)');
+    if(tab==='WAVE'){
+      button(114,lowerY,Math.max(52,W-231),40,
+        W>335?'POL '+(wave.polarization==='SIGMA+'?'σ+':wave.polarization==='SIGMA-'?'σ−':wave.polarization):wave.polarization==='SIGMA+'?'σ+':wave.polarization==='SIGMA-'?'σ−':wave.polarization,
+        false,()=>nextWavePolarization(),C.gold);
+    }
     button(18,lowerY,90,40,immersivePlayState()?'Ⅱ PAUSE':'▶ PLAY',
       immersivePlayState(),()=>toggleImmersivePlay(),C.mint);
     button(W-108,lowerY,42,40,'−',false,()=>{
@@ -1204,6 +1270,8 @@ html,body{margin:0;width:100%;height:100%;background:#070c16;overflow:hidden;ove
     if(tab==='WAVE'){
       txt('LEFT '+(wave.norm*100).toFixed(1)+'%',W-18,lowerY+54,10,C.mint,'right',700);
       txt('ESCAPED '+(wave.lost*100).toFixed(1)+'%',W-18,lowerY-25,10,C.gold,'right',700);
+      txt('2p+ '+(wave.targetPlus*100).toFixed(1)+'%  2p− '+(wave.targetMinus*100).toFixed(1)+'%',
+        18,lowerY-25,10,C.blue,'left',700);
       if(wave.boundaryMode==='REFLECT'&&wave.boundary>.01){
         const warningY=wave.viewMode!=='DENSITY'?181:141;
         fillRect(W*.5-111,warningY,222,27,7,'rgba(75,42,31,.84)');
