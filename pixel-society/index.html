@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 1.4 | Foremen</title>
+<title>Pixel Society 1.5 | Tenfold Tempo</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -149,6 +149,13 @@
 
 
 
+  // Exped. 14: tenfold simulation time (300 logical updates/second target vs 30).
+  // Simulation logic is unchanged; visual transitions and trace/cycle playback
+  // remain wall-clock based. A per-frame work budget keeps touch inputs usable
+  // on slower phones, which may run below the nominal 300 updates/sec.
+  const BASE_STEP_MS=1000/30, SIMULATION_MULTIPLIER=10;
+  const MAX_FRAME_UPDATES=30, MAX_FRAME_WORK_MS=18;
+  let actualUpdatesPerSecond=0, speedWindowStart=0, speedWindowSteps=0;
   let last=0,accumulator=0,pointerDown=false,held=false,holdTimer=0,sx=0,sy=0;
   let seed=0x7ac58c3e;
   function random(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;}
@@ -2321,17 +2328,32 @@
   });
   let resizeId=0;
   window.addEventListener('resize',()=>{cancelAnimationFrame(resizeId);resizeId=requestAnimationFrame(create);});
-  document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;});
+  document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;speedWindowStart=0;speedWindowSteps=0;});
   function frameLoop(now){
     if(!last)last=now;
-    const elapsed=Math.min(100,now-last);last=now;accumulator+=elapsed;
+    const elapsed=Math.min(100,Math.max(0,now-last));last=now;
     if(!document.hidden){
       advancePulse(elapsed);cycleTick(elapsed);
       jobMessageElapsed=Math.min(jobMessageDuration,jobMessageElapsed+elapsed);
       if(traceActive){accumulator=0;tickTrace(elapsed);}
       else{
-        let steps=0;
-        while(accumulator>=33.333&&steps<3){update();accumulator-=33.333;steps++;}
+        // Accumulate 10x real time. The cap drops stale backlog instead of
+        // freezing the browser while trying to simulate missed frames.
+        accumulator=Math.min(BASE_STEP_MS*MAX_FRAME_UPDATES,
+          accumulator+elapsed*SIMULATION_MULTIPLIER);
+        const workStart=performance.now();let steps=0;
+        while(accumulator>=BASE_STEP_MS&&steps<MAX_FRAME_UPDATES){
+          update();accumulator-=BASE_STEP_MS;steps++;
+          // Prevent an overloaded phone from trapping touches behind a long
+          // update burst. A slower device will transparently run below target.
+          if(performance.now()-workStart>=MAX_FRAME_WORK_MS)break;
+        }
+        speedWindowSteps+=steps;
+      }
+      if(!speedWindowStart)speedWindowStart=now;
+      if(now-speedWindowStart>=1000){
+        actualUpdatesPerSecond=Math.round(1000*speedWindowSteps/(now-speedWindowStart));
+        speedWindowStart=now;speedWindowSteps=0;
       }
       render();
     }
@@ -2340,7 +2362,7 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'1.4 foremen',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
+      version:'1.5 tenfold tempo',simulator:{multiplier:SIMULATION_MULTIPLIER,targetStepsPerSecond:300,measuredStepsPerSecond:actualUpdatesPerSecond},jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
@@ -2357,7 +2379,7 @@
         reinforcedEdges:reinforced,unusedDecayEvents:unusedFade,
         experiments:pulseRecord,source:pulseSource>=0?{x:pulseSource%W,y:(pulseSource/W)|0}:null},
       trace:{active:traceActive,source:traceSource<0?null:{x:traceSource%W,y:(traceSource/W)|0,color:traceSourceColor},nodes:traceNodes,maxHops:traceMax,spanX:traceSpan,detour:traceDetour,layer:traceLayer,finished:traceElapsed>=traceDuration,last:traceLast},
-      note:'PATHS visualizes existing local connection strengths; LEARN trains 24 pulses on a frozen snapshot, REST decays them with no pulses, LEARN again measures recovery and fingerprint overlap. Observer-only snapshots do not influence agents. These are designed plasticity/forgetting rules, not brain activity.' 
+      note:'Simulation is requested at 10x the former 30-step/s baseline (target 300/s). Rendering and frozen trace timing stay on wall time. Actual throughput depends on device CPU. PATHS visualizes existing local connection strengths; LEARN trains 24 pulses on a frozen snapshot, REST decays them with no pulses, LEARN again measures recovery and fingerprint overlap. Observer-only snapshots do not influence agents. These are designed plasticity/forgetting rules, not brain activity.' 
     };},
     // Manual deterministic exploration hooks for tests; no direct blueprint editing.
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
