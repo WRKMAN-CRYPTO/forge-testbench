@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#071017">
+<title>Pixel Society 0.2 | The Witness Network</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
+  canvas { display:block; width:100vw; height:100dvh; image-rendering:pixelated; touch-action:none; cursor:crosshair; }
+</style>
+</head>
+<body>
+<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. Tap GROW to seed waves, BREAK to scramble roles and memories, HEAL to encourage neighbor-to-neighbor repairs. Hold the colony to erase a local patch, or tap the agent count to inspect memory."></canvas>
+<script>
+(()=>{
+  'use strict';
+  // No rendered UI elements other than this canvas. The only visible pixels are
+  // produced by the states of autonomous agents in one ImageData buffer.
+  // A separate, invisible goal field is a *signal*, not a pre-painted image.
+  // Each agent must decide whether to follow it, listen to neighbors, or mutate.
+
+  const canvas = document.querySelector('#world');
+  const ctx = canvas.getContext('2d', {alpha:false, desynchronized:true});
+  const FONT = {
+    'A':['01110','10001','10001','11111','10001','10001','10001'],
+    'B':['11110','10001','10001','11110','10001','10001','11110'],
+    'C':['01111','10000','10000','10000','10000','10000','01111'],
+    'D':['11110','10001','10001','10001','10001','10001','11110'],
+    'E':['11111','10000','10000','11110','10000','10000','11111'],
+    'F':['11111','10000','10000','11110','10000','10000','10000'],
+    'G':['01111','10000','10000','10111','10001','10001','01111'],
+    'H':['10001','10001','10001','11111','10001','10001','10001'],
+    'I':['11111','00100','00100','00100','00100','00100','11111'],
+    'J':['00111','00010','00010','00010','10010','10010','01100'],
+    'K':['10001','10010','10100','11000','10100','10010','10001'],
+    'L':['10000','10000','10000','10000','10000','10000','11111'],
+    'M':['10001','11011','10101','10101','10001','10001','10001'],
+    'N':['10001','11001','10101','10011','10001','10001','10001'],
+    'O':['01110','10001','10001','10001','10001','10001','01110'],
+    'P':['11110','10001','10001','11110','10000','10000','10000'],
+    'Q':['01110','10001','10001','10001','10101','10010','01101'],
+    'R':['11110','10001','10001','11110','10100','10010','10001'],
+    'S':['01111','10000','10000','01110','00001','00001','11110'],
+    'T':['11111','00100','00100','00100','00100','00100','00100'],
+    'U':['10001','10001','10001','10001','10001','10001','01110'],
+    'V':['10001','10001','10001','10001','10001','01010','00100'],
+    'W':['10001','10001','10001','10101','10101','10101','01010'],
+    'X':['10001','10001','01010','00100','01010','10001','10001'],
+    'Y':['10001','10001','01010','00100','00100','00100','00100'],
+    'Z':['11111','00001','00010','00100','01000','10000','11111'],
+    '0':['01110','10011','10101','10101','11001','10001','01110'],
+    '1':['00100','01100','00100','00100','00100','00100','01110'],
+    '2':['01110','10001','00001','00010','00100','01000','11111'],
+    '3':['11110','00001','00001','01110','00001','00001','11110'],
+    '4':['00010','00110','01010','10010','11111','00010','00010'],
+    '5':['11111','10000','11110','00001','00001','10001','01110'],
+    '6':['00111','01000','10000','11110','10001','10001','01110'],
+    '7':['11111','00001','00010','00100','01000','01000','01000'],
+    '8':['01110','10001','10001','01110','10001','10001','01110'],
+    '9':['01110','10001','10001','01111','00001','00010','11100'],
+    ':':['00000','00100','00100','00000','00100','00100','00000'],
+    '.':['00000','00000','00000','00000','00000','01100','01100'],
+    '/':['00001','00001','00010','00100','01000','10000','10000'],
+    '-':['00000','00000','00000','11111','00000','00000','00000'],
+    '+':['00000','00100','00100','11111','00100','00100','00000'],
+    '!':['00100','00100','00100','00100','00100','00000','00100'],
+    ' ':['00000','00000','00000','00000','00000','00000','00000']
+  };
+  // EXPEDITION 0.2: Distributed Witness Network
+  // A single staging sheet seeds the initial interface; it is then DESTROYED.
+  // During runtime no agent can consult a global target. Instead each stores
+  // 3x3 local witness fragments of what its neighbors should look like.
+  // An agent with lost memory can rebuild it by asking adjacent survivors.
+  // Complete removal of all local witnesses can leave persistent scars.
+  const COLORS = [
+    [7,16,23], [22,63,77], [220,244,238], [66,228,209],
+    [253,107,166], [255,197,105], [39,115,133]
+  ];
+  const R={VOID:0,FRAME:1,INK:2,CYAN:3,PINK:4,GOLD:5,MIST:6};
+  let W=0,H=0,N=0,image,staging=null;
+  let role,nextRole,conviction,temperament,genome,damage,hotspot;
+  let life,nextLife,age,nextAge,flash;
+  let testimony,knowledge,possible; // per-agent 3x3 memories and known-bit mask
+  let region={x:0,y:0,w:0,h:0};
+  let repairBoost=0,glitchEvents=0,pulseEvents=0,generations=0;
+  let learnedFragments=0,amnesiaEvents=0,inspect=false,messageTicks=0;
+  let last=0,accumulator=0,pointerIsDown=false,held=false,holdTimer=0,sx=0,sy=0;
+  let seed=0x7ac58c3e;
+  function random(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;}
+  const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+  const ix=(x,y)=>x+y*W;
+  const inBounds=(x,y)=>x>=0&&y>=0&&x<W&&y<H;
+  function pixel(x,y,kind){if(staging&&inBounds(x,y))staging[ix(x,y)]=kind;}
+  function textWidth(t){return Math.max(0,t.length*6-1);}
+  function stampText(x,y,t,kind,center=false){
+    t=String(t).toUpperCase();if(center)x-=Math.floor(textWidth(t)/2);
+    for(let a=0;a<t.length;a++){
+      const glyph=FONT[t[a]]||FONT[' '],gx=x+a*6;
+      for(let b=0;b<7;b++)for(let c=0;c<5;c++)if(glyph[b][c]==='1')pixel(gx+c,y+b,kind);
+    }
+  }
+  function hline(x0,x1,y,type){for(let x=x0;x<=x1;x++)pixel(x,y,type);}
+  function frame(x,y,w,h,kind){
+    for(let a=0;a<w;a++){pixel(x+a,y,kind);pixel(x+a,y+h-1,kind);}
+    for(let b=0;b<h;b++){pixel(x,y+b,kind);pixel(x+w-1,y+b,kind);}
+  }
+  function button(x,y,w,h,label,color,id){
+    frame(x,y,w,h,R.FRAME);
+    pixel(x,y,color);pixel(x+w-1,y,color);pixel(x,y+h-1,color);pixel(x+w-1,y+h-1,color);
+    stampText(x+Math.floor(w/2),y+Math.floor((h-7)/2),label,color,true);
+    for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)if(inBounds(xx,yy))hotspot[ix(xx,yy)]=id;
+  }
+  function seedFounders(){
+    staging.fill(R.VOID);hotspot.fill(0);
+    stampText(Math.floor(W/2),8,'PIXEL SOCIETY',R.INK,true);
+    stampText(Math.floor(W/2),20,'WITNESS NETWORK',R.MIST,true);
+    hline(6,W-7,31,R.FRAME);
+    for(let x=6;x<W-6;x+=7)pixel(x,33,R.CYAN);
+    const gap=3,x0=4,bw=Math.floor((W-8-gap*2)/3),by=39,bh=17;
+    button(x0,by,bw,bh,'GROW',R.CYAN,1);
+    button(x0+bw+gap,by,bw,bh,'BREAK',R.PINK,2);
+    button(x0+(bw+gap)*2,by,bw,bh,'HEAL',R.GOLD,3);
+    region={x:6,y:64,w:W-12,h:Math.max(20,H-96)};
+    frame(region.x,region.y,region.w,region.h,R.FRAME);
+    for(let y=region.y+4;y<region.y+region.h-3;y+=10){pixel(region.x+3,y,R.FRAME);pixel(region.x+region.w-4,y,R.FRAME);}
+    stampText(region.x+6,region.y+5,'COLONY',R.INK);
+    stampText(region.x+region.w-14,region.y+5,'LIVE',R.CYAN,true);
+    hline(6,W-7,H-26,R.FRAME);
+    stampText(Math.floor(W/2),H-21,`${N.toLocaleString('en-US')} AGENTS`,R.CYAN,true);
+    stampText(Math.floor(W/2),H-11,'HOLD TO FORGET',R.INK,true);
+  }
+  // Only founders can author new instructions, and only during user events.
+  // To change a status message they update local memories in a tiny footer.
+  function publicNotice(label){
+    const sheet=new Uint8Array(N);
+    staging=sheet;stampText(Math.floor(W/2),H-11,label,R.INK,true);staging=null;
+    const y0=H-12,y1=H-3;
+    for(let y=y0;y<=y1;y++)for(let x=0;x<W;x++){
+      const i=ix(x,y),base=i*9;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const yy=y+dy,xx=x+dx;
+        if(yy>=H-11&&yy<H-4&&inBounds(xx,yy)){
+          const b=(dy+1)*3+dx+1;
+          testimony[base+b]=sheet[ix(xx,yy)];knowledge[i]|=1<<b;
+        }
+      }
+    }
+  }
+  function notify(s){publicNotice(s);messageTicks=70;}
+  function create(){
+    const cw=window.innerWidth,ch=window.innerHeight;
+    const unit=clamp(Math.max(cw/210,ch/230),3,7);
+    W=Math.max(100,Math.floor(cw/unit));H=Math.max(120,Math.floor(ch/unit));
+    N=W*H;canvas.width=W;canvas.height=H;image=ctx.createImageData(W,H);
+    role=new Uint8Array(N);nextRole=new Uint8Array(N);conviction=new Uint8Array(N);
+    temperament=new Uint8Array(N);genome=new Uint8Array(N);damage=new Uint8Array(N);
+    hotspot=new Uint8Array(N);life=new Uint8Array(N);nextLife=new Uint8Array(N);
+    age=new Uint8Array(N);nextAge=new Uint8Array(N);flash=new Uint8Array(N);
+    testimony=new Uint8Array(N*9);knowledge=new Uint16Array(N);possible=new Uint16Array(N);
+    staging=new Uint8Array(N);seedFounders();
+    // Each agent receives memories of its immediate neighbors, like a tiny
+    // error-correcting code. No central array survives this initialization.
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const i=ix(x,y),base=i*9;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(inBounds(x+dx,y+dy)){
+        const b=(dy+1)*3+dx+1;
+        testimony[base+b]=staging[ix(x+dx,y+dy)];
+        knowledge[i]|=1<<b;possible[i]|=1<<b;
+      }
+      role[i]=random()<.84?testimony[base+4]:Math.floor(random()*7);
+      conviction[i]=Math.floor(random()*100);
+      temperament[i]=Math.floor(random()*255);genome[i]=Math.floor(random()*255);
+    }
+    staging=null;
+    repairBoost=0;generations=0;learnedFragments=0;amnesiaEvents=0;
+    for(let j=0;j<18;j++)spark(region.x+8+Math.floor(random()*Math.max(1,region.w-16)),
+      region.y+12+Math.floor(random()*Math.max(1,region.h-20)),1);
+  }
+  function isField(i){const x=i%W,y=(i/W)|0;
+    return x>region.x+1&&x<region.x+region.w-2&&y>region.y+11&&y<region.y+region.h-2;}
+  function spark(x,y,r=3){
+    x=Math.round(x);y=Math.round(y);pulseEvents++;
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(dx*dx+dy*dy>r*r||!inBounds(x+dx,y+dy))continue;
+      const i=ix(x+dx,y+dy);
+      if(isField(i)){life[i]=1;age[i]=Math.floor(random()*3);flash[i]=255;}
+    }
+  }
+  function forget(i){
+    if(knowledge[i]){
+      knowledge[i]=0;
+      testimony.fill(0,i*9,i*9+9); // destroy the actual 3x3 memory
+      amnesiaEvents++;
+    }
+  }
+  function disrupt(){
+    glitchEvents++;repairBoost=0;
+    for(let i=0;i<N;i++)if(random()<.66){
+      role[i]=Math.floor(random()*7);conviction[i]=0;
+      damage[i]=5+Math.floor(random()*20);flash[i]=175;
+      if(random()<.63)forget(i);
+    }
+    notify('WITNESSES LOST');
+  }
+  function heal(){
+    repairBoost=110; // faster listening only; no global restore
+    damage.fill(0);
+    notify('SHARING MEMORY');
+  }
+  function bloom(){
+    for(let j=0;j<24;j++)spark(region.x+8+Math.floor(random()*Math.max(1,region.w-16)),
+      region.y+15+Math.floor(random()*Math.max(1,region.h-23)),1+Math.floor(random()*3));
+    notify('SIGNALS MOVING');
+  }
+  function erase(x,y,r=5){
+    amnesiaEvents++;
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(dx*dx+dy*dy>r*r||!inBounds(x+dx,y+dy))continue;
+      const i=ix(x+dx,y+dy);
+      if(!isField(i))continue;
+      forget(i);role[i]=Math.floor(random()*7);conviction[i]=0;
+      damage[i]=10+Math.floor(random()*10);flash[i]=225;
+    }
+    notify('LOCAL AMNESIA');
+  }
+  function nearby(i,arr){
+    const x=i%W,y=(i/W)|0;let n=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if((dx||dy)&&inBounds(x+dx,y+dy)&&arr[ix(x+dx,y+dy)]===1)n++;
+    }
+    return n;
+  }
+  // This is the crucial rule: a pixel asks the eight neighboring AGENTS
+  // what they remember about one target location. It never reads a map.
+  const votes=new Uint8Array(7);
+  function askNeighbors(x,y,bit){
+    const targetX=x+bit%3-1,targetY=y+((bit/3)|0)-1;
+    if(!inBounds(targetX,targetY))return -1;
+    votes.fill(0);let n=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;
+      const nx=x+dx,ny=y+dy;
+      if(!inBounds(nx,ny))continue;
+      const bx=targetX-nx+1,by=targetY-ny+1;
+      if(bx<0||bx>2||by<0||by>2)continue;
+      const j=ix(nx,ny),k=by*3+bx;
+      if(!(knowledge[j]&(1<<k)))continue;
+      votes[testimony[j*9+k]]++;n++;
+    }
+    if(!n)return -1;
+    let best=0,bestCount=0;
+    for(let t=0;t<7;t++)if(votes[t]>bestCount){best=t;bestCount=votes[t];}
+    return bestCount>n/2?best:-1;
+  }
+  function gossip(i,x,y){
+    if(knowledge[i]===possible[i])return;
+    // Rate-limited: each agent learns one fragment at a time through proximity.
+    if((i+generations)%(repairBoost?2:4)!==0)return;
+    const start=(genome[i]+generations)%9;
+    for(let k=0;k<9;k++){
+      const bit=(start+k)%9;
+      if(!(possible[i]&(1<<bit))||(knowledge[i]&(1<<bit)))continue;
+      const remembered=askNeighbors(x,y,bit);
+      if(remembered<0)continue;
+      testimony[i*9+bit]=remembered;
+      knowledge[i]|=1<<bit;
+      learnedFragments++;
+      if(bit===4)flash[i]=165;
+      break;
+    }
+  }
+  function update(){
+    generations++;
+    for(let i=0;i<N;i++){
+      const x=i%W,y=(i/W)|0;
+      gossip(i,x,y);
+      const remembered=(knowledge[i]&16)?testimony[i*9+4]:-1;
+      const current=role[i];let next=current,support=0;
+      if(remembered>=0){
+        if(x>0&&role[i-1]===remembered)support++;
+        if(x<W-1&&role[i+1]===remembered)support++;
+        if(y>0&&role[i-W]===remembered)support++;
+        if(y<H-1&&role[i+W]===remembered)support++;
+      }
+      if(damage[i]){
+        damage[i]--;
+        if(random()<.18)next=Math.floor(random()*7);
+        conviction[i]=Math.max(0,conviction[i]-4);
+      }else if(remembered>=0){
+        if(current===remembered){
+          conviction[i]=Math.min(255,conviction[i]+1+support);
+          if(random()<(temperament[i]<25?.002:.00035))next=Math.floor(random()*7);
+        }else{
+          conviction[i]=Math.max(0,conviction[i]-2);
+          const listen=.055+support*.055+(temperament[i]/255)*.05+(repairBoost?.39:0);
+          if(random()<listen){next=remembered;conviction[i]=40+support*16;}
+        }
+      }else{
+        // Without witnesses the agent may imitate a neighbor, but it cannot
+        // know if that guess belongs to the original glyph or line.
+        conviction[i]=Math.max(0,conviction[i]-2);
+        if(random()<.025){
+          const j=x>0&&random()<.5?i-1:y>0?i-W:i;
+          next=role[j];
+        }
+      }
+      nextRole[i]=next;
+      const l=life[i],a=age[i];
+      if(!isField(i)){nextLife[i]=0;nextAge[i]=0;}
+      else if(l===1){
+        if(a>=3+(genome[i]%4)){nextLife[i]=2;nextAge[i]=0;}
+        else{nextLife[i]=1;nextAge[i]=a+1;}
+      }else if(l===2){
+        if(a>=12+(genome[i]%17)){nextLife[i]=0;nextAge[i]=0;}
+        else{nextLife[i]=2;nextAge[i]=a+1;}
+      }else{
+        const neighbors=nearby(i,life);
+        if((neighbors>0&&random()<Math.min(.55,neighbors*(.085+(genome[i]%5)*.018)))||random()<.00015){
+          nextLife[i]=1;nextAge[i]=0;
+        }else{nextLife[i]=0;nextAge[i]=0;}
+      }
+      if(flash[i])flash[i]=Math.max(0,flash[i]-13);
+    }
+    [role,nextRole]=[nextRole,role];
+    [life,nextLife]=[nextLife,life];
+    [age,nextAge]=[nextAge,age];
+    if(repairBoost)repairBoost--;
+    if(messageTicks&&!--messageTicks)publicNotice('HOLD TO FORGET');
+  }
+  function render(){
+    const data=image.data,t=generations;
+    for(let i=0,o=0;i<N;i++,o+=4){
+      const r=role[i],p=COLORS[r],gene=genome[i];
+      let glow=r===0?.35+(gene/255)*.10:.52+conviction[i]/255*.43;
+      glow+=(Math.sin(t*.045+gene*.18)+1)*.028;
+      let red=p[0]*glow,green=p[1]*glow,blue=p[2]*glow;
+      if(life[i]===1){
+        const col=COLORS[3+gene%3],energy=age[i];
+        red=col[0]*(.75+.12*energy);green=col[1]*(.75+.12*energy);blue=col[2]*(.75+.12*energy);
+      }else if(life[i]===2){
+        const f=Math.max(0,.50-age[i]/75);red+=70*f;green+=155*f;blue+=175*f;
+      }
+      if(inspect){
+        if(!(knowledge[i]&16)){red+=145;green*=.35;blue+=65;}
+        else if(knowledge[i]!==possible[i]){red+=105;green+=60;blue*=.55;}
+        else if(r!==0){green+=32;blue+=13;}
+      }
+      if(flash[i]){red+=flash[i]*.3;green+=flash[i]*.06;blue+=flash[i]*.32;}
+      data[o]=Math.min(255,red)|0;data[o+1]=Math.min(255,green)|0;
+      data[o+2]=Math.min(255,blue)|0;data[o+3]=255;
+    }
+    ctx.putImageData(image,0,0);
+  }
+  function point(e){const b=canvas.getBoundingClientRect();return {
+    x:clamp(Math.floor((e.clientX-b.left)*W/b.width),0,W-1),
+    y:clamp(Math.floor((e.clientY-b.top)*H/b.height),0,H-1)
+  };}
+  function activate(e){
+    e.preventDefault();pointerIsDown=true;held=false;
+    const p=point(e),i=ix(p.x,p.y);
+    if(hotspot[i]===1)bloom();
+    else if(hotspot[i]===2)disrupt();
+    else if(hotspot[i]===3)heal();
+    else if(p.y>H-27&&p.y<H-15){inspect=!inspect;notify(inspect?'MEMORY VIEW':'COLONY VIEW');}
+    else if(isField(i)){
+      spark(p.x,p.y,4);notify('SIGNAL SENT');
+      clearTimeout(holdTimer);
+      const hx=p.x,hy=p.y;
+      holdTimer=setTimeout(()=>{if(pointerIsDown&&!held){held=true;erase(hx,hy,5);}},520);
+    }else spark(region.x+4+Math.floor(random()*(region.w-8)),region.y+Math.floor(region.h/2),3);
+    sx=p.x;sy=p.y;
+    try{canvas.setPointerCapture(e.pointerId);}catch(_){/* unsupported */}
+  }
+  canvas.addEventListener('pointerdown',activate,{passive:false});
+  canvas.addEventListener('pointermove',e=>{
+    if(!pointerIsDown||held)return;
+    const p=point(e);
+    if(Math.abs(p.x-sx)+Math.abs(p.y-sy)>3){
+      clearTimeout(holdTimer);
+      if(isField(ix(p.x,p.y)))spark(p.x,p.y,2);
+      sx=p.x;sy=p.y;
+    }
+  });
+  function release(){pointerIsDown=false;clearTimeout(holdTimer);}
+  ['pointerup','pointercancel','lostpointercapture'].forEach(k=>canvas.addEventListener(k,release));
+  window.addEventListener('keydown',e=>{
+    if(e.key==='1'||e.key.toLowerCase()==='g')bloom();
+    if(e.key==='2'||e.key.toLowerCase()==='b')disrupt();
+    if(e.key==='3'||e.key.toLowerCase()==='h')heal();
+    if(e.key.toLowerCase()==='m'){inspect=!inspect;notify(inspect?'MEMORY VIEW':'COLONY VIEW');}
+    if(e.key.toLowerCase()==='e')erase(region.x+Math.floor(region.w/2),region.y+Math.floor(region.h/2),5);
+  });
+  let resizeId=0;
+  window.addEventListener('resize',()=>{cancelAnimationFrame(resizeId);resizeId=requestAnimationFrame(create);});
+  document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;});
+  function frameLoop(now){
+    if(!last)last=now;
+    const elapsed=Math.min(100,now-last);last=now;
+    accumulator+=elapsed;
+    if(!document.hidden){
+      let steps=0;
+      while(accumulator>=33.333&&steps<3){update();accumulator-=33.333;steps++;}
+      render();
+    }
+    requestAnimationFrame(frameLoop);
+  }
+  create();requestAnimationFrame(frameLoop);
+  Object.defineProperty(window,'pixelSociety',{get:()=>{
+    let knownCenters=0,full=0;
+    for(let i=0;i<N;i++){if(knowledge[i]&16)knownCenters++;if(knowledge[i]===possible[i])full++;}
+    return {version:'0.2 witness network',agents:N,generations,
+      localMemoryCoverage:Math.round(1000*full/N)/10,
+      recoveredCenters:Math.round(1000*knownCenters/N)/10,
+      sharedFragments:learnedFragments,amnesiaEvents,signals:pulseEvents,glitches:glitchEvents,
+      blueprintAlive:staging!==null,
+      note:'Distributed memories, each a 3x3 patch. Neighbor gossip repairs forgotten fragments. Fully lost information cannot be conjured.'};
+  }});
+})();
+</script>
+</body>
+</html>
