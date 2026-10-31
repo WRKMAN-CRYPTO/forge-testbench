@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 1.6 | The Cost of Doing Business</title>
+<title>Pixel Society 1.7 | Underground Linkers</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -116,6 +116,31 @@
   const JOB={NONE:0,BUTTON:1,LINKER:2,FORMATTER:3,TEXT:4,FOREMAN:5};
   const JOB_NAMES=['UNASSIGNED','BUTTON','LINKER','FORMATTER','TEXT','FOREMAN'];
   let occupation=new Uint8Array(0),clan=new Uint8Array(0),obedience=new Uint8Array(0);
+  // The surface and buried occupation are separate, co-located agent slots.
+  // Zero = no underground linker. Never mutate surface occupation to create one.
+  let underClan=new Uint8Array(0),underTenure=new Uint8Array(0),underUse=new Uint8Array(0),underGene=new Uint8Array(0);
+  let deepView=false,underHired=0,underLeft=0,underTransfers=0;
+  const underAt=i=>underClan[i]!==0;
+  const underOwn=(i,m)=>underClan[i]===m.id;
+  const neighbors4=i=>{const x=i%W,y=(i/W)|0;return [x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];};
+  function hireUnder(i,m){
+    if(i<0||!isField(i)||underClan[i]||!m)return false;
+    if(!canFund(m,JOB.LINKER,-1))return budgetRefuse();
+    if(jobMode&&costOn&&marketOn)m.laborUsed+=3;
+    underClan[i]=m.id;underTenure[i]=0;underUse[i]=0;underGene[i]=Math.floor(random()*256);
+    m.linkers++;jobSwitches++;m.careerChanges++;underHired++;
+    flash[i]=Math.max(flash[i],72);
+    return true;
+  }
+  function retireUnder(i){
+    if(!underClan[i])return false;
+    const m=leaders[underClan[i]-1];if(m){m.linkers=Math.max(0,m.linkers-1);m.laborUsed=Math.max(0,m.laborUsed-3);}
+    if(chainIds[i])chainIds[i]=0;
+    underClan[i]=underTenure[i]=underUse[i]=underGene[i]=0;underLeft++;jobResigns++;
+    return true;
+  }
+  function toggleDeep(){deepView=!deepView;jobNews=deepView?'UNDERGROUND VIEW':'SURFACE VIEW';metrics=measure();displayStats();return deepView;}
+
   let jobMode=false,wipeArmed=false,leaders=[],jobTally=[0,0,0,0,0,0];
   // Foremen are recruited *pixels*, one or more per maker, not a global task scheduler.
   // They can inspect only a local radius, issue temporary orders, and earn
@@ -219,9 +244,11 @@
 
     // The controls in the colony header are genuine agent pixels too.
     // They recruit their own testimony just like the other fixed controls.
-    button(region.x+region.w-31,region.y+1,28,11,'JOBS',R.GOLD,13);
-    button(region.x+2,region.y+1,27,11,'WIPE',R.PINK,14);
-    button(region.x+Math.floor(region.w/2)-16,region.y+1,32,11,'ECON',R.CYAN,15);
+    const hw=Math.floor((region.w-10)/4),hg=2;
+    button(region.x+2,region.y+1,hw,11,'WIP',R.PINK,14);
+    button(region.x+2+(hw+hg),region.y+1,hw,11,'ECO',R.CYAN,15);
+    button(region.x+2+2*(hw+hg),region.y+1,hw,11,'SUB',R.CYAN,20);
+    button(region.x+2+3*(hw+hg),region.y+1,hw,11,'JOB',R.GOLD,13);
     hline(5,W-6,H-64,R.FRAME);
     // The status strip doubles as a compact, touchable experiment console.
     // All of it is still made from the same agent-controlled ImageData pixels.
@@ -329,7 +356,7 @@
     wires=new Uint8Array(N*2);wireUsed=new Uint16Array(N*2);
     cycleTouches=new Uint16Array(N*2);engram=new Uint8Array(N*2);engramWeight=new Uint8Array(N*2);
     wireView=false;cycleStage='NEW';cycleProgress=cycleTarget=cycleClock=0;
-    occupation=new Uint8Array(N);clan=new Uint8Array(N);obedience=new Uint8Array(N);
+    occupation=new Uint8Array(N);clan=new Uint8Array(N);obedience=new Uint8Array(N);underClan=new Uint8Array(N);underTenure=new Uint8Array(N);underUse=new Uint8Array(N);underGene=new Uint8Array(N);deepView=false;underHired=underLeft=underTransfers=0;
     workOrder=new Uint32Array(N);workMentor=new Uint32Array(N);
     jobTenure=new Uint8Array(N);jobUse=new Uint8Array(N);bridgeMark=new Uint32Array(N);
     jobMessageDist=new Int16Array(N);jobMessageDist.fill(-1);
@@ -409,7 +436,7 @@
       region.y+14+Math.floor(random()*Math.max(1,region.h-20)),1+Math.floor(random()*3));
   }
   function rewild(){
-    if(jobMode){jobMode=false;wipeArmed=false;leaders=[];occupation.fill(0);clan.fill(0);}
+    if(jobMode){jobMode=false;wipeArmed=false;leaders=[];occupation.fill(0);clan.fill(0);underClan.fill(0);}
     // Radical amnesia: erase every remembered assertion *about the field*,
     // including overlapping memories held by agents just outside the field.
     // The diagnostic origin remains read-only and inaccessible to agents.
@@ -1069,6 +1096,7 @@
     return column<5&&FONT[ch]?.[yy]?.[column]==='1';
   }
   function makeWorker(i,m,type){
+    if(type===JOB.LINKER)return hireUnder(i,m);
     if(i<0||!isField(i)||occupation[i]===JOB.BUTTON)return false;
     if(clan[i]!==0&&clan[i]!==m.id)return false;
     const fresh=clan[i]===0;
@@ -1090,7 +1118,7 @@
     if(!wild)rewild();
     if(traceActive)toggleTrace();
     training=false;jobMode=true;wipeArmed=false;
-    occupation.fill(0);clan.fill(0);obedience.fill(0);jobTenure.fill(0);jobUse.fill(0);bridgeMark.fill(0);leaders=[];
+    occupation.fill(0);clan.fill(0);obedience.fill(0);jobTenure.fill(0);jobUse.fill(0);bridgeMark.fill(0);underClan.fill(0);underTenure.fill(0);underUse.fill(0);underGene.fill(0);underHired=underLeft=underTransfers=0;leaders=[];
     workOrder.fill(0);workMentor.fill(0);foremanOrders=foremanRepairs=foremanHires=foremanLinkAssists=0;
     jobSwitches=jobPoaches=jobResigns=jobShortages=jobIdle=jobRecruitAttempts=jobOffersRejected=jobCompetition=0;
     bridgeTrials=bridgeSuccesses=bridgeBest=bridgeLastHops=bridgeRewards=bridgeShortageEvents=0;
@@ -1206,11 +1234,14 @@
     for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
       const i=ix(x,y),j=occupation[i],c=clan[i];
       if(j)jobTally[j]++;
+      if(underClan[i]){
+        const below=leaders[underClan[i]-1];
+        if(below){jobTally[JOB.LINKER]++;below.linkers++;below.laborUsed+=3;}
+      }
       if(!c)continue;
       const m=leaders[c-1];if(!m)continue;
       m.workers++;m.laborUsed+=laborCost(j);
       if(j===JOB.TEXT)m.text++;
-      if(j===JOB.LINKER)m.linkers++;
       if(j===JOB.FORMATTER)m.formatters++;
       if(j===JOB.FOREMAN)m.foremen++;
       if(!inLeader(m,x,y))continue;
@@ -1270,7 +1301,7 @@
       if(m.workers<(type===JOB.LINKER?3:type===JOB.TEXT?9:16))continue;
       let candidate=-1,best=-Infinity;
       for(let y=m.y+1;y<m.y+m.h-1;y++)for(let x=m.x+1;x<m.x+m.w-1;x++){
-        const i=ix(x,y);if(clan[i]!==m.id||occupation[i]!==JOB.NONE)continue;
+        const i=ix(x,y);if(clan[i]!==m.id||(type===JOB.LINKER?underAt(i):occupation[i]!==JOB.NONE))continue;
         let score=temperament[i]*.25+obedience[i]*.2;
         if(type===JOB.TEXT)score-=Math.abs(y-(m.y+Math.floor(m.h/2)))*12;
         else if(type===JOB.FORMATTER)score-=Math.abs(x-(m.x+Math.floor(m.w/2)))*3;
@@ -1283,7 +1314,6 @@
       }
       if(candidate>=0&&(!marketOn||random()<.78+obedience[candidate]/1200)&&makeWorker(candidate,m,type)){
         if(type===JOB.TEXT)m.text++;
-        if(type===JOB.LINKER)m.linkers++;
         if(type===JOB.FORMATTER)m.formatters++;
         if(marketOn){jobSwitches++;m.careerChanges++;}
         jobNews=type===JOB.TEXT?'TEXT MAKER HIRED':type===JOB.LINKER?'LINKER HIRED':'FORMATTER HIRED';
@@ -1292,7 +1322,7 @@
   }
   function jobAptitude(i,type){
     // Persistent personal preferences, no universal optimal class table.
-    const g=genome[i],t=temperament[i];
+    const g=type===JOB.LINKER&&underAt(i)?underGene[i]:genome[i],t=temperament[i];
     if(type===JOB.NONE)return 18+((g+t*3)&31);
     if(type===JOB.LINKER)return 14+((g*7+t*3)&63);
     if(type===JOB.FORMATTER)return 10+((g*5+t*11)&63);
@@ -1324,7 +1354,7 @@
         }else score+=18;
         score+=m.recentDeliveries>0?8:0;
         // Measured output belongs to this individual, not every neighbor.
-        score+=(jobUse[i]/(leanOn&&marketOn?5:12))|0;
+        score+=(underUse[i]/(leanOn&&marketOn?5:12))|0;
         // In LEAN mode a highly redundant crew is costly. A worker who
         // actually carried a bridge can justify their position with jobUse.
         if(leanOn&&marketOn&&m.bridgeWorkers>0&&generations<m.bridgeUntil&&m.linkers>m.linkTarget){
@@ -1338,7 +1368,7 @@
           const c=chains.get(chainIds[i]);
           if(c&&c.members.length>=3)score+=Math.min(72,c.members.length*2)+(c.done?65:0);
         }
-        if(jobTenure[i]>5&&jobUse[i]<8)score-=12;
+        if(underTenure[i]>5&&underUse[i]<8)score-=12;
         if(costOn&&marketOn){
           const over=Math.max(0,m.linkers-m.linkTarget);
           const tight=m.laborUsed+m.builderReserve>=m.laborBudget;
@@ -1360,13 +1390,15 @@
     // Tiny peer influence; local affinity can overcome a small pay gap.
     let peers=0;
     const x=i%W,y=(i/W)|0;
-    if(x>0&&occupation[i-1]===type&&clan[i-1]===m.id)peers++;
-    if(x<W-1&&occupation[i+1]===type&&clan[i+1]===m.id)peers++;
-    if(y>0&&occupation[i-W]===type&&clan[i-W]===m.id)peers++;
-    if(y<H-1&&occupation[i+W]===type&&clan[i+W]===m.id)peers++;
+    if(x>0&&(type===JOB.LINKER?underClan[i-1]===m.id:occupation[i-1]===type&&clan[i-1]===m.id))peers++;
+    if(x<W-1&&(type===JOB.LINKER?underClan[i+1]===m.id:occupation[i+1]===type&&clan[i+1]===m.id))peers++;
+    if(y>0&&(type===JOB.LINKER?underClan[i-W]===m.id:occupation[i-W]===type&&clan[i-W]===m.id))peers++;
+    if(y<H-1&&(type===JOB.LINKER?underClan[i+W]===m.id:occupation[i+W]===type&&clan[i+W]===m.id))peers++;
     return score+peers*4;
   }
   function changeCareer(i,m,to){
+    // Hiring a buried linker does not remove the surface worker.
+    if(to===JOB.LINKER)return hireUnder(i,m);
     const was=occupation[i];if(was===to||was===JOB.BUTTON)return false;
     if(!canFund(m,to,was))return budgetRefuse();
     if(jobMode&&costOn&&marketOn){
@@ -1389,7 +1421,7 @@
     return true;
   }
   function chainCreate(i){
-    const m=leaders[clan[i]-1];if(!m)return null;
+    const m=leaders[underClan[i]-1];if(!m)return null;
     const x=i%W,y=(i/W)|0;
     const target=leaders.filter(b=>b.id!==m.id).reduce((best,b)=>{
       const dx=b.x+b.w/2-x,dy=b.y+b.h/2-y,d=Math.abs(dx)+Math.abs(dy);
@@ -1398,7 +1430,7 @@
     // Mostly seek the nearest rival, but unique personal preferences
     // occasionally favor the perpendicular direction.
     let axis=target&&Math.abs(target.dy)>Math.abs(target.dx)?1:0;
-    if((genome[i]&15)===0)axis=1-axis;
+    if((underGene[i]&15)===0)axis=1-axis;
     const c={id:nextChainId++,axis,fixed:axis===0?y:x,lo:axis===0?x:y,
       hi:axis===0?x:y,owner:m.id,members:[i],done:false,active:true};
     chains.set(c.id,c);chainIds[i]=c.id;return c;
@@ -1406,12 +1438,12 @@
   function chainContacts(c){
     const found=new Set();
     for(const i of c.members){
-      if(occupation[i]!==JOB.LINKER||chainIds[i]!==c.id)continue;
+      if(!underAt(i)||chainIds[i]!==c.id)continue;
       const x=i%W,y=(i/W)|0;
       for(const m of leaders){
         // The source or recipient must have an actual employed linker in
         // its button territory, or its worker must touch this line.
-        if(clan[i]===m.id&&inLeader(m,x,y))found.add(m.id);
+        if((underClan[i]===m.id||clan[i]===m.id)&&inLeader(m,x,y))found.add(m.id);
         const near=[x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];
         // An ordinary employee can receive a message at the doorstep. The
         // interior of the button is NOT made into a fictional linker chain.
@@ -1424,7 +1456,7 @@
     // Recalculate physical membership; a departing worker can split a line.
     // Never use stale historical mass as a reward or fake a remote bridge.
     for(const c of [...chains.values()]){
-      const live=c.members.filter(i=>occupation[i]===JOB.LINKER&&chainIds[i]===c.id&&
+      const live=c.members.filter(i=>underAt(i)&&chainIds[i]===c.id&&
         (c.axis===0?((i/W)|0)===c.fixed:i%W===c.fixed));
       live.sort((a,b)=> (c.axis===0?a%W:((a/W)|0))-(c.axis===0?b%W:((b/W)|0)));
       if(!live.length){chains.delete(c.id);continue;}
@@ -1447,8 +1479,8 @@
     // New linkers begin as independent crews. Collinear contact is resolved
     // by merge below, rather than faking shared identity across a gap.
     for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
-      const i=ix(x,y);if(occupation[i]===JOB.LINKER&&clan[i]&&!chainIds[i])chainCreate(i);
-      if(occupation[i]!==JOB.LINKER)chainIds[i]=0;
+      const i=ix(x,y);if(underAt(i)&&underClan[i]&&!chainIds[i])chainCreate(i);
+      if(!underAt(i))chainIds[i]=0;
     }
   }
   function chainAbsorb(a,b){
@@ -1457,7 +1489,7 @@
     const large=a.members.length>=b.members.length?a:b;
     const small=large===a?b:a;
     const taken=small.members.length;
-    for(const i of small.members){chainIds[i]=large.id;jobUse[i]=Math.min(255,jobUse[i]+12);}
+    for(const i of small.members){chainIds[i]=large.id;underUse[i]=Math.min(255,underUse[i]+12);}
     large.members.push(...small.members);
     large.members.sort((i,j)=>(large.axis===0?i%W:((i/W)|0))-(large.axis===0?j%W:((j/W)|0)));
     large.lo=Math.min(large.lo,small.lo);large.hi=Math.max(large.hi,small.hi);
@@ -1496,7 +1528,7 @@
       if(c.done)continue;
       if(contacts.length>=2){
         c.done=true;chainConnections++;chainStopped++;
-        for(const i of c.members){jobUse[i]=Math.min(255,jobUse[i]+72);flash[i]=235;}
+        for(const i of c.members){underUse[i]=Math.min(255,underUse[i]+72);flash[i]=235;}
         jobNews='BRIDGE CONNECTED '+c.members.length;
       }
     }
@@ -1510,7 +1542,7 @@
       // Reward length and completed useful work rather than raw headcount.
       if(generations%24===0&&c.members.length>=3){
         const bonus=Math.min(28,Math.floor(Math.sqrt(c.members.length)*5));
-        for(const i of c.members){jobUse[i]=Math.min(255,jobUse[i]+bonus);}
+        for(const i of c.members){underUse[i]=Math.min(255,underUse[i]+bonus);}
         chainRewards+=c.members.length;
       }
       // Limit overspread: reward making one straight route, not covering the
@@ -1524,24 +1556,14 @@
         if(t<0||t>=(c.axis===0?W:H))continue;
         const i=c.axis===0?ix(t,x):ix(y,t);
         if(!isField(i))continue;
-        const rival=leaderByPosition(i%W,(i/W)|0);
-        if(rival&&rival.id!==m.id&&occupation[i]!==JOB.LINKER)continue;
-        if(occupation[i]===JOB.LINKER){
+        if(underAt(i)){
           const other=chains.get(chainIds[i]);
           if(other&&chainAbsorb(c,other))break;
           continue;
         }
-        if(clan[i]!==0&&clan[i]!==m.id)continue;
-        if(clan[i]===m.id&&occupation[i]!==JOB.NONE)continue;
-        // A border linker can still paint gold; don't wipe its visible job.
-        if(clan[i]===m.id){
-          if(random()<.55&&changeCareer(i,m,JOB.LINKER)){chainIds[i]=c.id;c.members.push(i);}
-          else continue;
-        }else{
-          if(random()>.25+obedience[i]/1400)continue;
-          if(!makeWorker(i,m,JOB.LINKER))continue;
-          m.linkers++;m.workers++;chainIds[i]=c.id;c.members.push(i);
-        }
+        if(random()>.30+temperament[i]/1500)continue;
+        if(!hireUnder(i,m))continue;
+        chainIds[i]=c.id;c.members.push(i);
         c.lo=Math.min(c.lo,t);c.hi=Math.max(c.hi,t);chainGrowth++;
         chainLongest=Math.max(chainLongest,c.members.length);
         flash[i]=160;break;
@@ -1568,56 +1590,25 @@
     return done*100<BUTTON_COMPLETION_TARGET*m.borderTotal;
   }
   function tryPoach(i,m){
-    // Button chiefs steal *linkers* for the unfinished interface, including
-    // when their normal linker quota is full. Offers still require the
-    // adjacency/contact path used by the labor market, never teleportation.
-    if(occupation[i]!==JOB.LINKER||!buttonNeedsWorkers(m))return false;
-    const former=leaders[clan[i]-1];
-    if(!former||former.id===m.id||jobTenure[i]<4)return false;
+    if(!underClan[i]||!buttonNeedsWorkers(m))return false;
+    const former=leaders[underClan[i]-1];
+    if(!former||former.id===m.id||underTenure[i]<4)return false;
+    // Physical contact with the receiving company's *surface* crew.
+    if(!neighbors4(i).some(j=>j>=0&&clan[j]===m.id))return false;
     buttonOffers++;jobCompetition++;
-    const x=i%W,y=(i/W)|0;
-    const onBorder=desiredBorder(m,x,y);
-    if(!canFund(m,onBorder?JOB.NONE:JOB.LINKER,-1))return budgetRefuse();
-    const deficit=1-m.borderPercent/100;
-    const offer=jobValue(i,m,onBorder?JOB.NONE:JOB.LINKER)+33+deficit*60;
-    const stay=jobValue(i,former,JOB.LINKER)+9+obedience[i]*.022;
-    if(offer<stay+4||random()>.57){jobOffersRejected++;return false;}
-    former.linkers--;
-    if(costOn&&marketOn&&jobMode){
-      m.laborUsed+=laborCost(onBorder?JOB.NONE:JOB.LINKER);
-      former.laborUsed-=laborCost(JOB.LINKER);
-    }
-    clan[i]=m.id;occupation[i]=onBorder?JOB.NONE:JOB.LINKER;
-    jobUse[i]=0;jobTenure[i]=0;obedience[i]=Math.floor(obedience[i]*.73);
-    m.workers++;if(!onBorder)m.linkers++;former.workers--;
-    m.poached++;former.losses++;jobPoaches++;jobSwitches++;
-    m.linkerSteals++;buttonSteals++;
-    role[i]=onBorder?R.MIST:R.CYAN;flash[i]=240;
-    jobEvent=m.label+' STOLE '+former.label+' LINKER';jobNews=jobEvent;
+    if(!canFund(m,JOB.LINKER,-1))return budgetRefuse();
+    const offer=(m.borderPercent<99?60:0)+jobAptitude(i,JOB.LINKER)+random()*42;
+    if(offer<jobAptitude(i,JOB.LINKER)+30||random()>.57){jobOffersRejected++;return false;}
+    former.linkers=Math.max(0,former.linkers-1);m.linkers++;
+    former.laborUsed=Math.max(0,former.laborUsed-3);m.laborUsed+=3;
+    underClan[i]=m.id;underTenure[i]=0;underUse[i]=0;underTransfers++;
+    former.losses++;m.poached++;jobPoaches++;jobSwitches++;m.linkerSteals++;buttonSteals++;
+    flash[i]=200;jobEvent=m.label+' STOLE UNDERGROUND LINKER';jobNews=jobEvent;
     return true;
   }
   function reclaimBorderLinkers(m){
-    // A maker can also take its own surplus linkers off a perimeter job and
-    // assign them to construction. Ordinary workers paint borders through
-    // the existing stochastic obedience rules, not by instant magic pixels.
-    if(!buttonNeedsWorkers(m))return;
-    let recalls=0;
-    const start=(generations+genome[m.chief])%m.borderTotal;
-    for(let a=0;a<m.borderTotal&&recalls<3;a++){
-      const k=(a+start)%m.borderTotal;
-      let x,y;
-      if(k<m.w){x=m.x+k;y=m.y;}
-      else if(k<m.w+m.h-2){x=m.x+m.w-1;y=m.y+1+(k-m.w);}
-      else if(k<2*m.w+m.h-2){x=m.x+m.w-1-(k-(m.w+m.h-2));y=m.y+m.h-1;}
-      else{x=m.x;y=m.y+m.h-2-(k-(2*m.w+m.h-2));}
-      const i=ix(x,y);
-      if(clan[i]!==m.id||occupation[i]!==JOB.LINKER)continue;
-      if(jobTenure[i]<2||random()>.64)continue; // people may refuse
-      if(changeCareer(i,m,JOB.NONE)){
-        m.linkerReclaims++;buttonReclaims++;recalls++;
-        jobEvent=m.label+' RECLAIMED LINKER';jobNews=jobEvent;
-      }
-    }
+    // Underground infrastructure no longer occupies the border surface.
+    // There is no need to pull a linker away to paint a border.
   }
   function recruitForemen(m){
     // Only the button maker can appoint a foreman, from *its own* ordinary
@@ -1695,9 +1686,9 @@
           const x=fx+dx,y=fy+dy;if(!inBounds(x,y)||desiredBorder(m,x,y))continue;
           const i=ix(x,y);
           if(clan[i]!==m.id||occupation[i]!==JOB.NONE||jobTenure[i]<3)continue;
-          const horizontal=x>0&&x<W-1&&occupation[i-1]===JOB.LINKER&&occupation[i+1]===JOB.LINKER;
-          const vertical=y>0&&y<H-1&&occupation[i-W]===JOB.LINKER&&occupation[i+W]===JOB.LINKER;
-          if((horizontal||vertical)&&random()<.12+obedience[i]/1800&&changeCareer(i,m,JOB.LINKER)){
+          const horizontal=x>0&&x<W-1&&underAt(i-1)&&underAt(i+1);
+          const vertical=y>0&&y<H-1&&underAt(i-W)&&underAt(i+W);
+          if((horizontal||vertical)&&!underAt(i)&&random()<.12+obedience[i]/1800&&hireUnder(i,m)){
             foremanLinkAssists++;m.foremanAssists++;jobUse[f]=Math.min(255,jobUse[f]+12);
             jobNews=m.label+' FOREMAN FIXED LINK GAP';break;
           }
@@ -1720,7 +1711,7 @@
       if((old===JOB.LINKER||old===JOB.FORMATTER)&&jobUse[i]<8&&jobTenure[i]>6)jobIdle++;
       if(jobTenure[i]<5||random()>.14)continue;
       const current=jobValue(i,m,old)+(old===JOB.TEXT?25:13);
-      const choices=[JOB.NONE,JOB.LINKER,JOB.FORMATTER];
+      const choices=[JOB.NONE,JOB.FORMATTER];
       // TEXT jobs cannot be self-appointed. The manager must recruit them.
       let bestType=old,best=current;
       for(const type of choices){
@@ -1731,10 +1722,15 @@
       }
       if(bestType!==old)changeCareer(i,m,bestType);
     }
-    // Button makers prioritize construction while their perimeter is below
-    // 99%. A border linker can be reassigned even when the regular staffing
-    // plan says the group already employs enough linkers.
-    if(generations%12===0)for(const m of leaders)reclaimBorderLinkers(m);
+    // Under-layer workers evaluate their own work and staffing demand.
+    // Nothing here changes the surface occupation living above them.
+    for(let i=0;i<N;i++)if(underClan[i]){
+      const m=leaders[underClan[i]-1];if(!m)continue;
+      underTenure[i]=Math.min(255,underTenure[i]+1);
+      if(underUse[i]>0&&generations%7===0)underUse[i]--;
+      if(underTenure[i]>9&&generations%12===0&&m.linkers>m.linkTarget+3&&
+        underUse[i]<10&&random()<.085)retireUnder(i);
+    }
     // Frontier agents make immediate local offers when rival neighbors
     // are encountered. A small sampled review also considers border contacts.
     for(let tries=0;tries<Math.min(60,Math.floor(jobTerritory/9));tries++){
@@ -1742,8 +1738,8 @@
       const y=region.y+13+Math.floor(random()*Math.max(1,region.h-16));
       const i=ix(x,y),c=clan[i];if(!c||occupation[i]===JOB.BUTTON)continue;
       const neighbors=[x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];
-      for(const j of neighbors)if(j>=0&&clan[j]&&clan[j]!==c&&occupation[j]===JOB.LINKER){
-        tryPoach(i,leaders[clan[j]-1]);break;
+      for(const j of neighbors)if(j>=0&&underClan[j]&&underClan[j]!==c){
+        tryPoach(j,leaders[c-1]);break;
       }
     }
     if(generations%36===0){
@@ -1788,7 +1784,7 @@
         // Linkers on a border can still fulfill its visible gold shape.
         // Border completion measures actual appearance, not job title.
         const target=border?R.GOLD:occupation[i]===JOB.FORMATTER?R.PINK:
-          occupation[i]===JOB.LINKER?R.CYAN:text?R.INK:R.VOID;
+          text?R.INK:R.VOID;
         let support=0;
         if(x>0&&role[i-1]===target)support++;
         if(y>0&&role[i-W]===target)support++;
@@ -1813,58 +1809,30 @@
       }
       if(generations%6===0)recruitSpecialists(m);
     }
-    // Linkers recruit into adjacent neutral territory to seek other groups.
-    // A multi-group route can appear, fail, or break as individual jobs change.
+    // Underground linkers independently expand through neighboring slots.
+    // They may pass beneath ANY surface class, including a rival's worker;
+    // ownership and communication remain strictly local to this underlayer.
     if((!chainMode||!marketOn)&&generations%4===0){
       const frontier=[];
       for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
-        const i=ix(x,y);if(occupation[i]===JOB.LINKER)frontier.push(i);
+        const i=ix(x,y);if(underAt(i))frontier.push(i);
       }
-      for(let t=0;t<Math.min(marketOn?110:75,frontier.length);t++){
-        let i=frontier[Math.floor(random()*frontier.length)];
-        if(marketOn){
-          // Scouts favor the outward edge of a group; still locally grown.
-          let best=-Infinity;
-          for(let z=0;z<7;z++){
-            const k=frontier[Math.floor(random()*frontier.length)],mm=leaders[clan[k]-1];
-            if(!mm)continue;
-            const kx=k%W,ky=(k/W)|0;
-            const near=leaders.filter(v=>v.id!==mm.id).reduce((a,v)=>Math.min(a,Math.abs(kx-(v.x+v.w/2))+Math.abs(ky-(v.y+v.h/2))),1e8);
-            const score=-near+random()*16+(inLeader(mm,kx,ky)?0:6);
-            if(score>best){best=score;i=k;}
-          }
-        }
-        const m=leaders[clan[i]-1];if(!m)continue;
+      for(let t=0;t<Math.min(marketOn?105:65,frontier.length);t++){
+        const i=frontier[Math.floor(random()*frontier.length)],m=leaders[underClan[i]-1];if(!m)continue;
         const x=i%W,y=(i/W)|0;
-        const directions=[i-1,i+1,i-W,i+W],other=leaders.filter(k=>k.id!==m.id);
-        const closest=other.reduce((a,k)=>{
-          const cx=k.x+k.w/2,cy=k.y+k.h/2;
-          return !a||Math.abs(cx-x)+Math.abs(cy-y)<a.dist?{m:k,dist:Math.abs(cx-x)+Math.abs(cy-y)}:a;
+        const nearest=leaders.filter(v=>v.id!==m.id).reduce((best,v)=>{
+          const cx=v.x+v.w/2,cy=v.y+v.h/2,dist=Math.abs(cx-x)+Math.abs(cy-y);
+          return !best||dist<best.dist?{x:cx,y:cy,dist}:best;
         },null);
-        if(!closest)continue;
-        const tx=closest.m.x+closest.m.w/2,ty=closest.m.y+closest.m.h/2;
-        directions.sort((a,b)=>{
-          const ax=a%W,ay=(a/W)|0,bx=b%W,by=(b/W)|0;
-          return (Math.abs(ax-tx)+Math.abs(ay-ty))-(Math.abs(bx-tx)+Math.abs(by-ty));
-        });
-        const j=random()<.76?directions[0]:directions[Math.floor(random()*4)];
-        const needLink=!marketOn||m.linkers<m.linkTarget;
-        const canSteal=marketOn&&j>=0&&j<N&&clan[j]>0&&clan[j]!==m.id&&
-          occupation[j]===JOB.LINKER&&buttonNeedsWorkers(m);
-        if(j>=0&&j<N&&isField(j)&&(needLink||canSteal)&&random()<(marketOn?.51:.36)){
-          if(clan[j]===0){
-            jobRecruitAttempts++;
-            if(marketOn&&random()<.20+temperament[j]/700)jobOffersRejected++;
-            else if(makeWorker(j,m,JOB.LINKER)){m.linkers++;m.workers++;}
-          }else if(marketOn&&clan[j]!==0&&clan[j]!==m.id){
-            tryPoach(j,m);
-          }else if(clan[j]===m.id&&occupation[j]===JOB.NONE&&random()<(marketOn?.43:.55)){
-            // In ECON mode, recruitment has to be useful to the new worker.
-            if(!marketOn||jobValue(j,m,JOB.LINKER)>jobValue(j,m,JOB.NONE)+12){
-              if(changeCareer(j,m,JOB.LINKER)){role[j]=R.CYAN;flash[j]=100;}
-            }else jobOffersRejected++;
-          }
-        }
+        const next=neighbors4(i).filter(j=>j>=0&&isField(j));
+        if(!nearest||!next.length)continue;
+        next.sort((a,b)=>Math.abs(a%W-nearest.x)+Math.abs(((a/W)|0)-nearest.y)-
+          Math.abs(b%W-nearest.x)-Math.abs(((b/W)|0)-nearest.y));
+        const j=random()<.77?next[0]:next[Math.floor(random()*next.length)];
+        if(!underAt(j)&&(!marketOn||m.linkers<m.linkTarget)&&random()<(marketOn?.45:.32)){
+          if(random()<.25+temperament[j]/1500)hireUnder(j,m);
+          else jobOffersRejected++;
+        }else if(underClan[j]&&underClan[j]!==m.id&&marketOn)tryPoach(j,m);
       }
     }
     if(chainMode&&marketOn&&generations%4===0)tickChains();
@@ -1891,12 +1859,12 @@
     for(let y=region.y+12;y<region.y+region.h-2;y++)
       for(let x=region.x+2;x<region.x+region.w-2;x++){
         const i=ix(x,y);
-        if(occupation[i]===JOB.LINKER&&clan[i]===m.id){distance[i]=0;queue[tail++]=i;}
+        if(underOwn(i,m)){distance[i]=0;queue[tail++]=i;}
       }
     let end=-1;
     while(head<tail){
       const i=queue[head++],x=i%W,y=(i/W)|0;
-      if(clan[i]!==m.id){end=i;break;}
+      if(clan[i]&&clan[i]!==m.id&&leaderByPosition(x,y)?.id===clan[i]){end=i;break;}
       const near=[x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];
       // A physical receiver inside another button accepts the final hop.
       // Only linkers can propagate beyond that receiver.
@@ -1905,14 +1873,14 @@
         parent[j]=i;distance[j]=distance[i]+1;end=j;break;
       }
       if(end>=0)break;
-      for(const j of near)if(j>=0&&occupation[j]===JOB.LINKER&&clan[j]&&distance[j]<0){
+      for(const j of near)if(j>=0&&underAt(j)&&distance[j]<0){
         parent[j]=i;distance[j]=distance[i]+1;queue[tail++]=j;
       }
     }
     if(end<0)return null;
     const path=[];let own=0;
     for(let i=end;i>=0;i=parent[i]){
-      path.push(i);if(clan[i]===m.id)own++;
+      path.push(i);if(underClan[i]===m.id)own++;
     }
     path.reverse();
     const hops=path.length-1;
@@ -1921,7 +1889,7 @@
     // rewards for number of linked pixels or distant flood coverage.
     const surplus=Math.max(0,m.linkers-own);
     const efficiency=Math.max(1,Math.round(100/(1+hops/35+surplus/16)));
-    return {path,hops,own,efficiency,surplus,targetClan:clan[end],visited:tail};
+    return {path,hops,own,efficiency,surplus,targetClan:clan[end]||underClan[end],visited:tail};
   }
   function recordBridge(m,b,award){
     bridgeTrials++;m.bridgeLast=b?1:0;
@@ -1934,9 +1902,9 @@
       // A lean route earns considerably more per contributing agent.
       // No bonus for other linkers, even though they belong to the team.
       const bonus=Math.max(5,Math.round(8+b.efficiency*.78));
-      for(const i of b.path)if(occupation[i]===JOB.LINKER){
+      for(const i of b.path)if(underAt(i)){
         // Both the sender and recipient deserve credit for working a bridge.
-        jobUse[i]=Math.min(255,jobUse[i]+bonus);
+        underUse[i]=Math.min(255,underUse[i]+bonus);
         bridgeMark[i]=generations;
         flash[i]=Math.max(flash[i],90);
         bridgeRewards++;
@@ -1949,7 +1917,7 @@
     // A tap is addressed to a real maker, who needs an employed linker.
     const owned=[];
     for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
-      const i=ix(x,y);if(occupation[i]===JOB.LINKER&&clan[i]===m.id)owned.push(i);
+      const i=ix(x,y);if(underOwn(i,m))owned.push(i);
     }
     if(!owned.length){jobNews='NO LINKER FOR '+m.label;metrics=measure();displayStats();return {sent:false,reason:'NO LINKER'};}
     const fmt=leaders.length&&format;
@@ -1966,7 +1934,7 @@
     for(const i of owned){jobMessageDist[i]=0;q[tail++]=i;}
     while(head<tail){
       const i=q[head++],d=jobMessageDist[i],x=i%W,y=(i/W)|0;
-      if(clan[i]!==m.id&&d>bestDistance){best=i;bestDistance=d;}
+      if(clan[i]&&clan[i]!==m.id&&leaderByPosition(x,y)?.id===clan[i]&&d>bestDistance){best=i;bestDistance=d;}
       const neighbors=[x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];
       for(const j of neighbors){
         if(j<0||jobMessageDist[j]>=0)continue;
@@ -1975,7 +1943,7 @@
           if(d+1>=bestDistance){best=j;bestDistance=d+1;}
           continue; // button worker can receive but cannot forward
         }
-        if(occupation[j]===JOB.LINKER){jobMessageDist[j]=d+1;q[tail++]=j;}
+        if(underAt(j)){jobMessageDist[j]=d+1;q[tail++]=j;}
       }
     }
     let efficientRoute=null;
@@ -2006,7 +1974,7 @@
       wipeArmed=false;
     }else if(best>=0){
       jobDeliveries++;m.recentDeliveries++;
-      jobNews='MESSAGE TO '+leaders[clan[best]-1].label;
+      jobNews='MESSAGE TO '+leaders[(clan[best]||underClan[best])-1].label;
       if(marketOn&&leanOn&&efficientRoute){
         recordBridge(m,efficientRoute,true);
         jobNews='BRIDGE '+efficientRoute.efficiency+' HOPS '+efficientRoute.hops;
@@ -2016,13 +1984,13 @@
         // Credit is local, not automatically given to all group workers.
         const stride=Math.max(1,Math.floor(tail/150));
         for(let k=0;k<tail;k+=stride){
-          const j=q[k];if(occupation[j]===JOB.LINKER)jobUse[j]=Math.min(255,jobUse[j]+14);
+          const j=q[k];if(underAt(j))underUse[j]=Math.min(255,underUse[j]+14);
         }
       }
     }
     else jobNews='SENT LOCAL ONLY';
     metrics=measure();displayStats();
-    return {sent:true,delivered:best>=0,target:best>=0?clan[best]:0,
+    return {sent:true,delivered:best>=0,target:best>=0?(clan[best]||underClan[best]):0,
       visited:tail,formatted:fmt};
   }
   function jobTap(x,y){
@@ -2036,6 +2004,7 @@
       foremen:jobTally[JOB.FOREMAN],foreman:{enabled:foremanOn,orders:foremanOrders,repairs:foremanRepairs,recruits:foremanHires,linkGapAssists:foremanLinkAssists},
       textMakers:jobTally[JOB.TEXT],recruits:jobRecruits,territory:jobTerritory,
       borderPercent:jobBorder,letteredButtons:jobLabelCount,taps:jobTaps,
+      underground:{enabled:true,visible:deepView,workers:jobTally[JOB.LINKER],hired:underHired,retired:underLeft,transferred:underTransfers,cooccupied:underClan.reduce((n,c,i)=>n+(!!c&&!!clan[i]),0)},
       chain:chainReport(),
       accounting:{enabled:costOn,spent:budgetSpent,capacity:budgetTotal,reserved:leaders.reduce((a,m)=>a+m.builderReserve,0),
         available:leaders.reduce((a,m)=>a+Math.max(0,m.laborBudget-m.laborUsed-m.builderReserve),0),
@@ -2230,7 +2199,6 @@
       if(jobMode&&isField(i)){
         const j=occupation[i];
         if(j===JOB.BUTTON){red=255;green=213;blue=122;}
-        else if(j===JOB.LINKER){red=36;green=225;blue=235;}
         else if(j===JOB.FORMATTER){red=230;green=102;blue=178;}
         else if(j===JOB.TEXT){red=252;green=225;blue=155;}
         else if(j===JOB.FOREMAN){red=164;green=250;blue=116;}
@@ -2308,13 +2276,21 @@
         }
         if(i===pulseSource){red=255;green=240;blue=210;}
       }
-      if(jobMode&&chainMode&&occupation[i]===JOB.LINKER&&chainIds[i]){
+      if(jobMode&&chainMode&&underAt(i)&&chainIds[i]&&deepView){
         const c=chains.get(chainIds[i]);
         if(c&&c.members.length>=3){
           const glow=Math.min(65,c.members.length*1.6);
           red+=c.done?glow*.75:glow*.18;
           green+=glow*.55;blue+=c.done?glow*.14:glow;
         }
+      }
+      if(jobMode&&deepView&&isField(i)){
+        // Real subsurface occupancy. The view does not change recruitment,
+        // memory, or signal topology; it only opens an inspection window.
+        if(underAt(i)){
+          const owner=underClan[i];
+          red=16+owner*9;green=193+Math.min(60,underUse[i]/3);blue=232+Math.min(23,underTenure[i]/5);
+        }else{red*=.12;green*=.15;blue*=.20;}
       }
       if(jobMode&&jobMessageElapsed<jobMessageDuration&&isField(i)&&jobMessageDist[i]>=0){
         const hop=Math.floor((jobMessageElapsed/jobMessageDuration)*35),d=jobMessageDist[i];
@@ -2345,6 +2321,7 @@
     const p=point(e),i=ix(p.x,p.y),hit=hotspot[i];
     if(['LEARNING','RESTING','RELEARNING'].includes(cycleStage)&&hit>=2&&hit<=9)return;
     if(hit===13)toggleJobs();
+    else if(hit===20)toggleDeep();
     else if(hit===15)toggleMarket();
     else if(hit===16)toggleLean();
     else if(hit===17)toggleChains();
@@ -2396,6 +2373,7 @@
     if(k==='8'||k==='i')togglePlastic();
     if(k==='9'||k==='u')pulse();
     if(k==='q')toggleForemen();if(k==='v')toggleWireView();if(k==='o')beginRest();if(k==='k')beginLearning();
+    if(k==='y')toggleDeep();
     if(k==='j')toggleJobs();if(k==='f')armWipe();if(k==='c')toggleMarket();if(k==='z')toggleLean();if(k==='x')toggleChains();if(k==='n')toggleCost();
     if(k==='l')rumor();if(k==='r')changePolicy();
     if(k==='t')testRumor();
@@ -2438,7 +2416,7 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'1.6 labor accounting',simulator:{multiplier:SIMULATION_MULTIPLIER,targetStepsPerSecond:300,measuredStepsPerSecond:actualUpdatesPerSecond},jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
+      version:'1.7 underground linkers',simulator:{multiplier:SIMULATION_MULTIPLIER,targetStepsPerSecond:300,measuredStepsPerSecond:actualUpdatesPerSecond},jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
@@ -2455,15 +2433,15 @@
         reinforcedEdges:reinforced,unusedDecayEvents:unusedFade,
         experiments:pulseRecord,source:pulseSource>=0?{x:pulseSource%W,y:(pulseSource/W)|0}:null},
       trace:{active:traceActive,source:traceSource<0?null:{x:traceSource%W,y:(traceSource/W)|0,color:traceSourceColor},nodes:traceNodes,maxHops:traceMax,spanX:traceSpan,detour:traceDetour,layer:traceLayer,finished:traceElapsed>=traceDuration,last:traceLast},
-      note:'Simulation is requested at 10x the former 30-step/s baseline (target 300/s). Rendering and frozen trace timing stay on wall time. Actual throughput depends on device CPU. PATHS visualizes existing local connection strengths; LEARN trains 24 pulses on a frozen snapshot, REST decays them with no pulses, LEARN again measures recovery and fingerprint overlap. Observer-only snapshots do not influence agents. These are designed plasticity/forgetting rules, not brain activity.' 
+      note:'Two separate agents can now inhabit each pixel: an ordinary surface worker and a buried linker whose actual neighbor-to-neighbor route can be inspected with DEEP. The 10x the former 30-step/s baseline (target 300/s). Rendering and frozen trace timing stay on wall time. Actual throughput depends on device CPU. PATHS visualizes existing local connection strengths; LEARN trains 24 pulses on a frozen snapshot, REST decays them with no pulses, LEARN again measures recovery and fingerprint overlap. Observer-only snapshots do not influence agents. These are designed plasticity/forgetting rules, not brain activity.' 
     };},
     // Manual deterministic exploration hooks for tests; no direct blueprint editing.
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
     trace:toggleTrace,traceAuto:autoTrace,traceAt,plastic:togglePlastic,pulse,
     jobs:toggleJobs,jobStart:startJobs,jobArmWipe:armWipe,jobMarket:toggleMarket,
-    lean:toggleLean,chains:toggleChains,chainReport,foremen:toggleForemen,accounting:toggleCost,jobTap,jobReport,
+    lean:toggleLean,chains:toggleChains,chainReport,foremen:toggleForemen,accounting:toggleCost,deep:toggleDeep,jobTap,jobReport,
     jobAt(x,y){if(!inBounds(x|0,y|0))return null;const i=ix(x|0,y|0);
-      return {job:JOB_NAMES[occupation[i]],clan:clan[i],role:role[i],known:knowledge[i],
+      return {job:JOB_NAMES[occupation[i]],clan:clan[i],underground:underClan[i]?{job:'LINKER',clan:underClan[i],genome:underGene[i],performance:underUse[i],tenure:underTenure[i],chainId:chainIds[i]}:null,role:role[i],known:knowledge[i],
         signalHop:jobMessageDist[i],obedience:obedience[i],aptitudes:{worker:jobAptitude(i,JOB.NONE),
           linker:jobAptitude(i,JOB.LINKER),formatter:jobAptitude(i,JOB.FORMATTER),text:jobAptitude(i,JOB.TEXT),foreman:jobAptitude(i,JOB.FOREMAN)},
         performance:jobUse[i],tenure:jobTenure[i],orderUntil:workOrder[i],
