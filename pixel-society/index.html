@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 0.7 | Living Connections</title>
+<title>Pixel Society 0.8 | The Memory of a Path</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. WILD enables spontaneous local colony patterns. BREAK introduces damage, HEAL speeds local memory exchange. TRAIN tests relays repeatedly. SELECT enables fitness-weighted local inheritance or switches to neutral DRIFT. RELAY tests colored paths from the left edge to the right edge. TRACE freezes the colony and reveals network distance. PLAST toggles activity-dependent connection strengths. PULSE sends a single stochastic signal and reinforces connections it successfully crosses. Repeat PULSE while TRACE is active to train connections on a frozen structure. Tap TRACE again to resume. Tap the statistics for observer view."></canvas>
+<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. WILD enables spontaneous local colony patterns. BREAK introduces damage, HEAL speeds local memory exchange. TRAIN tests relays repeatedly. SELECT enables fitness-weighted local inheritance or switches to neutral DRIFT. RELAY tests colored paths from the left edge to the right edge. TRACE freezes the colony and reveals network distance. PLAST toggles activity-dependent connection strengths. PULSE sends a single stochastic signal and reinforces connections it successfully crosses. Repeat PULSE while TRACE is active to train connections on a frozen structure. PATHS displays strong and weak connections. LEARN starts a fixed batch of pulses, REST weakens unused connections without any stimulus, and LEARN again tests whether preferred routes return. Tap TRACE again to resume. Tap the statistics for observer view."></canvas>
 <script>
 (()=>{
   'use strict';
@@ -68,7 +68,7 @@
     '!':['00100','00100','00100','00100','00100','00000','00100'],
     ' ':['00000','00000','00000','00000','00000','00000','00000']
   };
-  // EXPEDITION 0.7: ACTIVITY-DEPENDENT PLASTICITY AND FROZEN TOPOLOGY
+  // EXPEDITION 0.8: TRAIN, REST, RELEARN; VISUALIZE CONNECTION MEMORY
   // One-time founders teach local overlapping 3x3 fragments then discard the
   // blueprint. The observer retains a founding reference *only* to measure
   // accuracy. ask(), exchange(), gossip(), and update() NEVER consult it.
@@ -103,6 +103,15 @@
   let pulseElapsed=0,pulseDuration=0,pulseLast='NO PULSE',pulseSourceColor=0;
   let pulseRecord={PLASTIC:{tries:0,wins:0,total:0},STATIC:{tries:0,wins:0,total:0}};
   let avgWire=0,activeWires=0,reinforced=0,unusedFade=0;
+  // Observer-only engram experiment: network morphology stays fixed throughout
+  // the train/rest/relearn sequence. Agent-level behavior does not see these
+  // summaries; learning still happens solely through local transmissions.
+  let wireView=false,cycleStage='NEW',cycleProgress=0,cycleTarget=0,cycleClock=0;
+  let cycleTouches=new Uint16Array(0),engram=new Uint8Array(0),engramWeight=new Uint8Array(0);
+  let engramEdges=0,cycleWins=0,cycleSum=0,firstWins=-1,lastWins=-1;
+  let cycleOverlap=-1,cycleRetention=-1,cycleFirstReach=-1,cycleLastReach=-1;
+  let cycleSampleVersion=0;
+
 
   let last=0,accumulator=0,pointerDown=false,held=false,holdTimer=0,sx=0,sy=0;
   let seed=0x7ac58c3e;
@@ -152,6 +161,8 @@
     stampText(region.x+5,region.y+4,'COLONY',R.INK);
     stampText(region.x+region.w-15,region.y+4,'LIVE',R.CYAN,true);
     hline(5,W-6,H-64,R.FRAME);
+    // The status strip doubles as a compact, touchable experiment console.
+    // All of it is still made from the same agent-controlled ImageData pixels.
     stampText(Math.floor(W/2),H-58,'STATE CONSENSUS',R.CYAN,true);
     stampText(Math.floor(W/2),H-48,'KNOWN 100%',R.INK,true);
     stampText(Math.floor(W/2),H-38,'AGREE 100%',R.INK,true);
@@ -165,8 +176,24 @@
     if(!metrics)return;
     const sheet=new Uint8Array(N);
     staging=sheet;
-    stampText(Math.floor(W/2),H-58,'STATE '+(traceActive?'TRACE':metrics.state),R.CYAN,true);
-    if(traceActive){
+    const bw=Math.floor((W-12)/3);
+    button(4,H-63,bw,12,wireView?'AGENT':'PATHS',R.CYAN,10);
+    button(6+bw,H-63,bw,12,'REST',R.PINK,11);
+    button(8+bw*2,H-63,bw,12,'LEARN',R.GOLD,12);
+    if(cycleStage!=='NEW'){
+      const stageText=cycleStage==='LEARNING'?'TRAINING':cycleStage==='RELEARNING'?'RETRAIN':cycleStage==='RESTING'?'RESTING':cycleStage;
+      stampText(Math.floor(W/2),H-48,'MEMORY '+stageText,R.CYAN,true);
+      stampText(Math.floor(W/2),H-38,'WIRES '+avgWire+'%',R.INK,true);
+      if(cycleStage==='RESTING'||cycleStage==='LEARNING'||cycleStage==='RELEARNING'){
+        stampText(Math.floor(W/2),H-28,'STEP '+cycleProgress+'/'+cycleTarget,R.GOLD,true);
+      }else{
+        stampText(Math.floor(W/2),H-28,'RETAIN '+(cycleRetention<0?'--':cycleRetention+'%'),R.GOLD,true);
+      }
+      stampText(Math.floor(W/2),H-18,'ROUTE '+(cycleOverlap<0?'--':cycleOverlap+'%'),R.PINK,true);
+      const report=lastWins>=0?'SENT '+firstWins+' '+lastWins:
+        firstWins>=0?'FIRST '+firstWins+'/'+24:'PULSE '+pulseWins+'/'+pulseTries;
+      stampText(Math.floor(W/2),H-8,report,R.MIST,true);
+    }else if(traceActive){
       stampText(Math.floor(W/2),H-48,'DEPTH '+traceMax+' HOPS',R.INK,true);
       stampText(Math.floor(W/2),H-38,'NODES '+traceNodes,R.INK,true);
       stampText(Math.floor(W/2),H-28,'LAYER '+traceLayer+'/'+traceMax,R.GOLD,true);
@@ -223,6 +250,11 @@
     traceSource=-1;traceNodes=traceMax=traceLayer=traceElapsed=traceSpan=traceDetour=traceRefresh=0;
     traceSourceColor=0;traceLast='NO TRACE';
     wires=new Uint8Array(N*2);wireUsed=new Uint16Array(N*2);
+    cycleTouches=new Uint16Array(N*2);engram=new Uint8Array(N*2);engramWeight=new Uint8Array(N*2);
+    wireView=false;cycleStage='NEW';cycleProgress=cycleTarget=cycleClock=0;
+    engramEdges=cycleWins=cycleSum=0;firstWins=lastWins=-1;
+    cycleOverlap=cycleRetention=cycleFirstReach=cycleLastReach=-1;
+    cycleSampleVersion=0;
     pulseDist=new Int32Array(N);pulseDist.fill(-1);
     plasticOn=true;pulseSource=-1;pulseTries=pulseWins=pulseReach=pulseNodes=pulseDepth=pulseMax=0;
     pulseElapsed=pulseDuration=0;pulseLast='NO PULSE';pulseSourceColor=0;
@@ -292,6 +324,11 @@
     // The diagnostic origin remains read-only and inaccessible to agents.
     awakenings++;wild=true;training=false;repairBoost=0;trial=null;trialReport='WILD';
     wires.fill(0);wireUsed.fill(0);pulseDist.fill(-1);pulseSource=-1;
+    cycleTouches.fill(0);engram.fill(0);engramWeight.fill(0);
+    wireView=false;cycleStage='NEW';cycleProgress=cycleTarget=cycleClock=0;
+    engramEdges=cycleWins=cycleSum=0;firstWins=lastWins=-1;
+    cycleOverlap=cycleRetention=cycleFirstReach=cycleLastReach=-1;
+    cycleSampleVersion=0;
     pulseTries=pulseWins=pulseReach=pulseNodes=pulseDepth=pulseMax=0;
     pulseElapsed=pulseDuration=0;pulseLast='NO PULSE';
     pulseRecord={PLASTIC:{tries:0,wins:0,total:0},STATIC:{tries:0,wins:0,total:0}};
@@ -454,6 +491,9 @@
     const won=maxX>=bounds.maxX-1;if(won)pulseWins++;
     pulseLast=won?'DELIVERED':'PARTIAL';
     const record=pulseRecord[mode];record.tries++;record.total+=pulseReach;if(won)record.wins++;
+    if(cycleStage==='LEARNING'||cycleStage==='RELEARNING'){
+      for(const k of transfers)cycleTouches[k]=Math.min(65535,cycleTouches[k]+1);
+    }
     if(plasticOn){
       // Hebbian-like local rule: transmitted edges strengthen, neglected edges
       // weaken. These rules do not know which routes reach the destination.
@@ -471,6 +511,100 @@
     metrics=measure();displayStats();
     return {success:won,reach:pulseReach,nodes:pulseNodes,hops:pulseDepth,
       mode,meanWire:avgWire};
+  }
+  function enterMemoryExperiment(){
+    if(!wild)rewild();
+    // Stop existing auto-trials so the only changing variable is wire strength.
+    training=false;
+    if(!traceActive)autoTrace();
+    wireView=true;
+    plasticOn=true;
+  }
+  function toggleWireView(){
+    wireView=!wireView;
+    metrics=measure();displayStats();return wireView;
+  }
+  function beginLearning(){
+    if(cycleStage==='LEARNING'||cycleStage==='RELEARNING'||cycleStage==='RESTING')return false;
+    const remembering=cycleStage==='RESTED'||cycleStage==='RELEARNED';
+    enterMemoryExperiment();
+    if(!remembering){
+      engram.fill(0);engramWeight.fill(0);engramEdges=0;
+      firstWins=lastWins=-1;cycleOverlap=cycleRetention=-1;
+      cycleFirstReach=cycleLastReach=-1;
+    }
+    cycleStage=remembering?'RELEARNING':'LEARNING';
+    cycleProgress=0;cycleTarget=24;cycleClock=0;
+    cycleWins=cycleSum=0;cycleTouches.fill(0);
+    metrics=measure();displayStats();return true;
+  }
+  function beginRest(){
+    if(cycleStage==='RESTING'||cycleStage==='LEARNING'||cycleStage==='RELEARNING')return false;
+    if(engramEdges===0){
+      // First establish a reference; an empty surviving route may still rest.
+      if(cycleStage==='NEW')return beginLearning();
+    }
+    enterMemoryExperiment();
+    cycleStage='RESTING';cycleProgress=0;cycleTarget=64;cycleClock=0;
+    pulseElapsed=pulseDuration; // Rest is silent, including the visual signal.
+    metrics=measure();displayStats();return true;
+  }
+  function refreshWireAverage(){
+    let total=0,num=0;
+    for(let k=0;k<wires.length;k++)if(wires[k]){total+=wires[k];num++;}
+    activeWires=num;avgWire=num?Math.round(total*100/(num*255)):0;
+  }
+  function recordRetention(){
+    if(!engramEdges){cycleRetention=-1;return;}
+    let current=0,before=0;
+    for(let k=0;k<engram.length;k++)if(engram[k]){
+      before+=engramWeight[k];current+=wires[k];
+    }
+    cycleRetention=before?Math.round(100*current/before):-1;
+  }
+  function finishLearning(){
+    if(cycleStage==='LEARNING'){
+      firstWins=cycleWins;cycleFirstReach=Math.round(cycleSum/Math.max(1,cycleProgress));
+      engram.fill(0);engramWeight.fill(0);engramEdges=0;
+      for(let k=0;k<cycleTouches.length;k++){
+        if(wires[k]&&cycleTouches[k]>=3){engram[k]=1;engramWeight[k]=wires[k];engramEdges++;}
+      }
+      recordRetention();cycleStage='LEARNED';cycleOverlap=-1;
+    }else{
+      lastWins=cycleWins;cycleLastReach=Math.round(cycleSum/Math.max(1,cycleProgress));
+      let overlap=0,union=0;
+      for(let k=0;k<cycleTouches.length;k++){
+        const was=engram[k]!==0,now=cycleTouches[k]>=3;
+        if(was||now)union++;
+        if(was&&now)overlap++;
+      }
+      cycleOverlap=union?Math.round(100*overlap/union):-1;
+      recordRetention();cycleStage='RELEARNED';
+    }
+    cycleSampleVersion++;metrics=measure();displayStats();
+  }
+  function cycleTick(ms){
+    if(!['LEARNING','RESTING','RELEARNING'].includes(cycleStage))return;
+    cycleClock+=ms;
+    if(cycleClock<105)return;
+    cycleClock=0;
+    if(cycleStage==='RESTING'){
+      // No stimulation occurs here. Decay represents spontaneous forgetting,
+      // a deliberately modeled process absent in v0.7's pulse-only decay.
+      for(let k=0;k<wires.length;k++)if(wires[k]>0){
+        wires[k]=Math.max(48,Math.round(wires[k]*.978));
+      }
+      cycleProgress++;
+      refreshWireAverage();recordRetention();
+      if(cycleProgress>=cycleTarget){cycleStage='RESTED';cycleSampleVersion++;}
+    }else{
+      const result=pulse();cycleWins+=Number(result.success);
+      cycleSum+=result.reach;cycleProgress++;
+      if(cycleProgress>=cycleTarget){finishLearning();return;}
+    }
+    // Refresh slower than the simulation loop; otherwise text repaint can
+    // become more expensive than signal propagation on an older phone.
+    if(cycleProgress%3===0||cycleStage==='RESTED'){metrics=measure();displayStats();}
   }
   function advancePulse(ms){
     if(pulseSource<0||pulseElapsed>=pulseDuration)return;
@@ -552,6 +686,7 @@
     return traceFromIndex(chosen);
   }
   function toggleTrace(){
+    if(cycleStage==='RESTING'||cycleStage==='LEARNING'||cycleStage==='RELEARNING')return;
     if(traceActive){traceActive=false;traceLast='RESUMED';metrics=measure();displayStats();}
     else autoTrace();
   }
@@ -647,7 +782,8 @@
     if(!isField(j)||r<R.CYAN)return;
     let shared=0;
     for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-      if(!dx&&!dy)continue;      if(inBounds(tx+dx,ty+dy)&&role[ix(tx+dx,ty+dy)]===r)shared++;
+      if(!dx&&!dy)continue;
+      if(inBounds(tx+dx,ty+dy)&&role[ix(tx+dx,ty+dy)]===r)shared++;
     }
     if(shared<2)return; // Require a locally supported pattern.
     const k=i*9+bit;
@@ -1011,7 +1147,26 @@
         if(discovered[i]){green+=40;blue+=50;}
       }
       if(flash[i]&&!traceActive){red+=flash[i]*.3;green+=flash[i]*.06;blue+=flash[i]*.32;}
-      if(traceActive&&isField(i)){
+      if(wireView&&wild&&isField(i)){
+        const x=i%W,y=(i/W)|0;
+        let max=0,sum=0,num=0,ghost=false;
+        // Endpoints report the strength of their own cardinal connections;
+        // there are no graphical wires laid over the agent image.
+        const edges=[x<W-1?i*2:-1,x>0?(i-1)*2:-1,
+          y<H-1?i*2+1:-1,y>0?(i-W)*2+1:-1];
+        for(const k of edges)if(k>=0){
+          const w=wires[k];if(w){max=Math.max(max,w);sum+=w;num++;}
+          if(engram[k])ghost=true;
+        }
+        if(num){
+          const v=(max*.6+sum/num*.4)/255;
+          // Violet = weak, blue = medium, mint-white = strong.
+          red=20+120*v;green=18+215*v*v;blue=35+185*v;
+          if(ghost&&cycleStage==='RESTED'){red+=65*(1-v);blue+=40*(1-v);}
+          if(ghost&&cycleStage==='RELEARNED'){green+=15;blue+=12;}
+        }else{red=3;green=8;blue=15;}
+      }
+      if(traceActive&&!wireView&&isField(i)){
         const d=traceDist[i];
         if(d<0){
           // Preserve a faint map of other components: their lack of color
@@ -1062,7 +1217,11 @@
   function activate(e){
     e.preventDefault();pointerDown=true;held=false;
     const p=point(e),i=ix(p.x,p.y),hit=hotspot[i];
-    if(hit===7)toggleTrace();
+    if(['LEARNING','RESTING','RELEARNING'].includes(cycleStage)&&hit>=2&&hit<=9)return;
+    if(hit===10)toggleWireView();
+    else if(hit===11)beginRest();
+    else if(hit===12)beginLearning();
+    else if(hit===7)toggleTrace();
     else if(hit===8)togglePlastic();
     else if(hit===9)pulse();
     else if(traceActive&&isField(i)){traceAt(p.x,p.y);}
@@ -1102,6 +1261,7 @@
     if(k==='7'||k==='d')toggleTrace();
     if(k==='8'||k==='i')togglePlastic();
     if(k==='9'||k==='u')pulse();
+    if(k==='v')toggleWireView();if(k==='o')beginRest();if(k==='k')beginLearning();
     if(k==='l')rumor();if(k==='r')changePolicy();
     if(k==='t')testRumor();
     if(k==='m'){inspect=!inspect;metrics=measure();displayStats();}
@@ -1114,7 +1274,7 @@
     if(!last)last=now;
     const elapsed=Math.min(100,now-last);last=now;accumulator+=elapsed;
     if(!document.hidden){
-      advancePulse(elapsed);
+      advancePulse(elapsed);cycleTick(elapsed);
       if(traceActive){accumulator=0;tickTrace(elapsed);}
       else{
         let steps=0;
@@ -1127,23 +1287,31 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'0.7 living connections',agents:N,generations,policy:POLICIES[policy],
+      version:'0.8 the memory of a path',agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
       wild,awakenings,patches,bestPatch,probes,responses,misses,lastProbe,
       selectionOn,training,relayTries,relayWins,relayReach,lastRelay,relayRecords,
       inherited,mutations,activeCarriers:fitness.reduce((n,x)=>n+(x>25),0),
+      memory:{stage:cycleStage,wireView,progress:cycleProgress,target:cycleTarget,
+        engramEdges,retention:cycleRetention,overlap:cycleOverlap,
+        trainingSuccess:firstWins,relearningSuccess:lastWins,
+        trainingMeanReach:cycleFirstReach,relearningMeanReach:cycleLastReach,
+        frozen:traceActive,revision:cycleSampleVersion},
       plastic:{enabled:plasticOn,edges:activeWires,meanStrengthPercent:avgWire,
         pulseTries,pulseWins,pulseReach,pulseNodes,pulseDepth,pulseLast,
         reinforcedEdges:reinforced,unusedDecayEvents:unusedFade,
         experiments:pulseRecord,source:pulseSource>=0?{x:pulseSource%W,y:(pulseSource/W)|0}:null},
       trace:{active:traceActive,source:traceSource<0?null:{x:traceSource%W,y:(traceSource/W)|0,color:traceSourceColor},nodes:traceNodes,maxHops:traceMax,spanX:traceSpan,detour:traceDetour,layer:traceLayer,finished:traceElapsed>=traceDuration,last:traceLast},
-      note:'TRACE freezes morphology and exposes graph distance. PULSE sends a single probabilistic signal along same-color edges; PLAST reinforces successfully used connections and fades unused ones. This is a designed local learning rule, not proof of neural cognition. STATIC makes no weight updates.'
+      note:'PATHS visualizes existing local connection strengths; LEARN trains 24 pulses on a frozen snapshot, REST decays them with no pulses, LEARN again measures recovery and fingerprint overlap. Observer-only snapshots do not influence agents. These are designed plasticity/forgetting rules, not brain activity.' 
     };},
     // Manual deterministic exploration hooks for tests; no direct blueprint editing.
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
-    trace:toggleTrace,traceAuto:autoTrace,traceAt,plastic:togglePlastic,pulse,traceDistanceAt(x,y){
+    trace:toggleTrace,traceAuto:autoTrace,traceAt,plastic:togglePlastic,pulse,
+    paths:toggleWireView,rest:beginRest,learn:beginLearning,
+    cycleAdvance(ms){cycleTick(clamp(Number(ms)||0,0,1000));render();return this.status.memory;},
+    traceDistanceAt(x,y){
       x=x|0;y=y|0;return inBounds(x,y)?traceDist[ix(x,y)]:-1;
     },
     advanceTrace(ms){tickTrace(clamp(Number(ms)||0,0,30000));advancePulse(clamp(Number(ms)||0,0,30000));render();return this.status.trace;},
