@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 0.8 | The Memory of a Path</title>
+<title>Pixel Society 0.9 | A Society of Jobs</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -68,7 +68,7 @@
     '!':['00100','00100','00100','00100','00100','00000','00100'],
     ' ':['00000','00000','00000','00000','00000','00000','00000']
   };
-  // EXPEDITION 0.8: TRAIN, REST, RELEARN; VISUALIZE CONNECTION MEMORY
+  // EXPEDITION 0.9: LOCAL JOB CLASSES, RECRUITMENT, LETTERING, RELAY, FORMATTING
   // One-time founders teach local overlapping 3x3 fragments then discard the
   // blueprint. The observer retains a founding reference *only* to measure
   // accuracy. ask(), exchange(), gossip(), and update() NEVER consult it.
@@ -111,6 +111,15 @@
   let engramEdges=0,cycleWins=0,cycleSum=0,firstWins=-1,lastWins=-1;
   let cycleOverlap=-1,cycleRetention=-1,cycleFirstReach=-1,cycleLastReach=-1;
   let cycleSampleVersion=0;
+  // The class belongs to an individual pixel. Clan is its recruited employer.
+  // Managers are actual button-maker pixels (not nonlocal UI controllers).
+  const JOB={NONE:0,BUTTON:1,LINKER:2,FORMATTER:3,TEXT:4};
+  const JOB_NAMES=['UNASSIGNED','BUTTON','LINKER','FORMATTER','TEXT'];
+  let occupation=new Uint8Array(0),clan=new Uint8Array(0),obedience=new Uint8Array(0);
+  let jobMode=false,wipeArmed=false,leaders=[],jobTally=[0,0,0,0,0];
+  let jobRecruits=0,jobTaps=0,jobMessages=0,jobDeliveries=0,jobWipes=0;
+  let jobNews='TAP JOBS TO START',jobMessageDist=new Int16Array(0),jobMessageElapsed=0,jobMessageDuration=2300;
+  let jobBorder=0,jobTerritory=0,jobLabelCount=0;
 
 
   let last=0,accumulator=0,pointerDown=false,held=false,holdTimer=0,sx=0,sy=0;
@@ -158,8 +167,11 @@
     button(x0+(bw+gap)*2,55,bw,bh,'RELAY',R.GOLD,6);
     region={x:5,y:76,w:W-10,h:Math.max(19,H-143)};
     frame(region.x,region.y,region.w,region.h,R.FRAME);
-    stampText(region.x+5,region.y+4,'COLONY',R.INK);
-    stampText(region.x+region.w-15,region.y+4,'LIVE',R.CYAN,true);
+
+    // The controls in the colony header are genuine agent pixels too.
+    // They recruit their own testimony just like the other fixed controls.
+    button(region.x+region.w-39,region.y+1,36,11,'JOBS',R.GOLD,13);
+    button(region.x+2,region.y+1,31,11,'WIPE',R.PINK,14);
     hline(5,W-6,H-64,R.FRAME);
     // The status strip doubles as a compact, touchable experiment console.
     // All of it is still made from the same agent-controlled ImageData pixels.
@@ -180,7 +192,14 @@
     button(4,H-63,bw,12,wireView?'AGENT':'PATHS',R.CYAN,10);
     button(6+bw,H-63,bw,12,'REST',R.PINK,11);
     button(8+bw*2,H-63,bw,12,'LEARN',R.GOLD,12);
-    if(cycleStage!=='NEW'){
+    if(jobMode){
+      jobCensus();
+      stampText(Math.floor(W/2),H-48,'B '+jobTally[1]+' L '+jobTally[2]+' F '+jobTally[3]+' T '+jobTally[4],R.CYAN,true);
+      stampText(Math.floor(W/2),H-38,'RECRUITS '+jobRecruits,R.INK,true);
+      stampText(Math.floor(W/2),H-28,'BORDER '+jobBorder+'% TEXT '+jobLabelCount,R.GOLD,true);
+      stampText(Math.floor(W/2),H-18,'MSG '+jobMessages+' OK '+jobDeliveries+' WIPE '+jobWipes,R.PINK,true);
+      stampText(Math.floor(W/2),H-8,wipeArmed?'WIPE ARMED TAP BUTTON':jobNews,R.MIST,true);
+    }else if(cycleStage!=='NEW'){
       const stageText=cycleStage==='LEARNING'?'TRAINING':cycleStage==='RELEARNING'?'RETRAIN':cycleStage==='RESTING'?'RESTING':cycleStage;
       stampText(Math.floor(W/2),H-48,'MEMORY '+stageText,R.CYAN,true);
       stampText(Math.floor(W/2),H-38,'WIRES '+avgWire+'%',R.INK,true);
@@ -252,6 +271,12 @@
     wires=new Uint8Array(N*2);wireUsed=new Uint16Array(N*2);
     cycleTouches=new Uint16Array(N*2);engram=new Uint8Array(N*2);engramWeight=new Uint8Array(N*2);
     wireView=false;cycleStage='NEW';cycleProgress=cycleTarget=cycleClock=0;
+    occupation=new Uint8Array(N);clan=new Uint8Array(N);obedience=new Uint8Array(N);
+    jobMessageDist=new Int16Array(N);jobMessageDist.fill(-1);
+    jobMode=false;wipeArmed=false;leaders=[];jobTally=[0,0,0,0,0];
+    jobRecruits=jobTaps=jobMessages=jobDeliveries=jobWipes=0;
+    jobNews='TAP JOBS TO START';jobMessageElapsed=0;
+    jobBorder=jobTerritory=jobLabelCount=0;
     engramEdges=cycleWins=cycleSum=0;firstWins=lastWins=-1;
     cycleOverlap=cycleRetention=cycleFirstReach=cycleLastReach=-1;
     cycleSampleVersion=0;
@@ -319,6 +344,7 @@
       region.y+14+Math.floor(random()*Math.max(1,region.h-20)),1+Math.floor(random()*3));
   }
   function rewild(){
+    if(jobMode){jobMode=false;wipeArmed=false;leaders=[];occupation.fill(0);clan.fill(0);}
     // Radical amnesia: erase every remembered assertion *about the field*,
     // including overlapping memories held by agents just outside the field.
     // The diagnostic origin remains read-only and inaccessible to agents.
@@ -964,6 +990,253 @@
       break; // One fragment of local testimony considered per exchange.
     }
   }
+  // The employer's physical location and a tiny desired region are known to
+  // its own recruits. No full-frame instruction grid is ever generated here.
+  // Agents accept jobs, resist them, and sometimes switch employers.
+  function inLeader(m,x,y){return x>=m.x&&x<m.x+m.w&&y>=m.y&&y<m.y+m.h;}
+  function desiredBorder(m,x,y){return inLeader(m,x,y)&&(x===m.x||x===m.x+m.w-1||y===m.y||y===m.y+m.h-1);}
+  function leaderByPosition(x,y){for(const m of leaders)if(inLeader(m,x,y))return m;return null;}
+  function letterAt(m,x,y){
+    const t=m.label,tx=m.x+Math.floor((m.w-(t.length*6-1))/2),ty=m.y+Math.floor((m.h-7)/2);
+    const xx=x-tx,yy=y-ty;
+    if(yy<0||yy>=7||xx<0||xx>=t.length*6)return false;
+    const ch=t[Math.floor(xx/6)],column=xx%6;
+    return column<5&&FONT[ch]?.[yy]?.[column]==='1';
+  }
+  function makeWorker(i,m,type){
+    if(i<0||!isField(i)||occupation[i]===JOB.BUTTON)return false;
+    if(clan[i]!==0&&clan[i]!==m.id)return false;
+    const fresh=clan[i]===0;
+    clan[i]=m.id;occupation[i]=type;
+    obedience[i]=80+Math.floor(random()*145);
+    if(fresh)jobRecruits++;
+    if(type===JOB.LINKER)role[i]=R.CYAN;
+    if(type===JOB.FORMATTER)role[i]=R.PINK;
+    if(type===JOB.TEXT)role[i]=R.GOLD;
+    flash[i]=130;
+    return true;
+  }
+  function startJobs(){
+    // Preserve all the v0.8 instruments; recruitment begins only when
+    // explicitly enabled. Founder state is not secretly repainted.
+    if(!wild)rewild();
+    if(traceActive)toggleTrace();
+    training=false;jobMode=true;wipeArmed=false;
+    occupation.fill(0);clan.fill(0);obedience.fill(0);leaders=[];
+    jobMessages=jobDeliveries=jobWipes=jobRecruits=jobTaps=jobLabelCount=0;
+    jobMessageDist.fill(-1);jobMessageElapsed=0;
+    const b=fieldBounds(),width=b.maxX-b.minX+1,height=b.maxY-b.minY+1;
+    const gapX=Math.max(5,Math.floor(width*.13)),gapY=4;
+    const bw=Math.max(19,Math.min(42,Math.floor((width-gapX-4)/2)));
+    const bh=Math.max(13,Math.min(27,Math.floor((height-gapY-4)/2)));
+    const offX=Math.floor((width-(bw*2+gapX))/2),offY=Math.floor((height-(bh*2+gapY))/2);
+    const labels=['GO','UP','ON','HI'];
+    // A fresh workplace is neutral: colorful former WILD patterns remain
+    // outside, but are muted; no preset border or typography is drawn.
+    for(let y=b.minY;y<=b.maxY;y++)for(let x=b.minX;x<=b.maxX;x++){
+      const i=ix(x,y);role[i]=R.VOID;life[i]=0;conviction[i]=0;
+    }
+    for(let n=0;n<4;n++){
+      const x=b.minX+offX+(n%2)*(bw+gapX),y=b.minY+offY+Math.floor(n/2)*(bh+gapY);
+      const m={id:n+1,x,y,w:bw,h:bh,label:labels[n],chief:-1,strength:0,workers:0,text:0,linkers:0,formatters:0};
+      const mx=x+Math.floor(bw/2),my=y+1,chief=ix(mx,my);
+      m.chief=chief;occupation[chief]=JOB.BUTTON;clan[chief]=m.id;
+      role[chief]=R.GOLD;obedience[chief]=255;flash[chief]=220;
+      leaders.push(m);
+      // The boss starts with *one* adjacent assistant, never a filled border.
+      if(inBounds(mx,my+1))makeWorker(ix(mx,my+1),m,JOB.NONE);
+    }
+    jobNews='4 MAKERS SEEK WORKERS';metrics=measure();displayStats();
+    return jobReport();
+  }
+  function toggleJobs(){
+    if(jobMode){jobMode=false;wipeArmed=false;jobNews='JOBS STOPPED';}
+    else return startJobs();
+    metrics=measure();displayStats();return jobReport();
+  }
+  function armWipe(){
+    if(!jobMode)return jobNews='ENABLE JOBS FIRST';
+    wipeArmed=!wipeArmed;
+    jobNews=wipeArmed?'WIPE ARMED':'WIPE CANCELLED';
+    metrics=measure();displayStats();return wipeArmed;
+  }
+  function jobCensus(){
+    jobTally.fill(0);for(const m of leaders){m.workers=0;m.text=0;m.linkers=0;m.formatters=0;}
+    let owned=0,painted=0,edge=leaders.reduce((n,m)=>n+2*(m.w+m.h)-4,0);
+    for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
+      const i=ix(x,y),j=occupation[i],c=clan[i];
+      if(j)jobTally[j]++;
+      if(!c)continue;
+      const m=leaders[c-1];if(!m)continue;
+      m.workers++;
+      if(j===JOB.TEXT)m.text++;
+      if(j===JOB.LINKER)m.linkers++;
+      if(j===JOB.FORMATTER)m.formatters++;
+      if(!inLeader(m,x,y))continue;
+      owned++;
+      if(desiredBorder(m,x,y)&&(role[i]===R.CYAN||role[i]===R.GOLD))painted++;
+    }
+    jobTerritory=owned;
+    jobBorder=edge?Math.round(100*painted/edge):0;
+    jobLabelCount=leaders.filter(m=>m.text>0).length;
+  }
+  function recruitSpecialists(m){
+    // Only the maker initiates text-maker hiring. The appointment must come
+    // from already recruited people, not from a global scripted font stamp.
+    if(!m.workers)return;
+    const count=(type)=>m.workers&&type===JOB.LINKER?m.linkers:type===JOB.TEXT?m.text:m.formatters;
+    const wants=[JOB.LINKER,JOB.TEXT,JOB.FORMATTER];
+    for(const type of wants){
+      if(count(type)>= (type===JOB.LINKER?3:1))continue;
+      if(m.workers<(type===JOB.LINKER?3:type===JOB.TEXT?9:16))continue;
+      let candidate=-1,best=-Infinity;
+      for(let y=m.y+1;y<m.y+m.h-1;y++)for(let x=m.x+1;x<m.x+m.w-1;x++){
+        const i=ix(x,y);if(clan[i]!==m.id||occupation[i]!==JOB.NONE)continue;
+        let score=temperament[i]*.25+obedience[i]*.2;
+        if(type===JOB.TEXT)score-=Math.abs(y-(m.y+Math.floor(m.h/2)))*12;
+        else if(type===JOB.FORMATTER)score-=Math.abs(x-(m.x+Math.floor(m.w/2)))*3;
+        else score+=x>m.x+m.w/2?18:4;
+        if(score>best){best=score;candidate=i;}
+      }
+      if(candidate>=0&&makeWorker(candidate,m,type)){
+        if(type===JOB.TEXT)m.text++;
+        if(type===JOB.LINKER)m.linkers++;
+        if(type===JOB.FORMATTER)m.formatters++;
+        jobNews=type===JOB.TEXT?'TEXT MAKER HIRED':type===JOB.LINKER?'LINKER HIRED':'FORMATTER HIRED';
+      }
+    }
+  }
+  function tickJobs(){
+    if(!jobMode)return;
+    jobCensus();
+    // Bosses can only extend their organizations by persuading local workers.
+    // No button is drawn directly: recruited pixels adopt an intended state.
+    for(const m of leaders){
+      if(occupation[m.chief]!==JOB.BUTTON){occupation[m.chief]=JOB.BUTTON;clan[m.chief]=m.id;}
+      for(let y=m.y;y<m.y+m.h;y++)for(let x=m.x;x<m.x+m.w;x++){
+        const i=ix(x,y);
+        if(clan[i]===0){
+          let friends=0;
+          if(x>0&&clan[i-1]===m.id)friends++;
+          if(x<W-1&&clan[i+1]===m.id)friends++;
+          if(y>0&&clan[i-W]===m.id)friends++;
+          if(y<H-1&&clan[i+W]===m.id)friends++;
+          const stubborn=(temperament[i]/255)*.21;
+          if(friends&&random()<.05+friends*.07-stubborn)makeWorker(i,m,JOB.NONE);
+          continue;
+        }
+        if(clan[i]!==m.id)continue;
+        if(occupation[i]===JOB.BUTTON)continue;
+        const border=desiredBorder(m,x,y);
+        const text=m.text>0&&letterAt(m,x,y);
+        const target=occupation[i]===JOB.FORMATTER?R.PINK:
+          occupation[i]===JOB.LINKER?R.CYAN:border?R.GOLD:text?R.INK:R.VOID;
+        let support=0;
+        if(x>0&&role[i-1]===target)support++;
+        if(y>0&&role[i-W]===target)support++;
+        // Temperamental agents may ignore commands. Peers make it easier.
+        const obey=.19+support*.095+obedience[i]/700;
+        if(random()<obey){role[i]=target;conviction[i]=Math.min(255,conviction[i]+8);}
+        else if(random()<.004&&occupation[i]===JOB.NONE){role[i]=R.MIST;conviction[i]=30;}
+        if(random()<.0025){obedience[i]=Math.max(0,obedience[i]-1);}
+      }
+      if(generations%6===0)recruitSpecialists(m);
+    }
+    // Linkers recruit into adjacent neutral territory to seek other groups.
+    // A multi-group route can appear, fail, or break as individual jobs change.
+    if(generations%4===0){
+      const frontier=[];
+      for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
+        const i=ix(x,y);if(occupation[i]===JOB.LINKER)frontier.push(i);
+      }
+      for(let t=0;t<Math.min(75,frontier.length);t++){
+        const i=frontier[Math.floor(random()*frontier.length)],m=leaders[clan[i]-1];if(!m)continue;
+        const x=i%W,y=(i/W)|0;
+        const directions=[i-1,i+1,i-W,i+W],other=leaders.filter(k=>k.id!==m.id);
+        const closest=other.reduce((a,k)=>{
+          const cx=k.x+k.w/2,cy=k.y+k.h/2;
+          return !a||Math.abs(cx-x)+Math.abs(cy-y)<a.dist?{m:k,dist:Math.abs(cx-x)+Math.abs(cy-y)}:a;
+        },null);
+        if(!closest)continue;
+        const tx=closest.m.x+closest.m.w/2,ty=closest.m.y+closest.m.h/2;
+        directions.sort((a,b)=>{
+          const ax=a%W,ay=(a/W)|0,bx=b%W,by=(b/W)|0;
+          return (Math.abs(ax-tx)+Math.abs(ay-ty))-(Math.abs(bx-tx)+Math.abs(by-ty));
+        });
+        const j=random()<.76?directions[0]:directions[Math.floor(random()*4)];
+        if(j>=0&&j<N&&isField(j)&&random()<.36){
+          if(clan[j]===0)makeWorker(j,m,JOB.LINKER);
+          else if(clan[j]===m.id&&occupation[j]===JOB.NONE&&random()<.55){
+            occupation[j]=JOB.LINKER;role[j]=R.CYAN;flash[j]=100;
+          }
+        }
+      }
+    }
+    if(generations%30===0)jobCensus();
+  }
+  function sendJobMessage(m,format=false){
+    if(!jobMode)return {sent:false,reason:'JOBS OFF'};
+    jobTaps++;
+    // A tap is addressed to a real maker, who needs an employed linker.
+    const owned=[];
+    for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
+      const i=ix(x,y);if(occupation[i]===JOB.LINKER&&clan[i]===m.id)owned.push(i);
+    }
+    if(!owned.length){jobNews='NO LINKER FOR '+m.label;metrics=measure();displayStats();return {sent:false,reason:'NO LINKER'};}
+    const fmt=leaders.length&&format;
+    const formatters=[];
+    if(fmt)for(let y=m.y;y<m.y+m.h;y++)for(let x=m.x;x<m.x+m.w;x++){
+      const i=ix(x,y);if(occupation[i]===JOB.FORMATTER&&clan[i]===m.id)formatters.push(i);
+    }
+    if(fmt&&!formatters.length){jobNews='NO FORMATTER FOR '+m.label;metrics=measure();displayStats();return {sent:false,reason:'NO FORMATTER'};}
+    jobMessages++;
+    jobMessageDist.fill(-1);
+    // A local linker relays immediately; distant groups require an actual
+    // cardinally adjacent chain of employed linkers. No teleportation.
+    const q=new Int32Array(N);let head=0,tail=0,best=-1,bestDistance=0;
+    for(const i of owned){jobMessageDist[i]=0;q[tail++]=i;}
+    while(head<tail){
+      const i=q[head++],d=jobMessageDist[i],x=i%W,y=(i/W)|0;
+      if(clan[i]!==m.id&&d>bestDistance){best=i;bestDistance=d;}
+      const neighbors=[x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];
+      for(const j of neighbors)if(j>=0&&occupation[j]===JOB.LINKER&&jobMessageDist[j]<0){
+        jobMessageDist[j]=d+1;q[tail++]=j;
+      }
+    }
+    jobMessageElapsed=0;jobMessageDuration=clamp((bestDistance+4)*80,950,3800);
+    if(fmt){
+      // Only an employed formatter can execute a received erase order.
+      const f=formatters[Math.floor(random()*formatters.length)],fx=f%W,fy=(f/W)|0;
+      let erased=0;
+      for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){
+        const x=fx+dx,y=fy+dy;if(!inBounds(x,y)||dx*dx+dy*dy>16)continue;
+        const i=ix(x,y);
+        if(clan[i]!==m.id||i===m.chief)continue;
+        const had=knowledge[i];forget(i);if(had)erased++;
+        flash[i]=220;conviction[i]=0;
+      }
+      jobWipes++;jobNews='FORMAT ERASED '+erased;
+      wipeArmed=false;
+    }else if(best>=0){jobDeliveries++;jobNews='MESSAGE TO '+leaders[clan[best]-1].label;}
+    else jobNews='SENT LOCAL ONLY';
+    metrics=measure();displayStats();
+    return {sent:true,delivered:best>=0,target:best>=0?clan[best]:0,
+      visited:tail,formatted:fmt};
+  }
+  function jobTap(x,y){
+    const m=leaderByPosition(x,y);
+    if(!m)return {sent:false,reason:'NO BUTTON HERE'};
+    return sendJobMessage(m,wipeArmed);
+  }
+  function jobReport(){
+    jobCensus();return {enabled:jobMode,armed:wipeArmed,bosses:jobTally[JOB.BUTTON],
+      linkers:jobTally[JOB.LINKER],formatters:jobTally[JOB.FORMATTER],
+      textMakers:jobTally[JOB.TEXT],recruits:jobRecruits,territory:jobTerritory,
+      borderPercent:jobBorder,letteredButtons:jobLabelCount,taps:jobTaps,
+      messages:jobMessages,delivered:jobDeliveries,formats:jobWipes,
+      news:jobNews,leaders:leaders.map(m=>({id:m.id,label:m.label,x:m.x,y:m.y,w:m.w,h:m.h,
+        crew:m.workers,linkers:m.linkers,textMakers:m.text,formatters:m.formatters}))};
+  }
   function update(){
     generations++;
     for(let i=0;i<N;i++){
@@ -1040,6 +1313,7 @@
     }
     [role,nextRole]=[nextRole,role];[life,nextLife]=[nextLife,life];[age,nextAge]=[nextAge,age];
     [genome,nextGenome]=[nextGenome,genome];[fitness,nextFitness]=[nextFitness,fitness];
+    if(jobMode&&wild&&generations%2===0)tickJobs();
     if(wild){syncWires();if(training&&generations%60===0){relay();pulse();}}
     if(repairBoost)repairBoost--;
     if(generations%30===0){
@@ -1124,7 +1398,16 @@
       let glow=r===0?.35+(gene/255)*.10:.52+conviction[i]/255*.43;
       glow+=(Math.sin(t*.045+gene*.18)+1)*.028;
       let red=p[0]*glow,green=p[1]*glow,blue=p[2]*glow;
-      if(life[i]===1){
+      if(jobMode&&isField(i)){
+        const j=occupation[i];
+        if(j===JOB.BUTTON){red=255;green=213;blue=122;}
+        else if(j===JOB.LINKER){red=36;green=225;blue=235;}
+        else if(j===JOB.FORMATTER){red=230;green=102;blue=178;}
+        else if(j===JOB.TEXT){red=252;green=225;blue=155;}
+        else if(clan[i]){red*=1.12;green*=1.09;blue*=1.11;}
+      }
+      if(jobMode&&isField(i)&&clan[i]===0){red*=.12;green*=.12;blue*=.12;}
+      if(!jobMode&&life[i]===1){
         const col=COLORS[3+gene%3],energy=age[i];
         red=col[0]*(.75+.12*energy);green=col[1]*(.75+.12*energy);blue=col[2]*(.75+.12*energy);
       }else if(life[i]===2){
@@ -1195,6 +1478,11 @@
         }
         if(i===pulseSource){red=255;green=240;blue=210;}
       }
+      if(jobMode&&jobMessageElapsed<jobMessageDuration&&isField(i)&&jobMessageDist[i]>=0){
+        const hop=Math.floor((jobMessageElapsed/jobMessageDuration)*35),d=jobMessageDist[i];
+        if(d<=hop){if(hop-d<=2){red=255;green=255;blue=241;}
+          else {red+=28;green+=65;blue+=90;}}
+      }
       if(plasticOn&&wild&&isField(i)&&!traceActive&&role[i]>=R.CYAN){
         // The most-used local edges add a subtle, persistent electric glow.
         const x=i%W,y=(i/W)|0;let strength=0;
@@ -1218,7 +1506,9 @@
     e.preventDefault();pointerDown=true;held=false;
     const p=point(e),i=ix(p.x,p.y),hit=hotspot[i];
     if(['LEARNING','RESTING','RELEARNING'].includes(cycleStage)&&hit>=2&&hit<=9)return;
-    if(hit===10)toggleWireView();
+    if(hit===13)toggleJobs();
+    else if(hit===14){armWipe();metrics=measure();displayStats();}
+    else if(hit===10)toggleWireView();
     else if(hit===11)beginRest();
     else if(hit===12)beginLearning();
     else if(hit===7)toggleTrace();
@@ -1233,7 +1523,8 @@
     else if(hit===6){if(traceActive)toggleTrace();relay();}
     else if(p.y>=H-63){if(traceActive)toggleTrace();inspect=!inspect;metrics=measure();displayStats();}
     else if(isField(i)){
-      if(wild){if(!respond(p.x,p.y)){misses++;lastProbe='NO RESPONSE';}}else spark(p.x,p.y,4);
+      if(jobMode&&leaderByPosition(p.x,p.y))jobTap(p.x,p.y);
+      else if(wild){if(!respond(p.x,p.y)){misses++;lastProbe='NO RESPONSE';}}else spark(p.x,p.y,4);
       clearTimeout(holdTimer);
       const hx=p.x,hy=p.y;
       holdTimer=setTimeout(()=>{if(pointerDown&&!held){held=true;erase(hx,hy,5);}},550);
@@ -1262,6 +1553,7 @@
     if(k==='8'||k==='i')togglePlastic();
     if(k==='9'||k==='u')pulse();
     if(k==='v')toggleWireView();if(k==='o')beginRest();if(k==='k')beginLearning();
+    if(k==='j')toggleJobs();if(k==='f')armWipe();
     if(k==='l')rumor();if(k==='r')changePolicy();
     if(k==='t')testRumor();
     if(k==='m'){inspect=!inspect;metrics=measure();displayStats();}
@@ -1275,6 +1567,7 @@
     const elapsed=Math.min(100,now-last);last=now;accumulator+=elapsed;
     if(!document.hidden){
       advancePulse(elapsed);cycleTick(elapsed);
+      jobMessageElapsed=Math.min(jobMessageDuration,jobMessageElapsed+elapsed);
       if(traceActive){accumulator=0;tickTrace(elapsed);}
       else{
         let steps=0;
@@ -1287,7 +1580,7 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'0.8 the memory of a path',agents:N,generations,policy:POLICIES[policy],
+      version:'0.9 society of jobs',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
@@ -1309,6 +1602,10 @@
     // Manual deterministic exploration hooks for tests; no direct blueprint editing.
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
     trace:toggleTrace,traceAuto:autoTrace,traceAt,plastic:togglePlastic,pulse,
+    jobs:toggleJobs,jobStart:startJobs,jobArmWipe:armWipe,jobTap,jobReport,
+    jobAt(x,y){if(!inBounds(x|0,y|0))return null;const i=ix(x|0,y|0);
+      return {job:JOB_NAMES[occupation[i]],clan:clan[i],role:role[i],known:knowledge[i],
+        signalHop:jobMessageDist[i],obedience:obedience[i]};},
     paths:toggleWireView,rest:beginRest,learn:beginLearning,
     cycleAdvance(ms){cycleTick(clamp(Number(ms)||0,0,1000));render();return this.status.memory;},
     traceDistanceAt(x,y){
