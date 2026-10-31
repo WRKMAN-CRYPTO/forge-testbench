@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 0.3 | The Trust Experiment</title>
+<title>Pixel Society 0.4 | After the Forgetting</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. GROW, BREAK, and HEAL the colony. LIE introduces false memories, RULE changes whom the agents trust, TEST measures what survives. Tap the diagnostic panel for the observer view."></canvas>
+<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. WILD erases the colony blueprint and enables local rebuilding. BREAK disrupts memories. HEAL speeds testimony exchange. LIE injects rumors. RULE changes trust. PROBE tests whether new patterns respond to touch. Tap the statistics to inspect the observer view."></canvas>
 <script>
 (()=>{
   'use strict';
@@ -68,7 +68,7 @@
     '!':['00100','00100','00100','00100','00100','00000','00100'],
     ' ':['00000','00000','00000','00000','00000','00000','00000']
   };
-  // EXPEDITION 0.3: TRUST, DISAGREEMENT, AND FALSIFIABLE RUMORS
+  // EXPEDITION 0.4: CONSENSUS, CONFUSION, AMNESIA, AND EMERGENCE
   // One-time founders teach local overlapping 3x3 fragments then discard the
   // blueprint. The observer retains a founding reference *only* to measure
   // accuracy. ask(), exchange(), gossip(), and update() NEVER consult it.
@@ -78,11 +78,13 @@
   let W=0,H=0,N=0,image,staging=null,observerTruth=null;
   let role,nextRole,conviction,temperament,genome,damage,hotspot;
   let life,nextLife,age,nextAge,flash;
-  let testimony,knowledge,possible,certainty,reputation;
+  let testimony,knowledge,possible,certainty,reputation,source;
   let region={x:0,y:0,w:0,h:0},policy=0;
   let repairBoost=0,glitches=0,signals=0,generations=0;
   let learned=0,revisions=0,lies=0,erasures=0;
   let inspect=false,trial=null,trialReport='READY',metrics=null;
+  let wild=false,awakenings=0,probes=0,responses=0,misses=0,patches=0;
+  let discovered=new Uint8Array(0),bestPatch=null,lastProbe='UNTESTED';
   let last=0,accumulator=0,pointerDown=false,held=false,holdTimer=0,sx=0,sy=0;
   let seed=0x7ac58c3e;
   function random(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;}
@@ -112,39 +114,39 @@
   function seedFounders(){
     staging.fill(R.VOID);hotspot.fill(0);
     stampText(Math.floor(W/2),7,'PIXEL SOCIETY',R.INK,true);
-    stampText(Math.floor(W/2),18,'TRUST EXPERIMENT',R.MIST,true);
+    stampText(Math.floor(W/2),18,'THE FORGETTING',R.MIST,true);
     hline(5,W-6,30,R.FRAME);
     const gap=3,x0=4,bw=Math.floor((W-8-gap*2)/3),bh=16;
-    button(x0,35,bw,bh,'GROW',R.CYAN,1);
+    button(x0,35,bw,bh,'WILD',R.CYAN,1);
     button(x0+bw+gap,35,bw,bh,'BREAK',R.PINK,2);
     button(x0+(bw+gap)*2,35,bw,bh,'HEAL',R.GOLD,3);
     button(x0,55,bw,bh,'LIE',R.PINK,4);
     button(x0+bw+gap,55,bw,bh,'RULE',R.CYAN,5);
-    button(x0+(bw+gap)*2,55,bw,bh,'TEST',R.GOLD,6);
+    button(x0+(bw+gap)*2,55,bw,bh,'PROBE',R.GOLD,6);
     region={x:5,y:76,w:W-10,h:Math.max(19,H-143)};
     frame(region.x,region.y,region.w,region.h,R.FRAME);
     stampText(region.x+5,region.y+4,'COLONY',R.INK);
     stampText(region.x+region.w-15,region.y+4,'LIVE',R.CYAN,true);
     hline(5,W-6,H-64,R.FRAME);
-    stampText(Math.floor(W/2),H-58,'RULE COUNT',R.CYAN,true);
-    stampText(Math.floor(W/2),H-48,'ORIGIN 100%',R.INK,true);
-    stampText(Math.floor(W/2),H-38,'DISPUTES 0',R.INK,true);
-    stampText(Math.floor(W/2),H-28,'FALSE VOTES 0',R.PINK,true);
-    stampText(Math.floor(W/2),H-18,'TRIAL READY',R.GOLD,true);
-    stampText(Math.floor(W/2),H-8,'TAP STATS TO INSPECT',R.MIST,true);
+    stampText(Math.floor(W/2),H-58,'STATE CONSENSUS',R.CYAN,true);
+    stampText(Math.floor(W/2),H-48,'KNOWN 100%',R.INK,true);
+    stampText(Math.floor(W/2),H-38,'AGREE 100%',R.INK,true);
+    stampText(Math.floor(W/2),H-28,'SPLIT 0%',R.PINK,true);
+    stampText(Math.floor(W/2),H-18,'ORIGIN 100%',R.GOLD,true);
+    stampText(Math.floor(W/2),H-8,'MOTIFS 0 PINGS 0',R.MIST,true);
   }
   function displayStats(){
-    // The status strip is a separate addressable group of witness-agents.
-    // It receives reports, not a permanent canvas text overlay.
+    // Status information is taught to addressable status-strip agents, not
+    // painted as a separate overlay. A report cannot dictate field beliefs.
     if(!metrics)return;
     const sheet=new Uint8Array(N);
     staging=sheet;
-    stampText(Math.floor(W/2),H-58,'RULE '+POLICIES[policy],R.CYAN,true);
-    stampText(Math.floor(W/2),H-48,'ORIGIN '+Math.round(metrics.accuracy)+'%',R.INK,true);
-    stampText(Math.floor(W/2),H-38,'DISPUTES '+metrics.disputes,R.INK,true);
-    stampText(Math.floor(W/2),H-28,'FALSE VOTES '+metrics.falseConsensus,R.PINK,true);
-    stampText(Math.floor(W/2),H-18,'TRIAL '+trialReport,R.GOLD,true);
-    stampText(Math.floor(W/2),H-8,inspect?'OBSERVER VIEW':'TAP STATS TO INSPECT',R.MIST,true);
+    stampText(Math.floor(W/2),H-58,'STATE '+metrics.state,R.CYAN,true);
+    stampText(Math.floor(W/2),H-48,'KNOWN '+Math.round(metrics.coverage)+'%',R.INK,true);
+    stampText(Math.floor(W/2),H-38,'AGREE '+Math.round(metrics.agreement)+'%',R.INK,true);
+    stampText(Math.floor(W/2),H-28,'SPLIT '+Math.round(metrics.disputeRate)+'%',R.PINK,true);
+    stampText(Math.floor(W/2),H-18,'ORIGIN '+Math.round(metrics.accuracy)+'%',R.GOLD,true);
+    stampText(Math.floor(W/2),H-8,inspect?'OBSERVER VIEW':'MOTIFS '+patches+' PINGS '+responses,R.MIST,true);
     staging=null;
     const y0=H-62,y1=H-1;
     for(let y=y0;y<=y1;y++)for(let x=0;x<W;x++){
@@ -154,12 +156,10 @@
         if(yy>=y0&&yy<=y1&&inBounds(xx,yy)){
           const b=(dy+1)*3+dx+1;
           testimony[base+b]=sheet[ix(xx,yy)];knowledge[i]|=1<<b;
-          certainty[base+b]=175;
+          certainty[base+b]=175;source[base+b]=i+1;
         }
       }
       if(y>=H-60&&y<=H-2){
-        // Immediate readout is important for experimental feedback. The pixels
-        // remain agents, and their memories can still be damaged by BREAK.
         role[i]=sheet[i];conviction[i]=170;damage[i]=0;
       }
     }
@@ -174,7 +174,7 @@
     hotspot=new Uint8Array(N);life=new Uint8Array(N);nextLife=new Uint8Array(N);
     age=new Uint8Array(N);nextAge=new Uint8Array(N);flash=new Uint8Array(N);
     testimony=new Uint8Array(N*9);knowledge=new Uint16Array(N);possible=new Uint16Array(N);
-    certainty=new Uint8Array(N*9);reputation=new Uint8Array(N);
+    certainty=new Uint8Array(N*9);reputation=new Uint8Array(N);source=new Uint32Array(N*9);discovered=new Uint8Array(N);
     staging=new Uint8Array(N);seedFounders();
     observerTruth=staging.slice(); // Only observer metrics() may read this array.
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){
@@ -183,7 +183,7 @@
         const b=(dy+1)*3+dx+1;
         testimony[base+b]=staging[ix(x+dx,y+dy)];
         knowledge[i]|=1<<b;possible[i]|=1<<b;
-        certainty[base+b]=130+Math.floor(random()*50);
+        certainty[base+b]=130+Math.floor(random()*50);source[base+b]=i+1;
       }
       role[i]=random()<.92?testimony[base+4]:Math.floor(random()*7);
       conviction[i]=Math.floor(random()*130);
@@ -192,6 +192,7 @@
     }
     staging=null;generations=0;learned=0;revisions=0;lies=0;erasures=0;
     glitches=0;signals=0;repairBoost=0;trial=null;trialReport='READY';
+    wild=false;awakenings=0;probes=0;responses=0;misses=0;patches=0;bestPatch=null;lastProbe='UNTESTED';
     metrics=measure();displayStats();
     for(let i=0;i<12;i++)spark(region.x+10+Math.floor(random()*Math.max(1,region.w-20)),
       region.y+14+Math.floor(random()*Math.max(1,region.h-19)),1);
@@ -212,7 +213,7 @@
   function forget(i){
     if(knowledge[i]){
       knowledge[i]=0;testimony.fill(0,i*9,i*9+9);
-      certainty.fill(0,i*9,i*9+9);erasures++;
+      certainty.fill(0,i*9,i*9+9);source.fill(0,i*9,i*9+9);erasures++;
     }
   }
   function disrupt(){
@@ -228,6 +229,144 @@
   function bloom(){
     for(let j=0;j<25;j++)spark(region.x+6+Math.floor(random()*Math.max(1,region.w-12)),
       region.y+14+Math.floor(random()*Math.max(1,region.h-20)),1+Math.floor(random()*3));
+  }
+  function rewild(){
+    // Radical amnesia: erase every remembered assertion *about the field*,
+    // including overlapping memories held by agents just outside the field.
+    // The diagnostic origin remains read-only and inaccessible to agents.
+    awakenings++;wild=true;repairBoost=0;trial=null;trialReport='WILD';
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const i=ix(x,y),base=i*9;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const tx=x+dx,ty=y+dy;
+        if(!inBounds(tx,ty)||!isField(ix(tx,ty)))continue;
+        const bit=(dy+1)*3+dx+1;
+        knowledge[i]&=~(1<<bit);
+        testimony[base+bit]=0;certainty[base+bit]=0;source[base+bit]=0;
+      }
+      if(!isField(i))continue;
+      discovered[i]=0;
+      // A few personalities spontaneously express color preferences. There
+      // is no hidden target shape and no prescribed position for the seeds.
+      role[i]=random()<.026?[R.CYAN,R.PINK,R.GOLD,R.MIST][genome[i]%4]:R.VOID;
+      conviction[i]=0;damage[i]=0;flash[i]=role[i]?170:0;
+    }
+    census();metrics=measure();displayStats();
+  }
+  function weave(i,x,y){
+    // Fully local morphogenesis: agents inspect neighboring current states,
+    // choose whether to persist, propagate a neighboring color, or go quiet.
+    // Neither the observer reference nor an interface template is involved.
+    const counts=[0,0,0,0,0,0,0];let active=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;
+      if(!inBounds(x+dx,y+dy))continue;
+      const r=role[ix(x+dx,y+dy)];
+      if(r>=R.CYAN){counts[r]++;active++;}
+    }
+    let choice=R.CYAN,majority=counts[choice];
+    for(let r=R.PINK;r<=R.MIST;r++)if(counts[r]>majority){majority=counts[r];choice=r;}
+    const current=role[i];
+    if(current===R.VOID){
+      if(active>=2&&active<=5&&majority>=2&&random()<.15+(temperament[i]/255)*.05)
+        return choice;
+      if(active===0&&random()<.00020)return [R.CYAN,R.PINK,R.GOLD,R.MIST][genome[i]%4];
+      return R.VOID;
+    }
+    if(active>=6&&random()<.16)return R.VOID; // Crowding makes holes.
+    if(active===0&&random()<.018)return R.VOID; // Isolated marks may die.
+    if(majority>=3&&choice!==current&&random()<.055)return choice;
+    return current;
+  }
+  function rememberInvention(i,chosen){
+    if(chosen<R.CYAN)return;
+    const base=i*9+4;
+    if(!(knowledge[i]&16)){
+      knowledge[i]|=16;testimony[base]=chosen;certainty[base]=90;source[base]=i+1;
+      discovered[i]=1;learned++;flash[i]=145;
+    }else if(testimony[base]!==chosen&&certainty[base]<135){
+      testimony[base]=chosen;certainty[base]=85;source[base]=i+1;discovered[i]=1;revisions++;
+    }
+  }
+  function observePeers(i,x,y){
+    // Independent direct observation of the live colony. This is how a new
+    // pattern acquires genuinely different eyewitnesses instead of 8 copies
+    // of a single invented assertion. No historical image is consulted.
+    if((generations+genome[i])%23!==0)return;
+    const bit=(genome[i]+((generations/23)|0))%9;
+    const tx=x+(bit%3)-1,ty=y+((bit/3)|0)-1;
+    if(!inBounds(tx,ty))return;
+    const j=ix(tx,ty),r=role[j];
+    if(!isField(j)||r<R.CYAN)return;
+    let shared=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;
+      if(inBounds(tx+dx,ty+dy)&&role[ix(tx+dx,ty+dy)]===r)shared++;
+    }
+    if(shared<2)return; // Require a locally supported pattern.
+    const k=i*9+bit;
+    if(!(knowledge[i]&(1<<bit))||certainty[k]<120){
+      knowledge[i]|=1<<bit;testimony[k]=r;certainty[k]=110;
+      source[k]=i+1;learned++;
+    }
+  }
+  function census(){
+    // Distinct contiguous groups of colored agents. No founding pattern used.
+    const seen=new Uint8Array(N),queue=new Int32Array(N);
+    let found=0,best=0,chosen=null;
+    for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
+      const start=ix(x,y),color=role[start];
+      if(seen[start]||color<R.CYAN)continue;
+      let head=0,tail=1,sumX=0,sumY=0;queue[0]=start;seen[start]=1;
+      while(head<tail){
+        const i=queue[head++],cx=i%W,cy=(i/W)|0;
+        sumX+=cx;sumY+=cy;
+        for(const j of [i-1,i+1,i-W,i+W]){
+          if(j<0||j>=N||seen[j]||role[j]!==color||!isField(j)||
+            (Math.abs(i-j)===1&&((i/W)|0)!==((j/W)|0)))continue;
+          seen[j]=1;queue[tail++]=j;
+        }
+      }
+      if(tail>=6){
+        found++;
+        if(tail>best){best=tail;chosen={x:Math.round(sumX/tail),y:Math.round(sumY/tail),size:tail,color};}
+      }
+    }
+    patches=found;bestPatch=chosen;return {patches,largest:bestPatch};
+  }
+  function respond(x,y){
+    // An evolved patch must have >=3 matching neighbors to receive the input.
+    // No invisible hotspot preassigns this region to be a button.
+    const i=ix(x,y),kind=role[i];let mates=0;
+    if(kind<R.CYAN||!isField(i))return false;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;
+      if(inBounds(x+dx,y+dy)&&role[ix(x+dx,y+dy)]===kind)mates++;
+    }
+    if(mates<3)return false;
+    responses++;lastProbe='RESPONDED';
+    // A collective reaction travels from the tested patch.
+    spark(x,y,5);
+    for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){
+      if(dx*dx+dy*dy>16||!inBounds(x+dx,y+dy))continue;
+      const j=ix(x+dx,y+dy);
+      if(role[j]===kind)flash[j]=255;
+    }
+    return true;
+  }
+  function probe(){
+    probes++;const result=census();
+    if(!result.largest){misses++;lastProbe='NO PATCH';metrics=measure();displayStats();return false;}
+    // Search for a responsive member of the largest patch (centroid may
+    // itself be empty for a ring). This is external testing, not steering.
+    const {x,y,color}=result.largest;
+    for(let r=0;r<=12;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(Math.abs(dx)!==r&&Math.abs(dy)!==r)continue;
+      if(!inBounds(x+dx,y+dy))continue;
+      const i=ix(x+dx,y+dy);
+      if(role[i]===color&&respond(x+dx,y+dy)){metrics=measure();displayStats();return true;}
+    }
+    misses++;lastProbe='TOO FRAGILE';metrics=measure();displayStats();return false;
   }
   function erase(x,y,r=6){
     for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
@@ -261,7 +400,7 @@
           if(!(possible[i]&(1<<bit)))continue;
           // A malicious *assertion*, not a privileged new truth.
           testimony[base+bit]=R.PINK;
-          certainty[base+bit]=225+Math.floor(random()*31);
+          certainty[base+bit]=225+Math.floor(random()*31);source[base+bit]=N+lies;
           knowledge[i]|=1<<bit;contaminated=true;
         }
         if(contaminated){
@@ -282,26 +421,31 @@
     return n;
   }
   const votes=new Float32Array(7);
-  let heardRatio=0,heardCount=0;
+  let heardRatio=0,heardCount=0,heardRoot=0;
   function ask(x,y,bit){
     const tx=x+bit%3-1,ty=y+((bit/3)|0)-1;
     if(!inBounds(tx,ty))return -1;
     votes.fill(0);let total=0,n=0;
+    const roots=[],candidates=[];
     for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
       if(!dx&&!dy)continue;
       const nx=x+dx,ny=y+dy;if(!inBounds(nx,ny))continue;
       const bx=tx-nx+1,by=ty-ny+1;
       if(bx<0||bx>2||by<0||by>2)continue;
-      const j=ix(nx,ny),b=by*3+bx;
+      const j=ix(nx,ny),b=by*3+bx,k=j*9+b;
       if(!(knowledge[j]&(1<<b)))continue;
+      const root=source[k];if(!root||roots.includes(root))continue;
+      roots.push(root);candidates.push({root,color:testimony[k]});
       const weight=policy===0?1:policy===1?
-        .2+reputation[j]/70:.2+certainty[j*9+b]/65;
-      votes[testimony[j*9+b]]+=weight;total+=weight;n++;
+        .2+reputation[j]/70:.2+certainty[k]/65;
+      votes[testimony[k]]+=weight;total+=weight;n++;
     }
-    if(n<2){heardCount=n;heardRatio=0;return -1;}
+    // One real witness can transmit an idea, but cannot establish consensus.
+    if(n<(wild?1:2)){heardCount=n;heardRatio=0;heardRoot=0;return -1;}
     let best=-1,winner=0;
     for(let k=0;k<7;k++)if(votes[k]>winner){best=k;winner=votes[k];}
     heardCount=n;heardRatio=winner/total;
+    heardRoot=candidates.find(c=>c.color===best)?.root||0;
     return heardRatio>=.57?best:-1;
   }
   function exchange(i,x,y){
@@ -316,7 +460,7 @@
         if(heard>=0){
           testimony[base+bit]=heard;
           certainty[base+bit]=Math.floor(70+heardRatio*95);
-          knowledge[i]|=1<<bit;learned++;
+          knowledge[i]|=1<<bit;source[base+bit]=heardRoot;learned++;
           if(bit===4)flash[i]=135;
         }
       }else{
@@ -331,7 +475,7 @@
           const chance=heardRatio>.81?.12:heardRatio>.68?.065:.015;
           if((certainty[base+bit]<125&&random()<chance*3)||random()<chance*.18){
             testimony[base+bit]=heard;certainty[base+bit]=Math.floor(90+heardRatio*70);
-            revisions++;if(bit===4)flash[i]=190;
+            source[base+bit]=heardRoot;revisions++;if(bit===4)flash[i]=190;
           }
         }
       }
@@ -351,7 +495,21 @@
         if(y>0&&role[i-W]===remembered)support++;
         if(y<H-1&&role[i+W]===remembered)support++;
       }
-      if(damage[i]){
+      if(wild&&isField(i)){
+        // Wild field ignores inherited witness instructions for appearance;
+        // it evolves from peers' *current* states, and records what survives.
+        next=weave(i,x,y);
+        if(next!==R.VOID&&((generations+genome[i])%17===0)){
+          let supporters=0;
+          for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+            if(!dx&&!dy)continue;
+            if(inBounds(x+dx,y+dy)&&role[ix(x+dx,y+dy)]===next)supporters++;
+          }
+          if(supporters>=2)rememberInvention(i,next);
+        }
+        observePeers(i,x,y);
+        conviction[i]=next===current?Math.min(255,conviction[i]+2):Math.max(0,conviction[i]-5);
+      }else if(damage[i]){
         damage[i]--;if(random()<.16)next=Math.floor(random()*7);
         conviction[i]=Math.max(0,conviction[i]-4);
       }else if(remembered>=0){
@@ -387,6 +545,7 @@
     [role,nextRole]=[nextRole,role];[life,nextLife]=[nextLife,life];[age,nextAge]=[nextAge,age];
     if(repairBoost)repairBoost--;
     if(generations%30===0){
+      if(wild)census();
       metrics=measure();
       if(trial){
         if(generations>=trial.end){
@@ -410,34 +569,55 @@
     trialReport='RUNNING';displayStats();
   }
   function measure(){
-    // Only this function sees the founding reference. It is never used to
-    // render, persuade, heal, route UI actions, or determine agent fitness.
-    let total=0,known=0,wrong=0,visible=0,disputes=0,falseConsensus=0,completeness=0;
-    for(let y=region.y+2;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
-      const i=ix(x,y),base=i*9;total++;
+    // The observerTruth field is a DIAGNOSTIC ONLY. No colony behavior reads it.
+    // COUNT only testimony with at least 3 independent witnesses as "agreed".
+    // A lack of witnesses never counts as harmony or successful repair.
+    let total=0,known=0,wrong=0,visible=0,disputes=0,falseConsensus=0;
+    let silent=0,weak=0,coherent=0,contested=0,complete=0,originated=0;
+    const counts=new Uint8Array(7);
+    for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
+      const i=ix(x,y);total++;
       if(role[i]===observerTruth[i])visible++;
-      if(knowledge[i]===possible[i])completeness++;
-      if(!(knowledge[i]&16))continue;
-      known++;if(testimony[base+4]!==observerTruth[i])wrong++;
-      let supporters=0,dissenters=0;
-      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-        if(!dx&&!dy)continue;
-        const nx=x+dx,ny=y+dy;
-        if(!inBounds(nx,ny))continue;
-        const j=ix(nx,ny),b=(1-dy)*3+1-dx;
-        if(!(knowledge[j]&(1<<b)))continue;
-        if(testimony[j*9+b]===testimony[base+4])supporters++;
-        else dissenters++;
+      if(discovered[i])originated++;
+      if(knowledge[i]===possible[i])complete++;
+      if(knowledge[i]&16){
+        known++;if(testimony[i*9+4]!==observerTruth[i])wrong++;
       }
-      if(dissenters)disputes++;
-      if(testimony[base+4]!==observerTruth[i]&&supporters>=3&&supporters>dissenters)
-        falseConsensus++;
+      counts.fill(0);let voices=0;
+      const seenRoots=[];
+      // 9 overlapping witnesses, with copied assertions deduplicated by root.
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const nx=x+dx,ny=y+dy;if(!inBounds(nx,ny))continue;
+        const j=ix(nx,ny),bit=(1-dy)*3+1-dx;
+        if(!(knowledge[j]&(1<<bit)))continue;
+        const root=source[j*9+bit];
+        if(!root||seenRoots.includes(root))continue;
+        seenRoots.push(root);counts[testimony[j*9+bit]]++;voices++;
+      }
+      if(!voices){silent++;continue;}
+      if(voices<3){weak++;continue;}
+      let best=0,winner=0;
+      for(let k=0;k<7;k++)if(counts[k]>best){best=counts[k];winner=k;}
+      if(best/voices>=.75){
+        coherent++;
+        if(winner!==observerTruth[i])falseConsensus++;
+      }else{contested++;disputes++;}
     }
+    const coverage=total?100*(total-silent)/total:0;
+    const agreement=total?100*coherent/total:0;
+    const disputeRate=total?100*contested/total:0;
+    let state='RECOVERING';
+    if(coverage<15)state='AMNESIA';
+    else if(coverage<55)state='FRAGMENTS';
+    else if(disputeRate>10)state='CONFUSION';
+    else if(falseConsensus>Math.max(12,total*.08))state=wild?(responses?'NEW ORDER':'DIVERGENCE'):'FALSE UNITY';
+    else if(agreement>65&&disputeRate<5)state='CONSENSUS';
     return {total,knownCenters:known,wrongCenters:wrong,
       accuracy:total?100*(known-wrong)/total:0,
       visibleAccuracy:total?100*visible/total:0,
-      memoryCompleteness:total?100*completeness/total:0,
-      disputes,falseConsensus,generations};
+      memoryCompleteness:total?100*complete/total:0,
+      disputes,contested,silent,weak,coherent,originated,falseConsensus,
+      coverage,agreement,disputeRate,state,patches,responses,misses,generations};
   }
   function render(){
     const data=image.data,t=generations;
@@ -458,6 +638,7 @@
         else if(observerTruth[i]!==testimony[i*9+4]){red+=155;green+=30;blue+=90;}
         else if(knowledge[i]!==possible[i]){red+=95;green+=70;blue*=.55;}
         else if(r!==0){green+=20;blue+=9;}
+        if(discovered[i]){green+=40;blue+=50;}
       }
       if(flash[i]){red+=flash[i]*.3;green+=flash[i]*.06;blue+=flash[i]*.32;}
       data[o]=Math.min(255,red)|0;data[o+1]=Math.min(255,green)|0;
@@ -472,15 +653,16 @@
   function activate(e){
     e.preventDefault();pointerDown=true;held=false;
     const p=point(e),i=ix(p.x,p.y),hit=hotspot[i];
-    if(hit===1)bloom();
+    if(hit===1)rewild();
     else if(hit===2)disrupt();
     else if(hit===3)heal();
     else if(hit===4)rumor();
     else if(hit===5)changePolicy();
-    else if(hit===6)testRumor();
+    else if(hit===6)probe();
     else if(p.y>=H-63){inspect=!inspect;metrics=measure();displayStats();}
     else if(isField(i)){
-      spark(p.x,p.y,4);clearTimeout(holdTimer);
+      if(wild){if(!respond(p.x,p.y)){misses++;lastProbe='NO RESPONSE';}}else spark(p.x,p.y,4);
+      clearTimeout(holdTimer);
       const hx=p.x,hy=p.y;
       holdTimer=setTimeout(()=>{if(pointerDown&&!held){held=true;erase(hx,hy,5);}},550);
     }else spark(region.x+4+Math.floor(random()*Math.max(1,region.w-8)),region.y+Math.floor(region.h/2),3);
@@ -500,9 +682,10 @@
   ['pointerup','pointercancel','lostpointercapture'].forEach(k=>canvas.addEventListener(k,release));
   window.addEventListener('keydown',e=>{
     const k=e.key.toLowerCase();
-    if(k==='1'||k==='g')bloom();if(k==='2'||k==='b')disrupt();
+    if(k==='1'||k==='g'||k==='w')rewild();if(k==='2'||k==='b')disrupt();
     if(k==='3'||k==='h')heal();if(k==='4'||k==='l')rumor();
-    if(k==='5'||k==='r')changePolicy();if(k==='6'||k==='t')testRumor();
+    if(k==='5'||k==='r')changePolicy();if(k==='6'||k==='p')probe();
+    if(k==='t')testRumor();
     if(k==='m'){inspect=!inspect;metrics=measure();displayStats();}
     if(k==='e')erase(Math.floor(W/2),region.y+Math.floor(region.h/2),5);
   });
@@ -522,15 +705,17 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'0.3 trust experiment',agents:N,generations,policy:POLICIES[policy],
+      version:'0.4 after the forgetting',agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
-      note:'Observer truth is immutable and is ONLY used in measure() and the debug view. Agents can agree on a false recollection.'
+      wild,awakenings,patches,bestPatch,probes,responses,misses,lastProbe,
+      note:'Agreement requires at least three separate witnesses. No witness means amnesia, never consensus. WILD uses local roles; observer truth is only consulted by diagnostics.'
     };},
     // Manual deterministic exploration hooks for tests; no direct blueprint editing.
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));for(let j=0;j<n;j++)update();render();return this.status;},
-    lie:rumor,break:disrupt,heal,rule:changePolicy,test:testRumor,reset:create
+    lie:rumor,break:disrupt,heal,rule:changePolicy,test:testRumor,
+    wild:rewild,probe,observe:measure,census,reset:create
   };
   Object.defineProperty(window,'pixelSociety',{value:api,configurable:false});
 })();
