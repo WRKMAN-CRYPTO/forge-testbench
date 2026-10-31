@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 1.0 | The Labor Market</title>
+<title>Pixel Society 1.1 | Lean Linkers</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. WILD enables spontaneous local colony patterns. BREAK introduces damage, HEAL speeds local memory exchange. TRAIN tests relays repeatedly. SELECT enables fitness-weighted local inheritance or switches to neutral DRIFT. RELAY tests colored paths from the left edge to the right edge. TRACE freezes the colony and reveals network distance. PLAST toggles activity-dependent connection strengths. PULSE sends a single stochastic signal and reinforces connections it successfully crosses. Repeat PULSE while TRACE is active to train connections on a frozen structure. PATHS displays strong and weak connections. LEARN starts a fixed batch of pulses, REST weakens unused connections without any stimulus, and LEARN again tests whether preferred routes return. Tap TRACE again to resume. Tap the statistics for observer view."></canvas>
+<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. WILD enables spontaneous local colony patterns. BREAK introduces damage, HEAL speeds local memory exchange. TRAIN tests relays repeatedly. SELECT enables fitness-weighted local inheritance or switches to neutral DRIFT. RELAY tests colored paths from the left edge to the right edge. TRACE freezes the colony and reveals network distance. PLAST toggles activity-dependent connection strengths. PULSE sends a single stochastic signal and reinforces connections it successfully crosses. Repeat PULSE while TRACE is active to train connections on a frozen structure. PATHS displays strong and weak connections. LEARN starts a fixed batch of pulses, REST weakens unused connections without any stimulus, and LEARN again tests whether preferred routes return. Tap TRACE again to resume. While JOBS is on, tap LEAN to compare path-efficiency rewards with CLASSIC recruiting. Tap the statistics for observer view."></canvas>
 <script>
 (()=>{
   'use strict';
@@ -68,7 +68,7 @@
     '!':['00100','00100','00100','00100','00100','00000','00100'],
     ' ':['00000','00000','00000','00000','00000','00000','00000']
   };
-  // EXPEDITION 1.0: CAREER CHOICE, LOCAL DEMAND, POACHING, SPECIALIZATION
+  // EXPEDITION 1.1: LEAN LINKER BRIDGES, MEASURED WORK, HONEST TRADE-OFFS
   // One-time founders teach local overlapping 3x3 fragments then discard the
   // blueprint. The observer retains a founding reference *only* to measure
   // accuracy. ask(), exchange(), gossip(), and update() NEVER consult it.
@@ -126,6 +126,12 @@
   let jobIdle=0,jobRecruitAttempts=0,jobOffersRejected=0,jobCompetition=0;
   let jobTenure=new Uint8Array(0),jobUse=new Uint8Array(0);
   let jobEvent='LABOR MARKET OPEN';
+  // Efficiency mode scores actual cardinal-linker bridges from an in-button
+  // representative to a different maker; external probes are measurements
+  // and explicit task rewards, not secret global instructions to workers.
+  let leanOn=true,bridgeTrials=0,bridgeSuccesses=0,bridgeBest=0,bridgeLastHops=0;
+  let bridgeRewards=0,bridgeShortageEvents=0,bridgeMark=new Uint32Array(0);
+
 
 
   let last=0,accumulator=0,pointerDown=false,held=false,holdTimer=0,sx=0,sy=0;
@@ -197,13 +203,13 @@
     staging=sheet;
     const bw=Math.floor((W-12)/3);
     button(4,H-63,bw,12,wireView?'AGENT':'PATHS',R.CYAN,10);
-    button(6+bw,H-63,bw,12,'REST',R.PINK,11);
+    button(6+bw,H-63,bw,12,jobMode?(leanOn?'LEAN':'CLASS'):'REST',R.PINK,jobMode?16:11);
     button(8+bw*2,H-63,bw,12,'LEARN',R.GOLD,12);
     if(jobMode){
       jobCensus();
       stampText(Math.floor(W/2),H-48,'B'+jobTally[1]+' L'+jobTally[2]+' F'+jobTally[3]+' T'+jobTally[4],R.CYAN,true);
-      stampText(Math.floor(W/2),H-38,marketOn?'SW '+jobSwitches+' PO '+jobPoaches:'ORIGINAL CREWS',R.INK,true);
-      stampText(Math.floor(W/2),H-28,'EDGE '+jobBorder+'% TXT '+jobLabelCount,R.GOLD,true);
+      stampText(Math.floor(W/2),H-38,marketOn?(leanOn?'LEAN ':'CLASS ')+'SW '+jobSwitches+' PO '+jobPoaches:'ORIGINAL CREWS',R.INK,true);
+      stampText(Math.floor(W/2),H-28,leanOn&&marketOn?'BRIDGE '+bridgeSuccesses+'/'+bridgeTrials+' BEST '+bridgeBest:'EDGE '+jobBorder+'% TXT '+jobLabelCount,R.GOLD,true);
       stampText(Math.floor(W/2),H-18,'MSG '+jobMessages+' OK '+jobDeliveries+' F '+jobWipes,R.PINK,true);
       stampText(Math.floor(W/2),H-8,wipeArmed?'WIPE ARMED TAP BUTTON':jobNews,R.MIST,true);
     }else if(cycleStage!=='NEW'){
@@ -279,7 +285,7 @@
     cycleTouches=new Uint16Array(N*2);engram=new Uint8Array(N*2);engramWeight=new Uint8Array(N*2);
     wireView=false;cycleStage='NEW';cycleProgress=cycleTarget=cycleClock=0;
     occupation=new Uint8Array(N);clan=new Uint8Array(N);obedience=new Uint8Array(N);
-    jobTenure=new Uint8Array(N);jobUse=new Uint8Array(N);
+    jobTenure=new Uint8Array(N);jobUse=new Uint8Array(N);bridgeMark=new Uint32Array(N);
     jobMessageDist=new Int16Array(N);jobMessageDist.fill(-1);
     jobMode=false;wipeArmed=false;leaders=[];jobTally=[0,0,0,0,0];
     jobRecruits=jobTaps=jobMessages=jobDeliveries=jobWipes=0;
@@ -287,6 +293,7 @@
     jobBorder=jobTerritory=jobLabelCount=0;marketOn=true;
     jobSwitches=jobPoaches=jobResigns=jobShortages=jobIdle=jobRecruitAttempts=jobOffersRejected=jobCompetition=0;
     jobEvent='LABOR MARKET OPEN';
+    leanOn=true;bridgeTrials=bridgeSuccesses=bridgeBest=bridgeLastHops=bridgeRewards=bridgeShortageEvents=0;
     engramEdges=cycleWins=cycleSum=0;firstWins=lastWins=-1;
     cycleOverlap=cycleRetention=cycleFirstReach=cycleLastReach=-1;
     cycleSampleVersion=0;
@@ -1032,8 +1039,9 @@
     if(!wild)rewild();
     if(traceActive)toggleTrace();
     training=false;jobMode=true;wipeArmed=false;
-    occupation.fill(0);clan.fill(0);obedience.fill(0);jobTenure.fill(0);jobUse.fill(0);leaders=[];
+    occupation.fill(0);clan.fill(0);obedience.fill(0);jobTenure.fill(0);jobUse.fill(0);bridgeMark.fill(0);leaders=[];
     jobSwitches=jobPoaches=jobResigns=jobShortages=jobIdle=jobRecruitAttempts=jobOffersRejected=jobCompetition=0;
+    bridgeTrials=bridgeSuccesses=bridgeBest=bridgeLastHops=bridgeRewards=bridgeShortageEvents=0;
     jobEvent='MARKET BOOTING';
     jobMessages=jobDeliveries=jobWipes=jobRecruits=jobTaps=jobLabelCount=0;
     jobMessageDist.fill(-1);jobMessageElapsed=0;
@@ -1052,7 +1060,9 @@
       const x=b.minX+offX+(n%2)*(bw+gapX),y=b.minY+offY+Math.floor(n/2)*(bh+gapY);
       const m={id:n+1,x,y,w:bw,h:bh,label:labels[n],chief:-1,strength:0,workers:0,text:0,linkers:0,formatters:0,
         linkTarget:3,formatTarget:1,textTarget:1,recentDeliveries:0,recentFormats:0,recentMessages:0,
-        borderWork:0,output:0,poached:0,losses:0,careerChanges:0};
+        borderWork:0,output:0,poached:0,losses:0,careerChanges:0,
+        bridgeScore:0,bridgeHops:-1,bridgeWorkers:0,bridgeHits:0,bridgeLast:0,bridgeCost:0,
+        bridgeUntil:0};
       const mx=x+Math.floor(bw/2),my=y+1,chief=ix(mx,my);
       m.chief=chief;occupation[chief]=JOB.BUTTON;clan[chief]=m.id;
       role[chief]=R.GOLD;obedience[chief]=255;flash[chief]=220;
@@ -1073,6 +1083,14 @@
     jobNews=marketOn?'LABOR MARKET ON':'ORIGINAL JOB RULES';
     jobEvent=jobNews;
     metrics=measure();displayStats();return {enabled:marketOn,switches:jobSwitches,poaches:jobPoaches};
+  }
+  function toggleLean(){
+    leanOn=!leanOn;
+    bridgeMark.fill(0);
+    for(const m of leaders){m.bridgeScore=0;m.bridgeHops=-1;m.bridgeWorkers=0;m.bridgeLast=0;m.bridgeUntil=0;}
+    jobNews=leanOn?'LEAN REWARDS ON':'CLASSIC LINKERS';jobEvent=jobNews;
+    metrics=measure();displayStats();
+    return {enabled:leanOn,bridgeTrials,bridgeSuccesses};
   }
   function armWipe(){
     if(!jobMode)return jobNews='ENABLE JOBS FIRST';
@@ -1104,9 +1122,14 @@
       // task optimization. Delivery failures raise demand for connectors;
       // successful links reduce it. No agent sees other employers' ledgers.
       const effort=Math.min(1,m.recentMessages/12);
-      const failed=m.recentMessages>0&&m.recentDeliveries===0;
-      m.linkTarget=Math.round(clamp(Math.ceil(m.workers*(m.recentDeliveries>0?.047:failed?.095:.085))+
-        (m.recentDeliveries>0?4:12)+effort*3,3,Math.max(3,Math.ceil(m.workers*.14)+3)));
+      const productive=leanOn&&marketOn&&m.bridgeWorkers>0&&generations<m.bridgeUntil;
+      const failed=m.recentMessages>0&&m.recentDeliveries===0&&!productive;
+      m.linkTarget=Math.round(clamp(Math.ceil(m.workers*(m.recentDeliveries>0||productive?.047:failed?.095:.085))+
+        (m.recentDeliveries>0||productive?4:12)+effort*3,3,Math.max(3,Math.ceil(m.workers*.14)+3)));
+      // Once a proven path exists, stop advertising vacancies for a huge
+      // redundant crew. Keep a small reserve and all path workers employed.
+      if(productive)m.linkTarget=Math.max(3,Math.min(m.linkTarget,
+        m.bridgeWorkers+Math.max(3,Math.ceil(m.bridgeWorkers*.30))));
       m.formatTarget=m.workers<16?0:m.recentFormats>2?2:1;
       m.textTarget=m.workers<9?0:1;
     }
@@ -1178,7 +1201,14 @@
         }else score+=18;
         score+=m.recentDeliveries>0?8:0;
         // Measured output belongs to this individual, not every neighbor.
-        score+=(jobUse[i]/12)|0;
+        score+=(jobUse[i]/(leanOn&&marketOn?5:12))|0;
+        // In LEAN mode a highly redundant crew is costly. A worker who
+        // actually carried a bridge can justify their position with jobUse.
+        if(leanOn&&marketOn&&m.bridgeWorkers>0&&generations<m.bridgeUntil&&m.linkers>m.linkTarget){
+          const onRecentPath=bridgeMark[i]>0&&generations-bridgeMark[i]<300;
+          score-=Math.min(110,(m.linkers-m.linkTarget)*1.1+(onRecentPath?0:25));
+          if(onRecentPath)score+=78;
+        }
         if(jobTenure[i]>5&&jobUse[i]<8)score-=12;
       }else if(type===JOB.FORMATTER){
         score+=m.recentFormats?12:0;
@@ -1368,8 +1398,73 @@
         }
       }
     }
+    // Periodic task checks are not user messages. They only pay workers on
+    // an anchored, demonstrably working cross-clan path. No full relay flood
+    // gets a reward for sheer size. A disconnected town earns nothing.
+    if(marketOn&&leanOn&&generations%90===0){
+      jobCensus();for(const m of leaders){
+        const assessment=findEfficientBridge(m);
+        recordBridge(m,assessment,true);
+      }
+    }
     if(marketOn&&generations%12===0)jobCareerReview();
     if(generations%30===0)jobCensus();
+  }
+  function findEfficientBridge(m){
+    // Both LEAN and CLASSIC let a maker address all its own linkers.
+    // A remote delivery still requires cardinal adjacency through employed
+    // LINKER agents. This keeps the *connectivity test identical* between
+    // policies; only credit and staffing incentives differ.
+    const distance=new Int16Array(N);distance.fill(-1);
+    const parent=new Int32Array(N);parent.fill(-1);
+    const queue=new Int32Array(N);let head=0,tail=0;
+    for(let y=region.y+12;y<region.y+region.h-2;y++)
+      for(let x=region.x+2;x<region.x+region.w-2;x++){
+        const i=ix(x,y);
+        if(occupation[i]===JOB.LINKER&&clan[i]===m.id){distance[i]=0;queue[tail++]=i;}
+      }
+    let end=-1;
+    while(head<tail){
+      const i=queue[head++],x=i%W,y=(i/W)|0;
+      if(clan[i]!==m.id){end=i;break;}
+      const near=[x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];
+      for(const j of near)if(j>=0&&occupation[j]===JOB.LINKER&&clan[j]&&distance[j]<0){
+        parent[j]=i;distance[j]=distance[i]+1;queue[tail++]=j;
+      }
+    }
+    if(end<0)return null;
+    const path=[];let own=0;
+    for(let i=end;i>=0;i=parent[i]){
+      path.push(i);if(clan[i]===m.id)own++;
+    }
+    path.reverse();
+    const hops=path.length-1;
+    // The same bridge is less efficient with extra paid but unused linkers.
+    // Hops and surplus headcount are explicit costs, rather than arbitrary
+    // rewards for number of linked pixels or distant flood coverage.
+    const surplus=Math.max(0,m.linkers-own);
+    const efficiency=Math.max(1,Math.round(100/(1+hops/35+surplus/16)));
+    return {path,hops,own,efficiency,surplus,targetClan:clan[end],visited:tail};
+  }
+  function recordBridge(m,b,award){
+    bridgeTrials++;m.bridgeLast=b?1:0;
+    if(!b){m.bridgeScore=0;m.bridgeHops=-1;bridgeShortageEvents++;return;}
+    bridgeSuccesses++;m.bridgeHits++;m.bridgeScore=b.efficiency;
+    m.bridgeHops=b.hops;m.bridgeWorkers=b.own;m.bridgeUntil=generations+300;
+    bridgeBest=Math.max(bridgeBest,b.efficiency);bridgeLastHops=b.hops;
+    m.bridgeCost=b.surplus;
+    if(award){
+      // A lean route earns considerably more per contributing agent.
+      // No bonus for other linkers, even though they belong to the team.
+      const bonus=Math.max(5,Math.round(8+b.efficiency*.78));
+      for(const i of b.path)if(occupation[i]===JOB.LINKER){
+        // Both the sender and recipient deserve credit for working a bridge.
+        jobUse[i]=Math.min(255,jobUse[i]+bonus);
+        bridgeMark[i]=generations;
+        flash[i]=Math.max(flash[i],90);
+        bridgeRewards++;
+      }
+    }
   }
   function sendJobMessage(m,format=false){
     if(!jobMode)return {sent:false,reason:'JOBS OFF'};
@@ -1400,6 +1495,17 @@
         jobMessageDist[j]=d+1;q[tail++]=j;
       }
     }
+    let efficientRoute=null;
+    if(marketOn&&leanOn&&!fmt){
+      efficientRoute=findEfficientBridge(m);
+      jobMessageDist.fill(-1);
+      best=-1;bestDistance=0;
+      if(efficientRoute){
+        efficientRoute.path.forEach((i,k)=>{jobMessageDist[i]=k;});
+        best=efficientRoute.path[efficientRoute.path.length-1];
+        bestDistance=efficientRoute.hops;
+      }else for(const i of owned)if(inLeader(m,i%W,(i/W)|0))jobMessageDist[i]=0;
+    }
     jobMessageElapsed=0;jobMessageDuration=clamp((bestDistance+4)*80,950,3800);
     if(fmt){
       // Only an employed formatter can execute a received erase order.
@@ -1418,7 +1524,11 @@
     }else if(best>=0){
       jobDeliveries++;m.recentDeliveries++;
       jobNews='MESSAGE TO '+leaders[clan[best]-1].label;
-      if(marketOn){
+      if(marketOn&&leanOn&&efficientRoute){
+        recordBridge(m,efficientRoute,true);
+        jobNews='BRIDGE '+efficientRoute.efficiency+' HOPS '+efficientRoute.hops;
+      }else if(marketOn){
+        // In CLASSIC mode frontier flooding gets the original reward.
         // Only linkers on the observed transmission frontier gain credit.
         // Credit is local, not automatically given to all group workers.
         const stride=Math.max(1,Math.floor(tail/150));
@@ -1446,11 +1556,16 @@
       market:{enabled:marketOn,careerChanges:jobSwitches,poaches:jobPoaches,resignations:jobResigns,
         shortage:jobShortages,idleSpecialists:jobIdle,offers:jobRecruitAttempts,rejected:jobOffersRejected,
         competingContacts:jobCompetition,lastEvent:jobEvent},
+      lean:{enabled:leanOn,probes:bridgeTrials,bridges:bridgeSuccesses,bestEfficiency:bridgeBest,
+        latestHops:bridgeLastHops,creditedWorkerEvents:bridgeRewards,misses:bridgeShortageEvents},
       news:jobNews,leaders:leaders.map(m=>({id:m.id,label:m.label,x:m.x,y:m.y,w:m.w,h:m.h,
         crew:m.workers,linkers:m.linkers,textMakers:m.text,formatters:m.formatters,
         desired:{linkers:m.linkTarget,textMakers:m.textTarget,formatters:m.formatTarget},
         success:{messages:m.recentMessages,delivered:m.recentDeliveries,formats:m.recentFormats},
-        poached:m.poached,lost:m.losses,careerChanges:m.careerChanges}))};
+        poached:m.poached,lost:m.losses,careerChanges:m.careerChanges,
+        bridge:{connected:m.bridgeLast>0,efficiency:m.bridgeScore,hops:m.bridgeHops,
+          ownLinkersOnPath:m.bridgeWorkers,surplus:m.bridgeCost,discoveries:m.bridgeHits,
+          protectedFor:Math.max(0,m.bridgeUntil-generations)}}))};
   }
   function update(){
     generations++;
@@ -1723,6 +1838,7 @@
     if(['LEARNING','RESTING','RELEARNING'].includes(cycleStage)&&hit>=2&&hit<=9)return;
     if(hit===13)toggleJobs();
     else if(hit===15)toggleMarket();
+    else if(hit===16)toggleLean();
     else if(hit===14){armWipe();metrics=measure();displayStats();}
     else if(hit===10)toggleWireView();
     else if(hit===11)beginRest();
@@ -1769,7 +1885,7 @@
     if(k==='8'||k==='i')togglePlastic();
     if(k==='9'||k==='u')pulse();
     if(k==='v')toggleWireView();if(k==='o')beginRest();if(k==='k')beginLearning();
-    if(k==='j')toggleJobs();if(k==='f')armWipe();if(k==='c')toggleMarket();
+    if(k==='j')toggleJobs();if(k==='f')armWipe();if(k==='c')toggleMarket();if(k==='z')toggleLean();
     if(k==='l')rumor();if(k==='r')changePolicy();
     if(k==='t')testRumor();
     if(k==='m'){inspect=!inspect;metrics=measure();displayStats();}
@@ -1796,7 +1912,7 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'1.0 labor market',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
+      version:'1.1 lean linkers',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
@@ -1818,12 +1934,13 @@
     // Manual deterministic exploration hooks for tests; no direct blueprint editing.
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
     trace:toggleTrace,traceAuto:autoTrace,traceAt,plastic:togglePlastic,pulse,
-    jobs:toggleJobs,jobStart:startJobs,jobArmWipe:armWipe,jobMarket:toggleMarket,jobTap,jobReport,
+    jobs:toggleJobs,jobStart:startJobs,jobArmWipe:armWipe,jobMarket:toggleMarket,
+    lean:toggleLean,jobTap,jobReport,
     jobAt(x,y){if(!inBounds(x|0,y|0))return null;const i=ix(x|0,y|0);
       return {job:JOB_NAMES[occupation[i]],clan:clan[i],role:role[i],known:knowledge[i],
         signalHop:jobMessageDist[i],obedience:obedience[i],aptitudes:{worker:jobAptitude(i,JOB.NONE),
           linker:jobAptitude(i,JOB.LINKER),formatter:jobAptitude(i,JOB.FORMATTER),text:jobAptitude(i,JOB.TEXT)},
-        performance:jobUse[i],tenure:jobTenure[i]};},
+        performance:jobUse[i],tenure:jobTenure[i],lean:leanOn};},
     paths:toggleWireView,rest:beginRest,learn:beginLearning,
     cycleAdvance(ms){cycleTick(clamp(Number(ms)||0,0,1000));render();return this.status.memory;},
     traceDistanceAt(x,y){
