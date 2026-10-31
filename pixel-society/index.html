@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 0.5 | Survival of the Useful</title>
+<title>Pixel Society 0.6 | Frozen Topology</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. WILD enables spontaneous local colony patterns. BREAK introduces damage, HEAL speeds local memory exchange. TRAIN tests relays repeatedly. SELECT enables fitness-weighted local inheritance or switches to neutral DRIFT. RELAY tests colored paths from the left edge to the right edge. Tap the statistics for observer view."></canvas>
+<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. WILD enables spontaneous local colony patterns. BREAK introduces damage, HEAL speeds local memory exchange. TRAIN tests relays repeatedly. SELECT enables fitness-weighted local inheritance or switches to neutral DRIFT. RELAY tests colored paths from the left edge to the right edge. Press TRACE to freeze the colony and reveal how network distance differs from screen distance; tap a colored field agent to choose the source. Tap TRACE again to resume. Tap the statistics for observer view."></canvas>
 <script>
 (()=>{
   'use strict';
@@ -68,7 +68,7 @@
     '!':['00100','00100','00100','00100','00100','00000','00100'],
     ' ':['00000','00000','00000','00000','00000','00000','00000']
   };
-  // EXPEDITION 0.5: SURVIVAL OF THE USEFUL — RESPONSIVE FORM VS SIGNAL TRANSMISSION
+  // EXPEDITION 0.6: FROZEN TOPOLOGY — SINGLE SOURCE GRAPH DISTANCE
   // One-time founders teach local overlapping 3x3 fragments then discard the
   // blueprint. The observer retains a founding reference *only* to measure
   // accuracy. ask(), exchange(), gossip(), and update() NEVER consult it.
@@ -89,6 +89,12 @@
   let relayTier=new Uint16Array(0),inherited=0,mutations=0;
   let relayRecords={SELECT:{tries:0,wins:0,total:0,best:0},DRIFT:{tries:0,wins:0,total:0,best:0}};
   let lastRelay='UNTESTED';
+  // Observer-only trace: one frozen snapshot, one source, one same-color
+  // 4-neighbor BFS. No trace data ever enters an agent's local update rules.
+  let traceActive=false,traceDist=new Int32Array(0),traceSource=-1;
+  let traceNodes=0,traceMax=0,traceElapsed=0,traceDuration=10000,traceLayer=0;
+  let traceSourceColor=0,traceSpan=0,traceDetour=0,traceLast='NO TRACE',traceRefresh=0;
+
   let last=0,accumulator=0,pointerDown=false,held=false,holdTimer=0,sx=0,sy=0;
   let seed=0x7ac58c3e;
   function random(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;}
@@ -118,7 +124,9 @@
   function seedFounders(){
     staging.fill(R.VOID);hotspot.fill(0);
     stampText(Math.floor(W/2),7,'PIXEL SOCIETY',R.INK,true);
-    stampText(Math.floor(W/2),18,'SIGNAL ECOLOGY',R.MIST,true);
+    // A compact independent TRACE control occupies the former subtitle,
+    // preserving the colony field's height on short landscape screens.
+    button(Math.floor(W/2)-44,16,88,13,'TRACE',R.GOLD,7);
     hline(5,W-6,30,R.FRAME);
     const gap=3,x0=4,bw=Math.floor((W-8-gap*2)/3),bh=16;
     button(x0,35,bw,bh,'WILD',R.CYAN,1);
@@ -145,8 +153,14 @@
     if(!metrics)return;
     const sheet=new Uint8Array(N);
     staging=sheet;
-    stampText(Math.floor(W/2),H-58,'STATE '+metrics.state,R.CYAN,true);
-    if(wild){
+    stampText(Math.floor(W/2),H-58,'STATE '+(traceActive?'TRACE':metrics.state),R.CYAN,true);
+    if(traceActive){
+      stampText(Math.floor(W/2),H-48,'DEPTH '+traceMax+' HOPS',R.INK,true);
+      stampText(Math.floor(W/2),H-38,'NODES '+traceNodes,R.INK,true);
+      stampText(Math.floor(W/2),H-28,'LAYER '+traceLayer+'/'+traceMax,R.GOLD,true);
+      stampText(Math.floor(W/2),H-18,traceNodes?'DETOUR '+traceDetour+' X':'NO CONNECTED PATH',R.CYAN,true);
+      stampText(Math.floor(W/2),H-8,'TAP FIELD REPLAY',R.MIST,true);
+    }else if(wild){
       const mode=selectionOn?'SELECT':'DRIFT',r=relayRecords[mode];
       stampText(Math.floor(W/2),H-48,'KNOWN '+Math.round(metrics.coverage)+'%',R.INK,true);
       stampText(Math.floor(W/2),H-38,'REACH '+relayReach+'%',R.GOLD,true);
@@ -193,6 +207,9 @@
     age=new Uint8Array(N);nextAge=new Uint8Array(N);flash=new Uint8Array(N);
     testimony=new Uint8Array(N*9);knowledge=new Uint16Array(N);possible=new Uint16Array(N);
     certainty=new Uint8Array(N*9);reputation=new Uint8Array(N);source=new Uint32Array(N*9);discovered=new Uint8Array(N);relayTier=new Uint16Array(N);
+    traceDist=new Int32Array(N);traceDist.fill(-1);traceActive=false;
+    traceSource=-1;traceNodes=traceMax=traceLayer=traceElapsed=traceSpan=traceDetour=traceRefresh=0;
+    traceSourceColor=0;traceLast='NO TRACE';
     staging=new Uint8Array(N);seedFounders();
     observerTruth=staging.slice(); // Only observer metrics() may read this array.
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){
@@ -326,6 +343,95 @@
     record.total+=relayReach;record.best=Math.max(record.best,relayReach);
     metrics=measure();displayStats();
     return {success,reach:relayReach,components,mode:selectionOn?'SELECT':'DRIFT'};
+  }
+  function fieldBounds(){return {minX:region.x+2,maxX:region.x+region.w-3,
+    minY:region.y+12,maxY:region.y+region.h-3};}
+  // The source can be any living agent in the experimental field. No other
+  // connected component is launched, unlike the original multi-source RELAY.
+  function traceFromIndex(start){
+    if(start<0||start>=N||!isField(start)||role[start]<R.CYAN)return false;
+    const {minX,maxX,minY,maxY}=fieldBounds();
+    traceDist.fill(-1);
+    const q=new Int32Array(N);let head=0,tail=1;
+    q[0]=start;traceDist[start]=0;
+    const color=role[start],sx=start%W,sy=(start/W)|0;
+    let farX=sx,farY=sy,maximum=0,minSeenX=sx,maxSeenX=sx;
+    while(head<tail){
+      const i=q[head++],x=i%W,y=(i/W)|0,d=traceDist[i];
+      if(d>maximum){maximum=d;farX=x;farY=y;}
+      minSeenX=Math.min(minSeenX,x);maxSeenX=Math.max(maxSeenX,x);
+      const adj=[x>minX?i-1:-1,x<maxX?i+1:-1,
+        y>minY?i-W:-1,y<maxY?i+W:-1];
+      for(let k=0;k<4;k++){
+        const j=adj[k];if(j<0||traceDist[j]>=0||role[j]!==color)continue;
+        traceDist[j]=d+1;q[tail++]=j;
+      }
+    }
+    traceSource=start;traceSourceColor=color;traceNodes=tail;traceMax=maximum;
+    traceSpan=maxSeenX-minSeenX;traceElapsed=0;traceLayer=0;traceRefresh=0;
+    // Detour compares shortest network route to *straight-line* separation
+    // for the farthest agent. This is descriptive, not an extra dimension.
+    const straight=Math.hypot(farX-sx,farY-sy);
+    traceDetour=straight>0?Math.round(maximum/straight*10)/10:1;
+    traceDuration=clamp(5200+traceMax*22,6000,14000);
+    traceLast='TRACING';traceActive=true;
+    metrics=measure();displayStats();
+    return true;
+  }
+  function traceAt(x,y){
+    x=clamp(Math.round(x),0,W-1);y=clamp(Math.round(y),0,H-1);
+    let closest=-1,best=Infinity;
+    // A tap on a blank pixel chooses a nearby active agent; no teleporting
+    // across large gaps that would disguise disconnected islands.
+    const {minX,maxX,minY,maxY}=fieldBounds();
+    for(let dy=-7;dy<=7;dy++)for(let dx=-7;dx<=7;dx++){
+      const xx=x+dx,yy=y+dy;
+      if(xx<minX||xx>maxX||yy<minY||yy>maxY)continue;
+      const j=ix(xx,yy);if(role[j]<R.CYAN)continue;
+      const d=dx*dx+dy*dy;
+      if(d<best){best=d;closest=j;}
+    }
+    return closest>=0?traceFromIndex(closest):false;
+  }
+  function autoTrace(){
+    const {minX,maxX,minY,maxY}=fieldBounds();
+    const seen=new Uint8Array(N),q=new Int32Array(N);
+    let chosen=-1,bestScore=-Infinity;
+    for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++){
+      const root=ix(x,y),color=role[root];
+      if(color<R.CYAN||seen[root])continue;
+      q[0]=root;seen[root]=1;
+      let head=0,tail=1,leftX=x,rightX=x,leftI=root;
+      while(head<tail){
+        const i=q[head++],cx=i%W,cy=(i/W)|0;
+        if(cx<leftX){leftX=cx;leftI=i;}
+        rightX=Math.max(cx,rightX);
+        const adj=[cx>minX?i-1:-1,cx<maxX?i+1:-1,
+          cy>minY?i-W:-1,cy<maxY?i+W:-1];
+        for(const j of adj){if(j<0||seen[j]||role[j]!==color)continue;
+          seen[j]=1;q[tail++]=j;}
+      }
+      // Favor broad networks rather than picking the largest dense blob.
+      const score=(rightX-leftX)*25+Math.sqrt(tail)*2;
+      if(score>bestScore){bestScore=score;chosen=leftI;}
+    }
+    if(chosen<0){traceActive=true;traceDist.fill(-1);traceSource=-1;
+      traceNodes=traceMax=traceLayer=0;traceLast='EMPTY';metrics=measure();displayStats();return false;}
+    return traceFromIndex(chosen);
+  }
+  function toggleTrace(){
+    if(traceActive){traceActive=false;traceLast='RESUMED';metrics=measure();displayStats();}
+    else autoTrace();
+  }
+  function tickTrace(ms){
+    if(!traceActive)return;
+    traceElapsed=Math.min(traceDuration,traceElapsed+ms);
+    const previous=traceLayer;
+    traceLayer=traceNodes?Math.min(traceMax,Math.floor((traceElapsed/traceDuration)*(traceMax+1))):0;
+    if(traceElapsed>=traceDuration)traceLast=traceNodes?'COMPLETE':'EMPTY';
+    traceRefresh+=ms;
+    if(traceLayer!==previous&&traceRefresh>220){traceRefresh=0;displayStats();}
+    else if(traceRefresh>500){traceRefresh=0;displayStats();}
   }
   function toggleTraining(){
     if(!wild)rewild();training=!training;
@@ -757,7 +863,7 @@
       }else if(life[i]===2){
         const f=Math.max(0,.50-age[i]/75);red+=70*f;green+=155*f;blue+=175*f;
       }
-      if(wild&&relayTier[i]&&generations-relayLast<64){
+      if(!traceActive&&wild&&relayTier[i]&&generations-relayLast<64){
         const wave=(generations-relayLast)*3+1,delta=Math.abs(relayTier[i]-wave);
         if(delta<=3){red+=120;green+=150;blue+=145;}
       }
@@ -765,7 +871,7 @@
         green+=Math.min(30,fitness[i]*.13);
         blue+=Math.min(28,fitness[i]*.10);
       }
-      if(inspect){
+      if(inspect&&!traceActive){
         // This is the observer's view, separate from agents' own perception.
         if(!(knowledge[i]&16)){red+=140;green*=.3;blue+=90;}
         else if(observerTruth[i]!==testimony[i*9+4]){red+=155;green+=30;blue+=90;}
@@ -773,7 +879,27 @@
         else if(r!==0){green+=20;blue+=9;}
         if(discovered[i]){green+=40;blue+=50;}
       }
-      if(flash[i]){red+=flash[i]*.3;green+=flash[i]*.06;blue+=flash[i]*.32;}
+      if(flash[i]&&!traceActive){red+=flash[i]*.3;green+=flash[i]*.06;blue+=flash[i]*.32;}
+      if(traceActive&&isField(i)){
+        const d=traceDist[i];
+        if(d<0){
+          // Preserve a faint map of other components: their lack of color
+          // does not mean they are physically beneath this component.
+          red=red*.16;green=green*.18;blue=blue*.21;
+        }else if(d>traceLayer){
+          red=red*.22;green=green*.24;blue=blue*.29;
+        }else{
+          // Color = shortest graph distance, never screen depth. Blue near
+          // the source; teal mid-way; amber and pink at distant hops.
+          const u=traceMax?d/traceMax:0;
+          if(u<.45){const a=u/.45;red=22+42*a;green=122+110*a;blue=247-70*a;}
+          else if(u<.75){const a=(u-.45)/.30;red=64+190*a;green=232-32*a;blue=177-126*a;}
+          else {const a=(u-.75)/.25;red=254-7*a;green=200-127*a;blue=51+108*a;}
+          // Single traveling frontier: it reaches each location once.
+          if(traceElapsed<traceDuration&&traceLayer-d<=2){red=255;green=255;blue=242;}
+        }
+        if(i===traceSource){red=255;green=255;blue=255;}
+      }
       data[o]=Math.min(255,red)|0;data[o+1]=Math.min(255,green)|0;
       data[o+2]=Math.min(255,blue)|0;data[o+3]=255;
     }
@@ -786,13 +912,15 @@
   function activate(e){
     e.preventDefault();pointerDown=true;held=false;
     const p=point(e),i=ix(p.x,p.y),hit=hotspot[i];
-    if(hit===1)rewild();
-    else if(hit===2)disrupt();
-    else if(hit===3)heal();
-    else if(hit===4)toggleTraining();
-    else if(hit===5)toggleSelection();
-    else if(hit===6)relay();
-    else if(p.y>=H-63){inspect=!inspect;metrics=measure();displayStats();}
+    if(hit===7)toggleTrace();
+    else if(traceActive&&isField(i)){traceAt(p.x,p.y);}
+    else if(hit===1){if(traceActive)toggleTrace();rewild();}
+    else if(hit===2){if(traceActive)toggleTrace();disrupt();}
+    else if(hit===3){if(traceActive)toggleTrace();heal();}
+    else if(hit===4){if(traceActive)toggleTrace();toggleTraining();}
+    else if(hit===5){if(traceActive)toggleTrace();toggleSelection();}
+    else if(hit===6){if(traceActive)toggleTrace();relay();}
+    else if(p.y>=H-63){if(traceActive)toggleTrace();inspect=!inspect;metrics=measure();displayStats();}
     else if(isField(i)){
       if(wild){if(!respond(p.x,p.y)){misses++;lastProbe='NO RESPONSE';}}else spark(p.x,p.y,4);
       clearTimeout(holdTimer);
@@ -805,6 +933,7 @@
   canvas.addEventListener('pointermove',e=>{
     if(!pointerDown||held)return;
     const p=point(e);
+    if(traceActive)return;
     if(Math.abs(p.x-sx)+Math.abs(p.y-sy)>3){
       clearTimeout(holdTimer);
       if(isField(ix(p.x,p.y)))spark(p.x,p.y,2);
@@ -818,6 +947,7 @@
     if(k==='1'||k==='g'||k==='w')rewild();if(k==='2'||k==='b')disrupt();
     if(k==='3'||k==='h')heal();if(k==='4'||k==='a')toggleTraining();
     if(k==='5'||k==='s')toggleSelection();if(k==='6'||k==='p')relay();
+    if(k==='7'||k==='d')toggleTrace();
     if(k==='l')rumor();if(k==='r')changePolicy();
     if(k==='t')testRumor();
     if(k==='m'){inspect=!inspect;metrics=measure();displayStats();}
@@ -830,8 +960,11 @@
     if(!last)last=now;
     const elapsed=Math.min(100,now-last);last=now;accumulator+=elapsed;
     if(!document.hidden){
-      let steps=0;
-      while(accumulator>=33.333&&steps<3){update();accumulator-=33.333;steps++;}
+      if(traceActive){accumulator=0;tickTrace(elapsed);}
+      else{
+        let steps=0;
+        while(accumulator>=33.333&&steps<3){update();accumulator-=33.333;steps++;}
+      }
       render();
     }
     requestAnimationFrame(frameLoop);
@@ -839,17 +972,22 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'0.5 survival of the useful',agents:N,generations,policy:POLICIES[policy],
+      version:'0.6 frozen topology',agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
       wild,awakenings,patches,bestPatch,probes,responses,misses,lastProbe,
       selectionOn,training,relayTries,relayWins,relayReach,lastRelay,relayRecords,
       inherited,mutations,activeCarriers:fitness.reduce((n,x)=>n+(x>25),0),
-      note:'This experiment tests transport along same-color connected paths. Successful relays reward participating local carriers in SELECT mode; DRIFT is unrewarded. Switching modes mid-run is NOT a controlled comparison. A link is a programmer-defined task, not a discovered purpose.'
+      trace:{active:traceActive,source:traceSource<0?null:{x:traceSource%W,y:(traceSource/W)|0,color:traceSourceColor},nodes:traceNodes,maxHops:traceMax,spanX:traceSpan,detour:traceDetour,layer:traceLayer,finished:traceElapsed>=traceDuration,last:traceLast},
+      note:'TRACE freezes the 2D colony and animates a single-source four-neighbor BFS. Colored depth means graph hops, never physical Z depth; unreachable components stay dim. Automatic source favors wide connected networks.'
     };},
     // Manual deterministic exploration hooks for tests; no direct blueprint editing.
-    runSteps(n){n=Math.min(5000,Math.max(0,n|0));for(let j=0;j<n;j++)update();render();return this.status;},
+    runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
+    trace:toggleTrace,traceAuto:autoTrace,traceAt,traceDistanceAt(x,y){
+      x=x|0;y=y|0;return inBounds(x,y)?traceDist[ix(x,y)]:-1;
+    },
+    advanceTrace(ms){tickTrace(clamp(Number(ms)||0,0,30000));render();return this.status.trace;},
     lie:rumor,break:disrupt,heal,rule:changePolicy,test:testRumor,
     wild:rewild,probe,relay,train:toggleTraining,select:toggleSelection,observe:measure,census,reset:create,
     reseed(n){seed=(Number(n)>>>0)||0x7ac58c3e;create();return this.status;}
