@@ -242,9 +242,9 @@
     if(jobMode){
       const gap=2,b=Math.floor((W-8-3*gap)/4);
       button(4,H-63,b,12,foremanOn?'FORE':'SOLO',R.CYAN,18);
-      button(4+(b+gap),H-63,b,12,leanOn?'LEAN':'CLASS',R.PINK,16);
+      button(4+(b+gap),H-63,b,12,leanOn?'LEAN':'CLAS',R.PINK,16);
       button(4+2*(b+gap),H-63,b,12,chainMode?(b>=33?'CHAIN':'LINE'):'FREE',R.GOLD,17);
-      button(4+3*(b+gap),H-63,b,12,costOn?'COST':'SPREE',R.CYAN,19);
+      button(4+3*(b+gap),H-63,b,12,costOn?'COST':'FREE',R.CYAN,19);
     }else{
       button(4,H-63,bw,12,wireView?'AGENT':'PATHS',R.CYAN,10);
       button(6+bw,H-63,bw,12,'REST',R.PINK,11);
