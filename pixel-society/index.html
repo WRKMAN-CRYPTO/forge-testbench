@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 0.6 | Frozen Topology</title>
+<title>Pixel Society 0.7 | Living Connections</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. WILD enables spontaneous local colony patterns. BREAK introduces damage, HEAL speeds local memory exchange. TRAIN tests relays repeatedly. SELECT enables fitness-weighted local inheritance or switches to neutral DRIFT. RELAY tests colored paths from the left edge to the right edge. Press TRACE to freeze the colony and reveal how network distance differs from screen distance; tap a colored field agent to choose the source. Tap TRACE again to resume. Tap the statistics for observer view."></canvas>
+<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. WILD enables spontaneous local colony patterns. BREAK introduces damage, HEAL speeds local memory exchange. TRAIN tests relays repeatedly. SELECT enables fitness-weighted local inheritance or switches to neutral DRIFT. RELAY tests colored paths from the left edge to the right edge. TRACE freezes the colony and reveals network distance. PLAST toggles activity-dependent connection strengths. PULSE sends a single stochastic signal and reinforces connections it successfully crosses. Repeat PULSE while TRACE is active to train connections on a frozen structure. Tap TRACE again to resume. Tap the statistics for observer view."></canvas>
 <script>
 (()=>{
   'use strict';
@@ -68,7 +68,7 @@
     '!':['00100','00100','00100','00100','00100','00000','00100'],
     ' ':['00000','00000','00000','00000','00000','00000','00000']
   };
-  // EXPEDITION 0.6: FROZEN TOPOLOGY — SINGLE SOURCE GRAPH DISTANCE
+  // EXPEDITION 0.7: ACTIVITY-DEPENDENT PLASTICITY AND FROZEN TOPOLOGY
   // One-time founders teach local overlapping 3x3 fragments then discard the
   // blueprint. The observer retains a founding reference *only* to measure
   // accuracy. ask(), exchange(), gossip(), and update() NEVER consult it.
@@ -94,6 +94,15 @@
   let traceActive=false,traceDist=new Int32Array(0),traceSource=-1;
   let traceNodes=0,traceMax=0,traceElapsed=0,traceDuration=10000,traceLayer=0;
   let traceSourceColor=0,traceSpan=0,traceDetour=0,traceLast='NO TRACE',traceRefresh=0;
+  // Each undirected cardinal edge has a private strength. right/down at i;
+  // left/up are stored on the neighbor. Only matching live-color pixels connect.
+  // The pixel agents do not know the destination; an outside observer scores it.
+  let wires=new Uint8Array(0),wireUsed=new Uint16Array(0),plasticOn=true;
+  let pulseDist=new Int32Array(0),pulseSource=-1,pulseTries=0,pulseWins=0;
+  let pulseReach=0,pulseNodes=0,pulseDepth=0,pulseMax=0;
+  let pulseElapsed=0,pulseDuration=0,pulseLast='NO PULSE',pulseSourceColor=0;
+  let pulseRecord={PLASTIC:{tries:0,wins:0,total:0},STATIC:{tries:0,wins:0,total:0}};
+  let avgWire=0,activeWires=0,reinforced=0,unusedFade=0;
 
   let last=0,accumulator=0,pointerDown=false,held=false,holdTimer=0,sx=0,sy=0;
   let seed=0x7ac58c3e;
@@ -124,9 +133,12 @@
   function seedFounders(){
     staging.fill(R.VOID);hotspot.fill(0);
     stampText(Math.floor(W/2),7,'PIXEL SOCIETY',R.INK,true);
-    // A compact independent TRACE control occupies the former subtitle,
-    // preserving the colony field's height on short landscape screens.
-    button(Math.floor(W/2)-44,16,88,13,'TRACE',R.GOLD,7);
+    // Three instrument controls occupy the old subtitle strip; the field
+    // remains tall enough for landscape phone orientation.
+    const tw=Math.floor((W-8-4)/3);
+    button(4,16,tw,13,'TRACE',R.GOLD,7);
+    button(6+tw,16,tw,13,'PLAST',R.CYAN,8);
+    button(8+tw*2,16,tw,13,'PULSE',R.PINK,9);
     hline(5,W-6,30,R.FRAME);
     const gap=3,x0=4,bw=Math.floor((W-8-gap*2)/3),bh=16;
     button(x0,35,bw,bh,'WILD',R.CYAN,1);
@@ -159,14 +171,14 @@
       stampText(Math.floor(W/2),H-38,'NODES '+traceNodes,R.INK,true);
       stampText(Math.floor(W/2),H-28,'LAYER '+traceLayer+'/'+traceMax,R.GOLD,true);
       stampText(Math.floor(W/2),H-18,traceNodes?'DETOUR '+traceDetour+' X':'NO CONNECTED PATH',R.CYAN,true);
-      stampText(Math.floor(W/2),H-8,'TAP FIELD REPLAY',R.MIST,true);
+      stampText(Math.floor(W/2),H-8,pulseTries?'WIRE '+avgWire+'% '+(plasticOn?'ON':'OFF'):'TAP FIELD REPLAY',R.MIST,true);
     }else if(wild){
       const mode=selectionOn?'SELECT':'DRIFT',r=relayRecords[mode];
-      stampText(Math.floor(W/2),H-48,'KNOWN '+Math.round(metrics.coverage)+'%',R.INK,true);
-      stampText(Math.floor(W/2),H-38,'REACH '+relayReach+'%',R.GOLD,true);
-      stampText(Math.floor(W/2),H-28,'LINKS '+r.wins+'/'+r.tries,R.PINK,true);
-      stampText(Math.floor(W/2),H-18,mode+(training?' TRAIN':' IDLE'),R.CYAN,true);
-      stampText(Math.floor(W/2),H-8,inspect?'OBSERVER VIEW':'MOTIFS '+patches+' MUT '+mutations,R.MIST,true);
+      stampText(Math.floor(W/2),H-48,'RELAY '+relayReach+'%',R.INK,true);
+      stampText(Math.floor(W/2),H-38,'PULSE '+pulseReach+'%',R.GOLD,true);
+      stampText(Math.floor(W/2),H-28,'WIRES '+avgWire+'%',R.PINK,true);
+      stampText(Math.floor(W/2),H-18,(plasticOn?'PLASTIC':'STATIC')+(training?' TRAIN':' IDLE'),R.CYAN,true);
+      stampText(Math.floor(W/2),H-8,inspect?'OBSERVER VIEW':'SENT '+pulseWins+'/'+pulseTries+' MUT '+mutations,R.MIST,true);
     }else{
       stampText(Math.floor(W/2),H-48,'KNOWN '+Math.round(metrics.coverage)+'%',R.INK,true);
       stampText(Math.floor(W/2),H-38,'AGREE '+Math.round(metrics.agreement)+'%',R.INK,true);
@@ -210,6 +222,12 @@
     traceDist=new Int32Array(N);traceDist.fill(-1);traceActive=false;
     traceSource=-1;traceNodes=traceMax=traceLayer=traceElapsed=traceSpan=traceDetour=traceRefresh=0;
     traceSourceColor=0;traceLast='NO TRACE';
+    wires=new Uint8Array(N*2);wireUsed=new Uint16Array(N*2);
+    pulseDist=new Int32Array(N);pulseDist.fill(-1);
+    plasticOn=true;pulseSource=-1;pulseTries=pulseWins=pulseReach=pulseNodes=pulseDepth=pulseMax=0;
+    pulseElapsed=pulseDuration=0;pulseLast='NO PULSE';pulseSourceColor=0;
+    pulseRecord={PLASTIC:{tries:0,wins:0,total:0},STATIC:{tries:0,wins:0,total:0}};
+    avgWire=activeWires=reinforced=unusedFade=0;
     staging=new Uint8Array(N);seedFounders();
     observerTruth=staging.slice(); // Only observer metrics() may read this array.
     for(let y=0;y<H;y++)for(let x=0;x<W;x++){
@@ -273,6 +291,11 @@
     // including overlapping memories held by agents just outside the field.
     // The diagnostic origin remains read-only and inaccessible to agents.
     awakenings++;wild=true;training=false;repairBoost=0;trial=null;trialReport='WILD';
+    wires.fill(0);wireUsed.fill(0);pulseDist.fill(-1);pulseSource=-1;
+    pulseTries=pulseWins=pulseReach=pulseNodes=pulseDepth=pulseMax=0;
+    pulseElapsed=pulseDuration=0;pulseLast='NO PULSE';
+    pulseRecord={PLASTIC:{tries:0,wins:0,total:0},STATIC:{tries:0,wins:0,total:0}};
+    avgWire=activeWires=reinforced=unusedFade=0;
     fitness.fill(0);nextFitness.fill(0);relayTier.fill(0);relayTries=relayWins=relayReach=relayLast=0;
     mutations=0;inherited=0;lastRelay='UNTESTED';
     relayRecords={SELECT:{tries:0,wins:0,total:0,best:0},DRIFT:{tries:0,wins:0,total:0,best:0}};
@@ -292,7 +315,7 @@
       role[i]=random()<.026?[R.CYAN,R.PINK,R.GOLD,R.MIST][genome[i]%4]:R.VOID;
       conviction[i]=0;damage[i]=0;flash[i]=role[i]?170:0;
     }
-    census();metrics=measure();displayStats();
+    syncWires();census();metrics=measure();displayStats();
   }
   // Task: can a SAME-COLOR path carry a signal from left to right?
   // External test provides source and destination, never a map or answer.
@@ -343,6 +366,115 @@
     record.total+=relayReach;record.best=Math.max(record.best,relayReach);
     metrics=measure();displayStats();
     return {success,reach:relayReach,components,mode:selectionOn?'SELECT':'DRIFT'};
+  }
+  function edgeIndex(i,j){
+    // A single weight is shared by both ends of each cardinal edge.
+    if(j===i+1)return i*2;
+    if(j===i-1)return j*2;
+    if(j===i+W)return i*2+1;
+    return j*2+1;
+  }
+  function liveLink(i,j){return isField(i)&&isField(j)&&
+    role[i]>=R.CYAN&&role[i]===role[j];}
+  function syncWires(){
+    // Morphology changes can create or destroy edges, independently of
+    // reward. New same-color edges receive modest, individually varied weight.
+    let sum=0,num=0;
+    for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
+      const i=ix(x,y);
+      const right=i+1,down=i+W;
+      for(let dir=0;dir<2;dir++){
+        const j=dir?down:right,k=i*2+dir;
+        if(!liveLink(i,j)){wires[k]=0;wireUsed[k]=0;continue;}
+        if(!wires[k])wires[k]=72+Math.floor(random()*51);
+        sum+=wires[k];num++;
+      }
+    }
+    activeWires=num;avgWire=num?Math.round(100*sum/(num*255)):0;
+  }
+  function pulseSourcePick(){
+    const {minX,maxX,minY,maxY}=fieldBounds();
+    if(pulseSource>=0&&liveLink(pulseSource,pulseSource+1)&&
+      pulseSource%W<=minX+6)return pulseSource;
+    // External stimulator chooses the widest connected component touching
+    // the left fringe, not a path instructed to the agents.
+    const seen=new Uint8Array(N),q=new Int32Array(N);
+    let best=-1,score=-1;
+    for(let y=minY;y<=maxY;y++)for(let x=minX;x<=minX+5;x++){
+      const i=ix(x,y),color=role[i];if(color<R.CYAN||seen[i])continue;
+      let head=0,tail=1,furthest=x;
+      seen[i]=1;q[0]=i;
+      while(head<tail){
+        const at=q[head++],xx=at%W,yy=(at/W)|0;
+        furthest=Math.max(furthest,xx);
+        const arr=[xx>minX?at-1:-1,xx<maxX?at+1:-1,
+          yy>minY?at-W:-1,yy<maxY?at+W:-1];
+        for(const j of arr){if(j<0||seen[j]||role[j]!==color)continue;
+          seen[j]=1;q[tail++]=j;}
+      }
+      const s=(furthest-minX)*10+Math.sqrt(tail);
+      if(s>score){score=s;best=i;}
+    }
+    pulseSource=best;return best;
+  }
+  function togglePlastic(){
+    plasticOn=!plasticOn;
+    metrics=measure();displayStats();return plasticOn;
+  }
+  function pulse(){
+    if(!wild)rewild();
+    syncWires();
+    const start=pulseSourcePick(),bounds=fieldBounds();
+    pulseDist.fill(-1);pulseSource=start;pulseNodes=pulseDepth=pulseReach=0;
+    pulseElapsed=0;pulseDuration=4500;
+    const mode=plasticOn?'PLASTIC':'STATIC';
+    if(start<0){pulseLast='NO SOURCE';metrics=measure();displayStats();return {success:false,reach:0,nodes:0};}
+    // A pulse must be physically passed across an edge. A failed transfer
+    // is not retried on that edge during the same stimulus. Each successful
+    // edge can be reinforced after the whole traversal, avoiding order bias.
+    const visited=new Uint8Array(N),q=new Int32Array(N),transfers=[];
+    let head=0,tail=1,maxX=start%W,maxD=0;
+    visited[start]=1;q[0]=start;pulseDist[start]=0;
+    while(head<tail){
+      const i=q[head++],x=i%W,y=(i/W)|0,d=pulseDist[i];
+      maxX=Math.max(maxX,x);maxD=Math.max(maxD,d);
+      const neighbors=[x>bounds.minX?i-1:-1,x<bounds.maxX?i+1:-1,
+        y>bounds.minY?i-W:-1,y<bounds.maxY?i+W:-1];
+      for(const j of neighbors){
+        if(j<0||visited[j]||!liveLink(i,j))continue;
+        // A receiver can hear multiple neighbors, but an edge transmits
+        // only once per pulse. Successful transmission marks the receiver.
+        const k=edgeIndex(i,j),prob=1-Math.exp(-wires[k]/32);
+        if(random()>prob)continue;
+        visited[j]=1;pulseDist[j]=d+1;q[tail++]=j;transfers.push(k);
+      }
+    }
+    pulseTries++;pulseNodes=tail;pulseDepth=maxD;
+    pulseReach=Math.round(100*Math.max(0,maxX-bounds.minX)/Math.max(1,bounds.maxX-bounds.minX));
+    const won=maxX>=bounds.maxX-1;if(won)pulseWins++;
+    pulseLast=won?'DELIVERED':'PARTIAL';
+    const record=pulseRecord[mode];record.tries++;record.total+=pulseReach;if(won)record.wins++;
+    if(plasticOn){
+      // Hebbian-like local rule: transmitted edges strengthen, neglected edges
+      // weaken. These rules do not know which routes reach the destination.
+      for(const k of transfers){wires[k]=Math.min(255,wires[k]+14);wireUsed[k]=pulseTries;reinforced++;}
+      for(let k=0;k<wires.length;k++)if(wires[k]>0&&wireUsed[k]!==pulseTries&&pulseTries%4===0){
+        wires[k]=Math.max(1,wires[k]-1);unusedFade++;
+      }
+    }
+    // The average shown is a population statistic; it includes neglected
+    // edges as well as active signal-carriers.
+    let sum=0,num=0;
+    for(const v of wires)if(v){sum+=v;num++;}
+    activeWires=num;avgWire=num?Math.round(100*sum/(num*255)):0;
+    pulseDuration=clamp(2800+maxD*21,3200,12000);
+    metrics=measure();displayStats();
+    return {success:won,reach:pulseReach,nodes:pulseNodes,hops:pulseDepth,
+      mode,meanWire:avgWire};
+  }
+  function advancePulse(ms){
+    if(pulseSource<0||pulseElapsed>=pulseDuration)return;
+    pulseElapsed=Math.min(pulseDuration,pulseElapsed+ms);
   }
   function fieldBounds(){return {minX:region.x+2,maxX:region.x+region.w-3,
     minY:region.y+12,maxY:region.y+region.h-3};}
@@ -435,7 +567,7 @@
   }
   function toggleTraining(){
     if(!wild)rewild();training=!training;
-    if(training)relay();
+    if(training){relay();pulse();}
     metrics=measure();displayStats();
   }
   function toggleSelection(){
@@ -515,8 +647,7 @@
     if(!isField(j)||r<R.CYAN)return;
     let shared=0;
     for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-      if(!dx&&!dy)continue;
-      if(inBounds(tx+dx,ty+dy)&&role[ix(tx+dx,ty+dy)]===r)shared++;
+      if(!dx&&!dy)continue;      if(inBounds(tx+dx,ty+dy)&&role[ix(tx+dx,ty+dy)]===r)shared++;
     }
     if(shared<2)return; // Require a locally supported pattern.
     const k=i*9+bit;
@@ -773,7 +904,7 @@
     }
     [role,nextRole]=[nextRole,role];[life,nextLife]=[nextLife,life];[age,nextAge]=[nextAge,age];
     [genome,nextGenome]=[nextGenome,genome];[fitness,nextFitness]=[nextFitness,fitness];
-    if(training&&wild&&generations%60===0)relay();
+    if(wild){syncWires();if(training&&generations%60===0){relay();pulse();}}
     if(repairBoost)repairBoost--;
     if(generations%30===0){
       if(wild)census();
@@ -900,6 +1031,25 @@
         }
         if(i===traceSource){red=255;green=255;blue=255;}
       }
+      if(pulseSource>=0&&pulseElapsed<pulseDuration&&isField(i)){
+        const layer=Math.floor((pulseElapsed/pulseDuration)*(pulseDepth+4));
+        const d=pulseDist[i];
+        if(d>=0&&d<=layer){
+          if(layer-d<=3){red=252;green=252;blue=236;}
+          else {red=Math.min(255,red+18);green=Math.min(255,green+60);blue=Math.min(255,blue+125);}
+        }
+        if(i===pulseSource){red=255;green=240;blue=210;}
+      }
+      if(plasticOn&&wild&&isField(i)&&!traceActive&&role[i]>=R.CYAN){
+        // The most-used local edges add a subtle, persistent electric glow.
+        const x=i%W,y=(i/W)|0;let strength=0;
+        if(x<W-1)strength=Math.max(strength,wires[i*2]);
+        if(x>0)strength=Math.max(strength,wires[(i-1)*2]);
+        if(y<H-1)strength=Math.max(strength,wires[i*2+1]);
+        if(y>0)strength=Math.max(strength,wires[(i-W)*2+1]);
+        const energy=Math.max(0,strength-125)*.22;
+        red+=energy*.30;green+=energy*.65;blue+=energy;
+      }
       data[o]=Math.min(255,red)|0;data[o+1]=Math.min(255,green)|0;
       data[o+2]=Math.min(255,blue)|0;data[o+3]=255;
     }
@@ -913,6 +1063,8 @@
     e.preventDefault();pointerDown=true;held=false;
     const p=point(e),i=ix(p.x,p.y),hit=hotspot[i];
     if(hit===7)toggleTrace();
+    else if(hit===8)togglePlastic();
+    else if(hit===9)pulse();
     else if(traceActive&&isField(i)){traceAt(p.x,p.y);}
     else if(hit===1){if(traceActive)toggleTrace();rewild();}
     else if(hit===2){if(traceActive)toggleTrace();disrupt();}
@@ -948,6 +1100,8 @@
     if(k==='3'||k==='h')heal();if(k==='4'||k==='a')toggleTraining();
     if(k==='5'||k==='s')toggleSelection();if(k==='6'||k==='p')relay();
     if(k==='7'||k==='d')toggleTrace();
+    if(k==='8'||k==='i')togglePlastic();
+    if(k==='9'||k==='u')pulse();
     if(k==='l')rumor();if(k==='r')changePolicy();
     if(k==='t')testRumor();
     if(k==='m'){inspect=!inspect;metrics=measure();displayStats();}
@@ -960,6 +1114,7 @@
     if(!last)last=now;
     const elapsed=Math.min(100,now-last);last=now;accumulator+=elapsed;
     if(!document.hidden){
+      advancePulse(elapsed);
       if(traceActive){accumulator=0;tickTrace(elapsed);}
       else{
         let steps=0;
@@ -972,22 +1127,27 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'0.6 frozen topology',agents:N,generations,policy:POLICIES[policy],
+      version:'0.7 living connections',agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
       wild,awakenings,patches,bestPatch,probes,responses,misses,lastProbe,
       selectionOn,training,relayTries,relayWins,relayReach,lastRelay,relayRecords,
       inherited,mutations,activeCarriers:fitness.reduce((n,x)=>n+(x>25),0),
+      plastic:{enabled:plasticOn,edges:activeWires,meanStrengthPercent:avgWire,
+        pulseTries,pulseWins,pulseReach,pulseNodes,pulseDepth,pulseLast,
+        reinforcedEdges:reinforced,unusedDecayEvents:unusedFade,
+        experiments:pulseRecord,source:pulseSource>=0?{x:pulseSource%W,y:(pulseSource/W)|0}:null},
       trace:{active:traceActive,source:traceSource<0?null:{x:traceSource%W,y:(traceSource/W)|0,color:traceSourceColor},nodes:traceNodes,maxHops:traceMax,spanX:traceSpan,detour:traceDetour,layer:traceLayer,finished:traceElapsed>=traceDuration,last:traceLast},
-      note:'TRACE freezes the 2D colony and animates a single-source four-neighbor BFS. Colored depth means graph hops, never physical Z depth; unreachable components stay dim. Automatic source favors wide connected networks.'
+      note:'TRACE freezes morphology and exposes graph distance. PULSE sends a single probabilistic signal along same-color edges; PLAST reinforces successfully used connections and fades unused ones. This is a designed local learning rule, not proof of neural cognition. STATIC makes no weight updates.'
     };},
     // Manual deterministic exploration hooks for tests; no direct blueprint editing.
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
-    trace:toggleTrace,traceAuto:autoTrace,traceAt,traceDistanceAt(x,y){
+    trace:toggleTrace,traceAuto:autoTrace,traceAt,plastic:togglePlastic,pulse,traceDistanceAt(x,y){
       x=x|0;y=y|0;return inBounds(x,y)?traceDist[ix(x,y)]:-1;
     },
-    advanceTrace(ms){tickTrace(clamp(Number(ms)||0,0,30000));render();return this.status.trace;},
+    advanceTrace(ms){tickTrace(clamp(Number(ms)||0,0,30000));advancePulse(clamp(Number(ms)||0,0,30000));render();return this.status.trace;},
+    wireAt(x,y,dir=0){x=x|0;y=y|0;return inBounds(x,y)?wires[ix(x,y)*2+(dir===1?1:0)]:0;},
     lie:rumor,break:disrupt,heal,rule:changePolicy,test:testRumor,
     wild:rewild,probe,relay,train:toggleTraining,select:toggleSelection,observe:measure,census,reset:create,
     reseed(n){seed=(Number(n)>>>0)||0x7ac58c3e;create();return this.status;}
