@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#071017">
+<title>Pixel Society | Every Pixel Is an Agent</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
+  canvas { display:block; width:100vw; height:100dvh; image-rendering:pixelated; touch-action:none; cursor:crosshair; }
+</style>
+</head>
+<body>
+<canvas id="world" role="application" aria-label="Pixel Society. A living interface formed by individual pixel agents. Tap GROW to seed waves, BREAK to scramble the agents, HEAL to accelerate repair, or tap the colony to send local signals."></canvas>
+<script>
+(()=>{
+  'use strict';
+  // No rendered UI elements other than this canvas. The only visible pixels are
+  // produced by the states of autonomous agents in one ImageData buffer.
+  // A separate, invisible goal field is a *signal*, not a pre-painted image.
+  // Each agent must decide whether to follow it, listen to neighbors, or mutate.
+
+  const canvas = document.querySelector('#world');
+  const ctx = canvas.getContext('2d', {alpha:false, desynchronized:true});
+  const FONT = {
+    'A':['01110','10001','10001','11111','10001','10001','10001'],
+    'B':['11110','10001','10001','11110','10001','10001','11110'],
+    'C':['01111','10000','10000','10000','10000','10000','01111'],
+    'D':['11110','10001','10001','10001','10001','10001','11110'],
+    'E':['11111','10000','10000','11110','10000','10000','11111'],
+    'F':['11111','10000','10000','11110','10000','10000','10000'],
+    'G':['01111','10000','10000','10111','10001','10001','01111'],
+    'H':['10001','10001','10001','11111','10001','10001','10001'],
+    'I':['11111','00100','00100','00100','00100','00100','11111'],
+    'J':['00111','00010','00010','00010','10010','10010','01100'],
+    'K':['10001','10010','10100','11000','10100','10010','10001'],
+    'L':['10000','10000','10000','10000','10000','10000','11111'],
+    'M':['10001','11011','10101','10101','10001','10001','10001'],
+    'N':['10001','11001','10101','10011','10001','10001','10001'],
+    'O':['01110','10001','10001','10001','10001','10001','01110'],
+    'P':['11110','10001','10001','11110','10000','10000','10000'],
+    'Q':['01110','10001','10001','10001','10101','10010','01101'],
+    'R':['11110','10001','10001','11110','10100','10010','10001'],
+    'S':['01111','10000','10000','01110','00001','00001','11110'],
+    'T':['11111','00100','00100','00100','00100','00100','00100'],
+    'U':['10001','10001','10001','10001','10001','10001','01110'],
+    'V':['10001','10001','10001','10001','10001','01010','00100'],
+    'W':['10001','10001','10001','10101','10101','10101','01010'],
+    'X':['10001','10001','01010','00100','01010','10001','10001'],
+    'Y':['10001','10001','01010','00100','00100','00100','00100'],
+    'Z':['11111','00001','00010','00100','01000','10000','11111'],
+    '0':['01110','10011','10101','10101','11001','10001','01110'],
+    '1':['00100','01100','00100','00100','00100','00100','01110'],
+    '2':['01110','10001','00001','00010','00100','01000','11111'],
+    '3':['11110','00001','00001','01110','00001','00001','11110'],
+    '4':['00010','00110','01010','10010','11111','00010','00010'],
+    '5':['11111','10000','11110','00001','00001','10001','01110'],
+    '6':['00111','01000','10000','11110','10001','10001','01110'],
+    '7':['11111','00001','00010','00100','01000','01000','01000'],
+    '8':['01110','10001','10001','01110','10001','10001','01110'],
+    '9':['01110','10001','10001','01111','00001','00010','11100'],
+    ':':['00000','00100','00100','00000','00100','00100','00000'],
+    '.':['00000','00000','00000','00000','00000','01100','01100'],
+    '/':['00001','00001','00010','00100','01000','10000','10000'],
+    '-':['00000','00000','00000','11111','00000','00000','00000'],
+    '+':['00000','00100','00100','11111','00100','00100','00000'],
+    '!':['00100','00100','00100','00100','00100','00000','00100'],
+    ' ':['00000','00000','00000','00000','00000','00000','00000']
+  };
+  const COLORS = [
+    [7,16,23],     // 0 dark ordinary pixel
+    [22,63,77],    // 1 quiet structural pixel
+    [220,244,238], // 2 text pixel
+    [66,228,209],  // 3 cyan pixel
+    [253,107,166], // 4 rose pixel
+    [255,197,105], // 5 amber pixel
+    [39,115,133],  // 6 social halo pixel
+  ];
+  const R = {VOID:0,FRAME:1,INK:2,CYAN:3,PINK:4,GOLD:5,MIST:6};
+  let W=0,H=0,N=0,image;
+  let goal,role,nextRole,conviction,temperament,genome,damage,hotspot,life,nextLife,age,nextAge,flash;
+  let region={x:0,y:0,w:0,h:0};
+  let repairBoost=0, glitchEvents=0, pulseEvents=0, generations=0, message='TAP THE COLONY', messageTicks=0;
+  let last=0, accumulator=0, pointerIsDown=false;
+  let sx=0,sy=0;
+  let seed=0x7ac58c3e;
+  function random(){ seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296; }
+  const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+  const ix=(x,y)=>x+y*W;
+  const inBounds=(x,y)=>x>=0&&y>=0&&x<W&&y<H;
+  function pixel(x,y,kind){ if(inBounds(x,y))goal[ix(x,y)]=kind; }
+  function textWidth(t){return Math.max(0,t.length*6-1);}
+  function stampText(x,y,t,kind,center=false){
+    t=String(t).toUpperCase();
+    if(center)x-=Math.floor(textWidth(t)/2);
+    for(let a=0;a<t.length;a++){
+      const glyph=FONT[t[a]] || FONT[' '];
+      const gx=x+a*6;
+      for(let b=0;b<7;b++){
+        const line=glyph[b];
+        for(let c=0;c<5;c++)if(line[c]==='1')pixel(gx+c,y+b,kind);
+      }
+    }
+  }
+  function hline(x0,x1,y,type){for(let x=x0;x<=x1;x++)pixel(x,y,type);}
+  function frame(x,y,w,h,kind){
+    for(let a=0;a<w;a++){pixel(x+a,y,kind);pixel(x+a,y+h-1,kind);}
+    for(let b=0;b<h;b++){pixel(x,y+b,kind);pixel(x+w-1,y+b,kind);}
+  }
+  function button(x,y,w,h,label,color,id){
+    frame(x,y,w,h,R.FRAME);
+    pixel(x,y,color);pixel(x+w-1,y,color);pixel(x,y+h-1,color);pixel(x+w-1,y+h-1,color);
+    stampText(x+Math.floor(w/2),y+Math.floor((h-7)/2),label,color,true);
+    for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++){
+      if(inBounds(xx,yy))hotspot[ix(xx,yy)]=id;
+    }
+  }
+  function setSignal(){
+    goal.fill(R.VOID);hotspot.fill(0);
+    // A semantic blueprint influences agents, but never draws a visible pixel.
+    stampText(Math.floor(W/2),8,'PIXEL SOCIETY',R.INK,true);
+    stampText(Math.floor(W/2),20,W>=170?'AN INTERFACE MADE OF AGENTS':'EVERY DOT DECIDES',R.MIST,true);
+    hline(6,W-7,31,R.FRAME);
+    for(let x=6;x<W-6;x+=7)pixel(x,33,R.CYAN);
+    const gap=3, x0=4, bw=Math.floor((W-8-gap*2)/3), by=39,bh=17;
+    button(x0,by,bw,bh,'GROW',R.CYAN,1);
+    button(x0+bw+gap,by,bw,bh,'BREAK',R.PINK,2);
+    button(x0+(bw+gap)*2,by,bw,bh,'HEAL',R.GOLD,3);
+    region={x:6,y:64,w:W-12,h:Math.max(20,H-96)};
+    frame(region.x,region.y,region.w,region.h,R.FRAME);
+    // Agent marker stripes and scaffold detail.
+    for(let y=region.y+4;y<region.y+region.h-3;y+=10){
+      pixel(region.x+3,y,R.FRAME);pixel(region.x+region.w-4,y,R.FRAME);
+    }
+    stampText(region.x+6,region.y+5,'COLONY',R.INK);
+    stampText(region.x+region.w-6,region.y+5,'LIVE',R.CYAN,true);
+    hline(6,W-7,H-26,R.FRAME);
+    stampText(Math.floor(W/2),H-21,`${N.toLocaleString('en-US')} AGENTS`,R.CYAN,true);
+    stampText(Math.floor(W/2),H-11,message,R.INK,true);
+  }
+  function signalStatus(label){
+    // Replacing a signal does not set any visible agent's color directly.
+    for(let y=H-11;y<H-4;y++)for(let x=3;x<W-3;x++)goal[ix(x,y)]=R.VOID;
+    stampText(Math.floor(W/2),H-11,label,R.INK,true);
+  }
+  function create(){
+    const cw=window.innerWidth,ch=window.innerHeight;
+    const unit=clamp(Math.max(cw/210,ch/230),3,7);
+    W=Math.max(100,Math.floor(cw/unit));H=Math.max(120,Math.floor(ch/unit));
+    // The app uses *logical* pixels. Browser scaling preserves blocky appearance.
+    N=W*H;canvas.width=W;canvas.height=H;image=ctx.createImageData(W,H);
+    goal=new Uint8Array(N);role=new Uint8Array(N);nextRole=new Uint8Array(N);
+    conviction=new Uint8Array(N);temperament=new Uint8Array(N);genome=new Uint8Array(N);
+    damage=new Uint8Array(N);hotspot=new Uint8Array(N);
+    life=new Uint8Array(N);nextLife=new Uint8Array(N);age=new Uint8Array(N);
+    nextAge=new Uint8Array(N);flash=new Uint8Array(N);
+    for(let i=0;i<N;i++){
+      role[i]=Math.floor(random()*7);conviction[i]=Math.floor(random()*48);
+      temperament[i]=Math.floor(random()*255);genome[i]=Math.floor(random()*255);
+    }
+    setSignal();
+    for(let j=0;j<18;j++){
+      const x=region.x+8+Math.floor(random()*Math.max(1,region.w-16));
+      const y=region.y+12+Math.floor(random()*Math.max(1,region.h-20));
+      spark(x,y,1);
+    }
+  }
+  function isField(i){const x=i%W,y=(i/W)|0;return x>region.x+1&&x<region.x+region.w-2&&y>region.y+11&&y<region.y+region.h-2;}
+  function spark(x,y,r=3){
+    x=Math.round(x);y=Math.round(y);pulseEvents++;
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(dx*dx+dy*dy>r*r || !inBounds(x+dx,y+dy))continue;
+      const i=ix(x+dx,y+dy);
+      if(isField(i)){life[i]=1;age[i]=Math.floor(random()*3);flash[i]=255;}
+    }
+  }
+  function notify(s){message=s;messageTicks=65;signalStatus(s);}
+  function disrupt(){
+    glitchEvents++;repairBoost=0;
+    for(let i=0;i<N;i++)if(random()<0.63){
+      role[i]=Math.floor(random()*7);conviction[i]=Math.floor(random()*28);
+      damage[i]=4+Math.floor(random()*24);flash[i]=160;
+    }
+    notify('CONSENSUS LOST');
+  }
+  function heal(){
+    repairBoost=65;
+    damage.fill(0);
+    notify('HEALING');
+  }
+  function bloom(){
+    for(let j=0;j<24;j++){
+      const x=region.x+8+Math.floor(random()*Math.max(1,region.w-16));
+      const y=region.y+15+Math.floor(random()*Math.max(1,region.h-23));
+      spark(x,y,1+Math.floor(random()*3));
+    }
+    notify('SIGNALS MOVING');
+  }
+  function nearby(i,arr){
+    const x=i%W,y=(i/W)|0;
+    let n=0;
+    if(x>0&&arr[i-1]===1)n++;
+    if(x<W-1&&arr[i+1]===1)n++;
+    if(y>0&&arr[i-W]===1)n++;
+    if(y<H-1&&arr[i+W]===1)n++;
+    if(x>0&&y>0&&arr[i-W-1]===1)n++;
+    if(x<W-1&&y>0&&arr[i-W+1]===1)n++;
+    if(x>0&&y<H-1&&arr[i+W-1]===1)n++;
+    if(x<W-1&&y<H-1&&arr[i+W+1]===1)n++;
+    return n;
+  }
+  function update(){
+    generations++;
+    for(let i=0;i<N;i++){
+      // Local role negotiation: each pixel sees its own environmental signal,
+      // its previous decision, the decisions of nearby agents, and its gene.
+      const desired=goal[i], current=role[i];
+      const x=i%W,y=(i/W)|0;
+      let support=0;
+      if(x>0&&role[i-1]===desired)support++;
+      if(x<W-1&&role[i+1]===desired)support++;
+      if(y>0&&role[i-W]===desired)support++;
+      if(y<H-1&&role[i+W]===desired)support++;
+      let next=current;
+      if(damage[i]){
+        damage[i]--;
+        if(random()<0.17)next=Math.floor(random()*7);
+        conviction[i]=Math.max(0,conviction[i]-4);
+      } else if(current===desired){
+        conviction[i]=Math.min(255,conviction[i]+1+support);
+        // Some agents wander in preference briefly. The society repairs this.
+        if(random() < (temperament[i]<25?.003:.0004))next=Math.floor(random()*7);
+      } else {
+        conviction[i]=Math.max(0,conviction[i]-2);
+        const listen=.055+support*.055+(temperament[i]/255)*.055+(repairBoost? .35:0);
+        if(random()<listen){next=desired;conviction[i]=40+support*15;}
+        else if(random()<.009){
+          const j=x>0&&random()<.5?i-1:y>0?i-W:i;
+          next=role[j]; // A mistaken decision can spread from a neighbor.
+        }
+      }
+      nextRole[i]=next;
+      // A second, unconstrained cellular society occupies the central field.
+      // Wake / propagate / refractory / recover. No image is being followed.
+      const l=life[i], a=age[i];
+      if(!isField(i)){
+        nextLife[i]=0;nextAge[i]=0;
+      }else if(l===1){
+        if(a>=3+(genome[i]%4)){nextLife[i]=2;nextAge[i]=0;}
+        else{nextLife[i]=1;nextAge[i]=a+1;}
+      }else if(l===2){
+        if(a>=12+(genome[i]%17)){nextLife[i]=0;nextAge[i]=0;}
+        else{nextLife[i]=2;nextAge[i]=a+1;}
+      }else{
+        let neighbors=nearby(i,life);
+        if((neighbors>0 && random()<Math.min(.55,neighbors*(.085+(genome[i]%5)*.018))) || random()<.00015){
+          nextLife[i]=1;nextAge[i]=0;
+        } else {nextLife[i]=0;nextAge[i]=0;}
+      }
+      if(flash[i])flash[i]=Math.max(0,flash[i]-13);
+    }
+    [role,nextRole]=[nextRole,role];
+    [life,nextLife]=[nextLife,life];
+    [age,nextAge]=[nextAge,age];
+    if(repairBoost>0)repairBoost--;
+    if(messageTicks>0 && --messageTicks===0){message='TAP THE COLONY';signalStatus(message);}
+  }
+  function render(){
+    const data=image.data;
+    const t=generations;
+    for(let i=0,o=0;i<N;i++,o+=4){
+      const r=role[i],p=COLORS[r],gene=genome[i];
+      const stable=conviction[i]/255;
+      // The agent is the sole author of its display color.
+      let glow=r===0? .35+(gene/255)*.10 : .52+stable*.43;
+      const shimmer=(Math.sin(t*.045+gene*.18)+1)*.028;
+      glow+=shimmer;
+      let red=p[0]*glow,green=p[1]*glow,blue=p[2]*glow;
+      if(life[i]===1){
+        const energy=age[i],variant=gene%3;
+        const col=variant===0?COLORS[R.CYAN]:variant===1?COLORS[R.PINK]:COLORS[R.GOLD];
+        red=col[0]*(.75+.12*energy);green=col[1]*(.75+.12*energy);blue=col[2]*(.75+.12*energy);
+      }else if(life[i]===2){
+        const f=Math.max(0,.50-age[i]/75);
+        red+=70*f;green+=155*f;blue+=175*f;
+      }
+      if(flash[i]){
+        red+=flash[i]*.3;green+=flash[i]*.06;blue+=flash[i]*.32;
+      }
+      data[o]=Math.min(255,red)|0;data[o+1]=Math.min(255,green)|0;
+      data[o+2]=Math.min(255,blue)|0;data[o+3]=255;
+    }
+    ctx.putImageData(image,0,0);
+  }
+  function point(e){
+    const b=canvas.getBoundingClientRect();
+    return {x:clamp(Math.floor((e.clientX-b.left)*W/b.width),0,W-1),
+            y:clamp(Math.floor((e.clientY-b.top)*H/b.height),0,H-1)};
+  }
+  function activate(e){
+    e.preventDefault();pointerIsDown=true;
+    const p=point(e),i=ix(p.x,p.y);
+    if(hotspot[i]===1)bloom();
+    else if(hotspot[i]===2)disrupt();
+    else if(hotspot[i]===3)heal();
+    else if(isField(i)){spark(p.x,p.y,4);notify('SIGNAL SENT');}
+    else {spark(region.x+Math.floor(random()*(region.w-2))+1,region.y+Math.floor(region.h/2),4);}
+    sx=p.x;sy=p.y;
+    try{canvas.setPointerCapture(e.pointerId);}catch(_){/* unsupported */}
+  }
+  canvas.addEventListener('pointerdown',activate,{passive:false});
+  canvas.addEventListener('pointermove',e=>{
+    if(!pointerIsDown)return;
+    const p=point(e);
+    if(Math.abs(p.x-sx)+Math.abs(p.y-sy)>3 && isField(ix(p.x,p.y))){spark(p.x,p.y,2);sx=p.x;sy=p.y;}
+  });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(k=>canvas.addEventListener(k,()=>pointerIsDown=false));
+  // Keyboard provides optional accessibility and desktop shortcuts.
+  window.addEventListener('keydown',e=>{
+    if(e.key==='1'||e.key.toLowerCase()==='g')bloom();
+    if(e.key==='2'||e.key.toLowerCase()==='b')disrupt();
+    if(e.key==='3'||e.key.toLowerCase()==='h')heal();
+  });
+  let resizeId=0;
+  window.addEventListener('resize',()=>{cancelAnimationFrame(resizeId);resizeId=requestAnimationFrame(create);});
+  document.addEventListener('visibilitychange',()=>{last=0;accumulator=0;});
+  function frameLoop(now){
+    if(!last)last=now;
+    const elapsed=Math.min(100,now-last);last=now;
+    accumulator+=elapsed;
+    if(!document.hidden){
+      let steps=0;
+      while(accumulator>=33.333&&steps<3){update();accumulator-=33.333;steps++;}
+      render();
+    }
+    requestAnimationFrame(frameLoop);
+  }
+  create();requestAnimationFrame(frameLoop);
+  // Deliberately expose *read-only* diagnostics for people studying the toy.
+  Object.defineProperty(window,'pixelSociety',{get:()=>({
+    agents:N, logicalSize:`${W}x${H}`, generations,
+    roleAgreements:role.reduce((n,r,i)=>n+(r===goal[i]),0),
+    glitches:glitchEvents,signals:pulseEvents,
+    note:'Each logical pixel has its own role, conviction, temperament, genome, damage and local cellular state.'
+  })});
+})();
+</script>
+</body>
+</html>
