@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 1.5 | Tenfold Tempo</title>
+<title>Pixel Society 1.6 | The Cost of Doing Business</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -146,6 +146,21 @@
   let chainMode=true,chainIds=new Uint32Array(0),chains=new Map(),nextChainId=1;
   let chainMerges=0,chainAbsorbed=0,chainConnections=0,chainLongest=0,chainGrowth=0;
   let chainRewards=0,chainStopped=0;
+  // Expedition 14: finite *company-local* labor capacity. Each employee
+  // consumes a slot; specialists cost more, and unfinished border work
+  // reserves scarce capacity. This is a policy test, not universal knowledge.
+  let costOn=true,budgetDenied=0,budgetReleased=0,budgetSpent=0,budgetTotal=0;
+  const JOB_COST=[0,0,3,3,2,4];
+  const laborCost=(job)=>JOB_COST[job]??0;
+  function companyCapacity(m){return Math.max(70,Math.round(m.borderTotal*1.05+30));}
+  function companyReserve(m){return Math.ceil(Math.max(0,m.borderTotal-m.borderDone)*.40);}
+  function canFund(m,newJob,oldJob=-1){
+    if(!costOn||!marketOn||!jobMode)return true;
+    const delta=laborCost(newJob)-(oldJob<0?0:laborCost(oldJob));
+    return delta<=0||m.laborUsed+m.builderReserve+delta<=m.laborBudget;
+  }
+  function budgetRefuse(){budgetDenied++;return false;}
+
 
 
 
@@ -224,14 +239,22 @@
     const sheet=new Uint8Array(N);
     staging=sheet;
     const bw=Math.floor((W-12)/3);
-    button(4,H-63,bw,12,jobMode?(foremanOn?'FORE':'SOLO'):(wireView?'AGENT':'PATHS'),R.CYAN,jobMode?18:10);
-    button(6+bw,H-63,bw,12,jobMode?(leanOn?'LEAN':'CLASS'):'REST',R.PINK,jobMode?16:11);
-    button(8+bw*2,H-63,bw,12,jobMode?(chainMode?'CHAIN':'FREE'):'LEARN',R.GOLD,jobMode?17:12);
+    if(jobMode){
+      const gap=2,b=Math.floor((W-8-3*gap)/4);
+      button(4,H-63,b,12,foremanOn?'FORE':'SOLO',R.CYAN,18);
+      button(4+(b+gap),H-63,b,12,leanOn?'LEAN':'CLASS',R.PINK,16);
+      button(4+2*(b+gap),H-63,b,12,chainMode?(b>=33?'CHAIN':'LINE'):'FREE',R.GOLD,17);
+      button(4+3*(b+gap),H-63,b,12,costOn?'COST':'SPREE',R.CYAN,19);
+    }else{
+      button(4,H-63,bw,12,wireView?'AGENT':'PATHS',R.CYAN,10);
+      button(6+bw,H-63,bw,12,'REST',R.PINK,11);
+      button(8+bw*2,H-63,bw,12,'LEARN',R.GOLD,12);
+    }
     if(jobMode){
       jobCensus();
       stampText(Math.floor(W/2),H-48,'B'+jobTally[1]+' L'+jobTally[2]+' F'+jobTally[3]+' T'+jobTally[4]+' M'+jobTally[5],R.CYAN,true);
       stampText(Math.floor(W/2),H-38,marketOn?(leanOn?'LEAN ':'CLASS ')+'SW '+jobSwitches+' PO '+jobPoaches:'ORIGINAL CREWS',R.INK,true);
-      stampText(Math.floor(W/2),H-28,'EDGE '+jobBorder+'% STEAL '+buttonSteals,R.GOLD,true);
+      stampText(Math.floor(W/2),H-28,costOn?'EDGE '+jobBorder+'% COST '+(budgetTotal?Math.round(100*budgetSpent/budgetTotal):0)+'%':'EDGE '+jobBorder+'% STEAL '+buttonSteals,R.GOLD,true);
       stampText(Math.floor(W/2),H-18,chainMode?'CHAIN '+chainLongest+' JOIN '+chainMerges+' LINK '+chainConnections:'MSG '+jobMessages+' OK '+jobDeliveries,R.PINK,true);
       stampText(Math.floor(W/2),H-8,wipeArmed?'WIPE ARMED TAP BUTTON':jobNews,R.MIST,true);
     }else if(cycleStage!=='NEW'){
@@ -317,6 +340,7 @@
     jobBorder=jobTerritory=jobLabelCount=0;marketOn=true;
     jobSwitches=jobPoaches=jobResigns=jobShortages=jobIdle=jobRecruitAttempts=jobOffersRejected=jobCompetition=0;
     jobEvent='LABOR MARKET OPEN';
+    costOn=true;budgetDenied=budgetReleased=budgetSpent=budgetTotal=0;
     leanOn=true;bridgeTrials=bridgeSuccesses=bridgeBest=bridgeLastHops=bridgeRewards=bridgeShortageEvents=0;
     engramEdges=cycleWins=cycleSum=0;firstWins=lastWins=-1;
     cycleOverlap=cycleRetention=cycleFirstReach=cycleLastReach=-1;
@@ -1048,6 +1072,9 @@
     if(i<0||!isField(i)||occupation[i]===JOB.BUTTON)return false;
     if(clan[i]!==0&&clan[i]!==m.id)return false;
     const fresh=clan[i]===0;
+    const was=fresh?-1:occupation[i];
+    if(!canFund(m,type,was))return budgetRefuse();
+    if(jobMode&&costOn&&marketOn)m.laborUsed+=laborCost(type)-(fresh?0:laborCost(was));
     clan[i]=m.id;occupation[i]=type;jobTenure[i]=0;jobUse[i]=0;
     obedience[i]=80+Math.floor(random()*145);
     if(fresh)jobRecruits++;
@@ -1068,6 +1095,7 @@
     jobSwitches=jobPoaches=jobResigns=jobShortages=jobIdle=jobRecruitAttempts=jobOffersRejected=jobCompetition=0;
     bridgeTrials=bridgeSuccesses=bridgeBest=bridgeLastHops=bridgeRewards=bridgeShortageEvents=0;
     buttonSteals=buttonReclaims=buttonOffers=0;
+    budgetDenied=budgetReleased=budgetSpent=budgetTotal=0;
     chainIds=new Uint32Array(N);chains.clear();nextChainId=1;
     chainMerges=chainAbsorbed=chainConnections=chainLongest=chainGrowth=chainRewards=chainStopped=0;
     jobEvent='MARKET BOOTING';
@@ -1092,7 +1120,9 @@
         borderTotal:2*(bw+bh)-4,borderDone:0,borderPercent:0,
         linkerSteals:0,linkerReclaims:0,
         bridgeScore:0,bridgeHops:-1,bridgeWorkers:0,bridgeHits:0,bridgeLast:0,bridgeCost:0,
-        bridgeUntil:0};
+        bridgeUntil:0,
+        laborBudget:Math.max(70,Math.round((2*(bw+bh)-4)*1.05+30)),laborUsed:0,builderReserve:0,
+        budgetHolds:0,budgetSavings:0};
       const mx=x+Math.floor(bw/2),my=y+1,chief=ix(mx,my);
       m.chief=chief;occupation[chief]=JOB.BUTTON;clan[chief]=m.id;
       role[chief]=R.GOLD;obedience[chief]=255;flash[chief]=220;
@@ -1136,6 +1166,14 @@
     metrics=measure();displayStats();
     return {enabled:leanOn,bridgeTrials,bridgeSuccesses};
   }
+  function toggleCost(){
+    if(!jobMode)return {enabled:costOn,reason:'START JOBS FIRST'};
+    costOn=!costOn;
+    jobCensus();
+    jobNews=costOn?'COST ACCOUNTING ON':'FREE HIRING ON';jobEvent=jobNews;
+    metrics=measure();displayStats();
+    return {enabled:costOn,spent:budgetSpent,capacity:budgetTotal,denied:budgetDenied};
+  }
   function toggleChains(){
     chainMode=!chainMode;
     if(chainMode){chainIds=new Uint32Array(N);chains.clear();nextChainId=1;}
@@ -1162,6 +1200,7 @@
   function jobCensus(){
     jobTally.fill(0);for(const m of leaders){
       m.workers=0;m.text=0;m.linkers=0;m.formatters=0;m.foremen=0;m.borderDone=0;
+      m.laborUsed=0;
     }
     let owned=0,painted=0,edge=leaders.reduce((n,m)=>n+2*(m.w+m.h)-4,0);
     for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
@@ -1169,7 +1208,7 @@
       if(j)jobTally[j]++;
       if(!c)continue;
       const m=leaders[c-1];if(!m)continue;
-      m.workers++;
+      m.workers++;m.laborUsed+=laborCost(j);
       if(j===JOB.TEXT)m.text++;
       if(j===JOB.LINKER)m.linkers++;
       if(j===JOB.FORMATTER)m.formatters++;
@@ -1182,6 +1221,12 @@
     }
     jobTerritory=owned;
     jobBorder=edge?Math.round(100*painted/edge):0;
+    budgetSpent=0;budgetTotal=0;
+    for(const m of leaders){
+      m.laborBudget=companyCapacity(m);
+      m.builderReserve=companyReserve(m);
+      budgetSpent+=m.laborUsed;budgetTotal+=m.laborBudget;
+    }
     jobLabelCount=leaders.filter(m=>m.text>0).length;
     for(const m of leaders){
       m.borderPercent=m.borderTotal?100*m.borderDone/m.borderTotal:0;
@@ -1197,6 +1242,14 @@
       // redundant crew. Keep a small reserve and all path workers employed.
       if(productive)m.linkTarget=Math.max(3,Math.min(m.linkTarget,
         m.bridgeWorkers+Math.max(3,Math.ceil(m.bridgeWorkers*.30))));
+      if(costOn&&marketOn){
+        // Current workers are already employed. An unspent slot is not
+        // automatically worth another linker: preserve room for builders.
+        const baseWithoutLinkPremium=m.laborUsed-3*m.linkers;
+        const affordable=Math.max(2,Math.floor((m.laborBudget-m.builderReserve-baseWithoutLinkPremium)/3));
+        m.linkTarget=Math.max(2,Math.min(m.linkTarget,affordable));
+        m.budgetHolds=m.laborUsed+m.builderReserve>=m.laborBudget?m.budgetHolds+1:0;
+      }
       m.formatTarget=m.workers<16?0:m.recentFormats>2?2:1;
       m.foremanTarget=foremanOn&&m.workers>=16?(m.workers>130&&m.borderPercent<90?3:m.workers>55&&m.borderPercent<99?2:1):0;
       m.textTarget=m.workers<9?0:1;
@@ -1286,6 +1339,13 @@
           if(c&&c.members.length>=3)score+=Math.min(72,c.members.length*2)+(c.done?65:0);
         }
         if(jobTenure[i]>5&&jobUse[i]<8)score-=12;
+        if(costOn&&marketOn){
+          const over=Math.max(0,m.linkers-m.linkTarget);
+          const tight=m.laborUsed+m.builderReserve>=m.laborBudget;
+          // Even a long successful chain does not create free payroll.
+          // Protected bridge workers keep some credit, not infinite immunity.
+          score-=Math.min(230,over*4+(tight?58:0));
+        }
       }else if(type===JOB.FORMATTER){
         score+=m.recentFormats?12:0;
         if(jobTenure[i]>7&&jobUse[i]<5)score-=8;
@@ -1308,6 +1368,12 @@
   }
   function changeCareer(i,m,to){
     const was=occupation[i];if(was===to||was===JOB.BUTTON)return false;
+    if(!canFund(m,to,was))return budgetRefuse();
+    if(jobMode&&costOn&&marketOn){
+      const difference=laborCost(to)-laborCost(was);
+      m.laborUsed+=difference;
+      if(difference<0)budgetReleased+=-difference;
+    }
     if(was===JOB.LINKER)m.linkers--;
     if(was===JOB.FORMATTER)m.formatters--;
     if(was===JOB.TEXT)m.text--;
@@ -1511,11 +1577,16 @@
     buttonOffers++;jobCompetition++;
     const x=i%W,y=(i/W)|0;
     const onBorder=desiredBorder(m,x,y);
+    if(!canFund(m,onBorder?JOB.NONE:JOB.LINKER,-1))return budgetRefuse();
     const deficit=1-m.borderPercent/100;
     const offer=jobValue(i,m,onBorder?JOB.NONE:JOB.LINKER)+33+deficit*60;
     const stay=jobValue(i,former,JOB.LINKER)+9+obedience[i]*.022;
     if(offer<stay+4||random()>.57){jobOffersRejected++;return false;}
     former.linkers--;
+    if(costOn&&marketOn&&jobMode){
+      m.laborUsed+=laborCost(onBorder?JOB.NONE:JOB.LINKER);
+      former.laborUsed-=laborCost(JOB.LINKER);
+    }
     clan[i]=m.id;occupation[i]=onBorder?JOB.NONE:JOB.LINKER;
     jobUse[i]=0;jobTenure[i]=0;obedience[i]=Math.floor(obedience[i]*.73);
     m.workers++;if(!onBorder)m.linkers++;former.workers--;
@@ -1790,9 +1861,7 @@
           }else if(clan[j]===m.id&&occupation[j]===JOB.NONE&&random()<(marketOn?.43:.55)){
             // In ECON mode, recruitment has to be useful to the new worker.
             if(!marketOn||jobValue(j,m,JOB.LINKER)>jobValue(j,m,JOB.NONE)+12){
-              occupation[j]=JOB.LINKER;role[j]=R.CYAN;flash[j]=100;
-              if(marketOn){jobSwitches++;m.careerChanges++;jobTenure[j]=0;jobUse[j]=0;}
-              m.linkers++;
+              if(changeCareer(j,m,JOB.LINKER)){role[j]=R.CYAN;flash[j]=100;}
             }else jobOffersRejected++;
           }
         }
@@ -1968,6 +2037,10 @@
       textMakers:jobTally[JOB.TEXT],recruits:jobRecruits,territory:jobTerritory,
       borderPercent:jobBorder,letteredButtons:jobLabelCount,taps:jobTaps,
       chain:chainReport(),
+      accounting:{enabled:costOn,spent:budgetSpent,capacity:budgetTotal,reserved:leaders.reduce((a,m)=>a+m.builderReserve,0),
+        available:leaders.reduce((a,m)=>a+Math.max(0,m.laborBudget-m.laborUsed-m.builderReserve),0),
+        denied:budgetDenied,releasedByCareerChanges:budgetReleased,
+        note:'Specialists consume limited payroll; ordinary builders need no specialist slots. Unbuilt borders reserve budget.'},
       buttonReclamation:{targetPercent:BUTTON_COMPLETION_TARGET,stolenLinkers:buttonSteals,
         reclaimedOwnLinkers:buttonReclaims,offers:buttonOffers},
       messages:jobMessages,delivered:jobDeliveries,formats:jobWipes,
@@ -1978,6 +2051,8 @@
         latestHops:bridgeLastHops,creditedWorkerEvents:bridgeRewards,misses:bridgeShortageEvents},
       news:jobNews,leaders:leaders.map(m=>({id:m.id,label:m.label,x:m.x,y:m.y,w:m.w,h:m.h,
         crew:m.workers,linkers:m.linkers,textMakers:m.text,formatters:m.formatters,
+        accounting:{spent:m.laborUsed,capacity:m.laborBudget,borderReserve:m.builderReserve,
+          free:Math.max(0,m.laborBudget-m.laborUsed-m.builderReserve),atLimit:m.laborUsed+m.builderReserve>=m.laborBudget},
         foremen:m.foremen,foremanVacancies:m.foremanTarget,foremanRepairs:m.foremanRepairs,
         foremanHires:m.foremanHires,foremanLinkAssists:m.foremanAssists,
         desired:{linkers:m.linkTarget,textMakers:m.textTarget,formatters:m.formatTarget},
@@ -2273,6 +2348,7 @@
     else if(hit===15)toggleMarket();
     else if(hit===16)toggleLean();
     else if(hit===17)toggleChains();
+    else if(hit===19)toggleCost();
     else if(hit===14){armWipe();metrics=measure();displayStats();}
     else if(hit===10)toggleWireView();
     else if(hit===18)toggleForemen();
@@ -2320,7 +2396,7 @@
     if(k==='8'||k==='i')togglePlastic();
     if(k==='9'||k==='u')pulse();
     if(k==='q')toggleForemen();if(k==='v')toggleWireView();if(k==='o')beginRest();if(k==='k')beginLearning();
-    if(k==='j')toggleJobs();if(k==='f')armWipe();if(k==='c')toggleMarket();if(k==='z')toggleLean();if(k==='x')toggleChains();
+    if(k==='j')toggleJobs();if(k==='f')armWipe();if(k==='c')toggleMarket();if(k==='z')toggleLean();if(k==='x')toggleChains();if(k==='n')toggleCost();
     if(k==='l')rumor();if(k==='r')changePolicy();
     if(k==='t')testRumor();
     if(k==='m'){inspect=!inspect;metrics=measure();displayStats();}
@@ -2362,7 +2438,7 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'1.5 tenfold tempo',simulator:{multiplier:SIMULATION_MULTIPLIER,targetStepsPerSecond:300,measuredStepsPerSecond:actualUpdatesPerSecond},jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
+      version:'1.6 labor accounting',simulator:{multiplier:SIMULATION_MULTIPLIER,targetStepsPerSecond:300,measuredStepsPerSecond:actualUpdatesPerSecond},jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
@@ -2385,7 +2461,7 @@
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
     trace:toggleTrace,traceAuto:autoTrace,traceAt,plastic:togglePlastic,pulse,
     jobs:toggleJobs,jobStart:startJobs,jobArmWipe:armWipe,jobMarket:toggleMarket,
-    lean:toggleLean,chains:toggleChains,chainReport,foremen:toggleForemen,jobTap,jobReport,
+    lean:toggleLean,chains:toggleChains,chainReport,foremen:toggleForemen,accounting:toggleCost,jobTap,jobReport,
     jobAt(x,y){if(!inBounds(x|0,y|0))return null;const i=ix(x|0,y|0);
       return {job:JOB_NAMES[occupation[i]],clan:clan[i],role:role[i],known:knowledge[i],
         signalHop:jobMessageDist[i],obedience:obedience[i],aptitudes:{worker:jobAptitude(i,JOB.NONE),
