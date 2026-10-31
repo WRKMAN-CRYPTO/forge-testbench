@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 1.3 | Chain Reaction</title>
+<title>Pixel Society 1.4 | Foremen</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -113,10 +113,15 @@
   let cycleSampleVersion=0;
   // The class belongs to an individual pixel. Clan is its recruited employer.
   // Managers are actual button-maker pixels (not nonlocal UI controllers).
-  const JOB={NONE:0,BUTTON:1,LINKER:2,FORMATTER:3,TEXT:4};
-  const JOB_NAMES=['UNASSIGNED','BUTTON','LINKER','FORMATTER','TEXT'];
+  const JOB={NONE:0,BUTTON:1,LINKER:2,FORMATTER:3,TEXT:4,FOREMAN:5};
+  const JOB_NAMES=['UNASSIGNED','BUTTON','LINKER','FORMATTER','TEXT','FOREMAN'];
   let occupation=new Uint8Array(0),clan=new Uint8Array(0),obedience=new Uint8Array(0);
-  let jobMode=false,wipeArmed=false,leaders=[],jobTally=[0,0,0,0,0];
+  let jobMode=false,wipeArmed=false,leaders=[],jobTally=[0,0,0,0,0,0];
+  // Foremen are recruited *pixels*, one or more per maker, not a global task scheduler.
+  // They can inspect only a local radius, issue temporary orders, and earn
+  // reputation for repairs that actually happen; workers may refuse.
+  let foremanOn=true,workOrder=new Uint32Array(0),workMentor=new Uint32Array(0);
+  let foremanOrders=0,foremanRepairs=0,foremanHires=0,foremanLinkAssists=0;
   let jobRecruits=0,jobTaps=0,jobMessages=0,jobDeliveries=0,jobWipes=0;
   let jobNews='TAP JOBS TO START',jobMessageDist=new Int16Array(0),jobMessageElapsed=0,jobMessageDuration=2300;
   let jobBorder=0,jobTerritory=0,jobLabelCount=0;
@@ -212,12 +217,12 @@
     const sheet=new Uint8Array(N);
     staging=sheet;
     const bw=Math.floor((W-12)/3);
-    button(4,H-63,bw,12,wireView?'AGENT':'PATHS',R.CYAN,10);
+    button(4,H-63,bw,12,jobMode?(foremanOn?'FORE':'SOLO'):(wireView?'AGENT':'PATHS'),R.CYAN,jobMode?18:10);
     button(6+bw,H-63,bw,12,jobMode?(leanOn?'LEAN':'CLASS'):'REST',R.PINK,jobMode?16:11);
     button(8+bw*2,H-63,bw,12,jobMode?(chainMode?'CHAIN':'FREE'):'LEARN',R.GOLD,jobMode?17:12);
     if(jobMode){
       jobCensus();
-      stampText(Math.floor(W/2),H-48,'B'+jobTally[1]+' L'+jobTally[2]+' F'+jobTally[3]+' T'+jobTally[4],R.CYAN,true);
+      stampText(Math.floor(W/2),H-48,'B'+jobTally[1]+' L'+jobTally[2]+' F'+jobTally[3]+' T'+jobTally[4]+' M'+jobTally[5],R.CYAN,true);
       stampText(Math.floor(W/2),H-38,marketOn?(leanOn?'LEAN ':'CLASS ')+'SW '+jobSwitches+' PO '+jobPoaches:'ORIGINAL CREWS',R.INK,true);
       stampText(Math.floor(W/2),H-28,'EDGE '+jobBorder+'% STEAL '+buttonSteals,R.GOLD,true);
       stampText(Math.floor(W/2),H-18,chainMode?'CHAIN '+chainLongest+' JOIN '+chainMerges+' LINK '+chainConnections:'MSG '+jobMessages+' OK '+jobDeliveries,R.PINK,true);
@@ -295,9 +300,11 @@
     cycleTouches=new Uint16Array(N*2);engram=new Uint8Array(N*2);engramWeight=new Uint8Array(N*2);
     wireView=false;cycleStage='NEW';cycleProgress=cycleTarget=cycleClock=0;
     occupation=new Uint8Array(N);clan=new Uint8Array(N);obedience=new Uint8Array(N);
+    workOrder=new Uint32Array(N);workMentor=new Uint32Array(N);
     jobTenure=new Uint8Array(N);jobUse=new Uint8Array(N);bridgeMark=new Uint32Array(N);
     jobMessageDist=new Int16Array(N);jobMessageDist.fill(-1);
-    jobMode=false;wipeArmed=false;leaders=[];jobTally=[0,0,0,0,0];
+    jobMode=false;wipeArmed=false;leaders=[];jobTally=[0,0,0,0,0,0];
+    foremanOn=true;foremanOrders=foremanRepairs=foremanHires=foremanLinkAssists=0;
     jobRecruits=jobTaps=jobMessages=jobDeliveries=jobWipes=0;
     jobNews='TAP JOBS TO START';jobMessageElapsed=0;
     jobBorder=jobTerritory=jobLabelCount=0;marketOn=true;
@@ -1050,6 +1057,7 @@
     if(traceActive)toggleTrace();
     training=false;jobMode=true;wipeArmed=false;
     occupation.fill(0);clan.fill(0);obedience.fill(0);jobTenure.fill(0);jobUse.fill(0);bridgeMark.fill(0);leaders=[];
+    workOrder.fill(0);workMentor.fill(0);foremanOrders=foremanRepairs=foremanHires=foremanLinkAssists=0;
     jobSwitches=jobPoaches=jobResigns=jobShortages=jobIdle=jobRecruitAttempts=jobOffersRejected=jobCompetition=0;
     bridgeTrials=bridgeSuccesses=bridgeBest=bridgeLastHops=bridgeRewards=bridgeShortageEvents=0;
     buttonSteals=buttonReclaims=buttonOffers=0;
@@ -1072,7 +1080,7 @@
     for(let n=0;n<4;n++){
       const x=b.minX+offX+(n%2)*(bw+gapX),y=b.minY+offY+Math.floor(n/2)*(bh+gapY);
       const m={id:n+1,x,y,w:bw,h:bh,label:labels[n],chief:-1,strength:0,workers:0,text:0,linkers:0,formatters:0,
-        linkTarget:3,formatTarget:1,textTarget:1,recentDeliveries:0,recentFormats:0,recentMessages:0,
+        linkTarget:3,formatTarget:1,textTarget:1,foremen:0,foremanTarget:0,foremanRepairs:0,foremanHires:0,foremanAssists:0,recentDeliveries:0,recentFormats:0,recentMessages:0,
         borderWork:0,output:0,poached:0,losses:0,careerChanges:0,
         borderTotal:2*(bw+bh)-4,borderDone:0,borderPercent:0,
         linkerSteals:0,linkerReclaims:0,
@@ -1092,6 +1100,20 @@
     if(jobMode){jobMode=false;wipeArmed=false;jobNews='JOBS STOPPED';}
     else return startJobs();
     metrics=measure();displayStats();return jobReport();
+  }
+  function toggleForemen(){
+    if(!jobMode)return {enabled:foremanOn,reason:'START JOBS FIRST'};
+    foremanOn=!foremanOn;
+    if(!foremanOn){
+      // A/B switching cannot leave invisible supervisors issuing instructions.
+      for(let i=0;i<N;i++){
+        workOrder[i]=0;workMentor[i]=0;
+        if(occupation[i]!==JOB.FOREMAN)continue;
+        const m=leaders[clan[i]-1];if(m)changeCareer(i,m,JOB.NONE);
+      }
+    }
+    jobNews=foremanOn?'FOREMEN DELEGATE':'SOLO CREWS';jobEvent=jobNews;
+    metrics=measure();displayStats();return {enabled:foremanOn,report:jobReport().foreman};
   }
   function toggleMarket(){
     marketOn=!marketOn;
@@ -1132,7 +1154,7 @@
   }
   function jobCensus(){
     jobTally.fill(0);for(const m of leaders){
-      m.workers=0;m.text=0;m.linkers=0;m.formatters=0;m.borderDone=0;
+      m.workers=0;m.text=0;m.linkers=0;m.formatters=0;m.foremen=0;m.borderDone=0;
     }
     let owned=0,painted=0,edge=leaders.reduce((n,m)=>n+2*(m.w+m.h)-4,0);
     for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
@@ -1144,6 +1166,7 @@
       if(j===JOB.TEXT)m.text++;
       if(j===JOB.LINKER)m.linkers++;
       if(j===JOB.FORMATTER)m.formatters++;
+      if(j===JOB.FOREMAN)m.foremen++;
       if(!inLeader(m,x,y))continue;
       owned++;
       if(desiredBorder(m,x,y)&&role[i]===R.GOLD){
@@ -1168,6 +1191,7 @@
       if(productive)m.linkTarget=Math.max(3,Math.min(m.linkTarget,
         m.bridgeWorkers+Math.max(3,Math.ceil(m.bridgeWorkers*.30))));
       m.formatTarget=m.workers<16?0:m.recentFormats>2?2:1;
+      m.foremanTarget=foremanOn&&m.workers>=16?(m.workers>130&&m.borderPercent<90?3:m.workers>55&&m.borderPercent<99?2:1):0;
       m.textTarget=m.workers<9?0:1;
     }
     jobShortages=leaders.reduce((n,m)=>n+Math.max(0,m.linkTarget-m.linkers)+Math.max(0,m.formatTarget-m.formatters)+Math.max(0,m.textTarget-m.text),0);
@@ -1213,16 +1237,17 @@
     if(type===JOB.LINKER)return 14+((g*7+t*3)&63);
     if(type===JOB.FORMATTER)return 10+((g*5+t*11)&63);
     if(type===JOB.TEXT)return 12+((g*13+t*7)&63);
+    if(type===JOB.FOREMAN)return 10+((g*17+t*7)&63);
     return 0;
   }
   function jobValue(i,m,type){
-    const supply=type===JOB.LINKER?m.linkers:type===JOB.FORMATTER?m.formatters:type===JOB.TEXT?m.text:0;
-    const need=type===JOB.LINKER?m.linkTarget:type===JOB.FORMATTER?m.formatTarget:type===JOB.TEXT?m.textTarget:0;
+    const supply=type===JOB.LINKER?m.linkers:type===JOB.FORMATTER?m.formatters:type===JOB.TEXT?m.text:type===JOB.FOREMAN?m.foremen:0;
+    const need=type===JOB.LINKER?m.linkTarget:type===JOB.FORMATTER?m.formatTarget:type===JOB.TEXT?m.textTarget:type===JOB.FOREMAN?m.foremanTarget:0;
     let score=jobAptitude(i,type);
     if(type===JOB.NONE){
       // Borders and letters require ordinary recruited workers. The group
       // values workers more when specialists crowd out the job at hand.
-      const specialist=m.linkers+m.formatters+m.text;
+      const specialist=m.linkers+m.formatters+m.text+m.foremen;
       score+=25+Math.min(38,55*specialist/Math.max(1,m.workers));
       if(desiredBorder(m,i%W,(i/W)|0))score+=m.borderPercent<BUTTON_COMPLETION_TARGET?100:15;
     }else{
@@ -1260,6 +1285,9 @@
       }else if(type===JOB.TEXT){
         // The sole text-maker is valuable while the label is understaffed.
         score+=m.text<=1?40:0;
+      }else if(type===JOB.FOREMAN){
+        score+=m.borderPercent<99?25:0;
+        score+=(jobUse[i]/8)|0;
       }
     }
     // Tiny peer influence; local affinity can overcome a small pay gap.
@@ -1276,9 +1304,11 @@
     if(was===JOB.LINKER)m.linkers--;
     if(was===JOB.FORMATTER)m.formatters--;
     if(was===JOB.TEXT)m.text--;
+    if(was===JOB.FOREMAN)m.foremen--;
     occupation[i]=to;jobTenure[i]=0;jobUse[i]=0;
     if(to===JOB.LINKER){m.linkers++;role[i]=R.CYAN;}
     else if(to===JOB.FORMATTER){m.formatters++;role[i]=R.PINK;}
+    else if(to===JOB.FOREMAN){m.foremen++;role[i]=R.MIST;}
     else {role[i]=R.MIST;}
     jobSwitches++;m.careerChanges++;flash[i]=190;
     if(to===JOB.NONE)jobResigns++;
@@ -1511,6 +1541,92 @@
       }
     }
   }
+  function recruitForemen(m){
+    // Only the button maker can appoint a foreman, from *its own* ordinary
+    // recruited workers. They are placed near unfinished perimeter work rather
+    // than in a magical nonlocal office, and do not occupy border positions.
+    if(!foremanOn||m.foremen>=m.foremanTarget)return false;
+    let best=-1,score=-1e8;
+    for(let y=m.y+1;y<m.y+m.h-1;y++)for(let x=m.x+1;x<m.x+m.w-1;x++){
+      const i=ix(x,y);
+      if(clan[i]!==m.id||occupation[i]!==JOB.NONE||jobTenure[i]<2)continue;
+      let near=99;
+      for(const f of foremanPixels(m))near=Math.min(near,Math.abs(x-f%W)+Math.abs(y-((f/W)|0)));
+      if(near<6)continue;
+      let holes=0;
+      for(let dy=-6;dy<=6;dy++)for(let dx=-6;dx<=6;dx++){
+        if(Math.abs(dx)+Math.abs(dy)>8)continue;
+        const xx=x+dx,yy=y+dy;
+        if(desiredBorder(m,xx,yy)&&clan[ix(xx,yy)]===m.id&&role[ix(xx,yy)]!==R.GOLD)holes++;
+      }
+      const v=jobAptitude(i,JOB.FOREMAN)+obedience[i]*.24+Math.min(50,holes*5)+Math.min(20,near);
+      if(v>score){score=v;best=i;}
+    }
+    if(best>=0&&random()<.74+obedience[best]/1500&&changeCareer(best,m,JOB.FOREMAN)){
+      jobNews=m.label+' APPOINTED FOREMAN';return true;
+    }
+    return false;
+  }
+  function foremanPixels(m){
+    const out=[];
+    for(let y=m.y+1;y<m.y+m.h-1;y++)for(let x=m.x+1;x<m.x+m.w-1;x++){
+      const i=ix(x,y);
+      if(clan[i]===m.id&&occupation[i]===JOB.FOREMAN)out.push(i);
+    }
+    return out;
+  }
+  function tickForemen(){
+    if(!foremanOn||!jobMode||!marketOn)return;
+    if(generations%18===0){
+      jobCensus();for(const m of leaders)recruitForemen(m);
+    }
+    if(generations%3!==0)return;
+    for(const m of leaders)for(const f of foremanPixels(m)){
+      const fx=f%W,fy=(f/W)|0;
+      let target=-1,score=-1e8;
+      // A foreman surveys only a small physical neighborhood. No full
+      // blueprint, distant targets, or forced pixel-wide rewrite.
+      for(let dy=-8;dy<=8;dy++)for(let dx=-8;dx<=8;dx++){
+        if(Math.abs(dx)+Math.abs(dy)>9)continue;
+        const x=fx+dx,y=fy+dy;
+        if(!desiredBorder(m,x,y))continue;
+        const i=ix(x,y);
+        if(role[i]===R.GOLD&&clan[i]===m.id)continue;
+        if(clan[i]!==0&&clan[i]!==m.id)continue;
+        if(workOrder[i]>generations&&workMentor[i]!==f+1)continue;
+        let friends=0;
+        if(x>0&&clan[i-1]===m.id)friends++;
+        if(x<W-1&&clan[i+1]===m.id)friends++;
+        if(y>0&&clan[i-W]===m.id)friends++;
+        if(y<H-1&&clan[i+W]===m.id)friends++;
+        if(clan[i]===0&&!friends)continue;
+        const value=(clan[i]===m.id?35:0)+friends*15-(Math.abs(dx)+Math.abs(dy))*2+random()*8;
+        if(value>score){score=value;target=i;}
+      }
+      if(target>=0){
+        workOrder[target]=generations+15;workMentor[target]=f+1;
+        foremanOrders++;
+        // An employee's confidence rises only slightly and may still refuse
+        // to adopt a border. Promotion does not instantaneously paint gold.
+        if(clan[target]===m.id)obedience[target]=Math.min(255,obedience[target]+2);
+      }else if(m.borderPercent>=80&&m.linkers<m.linkTarget+1){
+        // Once local border work is scarce, look for a one-pixel gap in an
+        // actual linker line. A normal worker can refuse a temporary offer.
+        for(let dy=-6;dy<=6;dy++)for(let dx=-6;dx<=6;dx++){
+          if(Math.abs(dx)+Math.abs(dy)>7)continue;
+          const x=fx+dx,y=fy+dy;if(!inBounds(x,y)||desiredBorder(m,x,y))continue;
+          const i=ix(x,y);
+          if(clan[i]!==m.id||occupation[i]!==JOB.NONE||jobTenure[i]<3)continue;
+          const horizontal=x>0&&x<W-1&&occupation[i-1]===JOB.LINKER&&occupation[i+1]===JOB.LINKER;
+          const vertical=y>0&&y<H-1&&occupation[i-W]===JOB.LINKER&&occupation[i+W]===JOB.LINKER;
+          if((horizontal||vertical)&&random()<.12+obedience[i]/1800&&changeCareer(i,m,JOB.LINKER)){
+            foremanLinkAssists++;m.foremanAssists++;jobUse[f]=Math.min(255,jobUse[f]+12);
+            jobNews=m.label+' FOREMAN FIXED LINK GAP';break;
+          }
+        }
+      }
+    }
+  }
   function jobCareerReview(){
     if(!marketOn||!jobMode)return;
     jobCensus();
@@ -1519,7 +1635,7 @@
     // Each pixel weighs only its clan's bulletin, nearby peers and own work.
     for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
       const i=ix(x,y),c=clan[i],old=occupation[i];
-      if(!c||old===JOB.BUTTON)continue;
+      if(!c||old===JOB.BUTTON||old===JOB.FOREMAN)continue;
       const m=leaders[c-1];if(!m)continue;
       jobTenure[i]=Math.min(255,jobTenure[i]+1);
       if(jobUse[i]>0)jobUse[i]-=Math.min(jobUse[i],jobTenure[i]%3===0?2:1);
@@ -1563,6 +1679,7 @@
   function tickJobs(){
     if(!jobMode)return;
     jobCensus();
+    tickForemen();
     // Bosses can only extend their organizations by persuading local workers.
     // No button is drawn directly: recruited pixels adopt an intended state.
     for(const m of leaders){
@@ -1576,7 +1693,14 @@
           if(y>0&&clan[i-W]===m.id)friends++;
           if(y<H-1&&clan[i+W]===m.id)friends++;
           const stubborn=(temperament[i]/255)*.21;
-          if(friends&&random()<.05+friends*.07-stubborn)makeWorker(i,m,JOB.NONE);
+          const foremanHelp=foremanOn&&workOrder[i]>generations&&workMentor[i]>0&&
+            occupation[workMentor[i]-1]===JOB.FOREMAN&&clan[workMentor[i]-1]===m.id;
+          if(friends&&random()<.05+friends*.07-stubborn+(foremanHelp?.12:0)){
+            if(makeWorker(i,m,JOB.NONE)&&foremanHelp){
+              const f=workMentor[i]-1;foremanHires++;m.foremanHires++;
+              jobUse[f]=Math.min(255,jobUse[f]+8);
+            }
+          }
           continue;
         }
         if(clan[i]!==m.id)continue;
@@ -1591,9 +1715,18 @@
         if(x>0&&role[i-1]===target)support++;
         if(y>0&&role[i-W]===target)support++;
         // Temperamental agents may ignore commands. Peers make it easier.
-        const obey=.19+support*.095+obedience[i]/700;
+        const foremanHelp=foremanOn&&border&&workOrder[i]>generations&&workMentor[i]>0&&
+          occupation[workMentor[i]-1]===JOB.FOREMAN&&clan[workMentor[i]-1]===m.id;
+        const obey=.19+support*.095+obedience[i]/700+(foremanHelp?.24:0);
         if(random()<obey){
+          const repaired=foremanHelp&&target===R.GOLD&&role[i]!==R.GOLD;
           role[i]=target;conviction[i]=Math.min(255,conviction[i]+8);
+          if(repaired){
+            const f=workMentor[i]-1;
+            jobUse[f]=Math.min(255,jobUse[f]+20);
+            foremanRepairs++;m.foremanRepairs++;
+            workOrder[i]=0;workMentor[i]=0;
+          }
           if(marketOn&&occupation[i]===JOB.NONE&&(border||text))jobUse[i]=Math.min(255,jobUse[i]+2);
           if(marketOn&&occupation[i]===JOB.TEXT&&text)jobUse[i]=Math.min(255,jobUse[i]+2);
         }
@@ -1824,6 +1957,7 @@
   function jobReport(){
     jobCensus();return {enabled:jobMode,armed:wipeArmed,bosses:jobTally[JOB.BUTTON],
       linkers:jobTally[JOB.LINKER],formatters:jobTally[JOB.FORMATTER],
+      foremen:jobTally[JOB.FOREMAN],foreman:{enabled:foremanOn,orders:foremanOrders,repairs:foremanRepairs,recruits:foremanHires,linkGapAssists:foremanLinkAssists},
       textMakers:jobTally[JOB.TEXT],recruits:jobRecruits,territory:jobTerritory,
       borderPercent:jobBorder,letteredButtons:jobLabelCount,taps:jobTaps,
       chain:chainReport(),
@@ -1837,6 +1971,8 @@
         latestHops:bridgeLastHops,creditedWorkerEvents:bridgeRewards,misses:bridgeShortageEvents},
       news:jobNews,leaders:leaders.map(m=>({id:m.id,label:m.label,x:m.x,y:m.y,w:m.w,h:m.h,
         crew:m.workers,linkers:m.linkers,textMakers:m.text,formatters:m.formatters,
+        foremen:m.foremen,foremanVacancies:m.foremanTarget,foremanRepairs:m.foremanRepairs,
+        foremanHires:m.foremanHires,foremanLinkAssists:m.foremanAssists,
         desired:{linkers:m.linkTarget,textMakers:m.textTarget,formatters:m.formatTarget},
         success:{messages:m.recentMessages,delivered:m.recentDeliveries,formats:m.recentFormats},
         poached:m.poached,lost:m.losses,careerChanges:m.careerChanges,
@@ -2015,6 +2151,7 @@
         else if(j===JOB.LINKER){red=36;green=225;blue=235;}
         else if(j===JOB.FORMATTER){red=230;green=102;blue=178;}
         else if(j===JOB.TEXT){red=252;green=225;blue=155;}
+        else if(j===JOB.FOREMAN){red=164;green=250;blue=116;}
         else if(clan[i]){red*=1.12;green*=1.09;blue*=1.11;}
       }
       if(jobMode&&isField(i)&&clan[i]===0){red*=.12;green*=.12;blue*=.12;}
@@ -2131,6 +2268,7 @@
     else if(hit===17)toggleChains();
     else if(hit===14){armWipe();metrics=measure();displayStats();}
     else if(hit===10)toggleWireView();
+    else if(hit===18)toggleForemen();
     else if(hit===11)beginRest();
     else if(hit===12)beginLearning();
     else if(hit===7)toggleTrace();
@@ -2174,7 +2312,7 @@
     if(k==='7'||k==='d')toggleTrace();
     if(k==='8'||k==='i')togglePlastic();
     if(k==='9'||k==='u')pulse();
-    if(k==='v')toggleWireView();if(k==='o')beginRest();if(k==='k')beginLearning();
+    if(k==='q')toggleForemen();if(k==='v')toggleWireView();if(k==='o')beginRest();if(k==='k')beginLearning();
     if(k==='j')toggleJobs();if(k==='f')armWipe();if(k==='c')toggleMarket();if(k==='z')toggleLean();if(k==='x')toggleChains();
     if(k==='l')rumor();if(k==='r')changePolicy();
     if(k==='t')testRumor();
@@ -2202,7 +2340,7 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'1.3 chain reaction',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
+      version:'1.4 foremen',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
@@ -2225,12 +2363,14 @@
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
     trace:toggleTrace,traceAuto:autoTrace,traceAt,plastic:togglePlastic,pulse,
     jobs:toggleJobs,jobStart:startJobs,jobArmWipe:armWipe,jobMarket:toggleMarket,
-    lean:toggleLean,chains:toggleChains,chainReport,jobTap,jobReport,
+    lean:toggleLean,chains:toggleChains,chainReport,foremen:toggleForemen,jobTap,jobReport,
     jobAt(x,y){if(!inBounds(x|0,y|0))return null;const i=ix(x|0,y|0);
       return {job:JOB_NAMES[occupation[i]],clan:clan[i],role:role[i],known:knowledge[i],
         signalHop:jobMessageDist[i],obedience:obedience[i],aptitudes:{worker:jobAptitude(i,JOB.NONE),
-          linker:jobAptitude(i,JOB.LINKER),formatter:jobAptitude(i,JOB.FORMATTER),text:jobAptitude(i,JOB.TEXT)},
-        performance:jobUse[i],tenure:jobTenure[i],lean:leanOn,chainId:chainIds[i]||0};},
+          linker:jobAptitude(i,JOB.LINKER),formatter:jobAptitude(i,JOB.FORMATTER),text:jobAptitude(i,JOB.TEXT),foreman:jobAptitude(i,JOB.FOREMAN)},
+        performance:jobUse[i],tenure:jobTenure[i],orderUntil:workOrder[i],
+        supervisor:workMentor[i]?{x:(workMentor[i]-1)%W,y:Math.floor((workMentor[i]-1)/W)}:null,
+        lean:leanOn,chainId:chainIds[i]||0};},
     paths:toggleWireView,rest:beginRest,learn:beginLearning,
     cycleAdvance(ms){cycleTick(clamp(Number(ms)||0,0,1000));render();return this.status.memory;},
     traceDistanceAt(x,y){
