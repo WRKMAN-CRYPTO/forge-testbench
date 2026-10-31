@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 1.1 | Lean Linkers</title>
+<title>Pixel Society 1.2 | Button Reclamation</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -131,6 +131,11 @@
   // and explicit task rewards, not secret global instructions to workers.
   let leanOn=true,bridgeTrials=0,bridgeSuccesses=0,bridgeBest=0,bridgeLastHops=0;
   let bridgeRewards=0,bridgeShortageEvents=0,bridgeMark=new Uint32Array(0);
+  // Each maker independently measures its perimeter. Until 99% is truly
+  // complete, it can try to recruit rival LINKERS or reclaim its own border
+  // linkers as construction workers. No remote relocation of pixel agents.
+  const BUTTON_COMPLETION_TARGET=99;
+  let buttonSteals=0,buttonReclaims=0,buttonOffers=0;
 
 
 
@@ -209,7 +214,7 @@
       jobCensus();
       stampText(Math.floor(W/2),H-48,'B'+jobTally[1]+' L'+jobTally[2]+' F'+jobTally[3]+' T'+jobTally[4],R.CYAN,true);
       stampText(Math.floor(W/2),H-38,marketOn?(leanOn?'LEAN ':'CLASS ')+'SW '+jobSwitches+' PO '+jobPoaches:'ORIGINAL CREWS',R.INK,true);
-      stampText(Math.floor(W/2),H-28,leanOn&&marketOn?'BRIDGE '+bridgeSuccesses+'/'+bridgeTrials+' BEST '+bridgeBest:'EDGE '+jobBorder+'% TXT '+jobLabelCount,R.GOLD,true);
+      stampText(Math.floor(W/2),H-28,'EDGE '+jobBorder+'% STEAL '+buttonSteals,R.GOLD,true);
       stampText(Math.floor(W/2),H-18,'MSG '+jobMessages+' OK '+jobDeliveries+' F '+jobWipes,R.PINK,true);
       stampText(Math.floor(W/2),H-8,wipeArmed?'WIPE ARMED TAP BUTTON':jobNews,R.MIST,true);
     }else if(cycleStage!=='NEW'){
@@ -1042,6 +1047,7 @@
     occupation.fill(0);clan.fill(0);obedience.fill(0);jobTenure.fill(0);jobUse.fill(0);bridgeMark.fill(0);leaders=[];
     jobSwitches=jobPoaches=jobResigns=jobShortages=jobIdle=jobRecruitAttempts=jobOffersRejected=jobCompetition=0;
     bridgeTrials=bridgeSuccesses=bridgeBest=bridgeLastHops=bridgeRewards=bridgeShortageEvents=0;
+    buttonSteals=buttonReclaims=buttonOffers=0;
     jobEvent='MARKET BOOTING';
     jobMessages=jobDeliveries=jobWipes=jobRecruits=jobTaps=jobLabelCount=0;
     jobMessageDist.fill(-1);jobMessageElapsed=0;
@@ -1061,6 +1067,8 @@
       const m={id:n+1,x,y,w:bw,h:bh,label:labels[n],chief:-1,strength:0,workers:0,text:0,linkers:0,formatters:0,
         linkTarget:3,formatTarget:1,textTarget:1,recentDeliveries:0,recentFormats:0,recentMessages:0,
         borderWork:0,output:0,poached:0,losses:0,careerChanges:0,
+        borderTotal:2*(bw+bh)-4,borderDone:0,borderPercent:0,
+        linkerSteals:0,linkerReclaims:0,
         bridgeScore:0,bridgeHops:-1,bridgeWorkers:0,bridgeHits:0,bridgeLast:0,bridgeCost:0,
         bridgeUntil:0};
       const mx=x+Math.floor(bw/2),my=y+1,chief=ix(mx,my);
@@ -1099,7 +1107,9 @@
     metrics=measure();displayStats();return wipeArmed;
   }
   function jobCensus(){
-    jobTally.fill(0);for(const m of leaders){m.workers=0;m.text=0;m.linkers=0;m.formatters=0;}
+    jobTally.fill(0);for(const m of leaders){
+      m.workers=0;m.text=0;m.linkers=0;m.formatters=0;m.borderDone=0;
+    }
     let owned=0,painted=0,edge=leaders.reduce((n,m)=>n+2*(m.w+m.h)-4,0);
     for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
       const i=ix(x,y),j=occupation[i],c=clan[i];
@@ -1112,12 +1122,15 @@
       if(j===JOB.FORMATTER)m.formatters++;
       if(!inLeader(m,x,y))continue;
       owned++;
-      if(desiredBorder(m,x,y)&&(role[i]===R.CYAN||role[i]===R.GOLD))painted++;
+      if(desiredBorder(m,x,y)&&role[i]===R.GOLD){
+        painted++;m.borderDone++;
+      }
     }
     jobTerritory=owned;
     jobBorder=edge?Math.round(100*painted/edge):0;
     jobLabelCount=leaders.filter(m=>m.text>0).length;
     for(const m of leaders){
+      m.borderPercent=m.borderTotal?100*m.borderDone/m.borderTotal:0;
       // This is a *local employer's advertised staffing plan*, not global
       // task optimization. Delivery failures raise demand for connectors;
       // successful links reduce it. No agent sees other employers' ledgers.
@@ -1187,7 +1200,7 @@
       // values workers more when specialists crowd out the job at hand.
       const specialist=m.linkers+m.formatters+m.text;
       score+=25+Math.min(38,55*specialist/Math.max(1,m.workers));
-      if(desiredBorder(m,i%W,(i/W)|0))score+=15;
+      if(desiredBorder(m,i%W,(i/W)|0))score+=m.borderPercent<BUTTON_COMPLETION_TARGET?100:15;
     }else{
       const deficit=need-supply;
       score+=deficit>0?Math.min(72,32+deficit*4):deficit<0?-Math.min(100,30+(-deficit)*7):5;
@@ -1241,23 +1254,71 @@
     jobEvent=JOB_NAMES[was]+' TO '+JOB_NAMES[to];
     return true;
   }
+  function buttonNeedsWorkers(m){
+    // Check *actual* gold construction borders, not a stale rounded score.
+    // Cyan linkers on the perimeter do NOT count as completed building work.
+    // If the border is damaged below 99 later, the maker may recruit again.
+    let done=0;
+    for(let x=m.x;x<m.x+m.w;x++){
+      const top=ix(x,m.y),bottom=ix(x,m.y+m.h-1);
+      if(clan[top]===m.id&&role[top]===R.GOLD)done++;
+      if(clan[bottom]===m.id&&role[bottom]===R.GOLD)done++;
+    }
+    for(let y=m.y+1;y<m.y+m.h-1;y++){
+      const left=ix(m.x,y),right=ix(m.x+m.w-1,y);
+      if(clan[left]===m.id&&role[left]===R.GOLD)done++;
+      if(clan[right]===m.id&&role[right]===R.GOLD)done++;
+    }
+    m.borderDone=done;
+    m.borderPercent=100*done/m.borderTotal;
+    return done*100<BUTTON_COMPLETION_TARGET*m.borderTotal;
+  }
   function tryPoach(i,m){
-    const former=leaders[clan[i]-1],old=occupation[i];
-    if(!former||former.id===m.id||old===JOB.BUTTON||jobTenure[i]<4||m.linkers>=m.linkTarget)return false;
-    jobCompetition++;
-    const offer=jobValue(i,m,JOB.LINKER)+21;
-    const stay=jobValue(i,former,old)+9+obedience[i]*.022;
-    if(offer<stay+4||random()>.48){jobOffersRejected++;return false;}
-    if(old===JOB.LINKER)former.linkers--;
-    if(old===JOB.FORMATTER)former.formatters--;
-    if(old===JOB.TEXT)former.text--;
-    clan[i]=m.id;occupation[i]=JOB.LINKER;
+    // Button chiefs steal *linkers* for the unfinished interface, including
+    // when their normal linker quota is full. Offers still require the
+    // adjacency/contact path used by the labor market, never teleportation.
+    if(occupation[i]!==JOB.LINKER||!buttonNeedsWorkers(m))return false;
+    const former=leaders[clan[i]-1];
+    if(!former||former.id===m.id||jobTenure[i]<4)return false;
+    buttonOffers++;jobCompetition++;
+    const x=i%W,y=(i/W)|0;
+    const onBorder=desiredBorder(m,x,y);
+    const deficit=1-m.borderPercent/100;
+    const offer=jobValue(i,m,onBorder?JOB.NONE:JOB.LINKER)+33+deficit*60;
+    const stay=jobValue(i,former,JOB.LINKER)+9+obedience[i]*.022;
+    if(offer<stay+4||random()>.57){jobOffersRejected++;return false;}
+    former.linkers--;
+    clan[i]=m.id;occupation[i]=onBorder?JOB.NONE:JOB.LINKER;
     jobUse[i]=0;jobTenure[i]=0;obedience[i]=Math.floor(obedience[i]*.73);
-    m.workers++;m.linkers++;former.workers--;
+    m.workers++;if(!onBorder)m.linkers++;former.workers--;
     m.poached++;former.losses++;jobPoaches++;jobSwitches++;
-    role[i]=R.CYAN;flash[i]=240;jobEvent=m.label+' POACHED '+former.label;
-    jobNews=jobEvent;
+    m.linkerSteals++;buttonSteals++;
+    role[i]=onBorder?R.MIST:R.CYAN;flash[i]=240;
+    jobEvent=m.label+' STOLE '+former.label+' LINKER';jobNews=jobEvent;
     return true;
+  }
+  function reclaimBorderLinkers(m){
+    // A maker can also take its own surplus linkers off a perimeter job and
+    // assign them to construction. Ordinary workers paint borders through
+    // the existing stochastic obedience rules, not by instant magic pixels.
+    if(!buttonNeedsWorkers(m))return;
+    let recalls=0;
+    const start=(generations+genome[m.chief])%m.borderTotal;
+    for(let a=0;a<m.borderTotal&&recalls<3;a++){
+      const k=(a+start)%m.borderTotal;
+      let x,y;
+      if(k<m.w){x=m.x+k;y=m.y;}
+      else if(k<m.w+m.h-2){x=m.x+m.w-1;y=m.y+1+(k-m.w);}
+      else if(k<2*m.w+m.h-2){x=m.x+m.w-1-(k-(m.w+m.h-2));y=m.y+m.h-1;}
+      else{x=m.x;y=m.y+m.h-2-(k-(2*m.w+m.h-2));}
+      const i=ix(x,y);
+      if(clan[i]!==m.id||occupation[i]!==JOB.LINKER)continue;
+      if(jobTenure[i]<2||random()>.64)continue; // people may refuse
+      if(changeCareer(i,m,JOB.NONE)){
+        m.linkerReclaims++;buttonReclaims++;recalls++;
+        jobEvent=m.label+' RECLAIMED LINKER';jobNews=jobEvent;
+      }
+    }
   }
   function jobCareerReview(){
     if(!marketOn||!jobMode)return;
@@ -1285,6 +1346,10 @@
       }
       if(bestType!==old)changeCareer(i,m,bestType);
     }
+    // Button makers prioritize construction while their perimeter is below
+    // 99%. A border linker can be reassigned even when the regular staffing
+    // plan says the group already employs enough linkers.
+    if(generations%12===0)for(const m of leaders)reclaimBorderLinkers(m);
     // Frontier agents make immediate local offers when rival neighbors
     // are encountered. A small sampled review also considers border contacts.
     for(let tries=0;tries<Math.min(60,Math.floor(jobTerritory/9));tries++){
@@ -1380,7 +1445,9 @@
         });
         const j=random()<.76?directions[0]:directions[Math.floor(random()*4)];
         const needLink=!marketOn||m.linkers<m.linkTarget;
-        if(j>=0&&j<N&&isField(j)&&needLink&&random()<(marketOn?.51:.36)){
+        const canSteal=marketOn&&j>=0&&j<N&&clan[j]>0&&clan[j]!==m.id&&
+          occupation[j]===JOB.LINKER&&buttonNeedsWorkers(m);
+        if(j>=0&&j<N&&isField(j)&&(needLink||canSteal)&&random()<(marketOn?.51:.36)){
           if(clan[j]===0){
             jobRecruitAttempts++;
             if(marketOn&&random()<.20+temperament[j]/700)jobOffersRejected++;
@@ -1552,6 +1619,8 @@
       linkers:jobTally[JOB.LINKER],formatters:jobTally[JOB.FORMATTER],
       textMakers:jobTally[JOB.TEXT],recruits:jobRecruits,territory:jobTerritory,
       borderPercent:jobBorder,letteredButtons:jobLabelCount,taps:jobTaps,
+      buttonReclamation:{targetPercent:BUTTON_COMPLETION_TARGET,stolenLinkers:buttonSteals,
+        reclaimedOwnLinkers:buttonReclaims,offers:buttonOffers},
       messages:jobMessages,delivered:jobDeliveries,formats:jobWipes,
       market:{enabled:marketOn,careerChanges:jobSwitches,poaches:jobPoaches,resignations:jobResigns,
         shortage:jobShortages,idleSpecialists:jobIdle,offers:jobRecruitAttempts,rejected:jobOffersRejected,
@@ -1563,6 +1632,10 @@
         desired:{linkers:m.linkTarget,textMakers:m.textTarget,formatters:m.formatTarget},
         success:{messages:m.recentMessages,delivered:m.recentDeliveries,formats:m.recentFormats},
         poached:m.poached,lost:m.losses,careerChanges:m.careerChanges,
+        completionPercent:Math.round(m.borderPercent*10)/10,
+        borderDone:m.borderDone,borderTotal:m.borderTotal,
+        seekingLinkers:m.borderPercent<BUTTON_COMPLETION_TARGET,
+        stolenLinkers:m.linkerSteals,reclaimedLinkers:m.linkerReclaims,
         bridge:{connected:m.bridgeLast>0,efficiency:m.bridgeScore,hops:m.bridgeHops,
           ownLinkersOnPath:m.bridgeWorkers,surplus:m.bridgeCost,discoveries:m.bridgeHits,
           protectedFor:Math.max(0,m.bridgeUntil-generations)}}))};
@@ -1912,7 +1985,7 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'1.1 lean linkers',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
+      version:'1.2 button reclamation',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
