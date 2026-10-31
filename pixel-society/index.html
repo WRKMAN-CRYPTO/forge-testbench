@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#071017">
-<title>Pixel Society 1.2 | Button Reclamation</title>
+<title>Pixel Society 1.3 | Chain Reaction</title>
 <style>
   * { box-sizing: border-box; }
   html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071017; }
@@ -136,6 +136,11 @@
   // linkers as construction workers. No remote relocation of pixel agents.
   const BUTTON_COMPLETION_TARGET=99;
   let buttonSteals=0,buttonReclaims=0,buttonOffers=0;
+  // One chain is a truly contiguous horizontal or vertical run, not a
+  // virtual pool of remote workers. Chain identity != employer affiliation.
+  let chainMode=true,chainIds=new Uint32Array(0),chains=new Map(),nextChainId=1;
+  let chainMerges=0,chainAbsorbed=0,chainConnections=0,chainLongest=0,chainGrowth=0;
+  let chainRewards=0,chainStopped=0;
 
 
 
@@ -209,13 +214,13 @@
     const bw=Math.floor((W-12)/3);
     button(4,H-63,bw,12,wireView?'AGENT':'PATHS',R.CYAN,10);
     button(6+bw,H-63,bw,12,jobMode?(leanOn?'LEAN':'CLASS'):'REST',R.PINK,jobMode?16:11);
-    button(8+bw*2,H-63,bw,12,'LEARN',R.GOLD,12);
+    button(8+bw*2,H-63,bw,12,jobMode?(chainMode?'CHAIN':'FREE'):'LEARN',R.GOLD,jobMode?17:12);
     if(jobMode){
       jobCensus();
       stampText(Math.floor(W/2),H-48,'B'+jobTally[1]+' L'+jobTally[2]+' F'+jobTally[3]+' T'+jobTally[4],R.CYAN,true);
       stampText(Math.floor(W/2),H-38,marketOn?(leanOn?'LEAN ':'CLASS ')+'SW '+jobSwitches+' PO '+jobPoaches:'ORIGINAL CREWS',R.INK,true);
       stampText(Math.floor(W/2),H-28,'EDGE '+jobBorder+'% STEAL '+buttonSteals,R.GOLD,true);
-      stampText(Math.floor(W/2),H-18,'MSG '+jobMessages+' OK '+jobDeliveries+' F '+jobWipes,R.PINK,true);
+      stampText(Math.floor(W/2),H-18,chainMode?'CHAIN '+chainLongest+' JOIN '+chainMerges+' LINK '+chainConnections:'MSG '+jobMessages+' OK '+jobDeliveries,R.PINK,true);
       stampText(Math.floor(W/2),H-8,wipeArmed?'WIPE ARMED TAP BUTTON':jobNews,R.MIST,true);
     }else if(cycleStage!=='NEW'){
       const stageText=cycleStage==='LEARNING'?'TRAINING':cycleStage==='RELEARNING'?'RETRAIN':cycleStage==='RESTING'?'RESTING':cycleStage;
@@ -1048,6 +1053,8 @@
     jobSwitches=jobPoaches=jobResigns=jobShortages=jobIdle=jobRecruitAttempts=jobOffersRejected=jobCompetition=0;
     bridgeTrials=bridgeSuccesses=bridgeBest=bridgeLastHops=bridgeRewards=bridgeShortageEvents=0;
     buttonSteals=buttonReclaims=buttonOffers=0;
+    chainIds=new Uint32Array(N);chains.clear();nextChainId=1;
+    chainMerges=chainAbsorbed=chainConnections=chainLongest=chainGrowth=chainRewards=chainStopped=0;
     jobEvent='MARKET BOOTING';
     jobMessages=jobDeliveries=jobWipes=jobRecruits=jobTaps=jobLabelCount=0;
     jobMessageDist.fill(-1);jobMessageElapsed=0;
@@ -1099,6 +1106,23 @@
     jobNews=leanOn?'LEAN REWARDS ON':'CLASSIC LINKERS';jobEvent=jobNews;
     metrics=measure();displayStats();
     return {enabled:leanOn,bridgeTrials,bridgeSuccesses};
+  }
+  function toggleChains(){
+    chainMode=!chainMode;
+    if(chainMode){chainIds=new Uint32Array(N);chains.clear();nextChainId=1;}
+    jobNews=chainMode?'STRAIGHT CHAIN REWARDS':'FREE LINKER RECRUITMENT';
+    metrics=measure();displayStats();
+    return chainReport();
+  }
+  function chainReport(){
+    const active=[...chains.values()].filter(c=>c.members.length&&c.active);
+    return {enabled:chainMode,count:active.length,longest:chainLongest,
+      merges:chainMerges,absorbedWorkers:chainAbsorbed,completed:chainConnections,
+      activeBridges:active.filter(c=>c.done&&chainContacts(c).length>=2).length,
+      recruited:chainGrowth,rewardEvents:chainRewards,stopped:chainStopped,
+      largest:active.sort((a,b)=>b.members.length-a.members.length).slice(0,6).map(c=>({
+        length:c.members.length,orientation:c.axis===0?'horizontal':'vertical',
+        origin:c.owner,contacts:chainContacts(c),connected:c.done}))};
   }
   function armWipe(){
     if(!jobMode)return jobNews='ENABLE JOBS FIRST';
@@ -1208,6 +1232,7 @@
         // Useful relay workers tend to live on edges, not in a dense
         // central factory. This is a personal location-based preference.
         const x=i%W,y=(i/W)|0;
+        if(desiredBorder(m,x,y)&&m.borderPercent<BUTTON_COMPLETION_TARGET)score-=125;
         if(inLeader(m,x,y)){
           const edge=Math.min(x-m.x,m.x+m.w-1-x,y-m.y,m.y+m.h-1-y);
           score+=edge<=2?22:edge<=5?8:-22;
@@ -1221,6 +1246,12 @@
           const onRecentPath=bridgeMark[i]>0&&generations-bridgeMark[i]<300;
           score-=Math.min(110,(m.linkers-m.linkTarget)*1.1+(onRecentPath?0:25));
           if(onRecentPath)score+=78;
+        }
+        // Only a geometrically straight and genuinely staffed chain earns
+        // persistent utility. A completed two-button bridge earns more.
+        if(chainMode&&marketOn){
+          const c=chains.get(chainIds[i]);
+          if(c&&c.members.length>=3)score+=Math.min(72,c.members.length*2)+(c.done?65:0);
         }
         if(jobTenure[i]>5&&jobUse[i]<8)score-=12;
       }else if(type===JOB.FORMATTER){
@@ -1253,6 +1284,166 @@
     if(to===JOB.NONE)jobResigns++;
     jobEvent=JOB_NAMES[was]+' TO '+JOB_NAMES[to];
     return true;
+  }
+  function chainCreate(i){
+    const m=leaders[clan[i]-1];if(!m)return null;
+    const x=i%W,y=(i/W)|0;
+    const target=leaders.filter(b=>b.id!==m.id).reduce((best,b)=>{
+      const dx=b.x+b.w/2-x,dy=b.y+b.h/2-y,d=Math.abs(dx)+Math.abs(dy);
+      return !best||d<best.d?{dx,dy,d}:best;
+    },null);
+    // Mostly seek the nearest rival, but unique personal preferences
+    // occasionally favor the perpendicular direction.
+    let axis=target&&Math.abs(target.dy)>Math.abs(target.dx)?1:0;
+    if((genome[i]&15)===0)axis=1-axis;
+    const c={id:nextChainId++,axis,fixed:axis===0?y:x,lo:axis===0?x:y,
+      hi:axis===0?x:y,owner:m.id,members:[i],done:false,active:true};
+    chains.set(c.id,c);chainIds[i]=c.id;return c;
+  }
+  function chainContacts(c){
+    const found=new Set();
+    for(const i of c.members){
+      if(occupation[i]!==JOB.LINKER||chainIds[i]!==c.id)continue;
+      const x=i%W,y=(i/W)|0;
+      for(const m of leaders){
+        // The source or recipient must have an actual employed linker in
+        // its button territory, or its worker must touch this line.
+        if(clan[i]===m.id&&inLeader(m,x,y))found.add(m.id);
+        const near=[x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];
+        // An ordinary employee can receive a message at the doorstep. The
+        // interior of the button is NOT made into a fictional linker chain.
+        if(near.some(j=>j>=0&&clan[j]===m.id&&inLeader(m,j%W,(j/W)|0)))found.add(m.id);
+      }
+    }
+    return [...found].sort((a,b)=>a-b);
+  }
+  function chainNormalize(){
+    // Recalculate physical membership; a departing worker can split a line.
+    // Never use stale historical mass as a reward or fake a remote bridge.
+    for(const c of [...chains.values()]){
+      const live=c.members.filter(i=>occupation[i]===JOB.LINKER&&chainIds[i]===c.id&&
+        (c.axis===0?((i/W)|0)===c.fixed:i%W===c.fixed));
+      live.sort((a,b)=> (c.axis===0?a%W:((a/W)|0))-(c.axis===0?b%W:((b/W)|0)));
+      if(!live.length){chains.delete(c.id);continue;}
+      const runs=[];let run=[live[0]],last=c.axis===0?live[0]%W:((live[0]/W)|0);
+      for(const i of live.slice(1)){
+        const coord=c.axis===0?i%W:((i/W)|0);
+        if(coord!==last+1){runs.push(run);run=[];}
+        run.push(i);last=coord;
+      }
+      runs.push(run);runs.sort((a,b)=>b.length-a.length);
+      const keep=runs.shift();c.members=keep;
+      c.lo=c.axis===0?keep[0]%W:((keep[0]/W)|0);
+      c.hi=c.axis===0?keep[keep.length-1]%W:((keep[keep.length-1]/W)|0);
+      for(const fragment of runs){
+        const nc={...c,id:nextChainId++,members:fragment,lo:c.axis===0?fragment[0]%W:((fragment[0]/W)|0),
+          hi:c.axis===0?fragment[fragment.length-1]%W:((fragment[fragment.length-1]/W)|0),done:false};
+        chains.set(nc.id,nc);for(const i of fragment)chainIds[i]=nc.id;
+      }
+    }
+    // New linkers begin as independent crews. Collinear contact is resolved
+    // by merge below, rather than faking shared identity across a gap.
+    for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
+      const i=ix(x,y);if(occupation[i]===JOB.LINKER&&clan[i]&&!chainIds[i])chainCreate(i);
+      if(occupation[i]!==JOB.LINKER)chainIds[i]=0;
+    }
+  }
+  function chainAbsorb(a,b){
+    if(!a||!b||a.id===b.id||a.done||b.done||a.axis!==b.axis||a.fixed!==b.fixed)return false;
+    if(a.hi+1!==b.lo&&b.hi+1!==a.lo)return false;
+    const large=a.members.length>=b.members.length?a:b;
+    const small=large===a?b:a;
+    const taken=small.members.length;
+    for(const i of small.members){chainIds[i]=large.id;jobUse[i]=Math.min(255,jobUse[i]+12);}
+    large.members.push(...small.members);
+    large.members.sort((i,j)=>(large.axis===0?i%W:((i/W)|0))-(large.axis===0?j%W:((j/W)|0)));
+    large.lo=Math.min(large.lo,small.lo);large.hi=Math.max(large.hi,small.hi);
+    chains.delete(small.id);
+    // A lone pixel joining a line counts as growth, not a whole-chain
+    // merger. Absorption statistics require an established 2+ pixel run.
+    if(taken>=2){chainMerges++;chainAbsorbed+=taken;}
+    else chainGrowth++;
+    chainLongest=Math.max(chainLongest,large.members.length);
+    jobNews=(taken>=2?'CHAIN ABSORBED ':'CHAIN GAINED ')+taken+' TOTAL '+large.members.length;
+    return true;
+  }
+  function tickChains(){
+    if(!jobMode||!chainMode||!marketOn)return;
+    chainNormalize();
+    const cc=[...chains.values()];
+    // Connect collinear runs before growing, including chains that met after
+    // an agent independently changed careers.
+    for(const c of cc){
+      if(!chains.has(c.id)||c.done)continue;
+      for(const dir of [-1,1]){
+        const v=dir<0?c.lo-1:c.hi+1;
+        if(v<0||v>=(c.axis===0?W:H))continue;
+        const at=c.axis===0?ix(v,c.fixed):ix(c.fixed,v);
+        const other=chains.get(chainIds[at]);
+        if(other&&other.id!==c.id)chainAbsorb(c,other);
+      }
+    }
+    // Check achieved task before adding any more workers. A bridge means
+    // contact with *two real button groups*, not mere straight-line length.
+    for(const c of chains.values()){
+      const contacts=chainContacts(c);
+      // When an employee leaves and cuts the bridge, the survivors can
+      // resume growth. A historic success is not permanent connectivity.
+      if(c.done&&contacts.length<2)c.done=false;
+      if(c.done)continue;
+      if(contacts.length>=2){
+        c.done=true;chainConnections++;chainStopped++;
+        for(const i of c.members){jobUse[i]=Math.min(255,jobUse[i]+72);flash[i]=235;}
+        jobNews='BRIDGE CONNECTED '+c.members.length;
+      }
+    }
+    // Stop finished chains. Only growing linear tips can recruit; a
+    // perpendicular encounter is an obstacle, not a teleport or instant bend.
+    const work=[...chains.values()].filter(c=>!c.done).sort((a,b)=>b.members.length-a.members.length);
+    let attempts=0;
+    for(const c of work){
+      if(!chains.has(c.id)||c.done||attempts>=65)break;
+      const m=leaders[c.owner-1];if(!m)continue;
+      // Reward length and completed useful work rather than raw headcount.
+      if(generations%24===0&&c.members.length>=3){
+        const bonus=Math.min(28,Math.floor(Math.sqrt(c.members.length)*5));
+        for(const i of c.members){jobUse[i]=Math.min(255,jobUse[i]+bonus);}
+        chainRewards+=c.members.length;
+      }
+      // Limit overspread: reward making one straight route, not covering the
+      // entire map with many new branches. Shorter isolated chains still grow.
+      if(random()>.78)continue;
+      attempts++;
+      const x=c.axis===0?c.fixed:0,y=c.axis===1?c.fixed:0;
+      const options=random()<.5?[-1,1]:[1,-1];
+      for(const dir of options){
+        const t=dir<0?c.lo-1:c.hi+1;
+        if(t<0||t>=(c.axis===0?W:H))continue;
+        const i=c.axis===0?ix(t,x):ix(y,t);
+        if(!isField(i))continue;
+        const rival=leaderByPosition(i%W,(i/W)|0);
+        if(rival&&rival.id!==m.id&&occupation[i]!==JOB.LINKER)continue;
+        if(occupation[i]===JOB.LINKER){
+          const other=chains.get(chainIds[i]);
+          if(other&&chainAbsorb(c,other))break;
+          continue;
+        }
+        if(clan[i]!==0&&clan[i]!==m.id)continue;
+        if(clan[i]===m.id&&occupation[i]!==JOB.NONE)continue;
+        // A border linker can still paint gold; don't wipe its visible job.
+        if(clan[i]===m.id){
+          if(random()<.55&&changeCareer(i,m,JOB.LINKER)){chainIds[i]=c.id;c.members.push(i);}
+          else continue;
+        }else{
+          if(random()>.25+obedience[i]/1400)continue;
+          if(!makeWorker(i,m,JOB.LINKER))continue;
+          m.linkers++;m.workers++;chainIds[i]=c.id;c.members.push(i);
+        }
+        c.lo=Math.min(c.lo,t);c.hi=Math.max(c.hi,t);chainGrowth++;
+        chainLongest=Math.max(chainLongest,c.members.length);
+        flash[i]=160;break;
+      }
+    }
   }
   function buttonNeedsWorkers(m){
     // Check *actual* gold construction borders, not a stale rounded score.
@@ -1392,8 +1583,10 @@
         if(occupation[i]===JOB.BUTTON)continue;
         const border=desiredBorder(m,x,y);
         const text=m.text>0&&letterAt(m,x,y);
-        const target=occupation[i]===JOB.FORMATTER?R.PINK:
-          occupation[i]===JOB.LINKER?R.CYAN:border?R.GOLD:text?R.INK:R.VOID;
+        // Linkers on a border can still fulfill its visible gold shape.
+        // Border completion measures actual appearance, not job title.
+        const target=border?R.GOLD:occupation[i]===JOB.FORMATTER?R.PINK:
+          occupation[i]===JOB.LINKER?R.CYAN:text?R.INK:R.VOID;
         let support=0;
         if(x>0&&role[i-1]===target)support++;
         if(y>0&&role[i-W]===target)support++;
@@ -1411,7 +1604,7 @@
     }
     // Linkers recruit into adjacent neutral territory to seek other groups.
     // A multi-group route can appear, fail, or break as individual jobs change.
-    if(generations%4===0){
+    if((!chainMode||!marketOn)&&generations%4===0){
       const frontier=[];
       for(let y=region.y+12;y<region.y+region.h-2;y++)for(let x=region.x+2;x<region.x+region.w-2;x++){
         const i=ix(x,y);if(occupation[i]===JOB.LINKER)frontier.push(i);
@@ -1465,6 +1658,7 @@
         }
       }
     }
+    if(chainMode&&marketOn&&generations%4===0)tickChains();
     // Periodic task checks are not user messages. They only pay workers on
     // an anchored, demonstrably working cross-clan path. No full relay flood
     // gets a reward for sheer size. A disconnected town earns nothing.
@@ -1495,6 +1689,13 @@
       const i=queue[head++],x=i%W,y=(i/W)|0;
       if(clan[i]!==m.id){end=i;break;}
       const near=[x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];
+      // A physical receiver inside another button accepts the final hop.
+      // Only linkers can propagate beyond that receiver.
+      for(const j of near)if(j>=0&&clan[j]&&clan[j]!==m.id&&
+        leaderByPosition(j%W,(j/W)|0)?.id===clan[j]){
+        parent[j]=i;distance[j]=distance[i]+1;end=j;break;
+      }
+      if(end>=0)break;
       for(const j of near)if(j>=0&&occupation[j]===JOB.LINKER&&clan[j]&&distance[j]<0){
         parent[j]=i;distance[j]=distance[i]+1;queue[tail++]=j;
       }
@@ -1558,8 +1759,14 @@
       const i=q[head++],d=jobMessageDist[i],x=i%W,y=(i/W)|0;
       if(clan[i]!==m.id&&d>bestDistance){best=i;bestDistance=d;}
       const neighbors=[x>0?i-1:-1,x<W-1?i+1:-1,y>0?i-W:-1,y<H-1?i+W:-1];
-      for(const j of neighbors)if(j>=0&&occupation[j]===JOB.LINKER&&jobMessageDist[j]<0){
-        jobMessageDist[j]=d+1;q[tail++]=j;
+      for(const j of neighbors){
+        if(j<0||jobMessageDist[j]>=0)continue;
+        if(clan[j]&&clan[j]!==m.id&&leaderByPosition(j%W,(j/W)|0)?.id===clan[j]){
+          jobMessageDist[j]=d+1;
+          if(d+1>=bestDistance){best=j;bestDistance=d+1;}
+          continue; // button worker can receive but cannot forward
+        }
+        if(occupation[j]===JOB.LINKER){jobMessageDist[j]=d+1;q[tail++]=j;}
       }
     }
     let efficientRoute=null;
@@ -1619,6 +1826,7 @@
       linkers:jobTally[JOB.LINKER],formatters:jobTally[JOB.FORMATTER],
       textMakers:jobTally[JOB.TEXT],recruits:jobRecruits,territory:jobTerritory,
       borderPercent:jobBorder,letteredButtons:jobLabelCount,taps:jobTaps,
+      chain:chainReport(),
       buttonReclamation:{targetPercent:BUTTON_COMPLETION_TARGET,stolenLinkers:buttonSteals,
         reclaimedOwnLinkers:buttonReclaims,offers:buttonOffers},
       messages:jobMessages,delivered:jobDeliveries,formats:jobWipes,
@@ -1881,6 +2089,14 @@
         }
         if(i===pulseSource){red=255;green=240;blue=210;}
       }
+      if(jobMode&&chainMode&&occupation[i]===JOB.LINKER&&chainIds[i]){
+        const c=chains.get(chainIds[i]);
+        if(c&&c.members.length>=3){
+          const glow=Math.min(65,c.members.length*1.6);
+          red+=c.done?glow*.75:glow*.18;
+          green+=glow*.55;blue+=c.done?glow*.14:glow;
+        }
+      }
       if(jobMode&&jobMessageElapsed<jobMessageDuration&&isField(i)&&jobMessageDist[i]>=0){
         const hop=Math.floor((jobMessageElapsed/jobMessageDuration)*35),d=jobMessageDist[i];
         if(d<=hop){if(hop-d<=2){red=255;green=255;blue=241;}
@@ -1912,6 +2128,7 @@
     if(hit===13)toggleJobs();
     else if(hit===15)toggleMarket();
     else if(hit===16)toggleLean();
+    else if(hit===17)toggleChains();
     else if(hit===14){armWipe();metrics=measure();displayStats();}
     else if(hit===10)toggleWireView();
     else if(hit===11)beginRest();
@@ -1958,7 +2175,7 @@
     if(k==='8'||k==='i')togglePlastic();
     if(k==='9'||k==='u')pulse();
     if(k==='v')toggleWireView();if(k==='o')beginRest();if(k==='k')beginLearning();
-    if(k==='j')toggleJobs();if(k==='f')armWipe();if(k==='c')toggleMarket();if(k==='z')toggleLean();
+    if(k==='j')toggleJobs();if(k==='f')armWipe();if(k==='c')toggleMarket();if(k==='z')toggleLean();if(k==='x')toggleChains();
     if(k==='l')rumor();if(k==='r')changePolicy();
     if(k==='t')testRumor();
     if(k==='m'){inspect=!inspect;metrics=measure();displayStats();}
@@ -1985,7 +2202,7 @@
   create();requestAnimationFrame(frameLoop);
   const api={
     get status(){return {
-      version:'1.2 button reclamation',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
+      version:'1.3 chain reaction',jobs:jobReport(),agents:N,generations,policy:POLICIES[policy],
       observerBlueprintOnly:staging===null,metrics:measure(),
       rumors:lies,glitches,erasures,learnedFragments:learned,revisedBeliefs:revisions,
       activeTrial:trial,trialReport,completedTrials:history.slice(-10),
@@ -2008,12 +2225,12 @@
     runSteps(n){n=Math.min(5000,Math.max(0,n|0));if(!traceActive)for(let j=0;j<n;j++)update();render();return this.status;},
     trace:toggleTrace,traceAuto:autoTrace,traceAt,plastic:togglePlastic,pulse,
     jobs:toggleJobs,jobStart:startJobs,jobArmWipe:armWipe,jobMarket:toggleMarket,
-    lean:toggleLean,jobTap,jobReport,
+    lean:toggleLean,chains:toggleChains,chainReport,jobTap,jobReport,
     jobAt(x,y){if(!inBounds(x|0,y|0))return null;const i=ix(x|0,y|0);
       return {job:JOB_NAMES[occupation[i]],clan:clan[i],role:role[i],known:knowledge[i],
         signalHop:jobMessageDist[i],obedience:obedience[i],aptitudes:{worker:jobAptitude(i,JOB.NONE),
           linker:jobAptitude(i,JOB.LINKER),formatter:jobAptitude(i,JOB.FORMATTER),text:jobAptitude(i,JOB.TEXT)},
-        performance:jobUse[i],tenure:jobTenure[i],lean:leanOn};},
+        performance:jobUse[i],tenure:jobTenure[i],lean:leanOn,chainId:chainIds[i]||0};},
     paths:toggleWireView,rest:beginRest,learn:beginLearning,
     cycleAdvance(ms){cycleTick(clamp(Number(ms)||0,0,1000));render();return this.status.memory;},
     traceDistanceAt(x,y){
