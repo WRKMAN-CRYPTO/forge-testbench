@@ -1,161 +1,131 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#07111b">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07111b">
+<meta name="description" content="RED Subconscious v0.2: a general-purpose experience, association, and prediction laboratory.">
 <title>RED // SUBCONSCIOUS v0.2 · Experience Engine</title>
 <style>
-:root{color-scheme:dark;--bg:#07111b;--surface:#0b1927;--raised:#142b3c;--line:#294757;--ink:#ebf5f2;--muted:#93afba;--green:#74f2b7;--blue:#93b8ff;--amber:#ffd48e;--red:#ff9baf}
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-button,textarea,input{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}
-button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--green);outline-offset:2px}
-button:active{transform:translateY(1px)}h1,h2,h3,p{margin-top:0}::selection{background:#72f2b54b}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px;min-height:73px;background:#0a1623;border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:12px}
-.logo{width:42px;height:42px;display:grid;place-items:center;background:var(--green);color:#0a221d;font-size:24px;font-weight:950;clip-path:polygon(0 0,78% 0,100% 22%,100% 100%,22% 100%,0 78%)}
-.brand-title{font-size:15px;letter-spacing:.12em;font-weight:900}.brand-title span{color:var(--green)}
-.brand-sub{font-size:10px;letter-spacing:.1em;color:var(--muted);margin-top:4px}
-.header-actions{display:flex;align-items:center;gap:9px}
-.local{font-size:10px;border:1px solid #376755;border-radius:50px;color:var(--green);padding:7px 10px;white-space:nowrap}
-.local:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:8px;box-shadow:0 0 10px var(--green)}
-.ghost{background:transparent;border:1px solid #3c5968;color:#bdd6d5;padding:7px 10px;border-radius:8px;font-size:11px;min-height:35px}
-.workspace{display:grid;grid-template-columns:315px minmax(320px,1fr) 315px;min-height:670px}
-.left,.right{min-width:0;padding:18px 15px;background:#0b1927}
-.left{border-right:1px solid var(--line)}.right{border-left:1px solid var(--line)}
-.section{margin-bottom:18px;padding-bottom:19px;border-bottom:1px solid #2d4454}
-.section:last-child{border:0;margin-bottom:0;padding-bottom:0}
-.section-title{font-size:11px;font-weight:900;letter-spacing:.12em;margin:0 0 10px;display:flex;gap:9px;align-items:center}
-.index{border:1px solid #3c8a70;color:var(--green);border-radius:5px;padding:2px 6px;font-size:10px}
-.hint{font-size:11px;color:var(--muted);line-height:1.6;margin:0 0 12px}
-.label{display:block;color:#b2ccd1;letter-spacing:.08em;font-size:10px;margin:10px 0 6px}
-textarea{display:block;width:100%;background:#081622;border:1px solid #35566b;border-radius:8px;resize:vertical;color:var(--ink);padding:11px 12px;min-height:74px}
-textarea::placeholder{color:#6a8a98}textarea:focus{border-color:var(--green);outline:0}
-.episode{color:#a3d3c4;background:#102c33;border:1px solid #35675f;border-radius:7px;padding:8px 10px;font-size:11px;margin:11px 0}
-.kinds{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.kinds input{position:absolute;opacity:0;pointer-events:none}
-.kinds label{display:block;border-radius:7px;background:#122637;color:#b8d0d2;border:1px solid #3c566a;text-align:center;font-size:10px;padding:9px 2px;cursor:pointer}
-.kinds input:checked+label{background:var(--green);color:#07251c;border-color:var(--green);font-weight:900}
-.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
-.btn{border:1px solid #3a596d;background:#193145;color:var(--ink);border-radius:8px;padding:9px;min-height:41px;font-size:11px;font-weight:850;letter-spacing:.01em}
-.btn.primary{background:var(--green);color:#0d2a20;border-color:var(--green)}.btn.danger{color:#ffc0cd}.btn.full{width:100%;margin-top:8px}
-.tiny{color:#7f9da9;font-size:10px;line-height:1.55;margin:8px 0 0}
-.test-panel{display:none;background:#112938;border:1px solid #3a5f6b;border-radius:8px;padding:12px;margin:11px 0;font-size:11px;color:#bdd8d4;line-height:1.75}
-.test-panel.visible{display:block}.test-panel strong{color:var(--green);display:block;font-size:12px;margin-bottom:8px}.test-panel small{display:block;margin-top:8px;color:#8faeb8}
-.testfail{color:var(--red)}.testpass{color:#c4f4d8}
-.stage{position:relative;min-width:0;min-height:580px;overflow:hidden;background:radial-gradient(circle at 50% 44%,#142e40 0%,#0c1d2b 49%,#081421 100%)}
-.stage:before{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(#28485d25 1px,transparent 1px),linear-gradient(90deg,#28485d25 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(circle,#000 20%,transparent 80%)}
-#network{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
-.stage-head,.stage-foot{position:absolute;left:16px;right:16px;display:flex;justify-content:space-between;gap:10px;pointer-events:none}
-.stage-head{top:15px;align-items:start}.stage-head b{font-size:12px;letter-spacing:.14em}.stage-head small{display:block;margin-top:5px;color:var(--muted);font-size:10px}
-.live{font-size:9px;border:1px solid #416878;background:#0d2638a8;padding:6px 7px;border-radius:5px;white-space:nowrap}
-.stage-foot{bottom:13px;align-items:end;color:#90afb9;font-size:9px}
-.legend{display:flex;gap:10px;flex-wrap:wrap}.legend span{display:flex;gap:5px;align-items:center}
-.dot{display:inline-block;width:7px;height:7px;border-radius:50%}
-.blank{position:absolute;display:none;top:48%;left:50%;transform:translate(-50%,-50%);color:#89a9b8;font-size:11px;width:86%;text-align:center;pointer-events:none}
-.right>h2{font-size:11px;letter-spacing:.14em;margin:0 0 12px}
-.reply{border:1px solid #3a7664;border-radius:11px;padding:15px;background:linear-gradient(145deg,#133836,#112838);min-height:140px}
-.reply-tag{font-size:10px;letter-spacing:.12em;color:var(--green)}
-.reply-title{font-size:24px;font-weight:900;line-height:1.2;overflow-wrap:anywhere;margin:10px 0}
-.reply-help{font-size:11px;line-height:1.6;color:#a3c6c8}
-.evidence{white-space:pre-line;overflow-wrap:anywhere;border-left:2px solid #4d997b;padding-left:11px;margin:13px 0 18px;color:#acc9cb;font-size:11px;line-height:1.7}
-.block{margin-top:21px}.subhead{font-size:10px;font-weight:900;letter-spacing:.1em;color:#b8d0d5;border-bottom:1px solid #2d4958;padding-bottom:8px;margin-bottom:10px;display:flex;justify-content:space-between}
-.subhead em{color:var(--green);font-style:normal}
-.association{border:1px solid #304d60;background:#132739;border-radius:8px;margin-bottom:8px;padding:11px;cursor:pointer}
-.association:hover{border-color:#5f9a84}.association strong{display:block;color:#d6f4e9;font-size:11px}
-.association .arrow{color:var(--green);font-size:12px;margin:5px 0}.association small{display:block;color:#94b4bb;font-size:10px}
-.empty{font-size:11px;color:#86a5b2;line-height:1.6}
-.history{max-height:265px;overflow:auto}.history-row{font-size:10px;padding:9px 0;line-height:1.6;border-bottom:1px dashed #294153;color:#b8cdcc;cursor:pointer}
-.history-row b{color:var(--blue)}.surprise{color:var(--red);margin-top:5px}
-.inspector{display:none;border:1px solid #4c877b;background:#112f39;border-radius:8px;margin-top:16px;padding:12px}.inspector.visible{display:block}
-.inspector strong{color:var(--green);display:block;font-size:12px;margin-bottom:6px;overflow-wrap:anywhere}
-.inspector pre{font:11px/1.65 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:#b6d5d2;margin:0}
-.stats{display:flex;flex-wrap:wrap;border-top:1px solid var(--line);background:#091724}
-.stat{flex:1;min-width:125px;display:flex;justify-content:center;align-items:center;gap:8px;padding:11px;font-size:10px;color:#8eafb8;border-right:1px solid #30495a;letter-spacing:.06em}
-.stat b{font-size:13px;color:var(--green)}.stat:last-child{border:0}
-dialog{width:min(580px,calc(100% - 28px));padding:22px;background:#102635;color:#e6f4f0;border:1px solid #47796c;border-radius:12px;box-shadow:0 25px 90px #000b}
-dialog::backdrop{background:#040b15dd}dialog h2{font-size:19px;margin:0 0 14px}dialog p{font-size:12px;line-height:1.7;color:#afc9d0}dialog code{color:var(--green)}
-.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,14px);opacity:0;pointer-events:none;background:#1a4541;color:#eefff5;border:1px solid #68b59c;box-shadow:0 9px 35px #0008;border-radius:9px;padding:11px 14px;font-size:12px;transition:opacity .18s,transform .18s;z-index:9;max-width:90vw}.toast.visible{opacity:1;transform:translate(-50%,0)}
-@media(max-width:1120px){.workspace{grid-template-columns:275px minmax(300px,1fr)}.right{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:0 20px}.right>h2,.right>.evidence,.right>.inspector{grid-column:1/-1}.right>.block{margin-top:10px}}
-@media(max-width:680px){header{min-height:66px;padding:10px 13px}.brand-title{font-size:12px}.brand-sub{font-size:9px}.local{font-size:0;padding:9px}.local:before{margin-right:0}.header-actions{gap:6px}.ghost{font-size:10px}.workspace{display:flex;flex-direction:column;min-height:0}.left{order:0;border-right:0;border-bottom:1px solid var(--line);padding:15px}.stage{order:1;height:min(52dvh,450px);min-height:315px}.right{order:2;display:block;padding:15px;border-left:0}.right>.block{margin-top:20px}.section{padding-bottom:15px;margin-bottom:15px}.stage-head{top:11px;left:12px}.stage-head b{font-size:10px}.stage-head small{font-size:9px}.stage-foot{left:12px;bottom:9px}.stage-foot>small{display:none}.reply-title{font-size:23px}.stat{min-width:50%;border-bottom:1px solid #2a4250}.stat:nth-child(even){border-right:0}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+:root{color-scheme:dark;--bg:#07111b;--panel:#0b1928;--raised:#14283b;--border:#284355;--ink:#e5f4ee;--mute:#91abb9;--green:#73f4b8;--blue:#91b5ff;--gold:#ffce85;--red:#ff96a7}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:13px/1.48 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}button,input,select,textarea{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}button:active{transform:translateY(1px)}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--green);outline-offset:2px}[hidden]{display:none!important}::selection{background:#73f4b84a}
+header{min-height:77px;display:flex;align-items:center;justify-content:space-between;padding:12px 21px;gap:12px;background:#0a1724;border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}.logo{display:grid;place-items:center;flex:none;width:44px;height:44px;background:var(--green);clip-path:polygon(0 0,75% 0,100% 25%,100% 100%,25% 100%,0 75%);color:#09221c;font-size:23px;font-weight:1000}
+.brand-title{font-size:16px;font-weight:950;letter-spacing:.12em;white-space:nowrap}.brand-title span{color:var(--green)}.brand-desc{font-size:10px;letter-spacing:.1em;color:var(--mute);margin-top:2px}.head-actions{display:flex;align-items:center;gap:8px}
+.status{border:1px solid #3e7864;color:var(--green);padding:8px 11px;border-radius:99px;font-size:10px;white-space:nowrap}.status:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px var(--green);margin-right:8px}
+.top-btn{background:#162a3a;border:1px solid var(--border);border-radius:8px;color:#b6d5d8;padding:9px 12px;font-size:11px}
+.workspace{display:grid;grid-template-columns:310px minmax(310px,1fr) 325px;min-height:660px}
+.controls{padding:18px 16px 20px;border-right:1px solid var(--border);background:#0b1826;min-width:0}
+.readout{padding:18px 16px 20px;border-left:1px solid var(--border);background:#0b1826;min-width:0}
+.section{border-bottom:1px solid var(--border);padding-bottom:19px;margin-bottom:20px}.section:last-child{border-bottom:0;margin-bottom:0}
+.section-title{font-size:12px;font-weight:950;letter-spacing:.12em;display:flex;align-items:center;gap:10px;margin-bottom:10px}.count{border:1px solid #37866b;border-radius:5px;font-size:10px;padding:3px 6px;color:var(--green)}
+.hint{font-size:11px;line-height:1.6;color:var(--mute);margin:0 0 15px}
+.label{font-size:10px;color:#a8c9cc;letter-spacing:.1em;display:block;margin:11px 0 6px}
+.field{display:block;width:100%;border:1px solid #38556b;background:#071521;color:var(--ink);border-radius:8px;min-height:43px;padding:10px 11px;outline:0;font-size:13px}.field:focus{border-color:var(--green)}.field::placeholder{color:#708e9a}textarea.field{min-height:80px;resize:vertical;line-height:1.55}
+.episode{border:1px solid #355e64;background:#102834;color:#8dc9bc;border-radius:7px;padding:8px 10px;font-size:10px;font-weight:800;letter-spacing:.06em}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.btn{min-height:40px;font-size:11px;font-weight:900;letter-spacing:.025em;border:1px solid #395b70;color:#d3e6e7;background:#193246;border-radius:8px;padding:9px}.btn.primary{background:var(--green);border-color:var(--green);color:#102823}.btn.subtle{background:#122333}.btn.full{width:100%;margin-top:10px}.btn.danger{color:#ffabb2}.btn:hover{filter:brightness(1.08)}
+.small-note{margin:9px 0 0;font-size:10px;color:#7998a7;line-height:1.55}
+.stage{position:relative;min-height:600px;overflow:hidden;background:radial-gradient(circle at 54% 42%,#133244 0%,#0b1e30 52%,#081421 100%)}
+.stage:before{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(#2545592b 1px,transparent 1px),linear-gradient(90deg,#2545592b 1px,transparent 1px);background-size:33px 33px;mask-image:radial-gradient(ellipse at 50% 50%,#000,transparent 80%)}
+#network{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.stage-header{position:absolute;top:18px;left:18px;right:18px;display:flex;gap:10px;justify-content:space-between;pointer-events:none}
+.stage-header strong{letter-spacing:.15em;font-size:12px}.stage-header small{display:block;color:var(--mute);font-size:10px;margin-top:5px}
+.live{border:1px solid #356477;background:#1733438a;color:#a6ccce;border-radius:5px;font-size:9px;letter-spacing:.08em;padding:6px 9px;white-space:nowrap}
+.stage-footer{position:absolute;left:16px;right:16px;bottom:12px;display:flex;justify-content:space-between;gap:10px;font-size:10px;color:#8babb9;pointer-events:none}
+.legend{display:flex;flex-wrap:wrap;gap:12px}.legend span{display:flex;gap:6px;align-items:center}.dot{width:7px;height:7px;border-radius:50%;display:inline-block}.dot.word{background:var(--blue)}.dot.experience{background:var(--gold)}.dot.association{background:var(--green)}
+.blank{position:absolute;left:50%;top:49%;transform:translate(-50%,-50%);color:#84a5b3;text-align:center;line-height:1.8;pointer-events:none}
+.read-label{color:#b4cfd3;letter-spacing:.13em;font-size:11px;margin:0 0 12px;font-weight:900}
+.reply{border:1px solid #396b67;border-radius:11px;background:linear-gradient(145deg,#123734,#102836);padding:16px;min-height:148px}.reply-tag{color:var(--green);font-size:10px;font-weight:900;letter-spacing:.12em}.reply h2{margin:10px 0;font-size:24px;line-height:1.14;letter-spacing:.01em;overflow-wrap:anywhere;color:#effff5}.reply p{font-size:11px;color:#a6c7c7;margin:0;line-height:1.6}
+.evidence{border-left:2px solid #459b7f;padding:2px 0 2px 11px;margin-top:13px;color:#afcad0;font-size:11px;line-height:1.7}.evidence-line{margin:0 0 5px}
+.read-section{margin-top:21px}.read-heading{font-size:10px;color:#aec6ce;letter-spacing:.13em;border-bottom:1px solid var(--border);padding:0 0 9px;display:flex;justify-content:space-between;align-items:center;font-weight:900;margin-bottom:9px}.read-heading em{font-style:normal;color:var(--green)}
+.pattern,.convergence{display:block;width:100%;text-align:left;background:#132b3a;border:1px solid #365769;color:var(--ink);padding:11px;border-radius:8px;margin-bottom:8px;font-size:11px;overflow-wrap:anywhere}.pattern strong,.convergence strong{display:block;color:#e0faec}.pattern span{display:block;margin-top:4px}.pattern small,.convergence small{display:block;color:#8cabb4;font-size:10px;margin-top:5px}.green{color:var(--green)}.convergence{border-color:#3b7765;background:#113129}
+.muted-item{font-size:11px;color:#819fab;line-height:1.6;padding:10px 0}.history{max-height:295px;overflow:auto}.history-row{display:block;width:100%;text-align:left;background:transparent;color:#d8e9ea;border:0;border-bottom:1px dashed #284456;padding:9px 0;font-size:11px;overflow-wrap:anywhere}.history-row:hover{background:#ffffff07}.history-meta{font-size:10px;color:var(--blue);letter-spacing:.04em;margin-bottom:5px}.surprise-text{color:var(--red);font-size:10px;margin-top:5px}
+.inspector{margin-top:19px;border:1px solid #3c716b;background:#0c2b32;border-radius:8px;padding:12px}.inspector strong{font-size:12px;color:var(--green);display:block;margin-bottom:7px}.inspector pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#b9d3d3;font:11px/1.7 ui-monospace,monospace;margin:0}
+.test-results{border:1px solid #3d6374;background:#132d39;border-radius:8px;padding:12px;margin-top:12px;color:#bedada;line-height:1.6;font-size:11px}.test-results strong{display:block;color:var(--green);margin-bottom:8px}.test-results div{margin-bottom:6px}.test-results .test-pass{color:#a8f2c7}.test-results .test-fail{color:var(--red)}.test-results small{font-size:10px;color:#8eafbc}
+footer{display:flex;flex-wrap:wrap;background:#081622;border-top:1px solid var(--border)}.metric{flex:1;min-width:130px;padding:13px 7px;border-right:1px solid var(--border);text-align:center;font-size:10px;color:#8eacb8;letter-spacing:.08em}.metric b{color:var(--green);font-size:14px;margin-left:7px}.metric:last-child{border:0}
+.toast{position:fixed;z-index:100;left:50%;bottom:22px;transform:translate(-50%,16px);background:#214942;color:#e7fff3;border:1px solid #6aba95;padding:10px 15px;border-radius:9px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;font-size:12px;max-width:90vw}.toast.show{opacity:1;transform:translate(-50%,0)}
+dialog{width:min(550px,calc(100vw - 26px));max-height:80dvh;overflow-y:auto;background:#132638;border:1px solid #528077;color:#e9f7ef;border-radius:13px;padding:22px}dialog::backdrop{background:#030d16d9}dialog h2{margin:0 0 14px;font-size:19px}dialog p,dialog li{font-size:12px;color:#adcbcc;line-height:1.7}dialog code{color:var(--green)}
+@media(max-width:1110px){.workspace{grid-template-columns:280px minmax(280px,1fr)}.readout{grid-column:1/-1;border-left:0;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;column-gap:20px}.readout>.read-label,.readout>.evidence,.readout>.inspector{grid-column:1/-1}.read-section{margin-top:15px}}
+@media(max-width:680px){header{padding:11px 13px;min-height:67px}.brand-title{font-size:12px}.brand-desc{font-size:9px}.logo{height:38px;width:38px;font-size:21px}.head-actions{gap:6px}.status{font-size:0;padding:8px}.status:before{margin:0}.top-btn{font-size:10px;padding:8px}.workspace{display:flex;flex-direction:column}.controls{order:0;border-right:0;border-bottom:1px solid var(--border);padding:15px}.stage{order:1;min-height:330px;height:49dvh}.readout{order:2;display:block;border-left:0;border-top:1px solid var(--border);padding:15px}.section{margin-bottom:15px;padding-bottom:15px}.stage-header{top:11px;left:12px;right:12px}.stage-header strong{font-size:10px}.stage-header small{font-size:9px}.stage-footer{left:11px;right:11px;bottom:9px}.stage-footer>.controls-note{display:none}.metric{min-width:50%;border-bottom:1px solid var(--border)}.metric:nth-child(even){border-right:0}.reply h2{font-size:24px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
+<div class="app">
 <header>
-<div class="brand"><div class="logo">R</div><div><div class="brand-title">RED <span>// SUBCONSCIOUS</span></div><div class="brand-sub">FORGE TESTBENCH / EXPERIENCE ENGINE / V0.2</div></div></div>
-<div class="header-actions"><span class="local">LOCAL · NO API</span><button id="helpBtn" class="ghost">HOW IT WORKS ?</button></div>
+  <div class="brand"><div class="logo">R</div><div><div class="brand-title">RED <span>// SUBCONSCIOUS</span></div><div class="brand-desc">FORGE TESTBENCH / EXPERIENCE ENGINE V0.2</div></div></div>
+  <div class="head-actions"><span class="status">LOCAL MEMORY</span><button id="help" class="top-btn">HOW IT WORKS ?</button></div>
 </header>
 <main class="workspace">
-<aside class="left" aria-label="Experience and recall controls">
-<section class="section">
-<h2 class="section-title"><span class="index">01</span> EXPERIENCE STREAM</h2>
-<p class="hint">Record what Red notices, does, and encounters, in order. No game rules are built into the engine.</p>
-<div class="episode" id="episode">EPISODE 001</div>
-<label class="label" for="eventText">WHAT JUST HAPPENED?</label>
-<textarea id="eventText" placeholder="I pressed the square button"></textarea>
-<span class="label">EVENT TYPE</span>
-<div class="kinds">
-<div><input type="radio" name="kind" id="kindObserve" value="OBSERVE" checked><label for="kindObserve">OBSERVE</label></div>
-<div><input type="radio" name="kind" id="kindAct" value="ACT"><label for="kindAct">ACT</label></div>
-<div><input type="radio" name="kind" id="kindResult" value="RESULT"><label for="kindResult">RESULT</label></div>
-</div>
-<div class="actions"><button id="record" class="btn primary">+ RECORD EVENT</button><button id="newEpisode" class="btn">NEW EPISODE</button></div>
-<p class="tiny">Start a new episode when a separate activity begins, so unrelated events never become adjacent memories.</p>
-</section>
-<section class="section">
-<h2 class="section-title"><span class="index">02</span> PROBE THE NETWORK</h2>
-<p class="hint">Ask for a recollection or an evidence-based expectation about what could happen next.</p>
-<label class="label" for="query">RED IS THINKING ABOUT...</label>
-<textarea id="query" placeholder="press the square button"></textarea>
-<div class="actions"><button id="recall" class="btn">↖ RECALL</button><button id="predict" class="btn primary">PREDICT ↗</button></div>
-</section>
-<section class="section">
-<h2 class="section-title"><span class="index">03</span> GENERALITY TESTBENCH</h2>
-<p class="hint">Run the same memory rules on unrelated experiences. Tests use isolated brains, never your saved data.</p>
-<button id="tests" class="btn full">RUN BEHAVIORAL TRIALS</button>
-<div id="testResults" class="test-panel" aria-live="polite"></div>
-<div class="actions"><button id="demo" class="btn">LOAD DEMO</button><button id="reset" class="btn danger">EMPTY MIND</button></div>
-<div class="actions"><button id="export" class="btn">EXPORT JSON ↧</button><button id="import" class="btn">IMPORT JSON ↥</button></div>
-<input id="file" type="file" accept="application/json,.json" hidden>
-<p class="tiny">Local autosave. Export snapshots for a future Python bridge. Old v0.1 memories can be imported automatically.</p>
-</section>
+<aside class="controls" aria-label="Teach and test the subconscious">
+  <section class="section">
+    <div class="section-title"><span class="count">01</span> EXPERIENCE STREAM</div>
+    <p class="hint">Record what happens in order. Agents learn which experiences tend to follow others, without knowing what task Red is doing.</p>
+    <div id="episode" class="episode">EPISODE 001 / ACTIVE</div>
+    <label class="label" for="eventText">WHAT HAPPENED?</label>
+    <textarea id="eventText" class="field" placeholder="I clicked the square button"></textarea>
+    <label class="label" for="eventType">EVENT TYPE</label>
+    <select id="eventType" class="field">
+      <option value="OBSERVE">OBSERVE · what Red noticed</option>
+      <option value="ACT">ACT · what Red did</option>
+      <option value="RESULT">RESULT · what happened next</option>
+    </select>
+    <div class="btn-row"><button id="record" class="btn primary">+ RECORD EVENT</button><button id="newEpisode" class="btn">NEW EPISODE</button></div>
+    <p class="small-note">Start a new episode when the activity changes. This stops unrelated moments from being linked as cause and effect.</p>
+  </section>
+  <section class="section">
+    <div class="section-title"><span class="count">02</span> PROBE MEMORY</div>
+    <p class="hint">Red can retrieve old experiences or ask what is likely to happen next. Every answer comes with evidence.</p>
+    <label class="label" for="probeText">RED IS THINKING ABOUT...</label>
+    <textarea id="probeText" class="field" placeholder="press the blue button"></textarea>
+    <div class="btn-row"><button id="recall" class="btn">↖ RECALL</button><button id="predict" class="btn primary">PREDICT ↗</button></div>
+  </section>
+  <section class="section">
+    <div class="section-title"><span class="count">03</span> FIELD LAB</div>
+    <p class="hint">The same unchanged engine is tested in unrelated miniature environments, plus memory accuracy and contradiction trials.</p>
+    <button id="tests" class="btn full">RUN GENERALITY TRIALS</button>
+    <div id="report" class="test-results" hidden></div>
+    <div class="btn-row"><button id="demo" class="btn subtle">LOAD DEMO</button><button id="reset" class="btn subtle danger">EMPTY MEMORY</button></div>
+    <div class="btn-row"><button id="export" class="btn subtle">EXPORT JSON ↧</button><button id="import" class="btn subtle">IMPORT JSON ↥</button></div>
+    <input type="file" id="file" accept="application/json,.json" hidden>
+    <p class="small-note">Autosaved in this browser. No LLM, external data collection, or desktop integration. JSON is portable for a future Python port.</p>
+  </section>
 </aside>
-<section class="stage" aria-label="Interactive network of agents">
-<canvas id="network" aria-label="Word, experience and association agents. Click an agent to inspect its evidence."></canvas>
-<div class="stage-head"><div><b>SUBCONSCIOUS FIELD</b><small>Emergent connections from ordered experiences</small></div><span class="live">LIVE SIMULATION</span></div>
-<div id="blank" class="blank">NO EXPERIENCES YET<br>Record an observation to begin.</div>
-<div class="stage-foot"><div class="legend"><span><i class="dot" style="background:var(--blue)"></i>WORD</span><span><i class="dot" style="background:var(--amber)"></i>EXPERIENCE</span><span><i class="dot" style="background:var(--green)"></i>ASSOCIATION</span></div><small>DRAG · SCROLL TO ZOOM · TAP TO INSPECT</small></div>
+<section class="stage" aria-label="Living word agent and experience network">
+  <canvas id="network" aria-label="Memory graph. Select word, experience, and association nodes to inspect"></canvas>
+  <div class="stage-header"><div><strong>SUBCONSCIOUS FIELD</strong><small>Word agents · experiences · associations</small></div><span class="live">LIVE SIMULATION</span></div>
+  <div id="empty" class="blank">NO EXPERIENCES YET<br>Record one to wake the agents.</div>
+  <div class="stage-footer">
+    <div class="legend"><span><i class="dot word"></i>WORD</span><span><i class="dot experience"></i>EXPERIENCE</span><span><i class="dot association"></i>ASSOCIATION</span></div>
+    <span class="controls-note">DRAG · TAP NODES · SCROLL TO ZOOM</span>
+  </div>
 </section>
-<aside class="right" aria-label="Memory outputs">
-<h2>CONSCIOUS RETURN</h2>
-<div class="reply"><div id="resultTag" class="reply-tag">AWAITING EXPERIENCE</div><div id="resultTitle" class="reply-title">···</div><div id="resultHelp" class="reply-help">Feed the experience engine or probe an association.</div></div>
-<div id="evidence" class="evidence">No evidence activated yet.</div>
-<div class="block"><div class="subhead"><span>ASSOCIATION AGENTS</span><em id="associationCount">00</em></div><div id="associations"></div></div>
-<div class="block"><div class="subhead"><span>EXPERIENCE HISTORY</span><em id="historyCount">00</em></div><div id="history" class="history"></div></div>
-<div id="inspector" class="inspector"><strong id="inspectTitle"></strong><pre id="inspectBody"></pre></div>
+<aside class="readout" aria-label="Memory evidence and hypothesis output">
+  <h2 class="read-label">CONSCIOUS RETURN</h2>
+  <div class="reply" aria-live="polite"><div id="summaryLabel" class="reply-tag">AWAITING EXPERIENCE</div><h2 id="summaryTitle">···</h2><p id="summaryText">Experiences become associations here.</p></div>
+  <div id="evidence" class="evidence"><div class="evidence-line">No memories activated yet.</div></div>
+  <section class="read-section"><div class="read-heading"><span>PREDICTIVE ASSOCIATIONS</span><em>REPEATED</em></div><div id="associations"></div></section>
+  <section class="read-section"><div class="read-heading"><span>EPISODIC HISTORY</span><em>RECENT</em></div><div id="history" class="history"></div></section>
+  <div id="inspect" class="inspector" hidden><strong id="inspectTitle"></strong><pre id="inspectBody"></pre></div>
 </aside>
 </main>
-<footer class="stats">
-<div class="stat">WORDS <b id="s-words">0</b></div>
-<div class="stat">EXPERIENCES <b id="s-events">0</b></div>
-<div class="stat">ASSOCIATIONS <b id="s-patterns">0</b></div>
-<div class="stat">SURPRISES <b id="s-surprises">0</b></div>
-<div class="stat">PROBES <b id="s-probes">0</b></div>
+<footer>
+  <div class="metric">WORD AGENTS <b id="wordCount">0</b></div>
+  <div class="metric">EXPERIENCES <b id="experienceCount">0</b></div>
+  <div class="metric">ASSOCIATIONS <b id="associationCount">0</b></div>
+  <div class="metric">SURPRISES <b id="surpriseCount">0</b></div>
+  <div class="metric">PROBES <b id="probeCount">0</b></div>
 </footer>
-<dialog id="help">
-<button id="helpClose" class="ghost" style="float:right">CLOSE</button>
-<h2>How this little mind works</h2>
-<p><strong>Word agents</strong> track terms Red encounters. <strong>Experience agents</strong> keep whole observations and their order. <strong>Association agents</strong> emerge from repeated transitions. They aren't individually powered by an LLM.</p>
-<p>The engine applies weighted word overlap to find earlier contexts, then considers what followed those experiences. <strong>Predictions include supporting evidence</strong> and their competing outcomes. The confidence score is a heuristic, not a calibrated probability.</p>
-<p><strong>Surprise</strong> occurs when a new event contradicts a reinforced prediction. Rather than deleting the older prediction, the engine records the new outcome, allowing competing associations to develop.</p>
-<p><strong>Recall</strong> reads remembered experiences and their neighbors without inventing facts. <strong>New episode</strong> stops temporal connections from crossing unrelated sessions. All tests use exactly the same general engine, independently from the live brain.</p>
-<p><strong>Limitations:</strong> This is token similarity, not true semantic understanding. It's not an autonomous computer user, cannot watch Red's desktop yet, and processes no new events while closed.</p>
-<p>Bridge interface: <code>RedMemoryV2.observe({type:"ACT",text:"press key"})</code>, <code>.startEpisode()</code>, <code>.recall("press key")</code>, <code>.predict("press key")</code>, <code>.export()</code>, <code>.import(snapshot)</code>.</p>
+</div>
+<dialog id="manual"><button id="closeHelp" class="top-btn" style="float:right">CLOSE</button>
+<h2>RED // Experience Engine v0.2</h2>
+<p><b>Every word</b> receives a lightweight agent. Every recorded observation, action, or result becomes an experience agent. The engine finds repeated transitions and shared destinations. Agents do not need to know what a browser, game, or file is.</p>
+<p><b>Probing</b> finds prior experiences using weighted word overlap. Predictions are ranked by similarity and past supporting transitions. Competing outcomes remain visible. The confidence numbers are heuristic, not calibrated probabilities.</p>
+<p><b>Surprise</b> is raised when a next event disagrees sufficiently with a previously reinforced prediction. Surprise doesn't prove causation: it is a cue to pay attention.</p>
+<p><b>Spontaneous echoes</b> can surface when the newly recorded experience strongly resembles one from an older episode. The original evidence is preserved.</p>
+<p><b>New episode</b> cuts the chronological link so the engine doesn't silently associate the end of one task with the beginning of another.</p>
+<p><b>Limits:</b> This is a prototype using statistical word overlap, not semantic comprehension, causal inference, or autonomous desktop perception. The browser does not connect to Red's computer. All local data stays in this browser unless exported.</p>
+<p>Script interface: <code>window.RedMemoryV2.observe({type:"ACT",text:"press key"})</code>, <code>.startEpisode()</code>, <code>.predict(text)</code>, <code>.recall(text)</code>, <code>.export()</code>, <code>.runTests()</code>.</p>
 </dialog>
-<div class="toast" id="toast" role="status"></div>
-<script src="./engine.js"></script>
-<script src="./app.js"></script>
-</body>
-</html>
+<div id="toast" class="toast" role="status"></div>
+<script src="./engine-v2.js"></script>
+<script src="./app-v2.js"></script>
+</body></html>
