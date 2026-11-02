@@ -2,8 +2,11 @@
 (function(){
 "use strict";
 const $ = id => document.getElementById(id);
-const brain = RedEngine.create();
 const STORE="red-subconscious-experience-v2";
+const MODE_STORE="red-subconscious-caveman-mode-v3";
+let savedMode="caveman";
+try{savedMode=localStorage.getItem(MODE_STORE)==="original"?"original":"caveman"}catch(e){}
+const brain = RedEngine.create({mode:savedMode});
 const UI = {
   episode:$("episode"), event:$("eventText"), type:$("eventType"), probe:$("probeText"),
   title:$("summaryTitle"), body:$("summaryText"), evidence:$("evidence"),
@@ -30,7 +33,7 @@ function message(label,title,body,lines=[]){
 let toastTimer;
 function toast(t){UI.toast.textContent=t;UI.toast.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>UI.toast.classList.remove("show"),2400)}
 function pushLog(label,text){log.unshift({label,text});if(log.length>12)log.length=12}
-function save(){try{localStorage.setItem(STORE,JSON.stringify(brain.export()))}catch(e){toast("Local save unavailable. Export JSON instead.")}}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(brain.export()));localStorage.setItem(MODE_STORE,brain.getMode())}catch(e){toast("Local save unavailable. Export JSON instead.")}}
 function restore(){
   try{
     const v2=localStorage.getItem(STORE);
@@ -57,6 +60,7 @@ function excite(words,ids=[]){
 }
 function refresh(){
   const s=brain.stats(), recent=brain.events();
+  $("languageMode").value=brain.getMode();
   UI.episode.textContent="EPISODE "+String(recent.at(-1)?.episode||1).padStart(3,"0")+" / ACTIVE "+String(s.events)+" EVENTS";
   UI.statWords.textContent=s.words;
   UI.statEvents.textContent=s.events;
@@ -92,7 +96,69 @@ function refresh(){
   }
   UI.empty.hidden=!!s.events;
   rebuildGraph();
+  preview();
 }
+
+function preview(){
+  const raw=UI.event.value.trim()||UI.probe.value.trim();
+  const result=Caveman.compile(raw);
+  $("previewOriginal").textContent=raw||"Type an experience or a thought…";
+  $("previewCompressed").textContent=raw?result.compressed:"···";
+  $("previewCost").textContent=raw?
+    result.originalCount+" original tokens → "+result.compressedCount+" compressed tokens ("+
+    Math.round(result.ratio*100)+"% fewer occurrences) · "+
+    (result.removed.length?result.removed.slice(0,8).join(", ")+" filtered/normalized":"no words filtered"):
+    "Original words are always preserved.";
+  $("previewWarnings").textContent=result.warnings.length?
+    "CAUTION: "+result.warnings.join(" · ")+" · automatic English heuristics can be wrong.":"";
+}
+function modeSwitch(value){
+  const stats=brain.setMode(value);
+  save();refresh();
+  message("MEMORY LANGUAGE SWITCHED",stats.mode==="caveman"?"CAVEMAN ACTIVE":"ORIGINAL ACTIVE",
+    "The same experiences have been reindexed without editing their original sentences.",
+    ["Word agents: "+stats.words, "Retained event word tokens: "+stats.tokens+" / "+stats.originalTokens,
+     "Historical surprise signals were recorded in their original learning context."]);
+  toast(stats.mode==="caveman"?"Caveman listening 🦴":"Original language listening");
+  return stats;
+}
+function compare(){
+  const q=UI.probe.value.trim();
+  if(!q){toast("Enter a thought for comparison");return null}
+  const data=brain.export();
+  const results={};
+  for(const mode of ["original","caveman"]){
+    const candidate=RedEngine.create({mode});
+    candidate.load(data);
+    const t0=performance.now();
+    const recall=candidate.recall(q);
+    const forecast=candidate.predict(q);
+    const elapsed=performance.now()-t0;
+    results[mode]={mode,recall,forecast,stats:candidate.stats(),elapsed};
+  }
+  $("comparison").hidden=false;
+  const a=results.original,b=results.caveman;
+  function output(r,answerId,metaId){
+    const best=r.recall.hits[0],p=r.forecast.best;
+    $(answerId).textContent=best?best.event.text:"NO MEMORY";
+    $(metaId).textContent=(best?"Recall: #"+best.event.id+" / episode "+best.event.episode+
+      " / similarity "+Math.round(best.score*100)+"/100":"Recall: no supporting episode")+
+      "\nNext-event hypothesis: "+(p?p.text:"none")+
+      (p?" ("+p.support+" transitions, heuristic "+Math.round(p.confidence*100)+"/100)":"");
+    $(metaId).style.whiteSpace="pre-line";
+  }
+  output(a,"compareOriginalAnswer","compareOriginalMeta");
+  output(b,"compareCaveAnswer","compareCaveMeta");
+  const reduction=a.stats.tokens?Math.round(100*(1-b.stats.tokens/a.stats.tokens)):0;
+  $("compareStats").textContent="Stored word occurrences: ORIGINAL "+a.stats.tokens+
+    " vs CAVEMAN "+b.stats.tokens+" ("+reduction+"% fewer) · same "+a.stats.events+" source experiences.";
+  const agree=(a.recall.hits[0]?.event.id||null)===(b.recall.hits[0]?.event.id||null);
+  $("compareWarning").textContent=(agree?"Both modes chose the same leading recollection.":"The modes chose DIFFERENT leading recollections. Inspect the evidence.")+
+    " This measures token volume, not memory bytes or proven processing speed. Confidence scores are not calibrated.";
+  pushLog("A/B","Original and Caveman compared without modifying memory");
+  return results;
+}
+
 function record(){
   const r=brain.observe({type:UI.type.value,text:UI.event.value});
   if(!r){toast("Describe an event first");return}
@@ -194,7 +260,8 @@ function reset(){
   save();refresh();
 }
 function test(){
-  const r=RedEngine.tests();
+  const engineResult=RedEngine.tests(), caveResult=Caveman.tests();
+  const r={passed:engineResult.passed+caveResult.passed,total:engineResult.total+caveResult.total,checks:engineResult.checks.concat(caveResult.checks)};
   UI.report.hidden=false;
   UI.report.replaceChildren();
   UI.report.append(node("strong","",r.passed+" / "+r.total+" independent trials passed"));
@@ -202,7 +269,7 @@ function test(){
     const d=node("div",c.pass?"test-pass":"test-fail",(c.pass?"✓ ":"✕ ")+c.name+": "+c.detail);
     UI.report.append(d);
   }
-  UI.report.append(node("small","","These tests run in fresh isolated memories. The live brain is untouched."));
+  UI.report.append(node("small","","Engine: "+engineResult.passed+"/"+engineResult.total+" · Caveman: "+caveResult.passed+"/"+caveResult.total+". Isolated checks; your memory is untouched."));
   toast(r.passed===r.total?"All engine tests passed":"Some tests need attention");
   return r;
 }
@@ -232,7 +299,7 @@ function importData(input){
 function inspectEvent(e){
   UI.inspect.hidden=false;
   $("inspectTitle").textContent="EXPERIENCE #"+e.id;
-  $("inspectBody").textContent="EPISODE "+e.episode+" / "+e.type+"\n"+e.text+"\n\nWord agents: "+e.tokens.join(", ")+(e.surprise?"\n\nExpected: "+e.surprise.expected+"\nSurprise: "+e.surprise.strength+"/100":"");
+  $("inspectBody").textContent="EPISODE "+e.episode+" / "+e.type+"\nOriginal: "+e.text+"\nCaveman: "+Caveman.compile(e.text).compressed+"\n\nActive word agents: "+e.tokens.join(", ")+(e.surprise?"\n\nExpected: "+e.surprise.expected+"\nSurprise: "+e.surprise.strength+"/100":"");
 }
 function inspectPattern(p){
   UI.inspect.hidden=false;
@@ -348,6 +415,10 @@ UI.canvas.addEventListener("wheel",e=>{
   e.preventDefault();const b=UI.canvas.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top,next=Math.max(.5,Math.min(2.5,zoom*(e.deltaY>0?.9:1.1)));
   pan.x=x-(x-pan.x)*next/zoom;pan.y=y-(y-pan.y)*next/zoom;zoom=next;
 },{passive:false});
+$("languageMode").addEventListener("change",e=>modeSwitch(e.target.value));
+UI.event.addEventListener("input",preview);
+UI.probe.addEventListener("input",preview);
+$("compare").addEventListener("click",compare);
 $("record").addEventListener("click",record);
 $("newEpisode").addEventListener("click",newEpisode);
 $("recall").addEventListener("click",recall);
@@ -378,8 +449,10 @@ window.RedMemoryV2=Object.freeze({
   predict:q=>{const r=brain.predict(q,null,true);save();refresh();return r},
   recall:q=>{const r=brain.recall(q,true);save();refresh();return r},
   associations:()=>brain.patterns(),convergences:()=>brain.convergences(),
-  stats:()=>brain.stats(),export:()=>brain.export(),import:importData,reset,runTests:test
+  stats:()=>brain.stats(),export:()=>brain.export(),import:importData,reset,runTests:test,
+  setMode:modeSwitch,compile:text=>Caveman.compile(text),compare:compare
 });
+$("languageMode").value=brain.getMode();
 if(restore()){
   message("MEMORY RESTORED","EXPERIENCE ENGINE READY","Saved memories have been reconstructed.",["Patterns are computed from recorded evidence, not pre-programmed task labels."]);
   refresh();
