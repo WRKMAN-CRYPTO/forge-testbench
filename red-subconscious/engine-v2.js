@@ -13,10 +13,21 @@
   function signature(tokens) { return [...new Set(tokens)].sort().join("\u001f"); }
   function cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim().slice(0, 280); }
   function blank() { return { version: 2, episode: 1, id: 0, events: [], words: {}, probes: 0, surprises: 0 }; }
-  function create() {
+  function create(options = {}) {
+    let mode = options.mode === "caveman" ? "caveman" : "original";
     let data = blank();
     let pending = null;
     const numeric = v => Number.isFinite(Number(v)) ? Number(v) : 0;
+    function process(text) { return mode === "caveman" && root.Caveman ? root.Caveman.compile(text).tokens : tokenize(text); }
+    function setMode(nextMode) {
+      const target = nextMode === "caveman" ? "caveman" : "original";
+      if (mode === target) return stats();
+      mode = target;
+      data.words = {};
+      for (const e of data.events) { e.tokens = process(e.text); learnWords(e.tokens); }
+      pending = null;
+      return stats();
+    }
     function freq() {
       const m = {};
       for (const e of data.events) for (const w of e.tokens) m[w] = (m[w] || 0) + 1;
@@ -49,7 +60,7 @@
       return list;
     }
     function predict(text, kind = null, track = false) {
-      const query = tokenize(text), counts = freq(), buckets = new Map();
+      const query = process(text), counts = freq(), buckets = new Map();
       if (track) { data.probes++; learnWords(query); }
       if (!query.length) return { query, candidates: [], best: null };
       for (const p of pairs()) {
@@ -80,7 +91,7 @@
       return { query, candidates: all.slice(0,6), best: all[0] || null };
     }
     function recall(text, track = false) {
-      const query = tokenize(text), counts = freq(), hits = [];
+      const query = process(text), counts = freq(), hits = [];
       if (track) { data.probes++; learnWords(query); }
       if (!query.length) return { query, hits: [] };
       data.events.forEach((e, i) => {
@@ -128,7 +139,7 @@
     }
     function observe({ text, type = "OBSERVE" } = {}) {
       text = cleanText(text);
-      const tokens = tokenize(text);
+      const tokens = process(text);
       if (!tokens.length) return null;
       if (!KINDS.has(type)) type = "OBSERVE";
       let surprise = null;
@@ -162,12 +173,14 @@
       return { words: Object.keys(data.words).length, events: data.events.length,
         episodes: new Set(data.events.map(e=>e.episode)).size,
         patterns: patterns().length, convergences: convergences().length,
-        probes: data.probes, surprises: data.surprises };
+        probes: data.probes, surprises: data.surprises, mode,
+        tokens: data.events.reduce((n,e)=>n+e.tokens.length,0),
+        originalTokens: data.events.reduce((n,e)=>n+tokenize(e.text).length,0) };
     }
     function exportData() { return JSON.parse(JSON.stringify(data)); }
     function load(snapshot) {
       if (!snapshot || snapshot.version !== 2 || !Array.isArray(snapshot.events)) throw Error("Not a v0.2 memory snapshot");
-      const candidate = create(), list = snapshot.events.slice(-MAX_EVENTS);
+      const candidate = create({mode}), list = snapshot.events.slice(-MAX_EVENTS);
       let previousEpisode = null;
       for (const e of list) {
         if (!e || typeof e.text !== "string") continue;
@@ -185,7 +198,7 @@
     }
     function reset() { data = blank(); pending = null; }
     return { observe, recall, predict, patterns, convergences, startEpisode,
-      stats, export: exportData, load, reset, events: () => data.events.slice() };
+      stats, export: exportData, load, reset, setMode, getMode: () => mode, events: () => data.events.slice() };
   }
   function tests() {
     const test = [];
