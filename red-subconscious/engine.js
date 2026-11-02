@@ -85,7 +85,9 @@ function create(){
   if(!input||input.version!==2||!Array.isArray(input.events))throw Error("Not a v0.2 experience snapshot");
   const all=input.events.slice(-MAX_EVENTS);reset();let prev=null;
   for(const e of all){if(!e||typeof e.text!=="string")continue;const ep=clamp(Math.floor(e.episode),1,1e7);if(prev!==null&&ep!==prev)startEpisode();prev=ep;observe({type:e.type,text:e.text})}
-  state.probes=clamp(Math.floor(input.probes||0),0,1e6);pending=null;return stats();
+  state.probes=clamp(Math.floor(input.probes||0),0,1e6);pending=null;
+  if(state.events.length){const last=state.events[state.events.length-1];const next=predict(last.text,last.type,false);pending={episode:state.episode,best:next.best}}
+  return stats();
  }
  return {observe,startEpisode,predict,recall,patterns,convergences,stats,snapshot,reset,load,getState:()=>state,transitions};
 }
