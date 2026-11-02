@@ -171,7 +171,7 @@ function resize(){
  if(!ctx)return;
  const rect=cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1),oldW=width,oldH=height;
  width=Math.max(1,rect.width);height=Math.max(1,rect.height);cv.width=Math.round(width*dpr);cv.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
- if(oldW&&oldH){for(const n of graph.nodes){n.x+=(width-oldW)/2;n.y+=(height-oldH)/2}}else rebuildGraph();
+ if(oldW&&oldH){for(const n of graph.nodes){n.x+=(width-oldW)/2;n.y+=(height-oldH)/2}}else{graph={nodes:[],links:[],map:{}};rebuildGraph();}
 }
 function force(){
  const ns=graph.nodes;
