@@ -54,24 +54,25 @@
       if (!query.length) return { query, candidates: [], best: null };
       for (const p of pairs()) {
         const sim = similarity(query, p.from.tokens, counts);
-        if (sim < 0.21) continue;
+        if (sim < 0.39) continue;
         const typeFactor = kind && kind !== p.from.type ? 0.45 : 1;
         const weight = sim * typeFactor;
         const key = p.to.type + ":" + signature(p.to.tokens);
         if (!buckets.has(key)) buckets.set(key, {
           text: p.to.text, type: p.to.type, tokens: p.to.tokens,
-          score: 0, support: 0, evidence: []
+          score: 0, support: 0, maxSimilarity: 0, evidence: []
         });
         const hit = buckets.get(key);
         hit.score += weight;
         hit.support++;
+        hit.maxSimilarity = Math.max(hit.maxSimilarity, sim);
         hit.evidence.push({ from: p.from.id, to: p.to.id, episode: p.from.episode, similarity: +sim.toFixed(3) });
       }
       const all = [...buckets.values()].sort((a,b) => b.score - a.score || b.support - a.support || a.text.localeCompare(b.text));
       const sum = all.reduce((n,c) => n + c.score, 0);
       for (const c of all) {
         c.share = sum ? c.score / sum : 0;
-        c.confidence = Math.min(0.97, c.share * (1 - Math.exp(-c.support / 1.35)));
+        c.confidence = Math.min(0.97, c.share * (1 - Math.exp(-c.support / 1.35)) * Math.min(1, c.maxSimilarity / 0.8));
         c.score = +c.score.toFixed(3);
         c.confidence = +c.confidence.toFixed(3);
         c.share = +c.share.toFixed(3);
@@ -132,7 +133,7 @@
       if (!KINDS.has(type)) type = "OBSERVE";
       let surprise = null;
       if (pending && pending.episode === data.episode && pending.best &&
-          pending.best.support >= 2 && pending.best.confidence >= 0.53 &&
+          pending.best.support >= 2 && pending.best.confidence >= 0.53 && pending.best.maxSimilarity >= 0.70 &&
           pending.best.type === type) {
         const sim = similarity(tokens, pending.best.tokens, freq());
         const strength = Math.round((1 - sim) * pending.best.confidence * 180);
