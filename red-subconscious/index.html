@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07111b">
 <meta name="description" content="RED Subconscious v0.2: a general-purpose experience, association, and prediction laboratory.">
-<title>RED // SUBCONSCIOUS v0.2 · Experience Engine</title>
+<title>RED // SUBCONSCIOUS v0.3 · Caveman Lab</title>
 <style>
 :root{color-scheme:dark;--bg:#07111b;--panel:#0b1928;--raised:#14283b;--border:#284355;--ink:#e5f4ee;--mute:#91abb9;--green:#73f4b8;--blue:#91b5ff;--gold:#ffce85;--red:#ff96a7}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:13px/1.48 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}button,input,select,textarea{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}button:active{transform:translateY(1px)}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--green);outline-offset:2px}[hidden]{display:none!important}::selection{background:#73f4b84a}
@@ -46,12 +46,13 @@ dialog{width:min(550px,calc(100vw - 26px));max-height:80dvh;overflow-y:auto;back
 @media(max-width:1110px){.workspace{grid-template-columns:280px minmax(280px,1fr)}.readout{grid-column:1/-1;border-left:0;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;column-gap:20px}.readout>.read-label,.readout>.evidence,.readout>.inspector{grid-column:1/-1}.read-section{margin-top:15px}}
 @media(max-width:680px){header{padding:11px 13px;min-height:67px}.brand-title{font-size:12px}.brand-desc{font-size:9px}.logo{height:38px;width:38px;font-size:21px}.head-actions{gap:6px}.status{font-size:0;padding:8px}.status:before{margin:0}.top-btn{font-size:10px;padding:8px}.workspace{display:flex;flex-direction:column}.controls{order:0;border-right:0;border-bottom:1px solid var(--border);padding:15px}.stage{order:1;min-height:330px;height:49dvh}.readout{order:2;display:block;border-left:0;border-top:1px solid var(--border);padding:15px}.section{margin-bottom:15px;padding-bottom:15px}.stage-header{top:11px;left:12px;right:12px}.stage-header strong{font-size:10px}.stage-header small{font-size:9px}.stage-footer{left:11px;right:11px;bottom:9px}.stage-footer>.controls-note{display:none}.metric{min-width:50%;border-bottom:1px solid var(--border)}.metric:nth-child(even){border-right:0}.reply h2{font-size:24px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}
+.cave-box{border:1px solid #365f64;background:#10252e;border-radius:9px;padding:11px;overflow-wrap:anywhere}.cave-label{font-size:10px;color:var(--mute);letter-spacing:.1em;margin-bottom:6px}.cave-output{color:var(--green);font-size:13px;font-weight:800;line-height:1.6;word-break:break-word}.cave-raw{color:#b5cdd1;font-size:11px;margin-bottom:9px}.cave-meta{font-size:10px;color:#8ca8b4;margin-top:8px}.cave-warning{color:var(--gold);font-size:10px;margin-top:7px}.compare{border:1px solid #365869;background:#102937;border-radius:9px;padding:13px;margin-top:9px}.compare-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px}.compare h3{font-size:11px;color:var(--blue);letter-spacing:.06em;margin:0 0 8px}.compare h3.cave-title{color:var(--green)}.compare-result{font-weight:900;font-size:13px;overflow-wrap:anywhere}.compare-meta{font-size:10px;color:#a1bec6;line-height:1.65;overflow-wrap:anywhere}.compare-note{margin-top:9px;color:var(--gold);font-size:10px}.compare-stat{font-size:10px;margin:10px 0;color:#bcd5d5}.pill-choose{font-size:10px;color:var(--green)}@media(max-width:420px){.compare-columns{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="app">
 <header>
-  <div class="brand"><div class="logo">R</div><div><div class="brand-title">RED <span>// SUBCONSCIOUS</span></div><div class="brand-desc">FORGE TESTBENCH / EXPERIENCE ENGINE V0.2</div></div></div>
+  <div class="brand"><div class="logo">R</div><div><div class="brand-title">RED <span>// SUBCONSCIOUS</span></div><div class="brand-desc">FORGE TESTBENCH / CAVEMAN v0.3</div></div></div>
   <div class="head-actions"><span class="status">LOCAL MEMORY</span><button id="help" class="top-btn">HOW IT WORKS ?</button></div>
 </header>
 <main class="workspace">
@@ -72,15 +73,33 @@ dialog{width:min(550px,calc(100vw - 26px));max-height:80dvh;overflow-y:auto;back
     <p class="small-note">Start a new episode when the activity changes. This stops unrelated moments from being linked as cause and effect.</p>
   </section>
   <section class="section">
-    <div class="section-title"><span class="count">02</span> PROBE MEMORY</div>
+    <div class="section-title"><span class="count">02</span> CAVEMAN THOUGHT COMPILER 🦴</div>
+    <p class="hint">Compress words, not meaning. Keep NOT, AGAIN, uncertain pronouns, and BEFORE/AFTER order. Original memories stay untouched.</p>
+    <label class="label" for="languageMode">MEMORY LANGUAGE</label>
+    <select id="languageMode" class="field">
+      <option value="caveman" selected>CAVEMAN · compact word agents</option>
+      <option value="original">ORIGINAL · all word agents</option>
+    </select>
+    <div id="cavemanPreview" class="cave-box" aria-live="polite" style="margin-top:10px">
+      <div class="cave-label">SOURCE · ORIGINAL</div>
+      <div id="previewOriginal" class="cave-raw">Type an experience or probe...</div>
+      <div class="cave-label">CAVEMAN SAYS</div>
+      <div id="previewCompressed" class="cave-output">···</div>
+      <div id="previewCost" class="cave-meta">Original text always preserved.</div>
+      <div id="previewWarnings" class="cave-warning"></div>
+    </div>
+  </section>
+  <section class="section">
+    <div class="section-title"><span class="count">03</span> PROBE MEMORY</div>
     <p class="hint">Red can retrieve old experiences or ask what is likely to happen next. Every answer comes with evidence.</p>
     <label class="label" for="probeText">RED IS THINKING ABOUT...</label>
     <textarea id="probeText" class="field" placeholder="press the blue button"></textarea>
     <div class="btn-row"><button id="recall" class="btn">↖ RECALL</button><button id="predict" class="btn primary">PREDICT ↗</button></div>
+    <button id="compare" class="btn full subtle">COMPARE BOTH MINDS ↔</button>
   </section>
   <section class="section">
-    <div class="section-title"><span class="count">03</span> FIELD LAB</div>
-    <p class="hint">The same unchanged engine is tested in unrelated miniature environments, plus memory accuracy and contradiction trials.</p>
+    <div class="section-title"><span class="count">04</span> FIELD LAB</div>
+    <p class="hint">Isolated trials for general experience learning and Caveman compression, including tense, negation, and word-order safeguards.</p>
     <button id="tests" class="btn full">RUN GENERALITY TRIALS</button>
     <div id="report" class="test-results" hidden></div>
     <div class="btn-row"><button id="demo" class="btn subtle">LOAD DEMO</button><button id="reset" class="btn subtle danger">EMPTY MEMORY</button></div>
@@ -104,6 +123,17 @@ dialog{width:min(550px,calc(100vw - 26px));max-height:80dvh;overflow-y:auto;back
   <div id="evidence" class="evidence"><div class="evidence-line">No memories activated yet.</div></div>
   <section class="read-section"><div class="read-heading"><span>PREDICTIVE ASSOCIATIONS</span><em>REPEATED</em></div><div id="associations"></div></section>
   <section class="read-section"><div class="read-heading"><span>EPISODIC HISTORY</span><em>RECENT</em></div><div id="history" class="history"></div></section>
+  <section id="comparison" class="read-section" hidden>
+    <div class="read-heading"><span>ORIGINAL VS CAVEMAN</span><em>SAME MEMORIES</em></div>
+    <div class="compare">
+      <div class="compare-columns">
+        <div><h3>ORIGINAL</h3><div id="compareOriginalAnswer" class="compare-result">···</div><div id="compareOriginalMeta" class="compare-meta"></div></div>
+        <div><h3 class="cave-title">CAVEMAN</h3><div id="compareCaveAnswer" class="compare-result">···</div><div id="compareCaveMeta" class="compare-meta"></div></div>
+      </div>
+      <div id="compareStats" class="compare-stat"></div>
+      <div id="compareWarning" class="compare-note"></div>
+    </div>
+  </section>
   <div id="inspect" class="inspector" hidden><strong id="inspectTitle"></strong><pre id="inspectBody"></pre></div>
 </aside>
 </main>
@@ -116,16 +146,17 @@ dialog{width:min(550px,calc(100vw - 26px));max-height:80dvh;overflow-y:auto;back
 </footer>
 </div>
 <dialog id="manual"><button id="closeHelp" class="top-btn" style="float:right">CLOSE</button>
-<h2>RED // Experience Engine v0.2</h2>
+<h2>RED // Experience Engine v0.3: Caveman</h2>
 <p><b>Every word</b> receives a lightweight agent. Every recorded observation, action, or result becomes an experience agent. The engine finds repeated transitions and shared destinations. Agents do not need to know what a browser, game, or file is.</p>
 <p><b>Probing</b> finds prior experiences using weighted word overlap. Predictions are ranked by similarity and past supporting transitions. Competing outcomes remain visible. The confidence numbers are heuristic, not calibrated probabilities.</p>
 <p><b>Surprise</b> is raised when a next event disagrees sufficiently with a previously reinforced prediction. Surprise doesn't prove causation: it is a cue to pay attention.</p>
 <p><b>Spontaneous echoes</b> can surface when the newly recorded experience strongly resembles one from an older episode. The original evidence is preserved.</p>
 <p><b>New episode</b> cuts the chronological link so the engine doesn't silently associate the end of one task with the beginning of another.</p>
-<p><b>Limits:</b> This is a prototype using statistical word overlap, not semantic comprehension, causal inference, or autonomous desktop perception. The browser does not connect to Red's computer. All local data stays in this browser unless exported.</p>
+<p><b>Caveman:</b> A deterministic, lightweight normalization pass drops many filler words, reduces some English word forms, preserves negation and uncertainty markers, and shows a clause-order arrow when BEFORE, AFTER, or THEN explicitly indicate sequence. Toggle ORIGINAL to restore all original word-agent indexing without altering source events. Compare both modes on exactly the same stored experiences.</p><p><b>Limits:</b> This is a prototype using statistical word overlap, not semantic comprehension, causal inference, or autonomous desktop perception. The browser does not connect to Red's computer. All local data stays in this browser unless exported.</p>
 <p>Script interface: <code>window.RedMemoryV2.observe({type:"ACT",text:"press key"})</code>, <code>.startEpisode()</code>, <code>.predict(text)</code>, <code>.recall(text)</code>, <code>.export()</code>, <code>.runTests()</code>.</p>
 </dialog>
 <div id="toast" class="toast" role="status"></div>
+<script src="./caveman-v3.js"></script>
 <script src="./engine-v2.js"></script>
 <script src="./app-v2.js"></script>
 </body></html>
