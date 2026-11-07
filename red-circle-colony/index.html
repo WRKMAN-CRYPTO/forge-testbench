@@ -1,13 +1,13 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RED // Circle Colony</title><style>
 :root{color-scheme:dark;font-family:system-ui;background:#0b121b;color:#e9f1fa}*{box-sizing:border-box}body{max-width:1120px;margin:auto;padding:16px}h1{margin:4px 0;font-size:30px}p,.hint{font-size:12px;line-height:1.5;color:#9fb4c7}.panel{background:#162230;border:1px solid #30465a;border-radius:13px;padding:13px;margin:12px 0}button,input,select{font:inherit;background:#24394c;border:1px solid #4c667d;color:#f0f7ff;border-radius:8px;padding:8px}button{cursor:pointer}button:hover{border-color:#9bcbda}button.active{background:#2e5a4e;border-color:#70dcb0}input[type=range]{padding:0;vertical-align:middle;width:110px}.controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:8px 0}label{font-size:12px}.stage{background:#070c12;border-radius:9px;overflow:hidden}.stage canvas{width:100%;display:block;touch-action:none}.stats{font:12px/1.6 ui-monospace,monospace;white-space:pre-wrap;color:#c0d4e4}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.samples{display:flex;gap:7px;flex-wrap:wrap}.sample{font:12px ui-monospace,monospace;padding:7px 9px}.sample.sel{border-color:#7ce6b3;background:#27453c}.compare canvas{width:100%;max-height:250px;background:#0b141f;border-radius:8px;image-rendering:pixelated}.legend{display:flex;gap:14px;flex-wrap:wrap;color:#a9bdd0;font-size:12px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}@media(max-width:650px){.grid{grid-template-columns:1fr}} </style></head><body>
-<div class="hint">FORGE TESTBENCH / INDEPENDENT EXPERIMENT v0.7</div><h1>🦴 RED // CIRCLE COLONY</h1><p>Scouts discover contrast, grow and connect complete colonies, then fill each stable mature colony with individually stored circles. Largest available circles first, smaller circles in the remaining gaps, until 95% of colony pixels are covered. No OCR, alphabet knowledge, or fixed-grid compression.</p>
+<div class="hint">FORGE TESTBENCH / INDEPENDENT EXPERIMENT v0.8</div><h1>🦴 RED // CIRCLE COLONY</h1><p>Scouts discover contrast, grow and connect complete colonies, then fill each stable mature colony with individually stored circles. Largest available circles first, smaller circles in the remaining gaps, until 95% of colony pixels are covered. No OCR, alphabet knowledge, or fixed-grid compression.</p>
 <div class="panel"><div class="controls"><label>Image <input id="upload" type="file" accept="image/*"></label><button id="demo">Load neutral test shapes</button><button id="run">▶ Run</button><button id="restart">↻ Restart</button><button id="export">↓ Export JSON</button></div>
 <div class="controls"><label>Contrast <input id="threshold" type="range" min="10" max="110" value="38"><span id="tv">38</span></label><label>Scout count <input id="scouts" type="range" min="10" max="240" value="100"><span id="sv">100</span></label><label>Maturity <input id="maturity" type="range" min="8" max="150" value="30"><span id="mv">30</span> px</label><label>Speed <input id="speed" type="range" min="1" max="15" value="4"><span id="spv">4</span>x</label></div>
 <div class="controls"><button id="modeImage" class="active">Source + scouts</button><button id="modeCircles">Circles only</button><button id="modeMask">Colony masks</button><button id="modeCoverage">Coverage gaps</button></div>
 <div class="stage"><canvas id="canvas" width="640" height="350"></canvas></div><div id="status" class="stats"></div><p class="hint">The background contrast mask is estimated from image borders, not from letter shapes. The agents have no idea what an image represents. Mature means a connected colony reaches the chosen pixel count and stops growing; it does not imply recognition. Circles stay entirely inside their colony mask, and no two circles overlap.</p></div>
 <div class="grid"><div class="panel"><b>🪨 Colony archive</b><p class="hint">Select a colony to inspect every stored circle. Choose two colonies for a scale-only comparison. Archive is in memory until exported.</p><div id="samples" class="samples"></div><div id="chosen" class="stats">Waiting for colonies…</div></div>
 <div class="panel compare"><b>🔎 Scale comparison</b><p class="hint">Choose A and B from the colony archive. Comparison scales the circle geometry to the same bounding dimensions; it does not rotate, translate internally, or morph circles to force a match.</p><div class="controls"><label>A <select id="a"></select></label><label>B <select id="b"></select></label><button id="compare">Compare</button></div><canvas id="cmp" width="600" height="250"></canvas><div id="score" class="stats">Capture two mature colonies to compare.</div></div></div>
-<div class="panel"><b>🧬 Independent scaling trial</b><p class="hint">Choose a completed colony. Rebuild its original pixel mask at a different scale, then independently pack fresh circles into that mask. Compare the two circle memories after normalization. The fresh circles are not copied or scaled from the original.</p><div class="controls"><label>Colony <select id="trialColony"></select></label><label>Resize <input id="trialScale" type="range" min="50" max="200" step="10" value="150"><span id="trialScaleValue">150</span>%</label><button id="trialRun">Rebuild and compare</button></div><div class="grid compare"><div><div class="hint">Original circle memory</div><canvas id="trialOriginal" width="260" height="260"></canvas></div><div><div class="hint">New circles, resized shape</div><canvas id="trialRebuilt" width="260" height="260"></canvas></div></div><div id="trialResults" class="stats">Select a mature colony and run the trial.</div></div><div class="panel"><b>👀 Hundred-colony stress laboratory</b><p class="hint">Select a reference territory. One hundred new scout colonies independently explore the source pixels in that region, mature, and pack their own circles. Every scout colony gets its own observations, boundary, and circles. All circles retain their individual coordinates and radii. Stack them to see where their geometry agrees and differs. Run the three test shapes separately; no symbol identities are supplied to the algorithm.</p>
+<div class="panel"><b>🧬 Independent scaling trial</b><p class="hint">Choose a completed colony. Rebuild its original pixel mask at a different scale, then independently pack fresh circles into that mask. Compare the two circle memories after normalization. The fresh circles are not copied or scaled from the original.</p><div class="controls"><label>Colony <select id="trialColony"></select></label><label>Resize <input id="trialScale" type="range" min="50" max="200" step="10" value="150"><span id="trialScaleValue">150</span>%</label><button id="trialRun">Rebuild and compare</button></div><div class="grid compare"><div><div class="hint">Original circle memory</div><canvas id="trialOriginal" width="260" height="260"></canvas></div><div><div class="hint">New circles, resized shape</div><canvas id="trialRebuilt" width="260" height="260"></canvas></div></div><div id="trialResults" class="stats">Select a mature colony and run the trial.</div></div><div class="panel"><b>👀 Hundred-colony stress laboratory</b><p class="hint">Select a reference territory. One hundred scout colonies independently explore image contrast inside the reference bounds with different starting points and finite budgets, then pack only what they discover. Every scout colony gets its own observations, boundary, and circles. All circles retain their individual coordinates and radii. Stack them to see where their geometry agrees and differs. Run the three test shapes separately; no symbol identities are supplied to the algorithm.</p>
 <div class="controls"><label>Colony <select id="overlayColony"></select></label><button id="overlayStart">Grow 100 independent colonies</button><button id="overlayStop" disabled>■ Stop / preserve results</button><button id="overlayExport">↓ Export all runs</button></div>
 <div class="controls"><label>Display <select id="overlayMode"><option value="circles">All circles stacked</option><option value="frequency">Pixel agreement heatmap</option><option value="consensus">Adjustable consensus</option><option value="single">One run only</option></select></label><label>Run <input id="overlayRun" type="range" min="1" max="100" value="1"><span id="overlayRunValue">1</span></label><label>Opacity <input id="overlayOpacity" type="range" min="3" max="70" value="18"><span id="overlayOpacityValue">18</span>%</label></div>
 <div class="controls"><label>Consensus threshold <input id="consensusThreshold" type="range" min="50" max="100" step="1" value="90"><span id="consensusValue">90</span>%</label><button id="consensus50">50%</button><button id="consensus75">75%</button><button id="consensus90">90%</button><button id="consensus95">95%</button><button id="consensus100">100%</button></div>
@@ -90,13 +90,21 @@ function overlayRender(){
  }
  cx.strokeStyle='#60768b';cx.strokeRect(ox-.5,oy-.5,sw*scale+1,sh*scale+1)
 }
+function discoverySummary(){
+ if(!overlayData||!overlayData.discoveryCounts)return '';
+ let d=overlayData,n=d.runs.length,union=0,unanimous=0,majority=0,min=Infinity,max=0;
+ for(let v of d.discoveryCounts){if(v)union++;if(v===n)unanimous++;if(v>=Math.ceil(n*.9))majority++}
+ for(let r of d.runs){min=Math.min(min,r.discoveredPixels);max=Math.max(max,r.discoveredPixels)}
+ let first=d.runs[0].sourceMask,identical=d.runs.every(r=>r.sourceMask.every((v,i)=>v===first[i]));
+ return 'Discovery before packing: '+min+'–'+max+' pixels/run · '+union+' union · '+majority+' at ≥90% · '+unanimous+' unanimous · identical masks: '+(identical?'YES':'NO')+'\\n';
+}
 function consensusUpdate(){
  $('consensusValue').textContent=$('consensusThreshold').value;
  if(!overlayData||!overlayData.runs.length){$('consensusStats').textContent='Run the experiment to measure agreement.';return}
  let {counts,runs}=overlayData,n=runs.length,threshold=+$('consensusThreshold').value,required=Math.ceil(n*threshold/100),survive=0,any=0;
  for(let count of counts){if(count>=required)survive++;if(count>0)any++}
  let checkpoints=[50,75,90,95,100].map(t=>{let need=Math.ceil(n*t/100),pixels=0;for(let v of counts)if(v>=need)pixels++;return t+'%: '+pixels+'px ('+(any?100*pixels/any:0).toFixed(1)+'%)'}).join(' · ');
- $('consensusStats').textContent='Consensus ≥'+threshold+'% requires '+required+' of '+n+' colonies.\nSurviving pixels: '+survive+' / '+any+' ever-covered ('+(any?100*survive/any:0).toFixed(2)+'%).\n'+checkpoints+'\nPercentages use the union of all observed coverage, not a predefined correct shape.';
+ $('consensusStats').textContent=discoverySummary()+'Consensus ≥'+threshold+'% requires '+required+' of '+n+' colonies.\nSurviving pixels: '+survive+' / '+any+' ever-covered ('+(any?100*survive/any:0).toFixed(2)+'%).\n'+checkpoints+'\nPercentages use the union of all observed coverage, not a predefined correct shape.';
 }
 $('consensusThreshold').oninput=()=>{consensusUpdate();overlayRender()};
 for(let t of [50,75,90,95,100])$('consensus'+t).onclick=()=>{$('consensusThreshold').value=t;$('overlayMode').value='consensus';consensusUpdate();overlayRender()};
@@ -111,31 +119,33 @@ function overlayStatus(){
 // Reference bounds only choose the region of interest; its stored mask is NOT supplied.
 function overlayDiscover(ref){
  let pad=3,x0=Math.max(0,ref.minX-pad),y0=Math.max(0,ref.minY-pad),x1=Math.min(W-1,ref.maxX+pad),y1=Math.min(H-1,ref.maxY+pad);
- let w=x1-x0+1,h=y1-y0+1,n=w*h,accepted=new Uint8Array(n),visited=new Uint8Array(n);
- let threshold=+$('threshold').value+(Math.random()*24-12);
- for(let y=0;y<h;y++)for(let x=0;x<w;x++){let contrast=pixels[(y+y0)*W+x+x0];let p=contrast>=threshold+7?1:contrast<threshold-7?0:(contrast-(threshold-7))/14;accepted[y*w+x]=Math.random()<p?1:0}
- // Scouts independently choose a seed; select the largest reached connected territory,
- // not the stored reference mask. Randomized frontier produces distinct exploration paths.
- let best=[],queue=new Int32Array(n);
- for(let i=0;i<n;i++){if(!accepted[i]||visited[i])continue;let head=0,tail=1;queue[0]=i;visited[i]=1;
- while(head<tail){let j=queue[head++],x=j%w,y=j/w|0;
- if(x>0&&accepted[j-1]&&!visited[j-1]){visited[j-1]=1;queue[tail++]=j-1}
- if(x<w-1&&accepted[j+1]&&!visited[j+1]){visited[j+1]=1;queue[tail++]=j+1}
- if(y>0&&accepted[j-w]&&!visited[j-w]){visited[j-w]=1;queue[tail++]=j-w}
- if(y<h-1&&accepted[j+w]&&!visited[j+w]){visited[j+w]=1;queue[tail++]=j+w}
+ let w=x1-x0+1,h=y1-y0+1,n=w*h,accepted=new Uint8Array(n),mask=new Uint8Array(n);
+ let threshold=+$('threshold').value+(Math.random()*24-12),candidates=[];
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  let i=y*w+x,contrast=pixels[(y+y0)*W+x+x0],p=Math.max(0,Math.min(1,(contrast-threshold+12)/24));
+  accepted[i]=Math.random()<p?1:0;if(accepted[i])candidates.push(i);
  }
- if(tail>best.length)best=Array.from(queue.slice(0,tail))
+ // Each colony starts its own scouts. They explore locally with finite time,
+ // instead of exhaustively copying the largest connected component.
+ let budgetFraction=.52+Math.random()*.38,budget=Math.max(1,Math.round(candidates.length*budgetFraction));
+ let scoutCount=Math.max(3,Math.round(4+Math.random()*12)),frontiers=[],discovered=0;
+ for(let s=0;s<scoutCount&&candidates.length;s++){let seed=candidates[Math.random()*candidates.length|0];if(!mask[seed]){mask[seed]=1;discovered++}frontiers.push([seed])}
+ let attempts=0,limit=Math.max(500,n*6);
+ while(discovered<budget&&attempts++<limit){
+  let k=Math.random()*frontiers.length|0,frontier=frontiers[k];
+  if(!frontier.length){let seed=candidates[Math.random()*candidates.length|0];if(!mask[seed]){mask[seed]=1;discovered++}frontier.push(seed)}
+  let from=frontier[Math.random()*frontier.length|0],x=from%w,y=from/w|0,d=Math.random()*4|0;
+  let next=d===0?(x>0?from-1:-1):d===1?(x<w-1?from+1:-1):d===2?(y>0?from-w:-1):(y<h-1?from+w:-1);
+  if(next>=0&&accepted[next]&&!mask[next]){mask[next]=1;discovered++;frontier.push(next)}
+  else if(Math.random()<.17)frontier.splice(Math.random()*frontier.length|0,1);
  }
- let mask=new Uint8Array(n);
- // Discovery is independent and complete for the selected connected component.
- for(let i of best)mask[i]=1;
- return {mask,w,h,x0,y0,threshold,discoveredPixels:best.length}
+ return {mask,w,h,x0,y0,threshold,discoveredPixels:discovered,budgetFraction,scoutCount}
 }
 function overlayPackFull(m){return trialPack(m)}
 async function overlayStart(){
  if(overlayBusy)return;let c=root(+$('overlayColony').value);if(!c||!c.done){$('overlayStatus').textContent='Choose a fully packed reference colony first.';return}
  overlayBusy=true;overlayStopRequested=false;$('overlayStart').disabled=true;$('overlayStop').disabled=false;
- let runs=[],counts=null,reference=null,computeMs=0,estimatedBytes=0,started=performance.now();overlayData=null;
+ let runs=[],counts=null,discoveryCounts=null,reference=null,computeMs=0,estimatedBytes=0,started=performance.now();overlayData=null;
  try{
  for(let i=0;i<100;i++){
   if(overlayStopRequested)break;
@@ -144,23 +154,23 @@ async function overlayStart(){
   await new Promise(resolve=>setTimeout(resolve,0));
   if(overlayStopRequested)break;
   let t0=performance.now(),discovered=overlayDiscover(c),packed=overlayPackFull(discovered);
-  if(!reference){reference={w:discovered.w,h:discovered.h,x0:discovered.x0,y0:discovered.y0};counts=new Uint8Array(reference.w*reference.h)}
+  if(!reference){reference={w:discovered.w,h:discovered.h,x0:discovered.x0,y0:discovered.y0};counts=new Uint8Array(reference.w*reference.h);discoveryCounts=new Uint8Array(reference.w*reference.h)}
   let occupied=new Uint8Array(reference.w*reference.h);
   for(let q of packed.circles){let rr=q.r*q.r;for(let y=Math.max(0,Math.ceil(q.y-q.r));y<=Math.min(reference.h-1,Math.floor(q.y+q.r));y++)for(let x=Math.max(0,Math.ceil(q.x-q.r));x<=Math.min(reference.w-1,Math.floor(q.x+q.r));x++){let dx=x-q.x,dy=y-q.y;if(dx*dx+dy*dy<=rr)occupied[y*reference.w+x]=1}}
-  for(let j=0;j<counts.length;j++)counts[j]+=occupied[j];
-  runs.push({...packed,sourceMask:discovered.mask,threshold:discovered.threshold,discoveredPixels:discovered.discoveredPixels});
+  for(let j=0;j<counts.length;j++){counts[j]+=occupied[j];discoveryCounts[j]+=discovered.mask[j]}
+  runs.push({...packed,sourceMask:discovered.mask,threshold:discovered.threshold,discoveredPixels:discovered.discoveredPixels,budgetFraction:discovered.budgetFraction,scoutCount:discovered.scoutCount});
   estimatedBytes+=discovered.mask.byteLength+packed.circles.length*32;
   computeMs+=performance.now()-t0;
-  if((i+1)%5===0){overlayData={colonyId:c.id,mask:{w:reference.w,h:reference.h,mask:new Uint8Array(reference.w*reference.h).fill(1)},runs,counts,created:new Date().toISOString(),computeMs,elapsedMs:performance.now()-started,estimatedBytes};overlayStatus();consensusUpdate();overlayRender()}
+  if((i+1)%5===0){overlayData={colonyId:c.id,mask:{w:reference.w,h:reference.h,mask:new Uint8Array(reference.w*reference.h).fill(1)},runs,counts,discoveryCounts,created:new Date().toISOString(),computeMs,elapsedMs:performance.now()-started,estimatedBytes};overlayStatus();consensusUpdate();overlayRender()}
  }
- if(reference){overlayData={colonyId:c.id,mask:{w:reference.w,h:reference.h,mask:new Uint8Array(reference.w*reference.h).fill(1)},runs,counts,created:new Date().toISOString(),computeMs,elapsedMs:performance.now()-started,estimatedBytes};overlayStatus();overlayRender()}
+ if(reference){overlayData={colonyId:c.id,mask:{w:reference.w,h:reference.h,mask:new Uint8Array(reference.w*reference.h).fill(1)},runs,counts,discoveryCounts,created:new Date().toISOString(),computeMs,elapsedMs:performance.now()-started,estimatedBytes};overlayStatus();consensusUpdate();overlayRender()}
  }catch(e){$('overlayStatus').textContent='Trial error after '+runs.length+' colonies: '+e.message}
  finally{overlayBusy=false;$('overlayStart').disabled=false;$('overlayStop').disabled=true}
 }
 $('overlayStop').onclick=()=>{overlayStopRequested=true;$('overlayStatus').textContent='Stopping after current colony; completed observations will be preserved.'};
 $('overlayStart').onclick=overlayStart;
 for(let id of ['overlayMode','overlayRun','overlayOpacity'])$(id).oninput=()=>{$('overlayRunValue').textContent=$('overlayRun').value;$('overlayOpacityValue').textContent=$('overlayOpacity').value;overlayRender()};
-$('overlayExport').onclick=()=>{if(!overlayData){$('overlayStatus').textContent='Run the ten-pack experiment before exporting.';return}let d=overlayData,obj={experiment:'RED CIRCLE COLONY / 10-RUN OVERLAY',version:'0.7',created:d.created,colonyId:d.colonyId,width:d.mask.w,height:d.mask.h,sourceMask:Array.from(d.mask.mask),runs:d.runs.map((r,i)=>({run:i+1,threshold:r.threshold,discoveredPixels:r.discoveredPixels,sourceMask:Array.from(r.sourceMask),coverage:r.coverage,pixels:r.pixels,circles:r.circles.map(q=>({...q}))})),pixelAgreement:Array.from(d.counts),computeMs:d.computeMs,elapsedMs:d.elapsedMs,estimatedBytes:d.estimatedBytes};let url=URL.createObjectURL(new Blob([JSON.stringify(obj)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='red-circle-overlay-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$('overlayExport').onclick=()=>{if(!overlayData){$('overlayStatus').textContent='Run the ten-pack experiment before exporting.';return}let d=overlayData,obj={experiment:'RED CIRCLE COLONY / 10-RUN OVERLAY',version:'0.8',created:d.created,colonyId:d.colonyId,width:d.mask.w,height:d.mask.h,sourceMask:Array.from(d.mask.mask),runs:d.runs.map((r,i)=>({run:i+1,threshold:r.threshold,discoveredPixels:r.discoveredPixels,budgetFraction:r.budgetFraction,scoutCount:r.scoutCount,sourceMask:Array.from(r.sourceMask),coverage:r.coverage,pixels:r.pixels,circles:r.circles.map(q=>({...q}))})),pixelAgreement:Array.from(d.counts),discoveryAgreement:Array.from(d.discoveryCounts),computeMs:d.computeMs,elapsedMs:d.elapsedMs,estimatedBytes:d.estimatedBytes};let url=URL.createObjectURL(new Blob([JSON.stringify(obj)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='red-circle-overlay-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 function tick(){if(running){for(let i=0;i<+$('speed').value;i++)advance();render()}requestAnimationFrame(tick)}
 $('run').onclick=()=>{running=!running;$('run').textContent=running?'Ⅱ Pause':'▶ Run'};$('restart').onclick=restart;$('demo').onclick=drawDemo;
 for(let id of ['threshold','scouts','maturity','speed'])$(id).oninput=()=>{let k={threshold:'tv',scouts:'sv',maturity:'mv',speed:'spv'}[id];$(k).textContent=$(id).value;if(id==='threshold'||id==='scouts')restart()};
