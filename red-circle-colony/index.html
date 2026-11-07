@@ -1,10 +1,10 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RED // Circle Colony</title><style>
 :root{color-scheme:dark;font-family:system-ui;background:#0b121b;color:#e9f1fa}*{box-sizing:border-box}body{max-width:1120px;margin:auto;padding:16px}h1{margin:4px 0;font-size:30px}p,.hint{font-size:12px;line-height:1.5;color:#9fb4c7}.panel{background:#162230;border:1px solid #30465a;border-radius:13px;padding:13px;margin:12px 0}button,input,select{font:inherit;background:#24394c;border:1px solid #4c667d;color:#f0f7ff;border-radius:8px;padding:8px}button{cursor:pointer}button:hover{border-color:#9bcbda}button.active{background:#2e5a4e;border-color:#70dcb0}input[type=range]{padding:0;vertical-align:middle;width:110px}.controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:8px 0}label{font-size:12px}.stage{background:#070c12;border-radius:9px;overflow:hidden}.stage canvas{width:100%;display:block;touch-action:none}.stats{font:12px/1.6 ui-monospace,monospace;white-space:pre-wrap;color:#c0d4e4}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.samples{display:flex;gap:7px;flex-wrap:wrap}.sample{font:12px ui-monospace,monospace;padding:7px 9px}.sample.sel{border-color:#7ce6b3;background:#27453c}.compare canvas{width:100%;max-height:250px;background:#0b141f;border-radius:8px;image-rendering:pixelated}.legend{display:flex;gap:14px;flex-wrap:wrap;color:#a9bdd0;font-size:12px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}@media(max-width:650px){.grid{grid-template-columns:1fr}} </style></head><body>
-<div class="hint">FORGE TESTBENCH / INDEPENDENT EXPERIMENT v1.0</div><h1>🦴 RED // CIRCLE COLONY</h1><p>Scouts discover contrast, grow and connect complete colonies, then fill each stable mature colony with individually stored circles. Choose classic packing, bubble births, or fluid settlement: identical mobile bubbles redistribute inside each discovered territory. No OCR, alphabet knowledge, or fixed-grid compression.</p>
+<div class="hint">FORGE TESTBENCH / INDEPENDENT EXPERIMENT v1.1</div><h1>🦴 RED // CIRCLE COLONY</h1><p>Scouts discover contrast, grow and connect complete colonies, then fill each stable mature colony with individually stored circles. Choose classic packing, bubble births, or fluid settlement: identical mobile bubbles redistribute inside each discovered territory. No OCR, alphabet knowledge, or fixed-grid compression.</p>
 <div class="panel"><div class="controls"><label>Image <input id="upload" type="file" accept="image/*"></label><button id="demo">Load neutral test shapes</button><button id="run">▶ Run</button><button id="restart">↻ Restart</button><button id="export">↓ Export JSON</button></div>
-<div class="controls"><label>Contrast <input id="threshold" type="range" min="10" max="110" value="38"><span id="tv">38</span></label><label>Scout count <input id="scouts" type="range" min="10" max="240" value="100"><span id="sv">100</span></label><label>Maturity <input id="maturity" type="range" min="8" max="150" value="30"><span id="mv">30</span> px</label><label>Packing <select id="packingMode"><option value="classic">Classic 95%</option><option value="bubbles">Bubble births 99%</option><option value="fluid" selected>Fluid settlement</option></select></label><label>Fluid radius <input id="fluidRadius" type="range" min="1" max="5" step="0.5" value="2"><span id="frv">2</span>px</label><label>Speed <input id="speed" type="range" min="1" max="15" value="4"><span id="spv">4</span>x</label></div>
+<div class="controls"><label>Contrast <input id="threshold" type="range" min="10" max="110" value="38"><span id="tv">38</span></label><label>Scout count <input id="scouts" type="range" min="10" max="240" value="100"><span id="sv">100</span></label><label>Maturity <input id="maturity" type="range" min="8" max="150" value="30"><span id="mv">30</span> px</label><label>Packing <select id="packingMode"><option value="classic">Classic 95%</option><option value="bubbles">Bubble births 99%</option><option value="fluid" selected>Fluid settlement</option></select></label><label>Fluid radius <input id="fluidRadius" type="range" min="1" max="5" step="0.5" value="2"><span id="frv">2</span>px</label><label>Gravity <input id="gravity" type="range" min="0" max="100" value="25"><span id="gv">25</span>%</label><label>Direction <input id="gravityAngle" type="range" min="0" max="360" step="15" value="90"><span id="gav">90</span>°</label><label>Space pressure <input id="spacePressure" type="range" min="0" max="100" value="55"><span id="pv">55</span>%</label><label>Speed <input id="speed" type="range" min="1" max="15" value="4"><span id="spv">4</span>x</label></div>
 <div class="controls"><button id="modeImage" class="active">Source + scouts</button><button id="modeCircles">Circles only</button><button id="modeMask">Colony masks</button><button id="modeCoverage">Coverage gaps</button></div>
-<div class="stage"><canvas id="canvas" width="640" height="350"></canvas></div><div id="status" class="stats"></div><p class="hint">The background contrast mask is estimated from image borders, not from letter shapes. The agents have no idea what an image represents. Mature means a connected colony reaches the chosen pixel count and stops growing; it does not imply recognition. Circles stay entirely inside their colony mask, and no two circles overlap. Bubble births grow individually to the largest radius that fits, then pop if blocked. Fluid mode uses equal-radius mobile particles with repulsion, local empty-space pressure, damping, and periodic births after settling. Coverage is rasterized occupancy, not continuous area.</p></div>
+<div class="stage"><canvas id="canvas" width="640" height="350"></canvas></div><div id="status" class="stats"></div><p class="hint">The background contrast mask is estimated from image borders, not from letter shapes. The agents have no idea what an image represents. Mature means a connected colony reaches the chosen pixel count and stops growing; it does not imply recognition. Circles stay entirely inside their colony mask, and no two circles overlap. Bubble births grow individually to the largest radius that fits, then pop if blocked. Fluid mode uses equal-radius mobile particles with repulsion, adjustable directional gravity, local empty-space pressure, damping, and ongoing births. Rotate gravity live to shake loose crowded regions. Coverage is rasterized occupancy, not continuous area.</p></div>
 <div class="grid"><div class="panel"><b>🪨 Colony archive</b><p class="hint">Select a colony to inspect every stored circle. Choose two colonies for a scale-only comparison. Archive is in memory until exported.</p><div id="samples" class="samples"></div><div id="chosen" class="stats">Waiting for colonies…</div></div>
 <div class="panel compare"><b>🔎 Scale comparison</b><p class="hint">Choose A and B from the colony archive. Comparison scales the circle geometry to the same bounding dimensions; it does not rotate, translate internally, or morph circles to force a match.</p><div class="controls"><label>A <select id="a"></select></label><label>B <select id="b"></select></label><button id="compare">Compare</button></div><canvas id="cmp" width="600" height="250"></canvas><div id="score" class="stats">Capture two mature colonies to compare.</div></div></div>
 <div class="panel"><b>🧬 Independent scaling trial</b><p class="hint">Choose a completed colony. Rebuild its original pixel mask at a different scale, then independently pack fresh circles into that mask. Compare the two circle memories after normalization. The fresh circles are not copied or scaled from the original.</p><div class="controls"><label>Colony <select id="trialColony"></select></label><label>Resize <input id="trialScale" type="range" min="50" max="200" step="10" value="150"><span id="trialScaleValue">150</span>%</label><button id="trialRun">Rebuild and compare</button></div><div class="grid compare"><div><div class="hint">Original circle memory</div><canvas id="trialOriginal" width="260" height="260"></canvas></div><div><div class="hint">New circles, resized shape</div><canvas id="trialRebuilt" width="260" height="260"></canvas></div></div><div id="trialResults" class="stats">Select a mature colony and run the trial.</div></div><div class="panel"><b>👀 Hundred-colony stress laboratory</b><p class="hint">Select a reference territory. One hundred scout colonies independently explore image contrast inside the reference bounds. The stress laboratory currently compares classic or bubble-birth packing, not live fluid dynamics. Every scout colony gets its own observations, boundary, and circles. All circles retain their individual coordinates and radii. Stack them to see where their geometry agrees and differs. Run the three test shapes separately; no symbol identities are supplied to the algorithm.</p>
@@ -76,61 +76,41 @@ function packBubble(c,budget){
  if(c.covered/c.cells.length>=target||c.used.size>=c.cells.length){c.done=true;archive(c)}
 }
 function fluidPack(c,budget){
- if(!c.fluid){
-  c.fluid={particles:[],stalled:0,previousCoverage:0,steps:0,births:0,failedBirths:0,motion:0};
-  c.used=new Set();c.circle=[];c.covered=0;
- }
- let f=c.fluid,r=+$('fluidRadius').value,rr=r*r;
- // Positions are continuous; occupancy and collision checks use colony membership.
+ if(!c.fluid){c.fluid={particles:[],steps:0,births:0,failedBirths:0,motion:0,settled:0};c.used=new Set();c.circle=[];c.covered=0}
+ const f=c.fluid,r=+$('fluidRadius').value,rr=r*r,gravity=+$('gravity').value/100*.22,angle=+$('gravityAngle').value*Math.PI/180,pressure=+$('spacePressure').value/100*.20;
+ const gx=Math.cos(angle)*gravity,gy=Math.sin(angle)*gravity;
  function inside(x,y){let ix=Math.round(x),iy=Math.round(y);return ix>=0&&ix<W&&iy>=0&&iy<H&&owner[iy*W+ix]===c.id}
- function fits(x,y){if(!inside(x,y))return false;
-  for(let dy=-r;dy<=r;dy+=1)for(let dx=-r;dx<=r;dx+=1){if(dx*dx+dy*dy<=rr&&!inside(x+dx,y+dy))return false}return true}
- function birth(){
-  for(let t=0;t<36;t++){
-   let id=c.cells[Math.random()*c.cells.length|0],x=id%W,y=id/W|0;
-   if(!fits(x,y))continue;
-   let crowd=false;for(let p of f.particles){let dx=p.x-x,dy=p.y-y;if(dx*dx+dy*dy<(2*r*.88)**2){crowd=true;break}}
-   if(!crowd){f.particles.push({x,y,vx:0,vy:0});f.births++;return true}
-  }f.failedBirths++;return false
- }
- if(!f.particles.length){for(let i=0;i<Math.min(10,c.cells.length);i++)birth()}
- let iterations=Math.max(1,Math.min(3,budget));
- for(let step=0;step<iterations;step++){
-  f.steps++;let energy=0,particles=f.particles;
-  // Neighbor forces: short-range repulsion plus local empty-space pressure.
-  for(let i=0;i<particles.length;i++){
-   let p=particles[i],fx=0,fy=0;
-   for(let j=0;j<particles.length;j++){if(i===j)continue;let q=particles[j],dx=p.x-q.x,dy=p.y-q.y,d2=dx*dx+dy*dy;
-    if(d2<(.01+4*r*r*4)){let d=Math.sqrt(d2)||.001,force=d<2*r?(2*r-d)*.16:0;fx+=dx/d*force;fy+=dy/d*force}
+ function fits(x,y){if(!inside(x,y))return false;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy<=rr&&!inside(x+dx,y+dy))return false}return true}
+ // Spatial buckets make local interactions affordable as population grows.
+ const cell=Math.max(4,2.5*r);
+ function buckets(){let map=new Map();for(let p of f.particles){let x=Math.floor(p.x/cell),y=Math.floor(p.y/cell),key=x+','+y;if(!map.has(key))map.set(key,[]);map.get(key).push(p)}return map}
+ function neighbors(map,x,y){let out=[],bx=Math.floor(x/cell),by=Math.floor(y/cell);for(let yy=by-2;yy<=by+2;yy++)for(let xx=bx-2;xx<=bx+2;xx++){let a=map.get(xx+','+yy);if(a)out.push(...a)}return out}
+ function birth(map){for(let t=0;t<64;t++){let id=c.cells[Math.random()*c.cells.length|0],x=id%W,y=id/W|0;if(!fits(x,y))continue;let crowd=false;for(let p of neighbors(map,x,y)){let dx=p.x-x,dy=p.y-y;if(dx*dx+dy*dy<(2*r*.94)**2){crowd=true;break}}if(!crowd){f.particles.push({x,y,vx:0,vy:0});f.births++;return true}}f.failedBirths++;return false}
+ if(!f.particles.length){for(let i=0;i<Math.min(12,c.cells.length);i++)birth(buckets())}
+ for(let step=0;step<Math.max(1,Math.min(3,budget));step++){
+  f.steps++;let map=buckets(),energy=0;
+  for(let p of f.particles){let fx=gx,fy=gy,near=neighbors(map,p.x,p.y);
+   for(let q of near){if(q===p)continue;let dx=p.x-q.x,dy=p.y-q.y,d=Math.hypot(dx,dy)||.001;if(d<2*r){let force=(2*r-d)*.24;fx+=dx/d*force;fy+=dy/d*force}}
+   // Choose a locally reachable direction with the most free space.
+   if(pressure){let best=-Infinity,bx=0,by=0,offset=f.steps%8;
+    for(let k=0;k<8;k++){let a=(k+offset)*Math.PI/4,dx=Math.cos(a),dy=Math.sin(a),nx=p.x+dx*r*2,ny=p.y+dy*r*2;
+     if(!fits(nx,ny))continue;let nearest=16*r*r;
+     for(let q of neighbors(map,nx,ny)){if(q===p)continue;let d2=(q.x-nx)**2+(q.y-ny)**2;if(d2<nearest)nearest=d2}
+     let score=nearest+Math.random()*.01;if(score>best){best=score;bx=dx;by=dy}
+    }if(best>-Infinity){fx+=bx*pressure;fy+=by*pressure}
    }
-   // Sample candidate directions within the known local territory, not a global target.
-   let angles=8,best=-1e9,tx=0,ty=0;
-   for(let a=0;a<angles;a++){let ang=a*Math.PI*2/angles,dx=Math.cos(ang),dy=Math.sin(ang),nx=p.x+dx*r*2.5,ny=p.y+dy*r*2.5;
-    if(!fits(nx,ny))continue;let nearest=Infinity;
-    for(let q of particles){if(q===p)continue;let d2=(q.x-nx)**2+(q.y-ny)**2;if(d2<nearest)nearest=d2}
-    let score=Math.min(nearest,100*r*r);if(score>best){best=score;tx=dx;ty=dy}
-   }
-   if(best>-1e8){fx+=tx*.075;fy+=ty*.075}
-   p.vx=(p.vx+fx)*.76;p.vy=(p.vy+fy)*.76;
+   p.vx=Math.max(-1.5,Math.min(1.5,(p.vx+fx)*.90));p.vy=Math.max(-1.5,Math.min(1.5,(p.vy+fy)*.90));
   }
-  for(let p of particles){let nx=p.x+Math.max(-1.3,Math.min(1.3,p.vx)),ny=p.y+Math.max(-1.3,Math.min(1.3,p.vy));
-   if(fits(nx,p.y))p.x=nx;else p.vx=0;
-   if(fits(p.x,ny))p.y=ny;else p.vy=0;
-   energy+=p.vx*p.vx+p.vy*p.vy
-  }
-  f.motion=Math.sqrt(energy/Math.max(1,particles.length));
-  // Wait for motion to settle before introducing more equal-sized particles.
-  if(f.steps%18===0){
-   if(f.motion<.24){f.stalled++;if(f.stalled>=2){birth();f.stalled=0}}
-   else f.stalled=0;
-  }
+  for(let p of f.particles){let nx=p.x+p.vx,ny=p.y+p.vy;if(fits(nx,p.y))p.x=nx;else p.vx=0;if(fits(p.x,ny))p.y=ny;else p.vy=0;energy+=p.vx*p.vx+p.vy*p.vy}
+  f.motion=Math.sqrt(energy/Math.max(1,f.particles.length));
+  // Continuous supply prevents early sparse equilibrium; pause births only when
+  // repeated placement attempts show no available room.
+  if(f.steps%5===0){let map2=buckets();birth(map2)}
+  if(f.steps%45===0&&f.motion<.12)f.settled++;else if(f.motion>=.12)f.settled=0;
  }
- // Rasterize circles without changing their radius. Overlap is allowed transiently.
  c.circle=f.particles.map(p=>({x:p.x,y:p.y,r,coveredPixels:0}));
- let covered=new Set();
- for(let p of f.particles){for(let yy=Math.max(c.minY,Math.ceil(p.y-r));yy<=Math.min(c.maxY,Math.floor(p.y+r));yy++)for(let xx=Math.max(c.minX,Math.ceil(p.x-r));xx<=Math.min(c.maxX,Math.floor(p.x+r));xx++){let dx=xx-p.x,dy=yy-p.y;if(dx*dx+dy*dy<=rr&&owner[yy*W+xx]===c.id)covered.add(yy*W+xx)}}
+ let covered=new Set();for(let p of f.particles){for(let yy=Math.max(c.minY,Math.ceil(p.y-r));yy<=Math.min(c.maxY,Math.floor(p.y+r));yy++)for(let xx=Math.max(c.minX,Math.ceil(p.x-r));xx<=Math.min(c.maxX,Math.floor(p.x+r));xx++){let dx=xx-p.x,dy=yy-p.y;if(dx*dx+dy*dy<=rr&&owner[yy*W+xx]===c.id)covered.add(yy*W+xx)}}
  c.used=covered;c.covered=covered.size;
- // Fluid colonies remain active so the user can watch equilibrium and restart.
 }
 function pack(c,budget){return $('packingMode').value==='fluid'?fluidPack(c,budget):$('packingMode').value==='bubbles'?packBubble(c,budget):packClassic(c,budget)}
 $('packingMode').onchange=restart;$('fluidRadius').oninput=()=>{$('frv').textContent=$('fluidRadius').value;restart()};
@@ -278,10 +258,10 @@ for(let id of ['overlayMode','overlayRun','overlayOpacity'])$(id).oninput=()=>{$
 $('overlayExport').onclick=()=>{if(!overlayData){$('overlayStatus').textContent='Run the ten-pack experiment before exporting.';return}let d=overlayData,obj={experiment:'RED CIRCLE COLONY / 10-RUN OVERLAY',version:'0.9',created:d.created,colonyId:d.colonyId,width:d.mask.w,height:d.mask.h,sourceMask:Array.from(d.mask.mask),runs:d.runs.map((r,i)=>({run:i+1,threshold:r.threshold,discoveredPixels:r.discoveredPixels,budgetFraction:r.budgetFraction,scoutCount:r.scoutCount,sourceMask:Array.from(r.sourceMask),coverage:r.coverage,pixels:r.pixels,circles:r.circles.map(q=>({...q}))})),pixelAgreement:Array.from(d.counts),discoveryAgreement:Array.from(d.discoveryCounts),computeMs:d.computeMs,elapsedMs:d.elapsedMs,estimatedBytes:d.estimatedBytes};let url=URL.createObjectURL(new Blob([JSON.stringify(obj)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='red-circle-overlay-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 function tick(){if(running){for(let i=0;i<+$('speed').value;i++)advance();render()}requestAnimationFrame(tick)}
 $('run').onclick=()=>{running=!running;$('run').textContent=running?'Ⅱ Pause':'▶ Run'};$('restart').onclick=restart;$('demo').onclick=drawDemo;
-for(let id of ['threshold','scouts','maturity','speed'])$(id).oninput=()=>{let k={threshold:'tv',scouts:'sv',maturity:'mv',speed:'spv'}[id];$(k).textContent=$(id).value;if(id==='threshold'||id==='scouts')restart()};
+for(let id of ['threshold','scouts','maturity','speed','gravity','gravityAngle','spacePressure'])$(id).oninput=()=>{let k={threshold:'tv',scouts:'sv',maturity:'mv',speed:'spv',gravity:'gv',gravityAngle:'gav',spacePressure:'pv'}[id];$(k).textContent=$(id).value;if(id==='threshold'||id==='scouts')restart()};
 for(let [id,mode] of [['modeImage','image'],['modeCircles','circles'],['modeMask','mask'],['modeCoverage','coverage']])$(id).onclick=()=>{view=mode;document.querySelectorAll('[id^=mode]').forEach(b=>b.classList.toggle('active',b.id===id));render()};
 $('compare').onclick=comparison;
 $('upload').onchange=e=>{let file=e.target.files[0];if(!file)return;let url=URL.createObjectURL(file),img=new Image();img.onload=()=>{sc.fillStyle='#f0f1e9';sc.fillRect(0,0,W,H);let s=Math.min(W/img.width,H/img.height);sc.drawImage(img,(W-img.width*s)/2,(H-img.height*s)/2,img.width*s,img.height*s);URL.revokeObjectURL(url);restart()};img.src=url};
-$('export').onclick=()=>{let result={experiment:'RED CIRCLE COLONY',version:'1.0',packingMode:$('packingMode').value,fluidRadius:+$('fluidRadius').value,date:new Date().toISOString(),parameters:{threshold:+$('threshold').value,maturity:+$('maturity').value},colonies:colonies.filter(c=>!c.redirect&&c.mature).map(c=>({id:c.id,bounds:{x:c.minX,y:c.minY,width:c.maxX-c.minX+1,height:c.maxY-c.minY+1},pixelCount:c.cells.length,coverage:c.covered/c.cells.length,circles:c.circle.map(q=>({...q})),maskPixels:c.cells.map(i=>({x:i%W,y:i/W|0}))}))};let blob=new Blob([JSON.stringify(result)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='red-circle-colony-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$('export').onclick=()=>{let result={experiment:'RED CIRCLE COLONY',version:'1.1',packingMode:$('packingMode').value,fluidRadius:+$('fluidRadius').value,gravity:+$('gravity').value,gravityAngle:+$('gravityAngle').value,spacePressure:+$('spacePressure').value,date:new Date().toISOString(),parameters:{threshold:+$('threshold').value,maturity:+$('maturity').value},colonies:colonies.filter(c=>!c.redirect&&c.mature).map(c=>({id:c.id,bounds:{x:c.minX,y:c.minY,width:c.maxX-c.minX+1,height:c.maxY-c.minY+1},pixelCount:c.cells.length,coverage:c.covered/c.cells.length,circles:c.circle.map(q=>({...q})),maskPixels:c.cells.map(i=>({x:i%W,y:i/W|0}))}))};let blob=new Blob([JSON.stringify(result)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='red-circle-colony-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 drawDemo();requestAnimationFrame(tick);
 </script></body></html>
