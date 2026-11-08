@@ -1,23 +1,94 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TRAILWEB // THOUGHT OBSERVATORY</title><style>
 :root{color-scheme:dark;font-family:ui-monospace,Menlo,Consolas,monospace;background:#080d14;color:#dce9f5}*{box-sizing:border-box}body{margin:0}header{padding:14px 18px;border-bottom:1px solid #273a4b;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}h1{font-size:17px;margin:0;letter-spacing:.12em}small,.muted{color:#8ca5b8}button,label.file{border:1px solid #426078;border-radius:8px;background:#172838;color:#dce9f5;padding:9px 12px;cursor:pointer;font:inherit;font-size:12px}button:hover,label.file:hover{background:#234156}input[type=file]{display:none}main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(290px,1fr);height:calc(100dvh - 66px)}.left{position:relative;min-height:320px;border-right:1px solid #273a4b}canvas{width:100%;height:100%;display:block;touch-action:none}.hud{position:absolute;left:14px;top:14px;pointer-events:none;font-size:11px;line-height:1.7;color:#a9c5d9}.right{display:flex;flex-direction:column;min-height:0}.toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:12px;border-bottom:1px solid #273a4b}.chat{flex:1;overflow-y:auto;padding:14px;min-height:100px}.msg{margin-bottom:14px;border-left:2px solid #55b6b6;padding:4px 10px;overflow-wrap:anywhere}.msg .meta{font-size:10px;color:#86a5b8;margin-bottom:5px}.msg .words{font-size:15px;line-height:1.5}.controls{padding:12px;border-top:1px solid #273a4b;display:grid;gap:9px}input[type=text]{background:#0c1722;border:1px solid #3d596e;border-radius:8px;padding:12px;color:#e5f5ff;font:inherit;width:100%}.row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.row>*{flex:1}input[type=range]{width:100%}.status{font-size:11px;color:#9db8c8}.warning{color:#e6bd78}@media(max-width:750px){main{display:flex;flex-direction:column;height:calc(100dvh - 65px)}.left{height:45%;flex:none;border-right:0;border-bottom:1px solid #273a4b}.right{flex:1;min-height:0}.chat{min-height:70px}} </style></head><body>
-<header><div><h1>TRAILWEB <span style="color:#6bd1bc">// THOUGHT OBSERVATORY</span></h1><small>Associative network · no language model · local browser</small></div><span id="state" class="status">AWAKE</span></header>
-<main><section class="left"><canvas id="view"></canvas><div class="hud" id="hud"></div></section><section class="right"><div class="toolbar"><button id="pause">PAUSE</button><button id="step">ONE STEP</button><button id="speak">SPEAK NOW</button><button id="reset">RESET</button><label class="file">IMPORT JSON<input id="import" type="file" accept=".json,application/json"></label><button id="export">EXPORT JSON</button></div><div class="chat" id="chat"><div class="muted" style="font-size:12px">Thoughts will appear here. They are activation trails, not claims of comprehension.</div></div><div class="controls"><div class="row"><input id="stimulus" type="text" placeholder="Stimulate a word or phrase…"><button id="inject" style="flex:0 0 auto">STIMULATE</button></div><div class="row"><label style="font-size:11px">Thought interval <span id="intervalLabel">4s</span><input type="range" id="interval" min="1" max="15" value="4"></label><label style="font-size:11px">Activity <span id="activityLabel">45%</span><input type="range" id="activity" min="0" max="100" value="45"></label></div><div class="status" id="info">Tap a node to stimulate it. Drag nodes to rearrange. Imports merge by default.</div></div></section></main>
+<header><div><h1>TRAILWEB <span style="color:#6bd1bc">// THOUGHT OBSERVATORY</span></h1><small>Associative network · fatigue / competition / novelty · no LLM</small></div><span id="state" class="status">AWAKE</span></header>
+<main><section class="left"><canvas id="view"></canvas><div class="hud" id="hud"></div></section><section class="right"><div class="toolbar"><button id="pause">PAUSE</button><button id="step">ONE STEP</button><button id="speak">SPEAK NOW</button><button id="reset">RESET</button><label class="file">IMPORT JSON<input id="import" type="file" accept=".json,application/json"></label><button id="export">EXPORT JSON</button></div><div class="chat" id="chat"><div class="muted" style="font-size:12px">Thoughts are activation trails, not claims of comprehension. v2: fatigue + competition + novelty.</div></div><div class="controls"><div class="row"><input id="stimulus" type="text" placeholder="Stimulate a word or phrase…"><button id="inject" style="flex:0 0 auto">STIMULATE</button></div><div class="row"><label style="font-size:11px">Thought interval <span id="intervalLabel">4s</span><input type="range" id="interval" min="1" max="15" value="4"></label><label style="font-size:11px">Activity <span id="activityLabel">45%</span><input type="range" id="activity" min="0" max="100" value="45"></label></div><div class="status" id="info">Tap a node to stimulate it. Drag nodes to rearrange. Imports merge by default.</div></div></section></main>
 <script>
 (()=>{'use strict';
-const $=id=>document.getElementById(id),canvas=$('view'),ctx=canvas.getContext('2d');let nodes=[],edges=[],messages=[],paused=false,lastThought=0,lastFrame=0,elapsed=0,serial=0;
+const $=id=>document.getElementById(id),canvas=$('view'),ctx=canvas.getContext('2d');let nodes=[],edges=[],messages=[],paused=false,lastThought=0,lastFrame=0,elapsed=0,serial=0;let recentTrails=new Map(),lastTrail=[];
 const seedWords=['water','cold','ice','warm','fire','heat','steam','cloud','rain','sky','lightning','energy','motion','stone','earth','plant','growth','light','dark','night','sun','day','time','memory','experience','choice','action','result','change','pattern','connection','thought','question','unknown','discover','move','stop','near','far'];
 const seedLinks=[['water','cold'],['cold','ice'],['water','steam'],['steam','heat'],['heat','fire'],['steam','cloud'],['cloud','rain'],['rain','water'],['cloud','sky'],['sky','lightning'],['lightning','energy'],['energy','motion'],['earth','stone'],['earth','plant'],['plant','growth'],['growth','water'],['sun','light'],['sun','day'],['night','dark'],['day','time'],['night','time'],['memory','experience'],['experience','result'],['choice','action'],['action','result'],['result','change'],['change','pattern'],['pattern','connection'],['connection','thought'],['thought','question'],['question','unknown'],['unknown','discover'],['discover','experience'],['move','motion'],['move','stop'],['near','far'],['light','energy'],['ice','stone'],['fire','light']];
-function addNode(id,props={}){id=String(id).trim();if(!id)return null;let n=nodes.find(n=>n.id===id);if(n){if(Number.isFinite(+props.activation))n.a=Math.max(0,Math.min(1,+props.activation));return n}let angle=nodes.length*2.39996,r=70+Math.sqrt(nodes.length)*24;n={id,x:Number.isFinite(+props.x)?+props.x:Math.cos(angle)*r,y:Number.isFinite(+props.y)?+props.y:Math.sin(angle)*r,a:Math.max(0,Math.min(1,Number(props.activation)||0)),visits:0};nodes.push(n);return n}
+function addNode(id,props={}){id=String(id).trim();if(!id)return null;let n=nodes.find(n=>n.id===id);if(n){if(Number.isFinite(+props.activation))n.a=Math.max(0,Math.min(1,+props.activation));if(Number.isFinite(+props.fatigue))n.fatigue=Math.max(0,Math.min(1,+props.fatigue));return n}let angle=nodes.length*2.39996,r=70+Math.sqrt(nodes.length)*24;n={id,x:Number.isFinite(+props.x)?+props.x:Math.cos(angle)*r,y:Number.isFinite(+props.y)?+props.y:Math.sin(angle)*r,a:Math.max(0,Math.min(1,Number(props.activation)||0)),fatigue:Number.isFinite(+props.fatigue)?Math.max(0,Math.min(1,+props.fatigue)):0,visits:0};nodes.push(n);return n}
 function addEdge(a,b,w=.45){a=String(a);b=String(b);if(!a||!b||a===b)return;addNode(a);addNode(b);w=Number.isFinite(+w)?Math.max(.01,Math.min(1,+w)):.45;let e=edges.find(e=>(e.a===a&&e.b===b)||(e.a===b&&e.b===a));if(e)e.w=w;else edges.push({a,b,w})}
-function seed(){nodes=[];edges=[];messages=[];seedWords.forEach(x=>addNode(x));seedLinks.forEach(x=>addEdge(...x));nodes.find(x=>x.id==='water').a=1;nodes.find(x=>x.id==='experience').a=.8;renderMessages()}
+function seed(){nodes=[];edges=[];messages=[];recentTrails.clear();lastTrail=[];seedWords.forEach(x=>addNode(x));seedLinks.forEach(x=>addEdge(...x));nodes.find(x=>x.id==='water').a=1;nodes.find(x=>x.id==='experience').a=.8;renderMessages()}
 function stimulate(s){let words=s.toLowerCase().match(/[\p{L}\p{N}_'-]+/gu)||[];words=words.slice(0,32);let prev=null;for(let w of words){let n=addNode(w);n.a=1;n.visits++;if(prev)addEdge(prev,w,.55);prev=w}if(words.length){$('info').textContent='Stimulated: '+words.join(' · ');draw()}}
-function tick(dt){let next=new Map(nodes.map(n=>[n.id,n.a*Math.pow(.91,dt*10)]));for(let e of edges){let a=nodes.find(n=>n.id===e.a),b=nodes.find(n=>n.id===e.b);if(!a||!b)continue;let amount=dt*1.2*e.w;next.set(a.id,Math.min(1,next.get(a.id)+b.a*amount));next.set(b.id,Math.min(1,next.get(b.id)+a.a*amount))}for(let n of nodes)n.a=Math.min(1,next.get(n.id));let chance=dt*(+$('activity').value/100)*.7;if(Math.random()<chance&&nodes.length){let n=nodes[Math.floor(Math.random()*nodes.length)];n.a=Math.min(1,n.a+.65);n.visits++}}
-function thought(){if(!nodes.length)return;let ranked=[...nodes].sort((a,b)=>b.a-a.a);let start=ranked[0];if(!start||start.a<.035)return;let trail=[start],seen=new Set([start.id]),cur=start;for(let i=0;i<Math.min(7,nodes.length-1);i++){let candidates=edges.filter(e=>e.a===cur.id||e.b===cur.id).map(e=>({n:nodes.find(n=>n.id===(e.a===cur.id?e.b:e.a)),w:e.w})).filter(x=>x.n&&!seen.has(x.n.id)).sort((a,b)=>(b.n.a*b.w)-(a.n.a*a.w));if(!candidates.length||candidates[0].n.a<.025)break;cur=candidates[0].n;trail.push(cur);seen.add(cur.id)}if(trail.length===1&&ranked[1]?.a>.05)trail.push(ranked[1]);trail.forEach(n=>n.visits++);messages.push({id:++serial,time:new Date().toLocaleTimeString(),words:trail.map(n=>n.id),strength:Math.round(start.a*100)});if(messages.length>150)messages.shift();renderMessages()}
+function tick(dt){
+  // Passive leakage plus bounded incoming signal. A node cannot gain unlimited energy
+  // simply because it has many active neighbours.
+  const next=new Map();
+  for(const n of nodes){
+    n.fatigue=Math.max(0,n.fatigue-dt*.115);
+    next.set(n.id,n.a*Math.exp(-dt*.9));
+  }
+  const input=new Map(nodes.map(n=>[n.id,0]));
+  for(const e of edges){
+    const a=nodes.find(n=>n.id===e.a),b=nodes.find(n=>n.id===e.b);
+    if(!a||!b)continue;
+    input.set(a.id,input.get(a.id)+b.a*e.w);
+    input.set(b.id,input.get(b.id)+a.a*e.w);
+  }
+  const peak=Math.max(.001,...input.values());
+  for(const n of nodes){
+    const drive=Math.tanh(input.get(n.id)*.7);
+    const competition=.38*(input.get(n.id)/peak);
+    const gained=dt*.55*drive*(1-n.a)*(1-.55*n.fatigue);
+    next.set(n.id,Math.max(0,Math.min(1,next.get(n.id)+gained-dt*.18*competition*n.a)));
+  }
+  for(const n of nodes)n.a=next.get(n.id);
+  const chance=dt*(+$('activity').value/100)*.7;
+  if(Math.random()<chance&&nodes.length){
+    const weights=nodes.map(n=>.05+(1-n.a)*(1-.8*n.fatigue));
+    let pick=Math.random()*weights.reduce((a,b)=>a+b,0),chosen=nodes[0];
+    for(let i=0;i<nodes.length;i++){pick-=weights[i];if(pick<=0){chosen=nodes[i];break}}
+    chosen.a=Math.min(1,chosen.a+.45);chosen.visits++;
+  }
+  for(const [k,v] of recentTrails){const faded=v*Math.exp(-dt*.13);if(faded<.015)recentTrails.delete(k);else recentTrails.set(k,faded)}
+}
+function thought(){
+  if(!nodes.length)return;
+  // Sample from a small pool of viable starts instead of always choosing the top node.
+  const ranked=nodes.map(n=>({n,score:(n.a+.02)*(1-.8*n.fatigue)}))
+    .filter(x=>x.n.a>.035).sort((a,b)=>b.score-a.score);
+  if(!ranked.length)return;
+  const pool=ranked.slice(0,Math.min(12,ranked.length));
+  let start=pool[0].n;
+  if(pool.length>1){
+    const weights=pool.map(x=>Math.pow(x.score,1.5)),total=weights.reduce((a,b)=>a+b,0);
+    let r=Math.random()*total;
+    for(let i=0;i<pool.length;i++){r-=weights[i];if(r<=0){start=pool[i].n;break}}
+  }
+  let trail=[start],seen=new Set([start.id]),cur=start;
+  for(let i=0;i<Math.min(7,nodes.length-1);i++){
+    const candidates=edges.filter(e=>e.a===cur.id||e.b===cur.id)
+      .map(e=>({n:nodes.find(n=>n.id===(e.a===cur.id?e.b:e.a)),w:e.w}))
+      .filter(x=>x.n&&!seen.has(x.n.id)&&x.n.a>.025);
+    if(!candidates.length)break;
+    // Novelty is based only on recent output, not on a dictionary of 'good' phrases.
+    const scored=candidates.map(x=>{
+      const pair=[cur.id,x.n.id].join('>');
+      const repetition=recentTrails.get(pair)||0;
+      const score=(x.n.a+.04)*x.w*(1-.8*x.n.fatigue)/(1+2.5*repetition);
+      return {...x,score};
+    }).sort((a,b)=>b.score-a.score);
+    const options=scored.slice(0,Math.min(3,scored.length));
+    let choice=options[0],r=Math.random()*options.reduce((sum,x)=>sum+x.score*x.score,0);
+    for(const x of options){r-=x.score*x.score;if(r<=0){choice=x;break}}
+    cur=choice.n;trail.push(cur);seen.add(cur.id);
+  }
+  if(trail.length===1&&ranked.length>1)trail.push(ranked.find(x=>x.n.id!==start.id).n);
+  for(let i=0;i<trail.length;i++){
+    const n=trail[i];n.visits++;n.fatigue=Math.min(1,n.fatigue+.34);
+    if(i>0){const key=trail[i-1].id+'>'+n.id;recentTrails.set(key,Math.min(3,(recentTrails.get(key)||0)+.55))}
+  }
+  lastTrail=trail.map(n=>n.id);
+  messages.push({id:++serial,time:new Date().toLocaleTimeString(),words:lastTrail,strength:Math.round(start.a*100)});
+  if(messages.length>150)messages.shift();
+  renderMessages();
+}
 function renderMessages(){let c=$('chat');c.replaceChildren();if(!messages.length){let p=document.createElement('div');p.className='muted';p.textContent='Awaiting first activation trail…';c.append(p)}for(let m of messages){let d=document.createElement('div');d.className='msg';let meta=document.createElement('div');meta.className='meta';meta.textContent='#'+m.id+' · '+m.time+' · '+m.strength+'% activation';let words=document.createElement('div');words.className='words';words.textContent=m.words.join(' → ');d.append(meta,words);c.append(d)}c.scrollTop=c.scrollHeight}
 function bounds(){let r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);if(canvas.width!==Math.round(r.width*dpr)||canvas.height!==Math.round(r.height*dpr)){canvas.width=Math.round(r.width*dpr);canvas.height=Math.round(r.height*dpr)}ctx.setTransform(dpr,0,0,dpr,0,0);return{w:r.width,h:r.height}}
 function draw(){let {w,h}=bounds();ctx.clearRect(0,0,w,h);ctx.fillStyle='#080d14';ctx.fillRect(0,0,w,h);let scale=Math.min(w/850,h/650,1.2),cx=w/2,cy=h/2;const pos=n=>({x:cx+n.x*scale,y:cy+n.y*scale});for(let e of edges){let a=nodes.find(n=>n.id===e.a),b=nodes.find(n=>n.id===e.b);if(!a||!b)continue;let p=pos(a),q=pos(b);ctx.strokeStyle='rgba(75,157,179,'+(.10+Math.max(a.a,b.a)*.6)+')';ctx.lineWidth=.7+e.w*2;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke()}for(let n of nodes){let p=pos(n),rad=5+n.a*8;ctx.beginPath();ctx.arc(p.x,p.y,rad+7*n.a,0,Math.PI*2);ctx.fillStyle='rgba(88,226,195,'+(n.a*.13)+')';ctx.fill();ctx.beginPath();ctx.arc(p.x,p.y,rad,0,Math.PI*2);ctx.fillStyle=n.a>.4?'#78f0d3':'#497b92';ctx.fill();ctx.font=(n.a>.45?'bold ':'')+'11px monospace';ctx.textAlign='center';ctx.fillStyle=n.a>.3?'#e3fff4':'#93aebe';ctx.fillText(n.id,p.x,p.y-12-n.a*8)}$('hud').textContent=nodes.length+' WORDS / '+edges.length+' LINKS / '+messages.length+' THOUGHTS'}
 function loop(t){let dt=Math.min(.08,(t-lastFrame)/1000||.016);lastFrame=t;if(!paused){tick(dt);elapsed+=dt;if(elapsed>=+$('interval').value){elapsed=0;thought()}}draw();requestAnimationFrame(loop)}
-function download(){let data={format:'trailweb-thought-v1',version:1,nodes:nodes.map(n=>({id:n.id,activation:+n.a.toFixed(4),x:Math.round(n.x),y:Math.round(n.y)})),edges:edges.map(e=>({source:e.a,target:e.b,weight:e.w})),thoughts:messages};let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='trailweb-thought-brain.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function download(){let data={format:'trailweb-thought-v2',version:2,nodes:nodes.map(n=>({id:n.id,activation:+n.a.toFixed(4),fatigue:+n.fatigue.toFixed(4),x:Math.round(n.x),y:Math.round(n.y)})),edges:edges.map(e=>({source:e.a,target:e.b,weight:e.w})),thoughts:messages};let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='trailweb-thought-brain.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 function ingest(data){if(Array.isArray(data))data={nodes:data};if(!data||typeof data!=='object')throw Error('Expected a JSON object');let ns=data.nodes||data.words||data.vocabulary||[],es=data.edges||data.links||data.connections||[];if(!Array.isArray(ns)&&typeof ns==='object')ns=Object.entries(ns).map(([id,v])=>({id,...(typeof v==='object'?v:{activation:v})}));if(!Array.isArray(ns)||!Array.isArray(es))throw Error('nodes and edges must be arrays');if(ns.length>2000||es.length>10000)throw Error('Import exceeds safety limit');for(let item of ns){if(typeof item==='string')addNode(item);else if(item&&typeof item==='object')addNode(item.id??item.word??item.label??item.name,item)}for(let e of es){if(Array.isArray(e))addEdge(e[0],e[1],e[2]);else if(e&&typeof e==='object')addEdge(e.source??e.from??e.a,e.target??e.to??e.b,e.weight??e.strength??e.w)}$('info').textContent='Merged '+ns.length+' nodes and '+es.length+' connections. Brain now has '+nodes.length+' words.'}
 $('import').onchange=async e=>{let f=e.target.files[0];if(!f)return;try{ingest(JSON.parse(await f.text()))}catch(err){$('info').textContent='Import error: '+err.message}e.target.value=''};$('export').onclick=download;$('pause').onclick=()=>{paused=!paused;$('pause').textContent=paused?'RESUME':'PAUSE';$('state').textContent=paused?'PAUSED':'AWAKE'};$('step').onclick=()=>{tick(.3);thought();draw()};$('speak').onclick=thought;$('reset').onclick=()=>{if(confirm('Reset the network and clear thought history?')){seed();serial=0}};$('inject').onclick=()=>{stimulate($('stimulus').value);$('stimulus').value=''};$('stimulus').onkeydown=e=>{if(e.key==='Enter')$('inject').click()};$('interval').oninput=()=>{$('intervalLabel').textContent=$('interval').value+'s'};$('activity').oninput=()=>{$('activityLabel').textContent=$('activity').value+'%'};
 let drag=null;function locate(e){let r=canvas.getBoundingClientRect(),scale=Math.min(r.width/850,r.height/650,1.2);return{x:(e.clientX-r.left-r.width/2)/scale,y:(e.clientY-r.top-r.height/2)/scale}}canvas.addEventListener('pointerdown',e=>{let p=locate(e);drag=nodes.find(n=>Math.hypot(n.x-p.x,n.y-p.y)<20)||null;if(drag){drag.a=1;drag.visits++;canvas.setPointerCapture(e.pointerId)}});canvas.addEventListener('pointermove',e=>{if(drag){let p=locate(e);drag.x=p.x;drag.y=p.y}});canvas.addEventListener('pointerup',()=>drag=null);canvas.addEventListener('pointercancel',()=>drag=null);
