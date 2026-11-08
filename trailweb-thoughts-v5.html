@@ -64,7 +64,7 @@ function thought(){
     for(let i=0;i<pool.length;i++){r-=weights[i];if(r<=0){start=pool[i].n;break}}
   }
   let trail=[start],seen=new Set([start.id]),cur=start;
-  for(let i=0;i<Math.min(7,nodes.length-1);i++){
+  for(let i=0;i<Math.min(20,nodes.length-1);i++){
     const candidates=edges.filter(e=>e.a===cur.id||e.b===cur.id)
       .map(e=>({n:nodes.find(n=>n.id===(e.a===cur.id?e.b:e.a)),w:e.w,trace:e.trace||0}))
       .filter(x=>x.n&&!seen.has(x.n.id)&&x.n.a>.025);
