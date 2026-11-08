@@ -2,11 +2,11 @@
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>TrailWeb // Snake</title>
 <style>
 :root{color-scheme:dark;font-family:ui-monospace,Menlo,Consolas,monospace}*{box-sizing:border-box}body{margin:0;background:#080d13;color:#d7e6e5}main{max-width:980px;margin:auto;padding:18px}h1{font-size:clamp(23px,5vw,38px);margin:8px 0}small,.muted{color:#809c9b}header{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.tag{border:1px solid #31534f;border-radius:20px;padding:6px 10px;color:#8ce3c3}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.stat{background:#111e26;border:1px solid #253943;padding:12px;border-radius:12px}.stat strong{display:block;font-size:22px;color:#a3efcf}canvas{display:block;width:100%;aspect-ratio:1;background:#0d171e;border:1px solid #2b454a;border-radius:12px;image-rendering:pixelated}section{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(220px,1fr);gap:14px}.panel{background:#101b23;border:1px solid #263e47;border-radius:12px;padding:14px}.panel h2{font-size:15px;margin:0 0 12px}.log{font-size:12px;line-height:1.8;max-height:230px;overflow:auto;color:#a4c1bc}.row{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #21333a;padding:5px 0}button{background:#17352f;color:#c8f5df;border:1px solid #3b7863;border-radius:8px;padding:9px 12px;font:inherit;cursor:pointer}button:focus-visible{outline:2px solid white}.buttons{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.note{font-size:12px;line-height:1.6;color:#91aaa9}#flash{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:10}#flash.green{background:#20ff72;animation:flash .32s ease-out}#flash.red{background:#ff193a;animation:flash .52s ease-out}@keyframes flash{0%{opacity:.7}100%{opacity:0}}@media(max-width:650px){section{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}main{padding:12px}}
-.observatory{margin-top:16px}.obsgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.obschart{width:100%;height:150px;background:#0b171c;border:1px solid #284047;border-radius:8px}.benchmark{font-size:13px;line-height:1.7;white-space:pre-wrap;color:#b9dbd2}.fine{font-size:11px;color:#86a5a1}@media(max-width:650px){.obsgrid{grid-template-columns:1fr}}</style>
+.observatory{margin-top:16px}.obsgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.obschart{width:100%;height:150px;aspect-ratio:auto;background:#0b171c;border:1px solid #284047;border-radius:8px}.benchmark{font-size:13px;line-height:1.7;white-space:pre-wrap;color:#b9dbd2}.fine{font-size:11px;color:#86a5a1}@media(max-width:650px){.obsgrid{grid-template-columns:1fr}}</style>
 <div id="flash"></div><main><header><div><small>FORGE // AUTONOMOUS EXPERIMENT</small><h1>TRAILWEB <span style="color:#70e9a6">/ SNAKE</span></h1></div><span class="tag">NO PLAYER CONTROLS</span></header>
 <div class="stats"><div class="stat"><small>FOOD EATEN</small><strong id="food">0</strong></div><div class="stat"><small>DEATHS</small><strong id="deaths">0</strong></div><div class="stat"><small>BEST LENGTH</small><strong id="best">3</strong></div><div class="stat"><small>TRAIL LINKS</small><strong id="links">0</strong></div></div>
 <section><div><canvas id="board" width="560" height="560" aria-label="Autonomous snake game"></canvas><div class="buttons"><button id="pause">Pause observer</button><button id="speed">Speed: 1×</button><button id="export">Export brain</button><button id="reset">Erase learning</button></div><p class="note">Green flash: food. Red flash: death (wall, body, or starvation). The snake starts again automatically. No keyboard, touch, or mouse input steers it.</p></div>
-<div class="panel"><h2>ASSOCIATIVE TRAILWEB</h2><div class="row"><span>Mode</span><b id="mode">Exploring</b></div><div class="row"><span>Current length</span><b id="length">3</b></div><div class="row"><span>Moves survived</span><b id="moves">0</b></div><div class="row"><span>Exploration</span><b id="epsilon">35%</b></div><h2 style="margin-top:22px">LATEST TRAILS</h2><div id="log" class="log"></div><p class="note">The brain sees local wall/body danger, food direction, and whether it is moving toward food. It associates those observations with relative actions (straight, left, right), strengthens rewarded trails, and weakens fatal ones. No pathfinder or hardcoded food-seeking policy.</p></div></section><div class="panel observatory"><h2>LEARNING OBSERVATORY</h2><p class="note">Live history records completed lives from this update onward. Your existing brain and scores remain untouched.</p><div class="obsgrid"><div><b>Meals per life</b><canvas id="mealChart" class="obs chart" width="430" height="150"></canvas></div><div><b>Moves survived per life</b><canvas id="survivalChart" class="obs chart" width="430" height="150"></canvas></div></div><div class="row"><span>Recorded lives</span><b id="historyCount">0</b></div><div class="row"><span>Last 20 lives: meals / life</span><b id="recentMeals">—</b></div><div class="row"><span>Last 20 lives: moves / life</span><b id="recentMoves">—</b></div><div class="buttons"><button id="benchmark">Experiment 02: 20 scrambles + 20 action shuffles</button><button id="exportHistory">Export observatory</button></div><div id="benchmarkResult" class="benchmark">No benchmark run yet. This is an evaluation, not training.</div><p class="fine">Experiment 02: 100 matched seeds for the experienced and blank brains, plus 20 independent state-key scrambles and 20 independent per-state action-label shuffles. All policies are frozen. Seeded food streams can diverge after actions differ. The two controls preserve learned weight values but disrupt different relationships.</p></div></main>
+<div class="panel"><h2>ASSOCIATIVE TRAILWEB</h2><div class="row"><span>Mode</span><b id="mode">Exploring</b></div><div class="row"><span>Current length</span><b id="length">3</b></div><div class="row"><span>Moves survived</span><b id="moves">0</b></div><div class="row"><span>Exploration</span><b id="epsilon">35%</b></div><h2 style="margin-top:22px">LATEST TRAILS</h2><div id="log" class="log"></div><p class="note">The brain sees local wall/body danger, food direction, and whether it is moving toward food. It associates those observations with relative actions (straight, left, right), strengthens rewarded trails, and weakens fatal ones. No pathfinder or hardcoded food-seeking policy.</p></div></section><div class="panel observatory"><h2>LEARNING OBSERVATORY</h2><p class="note">Live history records completed lives from this update onward. Your existing brain and scores remain untouched.</p><div class="obsgrid"><div><b>Meals per life</b><canvas id="mealChart" class="obschart" width="430" height="150"></canvas></div><div><b>Moves survived per life</b><canvas id="survivalChart" class="obs chart" width="430" height="150"></canvas></div></div><div class="row"><span>Recorded lives</span><b id="historyCount">0</b></div><div class="row"><span>Last 20 lives: meals / life</span><b id="recentMeals">—</b></div><div class="row"><span>Last 20 lives: moves / life</span><b id="recentMoves">—</b></div><div class="buttons"><button id="benchmark">Experiment 02: 20 scrambles + 20 action shuffles</button><button id="worldBenchmark">Experiment 03: unfamiliar worlds</button><button id="exportHistory">Export observatory</button></div><div id="worldResult" class="benchmark">Experiment 03 not run yet.</div><div id="benchmarkResult" class="benchmark">No benchmark run yet. This is an evaluation, not training.</div><p class="fine">Experiment 02: 100 matched seeds for the experienced and blank brains, plus 20 independent state-key scrambles and 20 independent per-state action-label shuffles. All policies are frozen. Seeded food streams can diverge after actions differ. The two controls preserve learned weight values but disrupt different relationships.</p></div></main>
 <script>
 (()=>{'use strict';
 const N=20,C=560/N,DIR=[[1,0],[0,1],[-1,0],[0,-1]],KEY='trailweb-snake-v1';
@@ -94,8 +94,60 @@ output.textContent='EXPERIMENT 02 · ASSOCIATION INTEGRITY\\n100 matched seeds �
 lastBenchmark=results;
 button.disabled=false;button.textContent='Experiment 02: rerun 20 + 20 controls';
 }catch(e){output.textContent='Benchmark failed: '+e.message;button.disabled=false;button.textContent='Retry Experiment 02'}}setTimeout(advance,0)}
+
+const WORLDS=[
+{id:'familiar',label:'20×20 · familiar',size:20,pattern:'uniform'},
+{id:'small',label:'16×16 · smaller',size:16,pattern:'uniform'},
+{id:'large',label:'24×24 · larger',size:24,pattern:'uniform'},
+{id:'pillars',label:'20×20 · pillars',size:20,pattern:'uniform',obstacles:true},
+{id:'edge',label:'20×20 · edge food',size:20,pattern:'edge'},
+{id:'center',label:'20×20 · center food',size:20,pattern:'center'}
+];
+function worldLife(weights,seed,world){
+const n=world.size,env=rng(seed^0xBADC0DE),policy=rng(seed^0x12345678),pick=(random,max)=>Math.floor(random()*max),startDir=pick(env,4),mid=Math.floor(n/2);
+let body=[{x:mid,y:mid},{x:mid-DIR[startDir][0],y:mid-DIR[startDir][1]},{x:mid-2*DIR[startDir][0],y:mid-2*DIR[startDir][1]}],heading=startDir,meals=0,moves=0,target=null;
+const sameCell=(a,b)=>a.x===b.x&&a.y===b.y;
+const blocks=new Set();
+if(world.obstacles){for(const [x,y] of [[4,4],[4,5],[5,4],[5,5],[14,4],[14,5],[15,4],[15,5],[4,14],[4,15],[5,14],[5,15],[14,14],[14,15],[15,14],[15,15]])blocks.add(y*n+x)}
+const blocked=p=>p.x<0||p.y<0||p.x>=n||p.y>=n||blocks.has(p.y*n+p.x);
+const occupied=(p,grow=false)=>blocked(p)||body.slice(0,grow?undefined:-1).some(b=>sameCell(b,p));
+const spawn=()=>{const free=[];for(let y=0;y<n;y++)for(let x=0;x<n;x++){if(blocked({x,y})||body.some(b=>b.x===x&&b.y===y))continue;if(world.pattern==='edge'&&x!==0&&y!==0&&x!==n-1&&y!==n-1)continue;if(world.pattern==='center'&&(x<Math.floor(n/4)||y<Math.floor(n/4)||x>=Math.ceil(n*3/4)||y>=Math.ceil(n*3/4)))continue;free.push({x,y})}target=free.length?free[pick(env,free.length)]:null};
+spawn();
+for(let turn=0;turn<Math.max(180,n*n+body.length*12)&&target;turn++){
+const h=body[0],dx=target.x-h.x,dy=target.y-h.y,angles=[heading,(heading+3)%4,(heading+1)%4],dots=angles.map(d=>Math.sign(dx*DIR[d][0]+dy*DIR[d][1]));
+const ds=angles.map(d=>{const p={x:h.x+DIR[d][0],y:h.y+DIR[d][1]};return occupied(p,sameCell(p,target))?1:0});
+const near=angles.map(d=>{let p={x:h.x+DIR[d][0],y:h.y+DIR[d][1]},distance=0;while(distance<4&&!occupied(p)){distance++;p={x:p.x+DIR[d][0],y:p.y+DIR[d][1]}}return distance===0?'0':distance===1?'1':'2'});
+const key=[ds.join(''),near.join(''),...dots,body.length>8?'L':'S'].join('|'),node=weights[key],w=node&&node.w||[0,0,0];
+let action=0,bestScore=-Infinity;for(let i=0;i<3;i++){const score=w[i]+policy()*.3;if(score>bestScore){bestScore=score;action=i}}
+const nextDir=angles[action],p={x:h.x+DIR[nextDir][0],y:h.y+DIR[nextDir][1]},eat=sameCell(p,target);
+if(occupied(p,eat))break;
+body.unshift(p);heading=nextDir;moves++;if(eat){meals++;spawn()}else body.pop();
+}
+return{meals,moves};
+}
+let lastWorldBenchmark=null;
+function runWorldBenchmark(){
+const button=$('worldBenchmark'),output=$('worldResult');button.disabled=true;button.textContent='Evaluating worlds…';
+const snapshot=JSON.parse(JSON.stringify(brain)),seeds=Array.from({length:100},(_,i)=>(0x9e3779b9+i*2654435761)>>>0);
+const report={version:3,method:'frozen policies, 100 seeded trials per world; separate environment and action RNG streams',worlds:[],states:Object.keys(snapshot).length};
+let index=0;
+function advance(){try{
+if(index<WORLDS.length){
+const world=WORLDS[index],experienced=[],blank=[];
+for(const seed of seeds){experienced.push(worldLife(snapshot,seed,world));blank.push(worldLife({},seed,world))}
+const avg=(arr,k)=>arr.reduce((sum,x)=>sum+x[k],0)/arr.length;
+report.worlds.push({id:world.id,label:world.label,experienced:{meals:avg(experienced,'meals'),moves:avg(experienced,'moves')},blank:{meals:avg(blank,'meals'),moves:avg(blank,'moves')},winsMeals:experienced.filter((x,i)=>x.meals>blank[i].meals).length,raw:{experienced,blank}});
+index++;output.textContent='Experiment 03: '+index+'/'+WORLDS.length+' worlds evaluated…';setTimeout(advance,0);return;
+}
+const fmt=n=>n.toFixed(2).padStart(7),lines=report.worlds.map(w=>w.label.padEnd(23)+fmt(w.experienced.meals)+' / '+fmt(w.blank.meals)+'   '+fmt(w.experienced.moves)+' / '+fmt(w.blank.moves)+'   '+w.winsMeals+'/100');
+output.textContent='EXPERIMENT 03 · UNFAMILIAR WORLDS\\n100 seeded trials per world; frozen trained vs blank\\n\\nWorld                    Meals trained/blank  Moves trained/blank  Meal wins\\n'+lines.join('\\n')+'\\n\\nWorlds: familiar 20×20, smaller 16×16, larger 24×24, four 2×2 corner-area pillars, food on perimeter, food in center region. Food streams are independently seeded from policy tie-breaks. No training occurs. Compare to the familiar baseline within this experiment, not Experiment 02 (random streams differ).';
+lastWorldBenchmark=report;button.disabled=false;button.textContent='Experiment 03: rerun unfamiliar worlds';
+}catch(e){output.textContent='Experiment 03 failed: '+e.message;button.disabled=false;button.textContent='Retry Experiment 03'}}
+setTimeout(advance,0)
+}
+$('worldBenchmark').onclick=runWorldBenchmark;
 $('benchmark').onclick=runBenchmark;
-$('exportHistory').onclick=()=>{const blob=new Blob([JSON.stringify({history,benchmarkText:$('benchmarkResult').textContent,benchmark:lastBenchmark},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='trailweb-snake-observatory.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+$('exportHistory').onclick=()=>{const blob=new Blob([JSON.stringify({history,benchmarkText:$('benchmarkResult').textContent,benchmark:lastBenchmark,worldBenchmark:lastWorldBenchmark},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='trailweb-snake-observatory.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 updateObservatory();
 
 })();
