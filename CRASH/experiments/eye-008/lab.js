@@ -1,0 +1,27 @@
+const $=id=>document.getElementById(id),W=32,P=1024,T=8;let weights=new Float64Array(T),updates=0,last=null,result=null,busy=false,stop=false,playId=0;
+const rand=(a,b)=>a+Math.floor(Math.random()*(b-a+1)),sig=z=>1/(1+Math.exp(-Math.max(-30,Math.min(30,z))));
+function makeTrial(){const side=Math.random()<.5?0:1,split=$('split').value,y=split==='train'?rand(1,14):split==='held'?rand(17,30):rand(1,30),x=side?rand(17,30):rand(1,14),pos=y*W+x,onset=rand(1,5),brightness=rand(65,230),frames=Array.from({length:T},()=>new Uint8Array(P));
+ for(let t=onset;t<T;t++)frames[t][pos]=brightness;
+ const flashes=$('world').value==='heavy'?9:$('world').value==='quiet'?0:3;
+ for(let t=0;t<T;t++)for(let j=0;j<flashes;j++){const p=rand(0,P-1);if(p!==pos)frames[t][p]=rand(55,255)}
+ return {frames,pos,x,y,onset,brightness,answer:side===0?'left':'right'}}
+function observe(t){const activ=new Float64Array(P),left=new Float64Array(T),right=new Float64Array(T);let ls=0,rs=0;
+ for(let p=0;p<P;p++){let a=0;const isLeft=p%W<16;for(let k=0;k<T;k++){const v=t.frames[k][p]/255;a+=weights[k]*v;if(isLeft)left[k]+=v;else right[k]+=v}const score=Math.max(0,a);activ[p]=score;if(isLeft)ls+=score;else rs+=score}
+ const delta=(ls-rs)/8,p=sig(delta),choice=Math.random()<p?'left':'right';let baseL=0,baseR=0;for(let i=0;i<P;i++){if(i%W<16)baseL+=t.frames[T-1][i];else baseR+=t.frames[T-1][i]}const base=baseL===baseR?(Math.random()<.5?'left':'right'):(baseL>baseR?'left':'right');
+ return {activ,left,right,p,choice,base,ls,rs}}
+function update(t,o){const error=(t.answer==='left'?1:0)-o.p,gradient=new Float64Array(T);
+ // Backpropagate through ReLU attention and left/right sum. All pixels are visited.
+ for(let p=0;p<P;p++){if(o.activ[p]<=0)continue;const sign=p%W<16?1:-1;for(let k=0;k<T;k++)gradient[k]+=sign*t.frames[k][p]/255}
+ for(let k=0;k<T;k++)weights[k]=Math.max(-8,Math.min(8,weights[k]+.12*error*gradient[k]/8));updates++}
+function sample(train){const t=makeTrial(),o=observe(t);if(train)update(t,o);last={t,o};return {learned:Number(o.choice===t.answer),baseline:Number(o.base===t.answer),target:o.activ[t.pos],total:o.ls+o.rs}}
+function paint(id,data,attention=false){const ctx=$(id).getContext('2d'),img=ctx.createImageData(W,W);let peak=0;if(attention)for(let i=0;i<P;i++)peak=Math.max(peak,data[i]);for(let i=0;i<P;i++){const v=attention?(peak>0?data[i]/peak:0):data[i]/255;img.data[i*4]=attention?Math.round(255*v):Math.round(255*v);img.data[i*4+1]=attention?Math.round(125*v):Math.round(255*v);img.data[i*4+2]=attention?Math.round(20*v):Math.round(255*v);img.data[i*4+3]=255}ctx.putImageData(img,0,0)}
+function display(){if(last){const {t,o}=last;$('example').textContent='Attention: '+o.choice+' · Last frame: '+o.base+' · Actual: '+t.answer;$('details').textContent=JSON.stringify({world:$('world').value,locationSplit:$('split').value,example:{x:t.x,y:t.y,onset:t.onset,brightness:t.brightness,answer:t.answer,attentionOnTarget:o.activ[t.pos],totalAttention:o.ls+o.rs},learner:{weights:Array.from(weights),updates},evaluation:result},null,2);paint('attention',o.activ,true)}$('learned').textContent=result?(100*result.learned/result.total).toFixed(1)+'%':'—';$('baseline').textContent=result?(100*result.baseline/result.total).toFixed(1)+'%':'—';$('count').textContent=updates.toLocaleString();$('target').textContent=result?(100*result.targetShare/result.total).toFixed(1)+'%':'—'}
+async function replay(){if(!last)return;const id=++playId;for(let k=0;k<T;k++){if(id!==playId)return;paint('scene',last.t.frames[k]);$('frame').textContent='Frame '+(k+1)+' / '+T;await new Promise(r=>setTimeout(r,260))}}
+function lock(v){busy=v;for(const id of ['eval','train','new','world','split'])$(id).disabled=v;$('reset').textContent=v?'Cancel and reset':'Reset learner'}
+async function run(n,train){if(busy)return;stop=false;lock(true);let done=0,l=0,b=0,share=0;if(train)result=null;while(done<n&&!stop){const batch=Math.min(25,n-done);for(let i=0;i<batch;i++){const a=sample(train);l+=a.learned;b+=a.baseline;share+=a.total>0?a.target/a.total:0}done+=batch;$('status').textContent=(train?'Training ':'Evaluating ')+done+' / '+n;display();await new Promise(r=>setTimeout(r,0))}if(!stop){if(!train)result={total:n,learned:l,baseline:b,targetShare:share};$('status').textContent=(train?'Training':'Evaluation')+' complete';++playId;paint('scene',last.t.frames[T-1]);$('frame').textContent='Frame 8 / 8';display()}lock(false)}
+$('train').onclick=()=>run(10000,true);$('eval').onclick=()=>run(1000,false);
+$('reset').onclick=()=>{stop=true;weights=new Float64Array(T);updates=0;result=null;last=null;++playId;$('status').textContent='Reset';$('details').textContent='';paint('attention',new Float64Array(P),true);display()};
+for(const id of ['world','split'])$(id).onchange=()=>{result=null;$('status').textContent='World changed. Evaluate again.';display()};
+$('new').onclick=()=>{const t=makeTrial(),o=observe(t);last={t,o};display();replay()};$('replay').onclick=()=>replay();
+$('export').onclick=()=>{const data={experiment:'eye-008',world:$('world').value,locationSplit:$('split').value,learner:{weights:Array.from(weights),updates},evaluation:result,example:last&&{x:last.t.x,y:last.t.y,onset:last.t.onset,brightness:last.t.brightness,answer:last.t.answer,attentionOnTarget:last.o.activ[last.t.pos]}};const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='crash-eye-008.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$('new').click();
