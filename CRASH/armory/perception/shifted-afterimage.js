@@ -1,0 +1,5 @@
+// Render latest to oldest, with older frames progressively bit-shifted and faded.
+// This is a visualization algorithm, not a learned perception.
+export function composeAfterimage(frames,width=32,height=32){const out=new Uint8ClampedArray(width*height*4);for(let i=0;i<out.length;i+=4)out[i+3]=255;for(let age=0;age<frames.length;age++){const rgb=frames[age],shift=Math.min(age,7),alpha=age===0?1:1/(age+1);for(let p=0;p<width*height;p++){const i=p*4,j=p*3;for(let c=0;c<3;c++){const value=rgb[j+c]>>shift;out[i+c]=Math.round(value*alpha+out[i+c]*(1-alpha))}}}return out}
+export function drawRGB(canvas,rgb,size=32){const ctx=canvas.getContext('2d'),im=ctx.createImageData(size,size);for(let p=0;p<size*size;p++){im.data[p*4]=rgb[p*3];im.data[p*4+1]=rgb[p*3+1];im.data[p*4+2]=rgb[p*3+2];im.data[p*4+3]=255}ctx.putImageData(im,0,0)}
+export function drawRGBA(canvas,rgba,size=32){const ctx=canvas.getContext('2d'),im=ctx.createImageData(size,size);im.data.set(rgba);ctx.putImageData(im,0,0)}
