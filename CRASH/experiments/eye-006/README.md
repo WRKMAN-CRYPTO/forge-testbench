@@ -1,0 +1,5 @@
+# Eye 006: Wandering Witness
+
+Eye 005 remains untouched. Two points appear at random locations within left/right halves of eight full 32×32 RGB frames, with independent brightness and staggered appearance. Neither learner receives coordinates or onset labels. A fixed, supplied difference detector compares every pixel in adjacent frames and aggregates positive brightness changes by half; the history learner learns seven temporal weights for those differences. The control learner sees only final total brightness by half. Both train via online logistic feedback and are evaluated on fresh held-out trials without updating weights.
+
+This removes fixed pixel coordinates, but not fixed left/right spatial grouping or supplied frame-difference detection. It is not a test of autonomous object discovery or self-built visual attention. Evaluate before training; train 10,000 in random mode; evaluate again and then in adversarial brightness mode without further training. Export results. This synthetic task is intentionally simple and could also be solved by hand-coded onset detection, so success is evidence of learned use of temporal features only.
