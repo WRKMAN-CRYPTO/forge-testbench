@@ -1,0 +1,23 @@
+const $=id=>document.getElementById(id),N=32,P=N*N,K=10,MAX=24,keys=['rgb','gray','red','green','blue'];let frame=new Uint8Array(P*3),work=fresh(),archive=[],tick=0,within=0,timer=null;
+function fresh(){return {rgb:new Float32Array(P*3),gray:new Float32Array(P),red:new Float32Array(P),green:new Float32Array(P),blue:new Float32Array(P)}}
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1)),clamp=x=>Math.min(255,Math.max(0,x));
+function dot(f,x,y,r,g,b){if(x<0||x>=32||y<0||y>=32)return;const i=(y*32+x)*3;f[i]=r;f[i+1]=g;f[i+2]=b}
+function make(t){const f=new Uint8Array(P*3),s=$('scene').value;
+if(s==='mixed'||s==='equal'){for(let y=5;y<12;y++)for(let x=4;x<11;x++)dot(f,x,y,255,0,0);for(let y=20;y<27;y++)for(let x=21;x<28;x++)dot(f,x,y,0,130,0)}
+if(s==='mixed'||s==='moving'){const x=2+t%28,y=14+Math.round(5*Math.sin(t*.22));dot(f,x,y,0,0,255);dot(f,31-x,19,255,100,0)}
+if(s==='recolor'){const color=Math.floor(t/10)%2;for(let y=10;y<23;y++)for(let x=10;x<23;x++)dot(f,x,y,color?0:255,color?130:0,0)}
+if(s==='mixed'||s==='noise'){for(let j=0;j<Number($('noise').value);j++){const x=rnd(0,31),y=rnd(0,31),c=rnd(0,2),v=rnd(100,255);dot(f,x,y,c===0?v:0,c===1?v:0,c===2?v:0)}}
+return f}
+function rgbBytes(a){return Uint8Array.from(a,v=>Math.round(clamp(v)))}
+function draw(id,arr,mode){const ctx=$(id).getContext('2d'),im=ctx.createImageData(N,N);for(let p=0;p<P;p++){const j=p*4;if(mode==='rgb'){im.data[j]=arr[p*3];im.data[j+1]=arr[p*3+1];im.data[j+2]=arr[p*3+2]}else{const v=arr[p];im.data[j]=mode==='red'||mode==='gray'?v:0;im.data[j+1]=mode==='green'||mode==='gray'?v:0;im.data[j+2]=mode==='blue'||mode==='gray'?v:0}im.data[j+3]=255}ctx.putImageData(im,0,0)}
+function refresh(){draw('live',frame,'rgb');for(const k of keys)draw(k,work[k],k);$('progress').textContent=within+' / 10 frames · '+tick+' observed · '+archive.length+' stored batches'}
+function inspect(m){for(const k of keys)draw('saved'+k,m[k],k);$('selected').textContent='Stored frames '+m.start+'–'+m.end}
+function renderArchive(){const root=$('archive');root.replaceChildren();for(let i=archive.length-1;i>=0;i--){const m=archive[i],b=document.createElement('button'),c=document.createElement('canvas');c.width=c.height=N;b.append(c,document.createTextNode('Frames '+m.start+'–'+m.end));b.onclick=()=>inspect(m);root.append(b);const ctx=c.getContext('2d'),im=ctx.createImageData(N,N);for(let p=0;p<P;p++){const j=p*4;im.data[j]=m.rgb[p*3];im.data[j+1]=m.rgb[p*3+1];im.data[j+2]=m.rgb[p*3+2];im.data[j+3]=255}ctx.putImageData(im,0,0)}}
+function observe(){frame=make(tick);for(let p=0;p<P;p++){const j=p*3,r=frame[j],g=frame[j+1],b=frame[j+2];work.rgb[j]=clamp(work.rgb[j]+r*.1);work.rgb[j+1]=clamp(work.rgb[j+1]+g*.1);work.rgb[j+2]=clamp(work.rgb[j+2]+b*.1);work.red[p]=clamp(work.red[p]+r*.1);work.green[p]=clamp(work.green[p]+g*.1);work.blue[p]=clamp(work.blue[p]+b*.1);work.gray[p]=clamp(work.gray[p]+(.2126*r+.7152*g+.0722*b)*.1)}
+tick++;within++;if(within===K){const m={start:tick-K+1,end:tick};for(const k of keys)m[k]=rgbBytes(work[k]);archive.push(m);if(archive.length>MAX)archive.shift();inspect(m);renderArchive();work=fresh();within=0;$('status').textContent='Stored frames '+m.start+'–'+m.end}refresh()}
+function stop(){if(timer!==null)clearInterval(timer);timer=null;$('play').textContent='Autoplay'}
+function play(){stop();timer=setInterval(observe,1000/Number($('fps').value));$('play').textContent='Pause'}
+$('step').onclick=observe;$('ten').onclick=()=>{for(let i=0;i<10;i++)observe()};$('play').onclick=()=>timer===null?play():stop();$('fps').oninput=()=>{$('fpsVal').textContent=$('fps').value;if(timer!==null)play()};$('noise').oninput=()=>{$('noiseVal').textContent=$('noise').value};$('scene').onchange=()=>{$('status').textContent='Scene changed; existing memories retained'};
+$('reset').onclick=()=>{stop();frame=new Uint8Array(P*3);work=fresh();archive=[];tick=0;within=0;renderArchive();for(const k of keys)draw('saved'+k,work[k],k);$('selected').textContent='No completed memories yet.';$('status').textContent='Reset';refresh()};
+$('export').onclick=()=>{const obj={experiment:'eye-010',method:'independent RGB, grayscale, R, G, B ten-frame additive memories',scene:$('scene').value,noise:Number($('noise').value),totalFrames:tick,workingFrames:within,working:Object.fromEntries(keys.map(k=>[k,Array.from(work[k])])),archive:archive.map(m=>({start:m.start,end:m.end,...Object.fromEntries(keys.map(k=>[k,Array.from(m[k])]))}))};const url=URL.createObjectURL(new Blob([JSON.stringify(obj)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='crash-eye-010.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+refresh();
