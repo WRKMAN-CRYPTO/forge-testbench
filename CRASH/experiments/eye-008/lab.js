@@ -5,13 +5,13 @@ function makeTrial(){const side=Math.random()<.5?0:1,split=$('split').value,y=sp
  const flashes=$('world').value==='heavy'?9:$('world').value==='quiet'?0:3;
  for(let t=0;t<T;t++)for(let j=0;j<flashes;j++){const p=rand(0,P-1);if(p!==pos)frames[t][p]=rand(55,255)}
  return {frames,pos,x,y,onset,brightness,answer:side===0?'left':'right'}}
-function observe(t){const activ=new Float64Array(P),left=new Float64Array(T),right=new Float64Array(T);let ls=0,rs=0;
- for(let p=0;p<P;p++){let a=0;const isLeft=p%W<16;for(let k=0;k<T;k++){const v=t.frames[k][p]/255;a+=weights[k]*v;if(isLeft)left[k]+=v;else right[k]+=v}const score=Math.max(0,a);activ[p]=score;if(isLeft)ls+=score;else rs+=score}
+function observe(t){const activ=new Float64Array(P),active=new Uint8Array(P),left=new Float64Array(T),right=new Float64Array(T);let ls=0,rs=0;
+ for(let p=0;p<P;p++){let a=0;const isLeft=p%W<16;for(let k=0;k<T;k++){const v=t.frames[k][p]/255;a+=weights[k]*v;if(isLeft)left[k]+=v;else right[k]+=v}const score=Math.max(0,a);active[p]=a>=0?1:0;activ[p]=score;if(isLeft)ls+=score;else rs+=score}
  const delta=(ls-rs)/8,p=sig(delta),choice=Math.random()<p?'left':'right';let baseL=0,baseR=0;for(let i=0;i<P;i++){if(i%W<16)baseL+=t.frames[T-1][i];else baseR+=t.frames[T-1][i]}const base=baseL===baseR?(Math.random()<.5?'left':'right'):(baseL>baseR?'left':'right');
- return {activ,left,right,p,choice,base,ls,rs}}
+ return {activ,active,left,right,p,choice,base,ls,rs}}
 function update(t,o){const error=(t.answer==='left'?1:0)-o.p,gradient=new Float64Array(T);
  // Backpropagate through ReLU attention and left/right sum. All pixels are visited.
- for(let p=0;p<P;p++){if(o.activ[p]<=0)continue;const sign=p%W<16?1:-1;for(let k=0;k<T;k++)gradient[k]+=sign*t.frames[k][p]/255}
+ for(let p=0;p<P;p++){if(!o.active[p])continue;const sign=p%W<16?1:-1;for(let k=0;k<T;k++)gradient[k]+=sign*t.frames[k][p]/255}
  for(let k=0;k<T;k++)weights[k]=Math.max(-8,Math.min(8,weights[k]+.12*error*gradient[k]/8));updates++}
 function sample(train){const t=makeTrial(),o=observe(t);if(train)update(t,o);last={t,o};return {learned:Number(o.choice===t.answer),baseline:Number(o.base===t.answer),target:o.activ[t.pos],total:o.ls+o.rs}}
 function paint(id,data,attention=false){const ctx=$(id).getContext('2d'),img=ctx.createImageData(W,W);let peak=0;if(attention)for(let i=0;i<P;i++)peak=Math.max(peak,data[i]);for(let i=0;i<P;i++){const v=attention?(peak>0?data[i]/peak:0):data[i]/255;img.data[i*4]=attention?Math.round(255*v):Math.round(255*v);img.data[i*4+1]=attention?Math.round(125*v):Math.round(255*v);img.data[i*4+2]=attention?Math.round(20*v):Math.round(255*v);img.data[i*4+3]=255}ctx.putImageData(img,0,0)}
