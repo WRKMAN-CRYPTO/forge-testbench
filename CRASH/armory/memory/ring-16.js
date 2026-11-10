@@ -1,0 +1,2 @@
+// Working memory contains at most 16 point measurements, not an image.
+export function createRingMemory(capacity=16){let items=[];return {get capacity(){return capacity},recall(x,y){return [...items].reverse().find(p=>p.x===x&&p.y===y)||null},store(point){items.push({...point});if(items.length>capacity)items.shift()},all(){return items.map(p=>({...p}))},clear(){items=[]}}}
