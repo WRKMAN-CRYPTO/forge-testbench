@@ -1,0 +1,2 @@
+// No image access: one coordinate in, one measured value out.
+export function createPointSampler(world){let reads=0;return {sample(x,y,tick){reads++;return {x,y,value:world.read(x,y),tick}},get reads(){return reads}}}
