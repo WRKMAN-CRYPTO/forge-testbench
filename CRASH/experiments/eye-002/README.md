@@ -1,0 +1,3 @@
+# Eye 002: Shifted Afterimage
+
+A separate experiment from Eye 001. Retains 16 full RGB snapshots of a 32×32 world. The first retained frame is the newest. Composite draws newest to oldest. At age `a`, each channel is shifted right by `min(a,7)` bits; opacity is `1/(a+1)` (newest is 100%). Each older frame overlays the composite already drawn. Thus dark older pixels can darken the newest frame, by design. All 1,024 pixels per frame are captured, not sparsely sampled. World is editable by touch; a moving dot and automatic captures make temporal trails easy to test. The composite is a laboratory visualization, not evidence of learned visual understanding. No automatic persistence; export JSON to retain a run.
