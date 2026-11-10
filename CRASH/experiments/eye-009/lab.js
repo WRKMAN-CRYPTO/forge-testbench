@@ -1,0 +1,23 @@
+const $=id=>document.getElementById(id),W=32,P=W*W,BATCH=10,MAX=24;let current=new Float32Array(P),live=new Uint8Array(P),archive=[],tick=0,within=0,timer=null,selected=null;
+const clamp=n=>Math.max(0,Math.min(255,n)),rand=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+function dot(frame,x,y,value=255){if(x>=0&&x<W&&y>=0&&y<W)frame[y*W+x]=Math.max(frame[y*W+x],value)}
+function sceneFrame(t){const f=new Uint8Array(P),mode=$('scene').value;
+ if(mode==='mixed'||mode==='stationary'){for(let y=6;y<12;y++)for(let x=5;x<11;x++)dot(f,x,y,210);for(let y=21;y<26;y++)dot(f,23,y,165)}
+ if(mode==='mixed'||mode==='moving'){const x=2+(t%28),y=15+Math.round(5*Math.sin(t*.27));dot(f,x,y,255)}
+ if(mode==='blink')if(t%4<2)dot(f,16,16,255);
+ if(mode==='mixed'||mode==='flicker'||mode==='blink'){const n=Number($('noise').value);for(let i=0;i<n;i++)dot(f,rand(0,31),rand(0,31),rand(90,255))}
+ return f}
+function paint(canvasId,arr,contrast=false){const ctx=$(canvasId).getContext('2d'),img=ctx.createImageData(W,W);let maximum=0;if(contrast)for(const v of arr)maximum=Math.max(maximum,v);const gain=contrast&&maximum>0?255/maximum:1;for(let i=0;i<P;i++){const v=clamp(Math.round(arr[i]*gain)),j=i*4;img.data[j]=v;img.data[j+1]=v;img.data[j+2]=v;img.data[j+3]=255}ctx.putImageData(img,0,0)}
+function renderArchive(){const root=$('memories');root.replaceChildren();for(let i=archive.length-1;i>=0;i--){const m=archive[i],button=document.createElement('button'),canvas=document.createElement('canvas'),caption=document.createElement('small');canvas.width=canvas.height=W;caption.textContent='Frames '+m.start+'–'+m.end;button.append(canvas,caption);button.onclick=()=>inspect(m);root.append(button);const ctx=canvas.getContext('2d'),im=ctx.createImageData(W,W);for(let p=0;p<P;p++){const j=p*4,v=m.pixels[p];im.data[j]=im.data[j+1]=im.data[j+2]=v;im.data[j+3]=255}ctx.putImageData(im,0,0)}}
+function inspect(m){selected=m;paint('selected',m.pixels);paint('contrast',m.pixels,true);$('selectedLabel').textContent='Stored frames '+m.start+'–'+m.end}
+function display(){paint('live',live);paint('working',current);$('progress').textContent='Working memory: '+within+' / '+BATCH+' frames · Total observed: '+tick;$('details').textContent=JSON.stringify({scene:$('scene').value,totalFrames:tick,workingFrames:within,storedMemories:archive.length,selected: selected?{start:selected.start,end:selected.end,meanBrightness:selected.meanBrightness}:null},null,2)}
+function observe(){live=sceneFrame(tick);for(let i=0;i<P;i++)current[i]=Math.min(255,current[i]+live[i]*.1);tick++;within++;if(within===BATCH){const pixels=Uint8Array.from(current,v=>Math.round(v)),meanBrightness=pixels.reduce((a,b)=>a+b,0)/P,m={start:tick-BATCH+1,end:tick,pixels,meanBrightness};archive.push(m);if(archive.length>MAX)archive.shift();inspect(m);current=new Float32Array(P);within=0;renderArchive();$('status').textContent='Archived frames '+m.start+'–'+m.end}display()}
+function stop(){if(timer!==null){clearInterval(timer);timer=null}$('run').textContent='Start autoplay'}
+function start(){stop();timer=setInterval(observe,1000/Number($('speed').value));$('run').textContent='Pause autoplay'}
+$('step').onclick=()=>observe();$('ten').onclick=()=>{for(let i=0;i<10;i++)observe()};$('run').onclick=()=>timer===null?start():stop();
+$('speed').oninput=()=>{$('speedLabel').textContent=$('speed').value+' fps';if(timer!==null)start()};
+$('noise').oninput=()=>{$('noiseLabel').textContent=$('noise').value};
+$('scene').onchange=()=>{$('status').textContent='Scene changed; existing memories preserved.'};
+$('reset').onclick=()=>{stop();current=new Float32Array(P);live=new Uint8Array(P);archive=[];tick=0;within=0;selected=null;renderArchive();paint('selected',live);paint('contrast',live);$('selectedLabel').textContent='Select an archived memory';$('status').textContent='Observation reset';display()};
+$('export').onclick=()=>{const data={experiment:'eye-009',method:'additive 10% per frame; reset every 10',scene:$('scene').value,noise:Number($('noise').value),totalFrames:tick,workingFrames:within,working:Array.from(current),archive:archive.map(m=>({start:m.start,end:m.end,meanBrightness:m.meanBrightness,pixels:Array.from(m.pixels)}))};const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='crash-eye-009.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+display();
