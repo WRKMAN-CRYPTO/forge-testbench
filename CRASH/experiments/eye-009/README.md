@@ -1,0 +1,5 @@
+# Eye 009: The Ten-Frame Witness
+
+An isolated, **non-learning** observation experiment. A synthetic 32×32 grayscale scene generates stationary objects, moving dots, blinking pixels, and/or random flashes. Starting from black, the temporary canvas accumulates `0.10 × frame` every observation (with 255 clipping). At ten observations the canvas is stored as one compressed image, then cleared. Archive holds the newest 24 images. The live snapshot, accumulating canvas, completed archive, and display-only contrast-enhanced inspection are visible. Export includes every archived 32×32 pixel image plus the partial working canvas.
+
+This is an **additive sum**, not an exponential moving average. Consistently bright pixels accumulate; moving objects leave trails; sporadic flashes tend to be faint. It does not directly measure stability, motion, or change. Equal accumulated brightness can result from different temporal patterns. Resetting every ten frames prevents indefinite saturation, although pixels may saturate within a batch if values are unusually high. No learning, reward, attention, or decisions occur in this experiment. Eye 008 remains unchanged.
