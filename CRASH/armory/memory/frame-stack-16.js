@@ -1,0 +1,2 @@
+// Replaceable 16-frame memory: each frame is a private copy of 32x32 RGB pixels.
+export function createFrameStack(capacity=16){let frames=[];return {capacity,push(rgb){frames.unshift(Uint8ClampedArray.from(rgb));if(frames.length>capacity)frames.pop()},all(){return frames.map(f=>Uint8ClampedArray.from(f))},get length(){return frames.length},clear(){frames=[]}}}
