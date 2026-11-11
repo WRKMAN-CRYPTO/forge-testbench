@@ -1,0 +1,7 @@
+# Eye 014: Break the Pointer
+
+Isolated test of direction-specific relational attention. A white 4×4 marker touches one of equally persistent red/green 4×4 objects. Color totals are balanced regardless of label. The 32×32 RGB image is a ten-frame additive memory. The fixed front end identifies colored candidate tiles from the image and reads four neighboring RGB tiles; it does **not** provide a named marker feature or target coordinate. A four-weight trainable spatial filter scores neighboring white intensity and softmax attends over candidates. A trainable logistic head maps attended red/green to A/B. A global-color logistic control is trained on the same outcomes.
+
+Default training shows the marker above the target only. Evaluation can move it right, below, left, or mix all directions. Separate per-direction evaluation statistics are exported. A second training setting mixes all directions, testing whether sufficient variation permits a reusable filter. All positions vary across the 8×8 grid; evaluation also varies brightness. Both learners freeze during evaluation.
+
+Important limits: Candidate segmentation, four-neighbor sampling, aligned tile geometry, and marker proximity are engineered. The task tests learning which neighbor directions matter, not learning spatial geometry from unrestricted raw pixels. A direction-generalized model may simply learn that any neighboring white tile marks the target. This is useful but narrow. No other eye experiment is modified.
