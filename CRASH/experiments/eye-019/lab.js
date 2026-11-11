@@ -8,7 +8,7 @@ const bright=rnd(95,240);function paint(tx,ty,r,g,b){for(let yy=ty*4;yy<ty*4+4;y
 for(const o of objects)paint(o.x,o.y,o.cls?0:bright,o.cls?bright*.2973:0,0);paint(mx,my,125,125,125);
 const tiles=[];for(let ty=0;ty<8;ty++)for(let tx=0;tx<8;tx++){const j=(ty*4*32+tx*4)*3,r=mem[j],g=mem[j+1],b=mem[j+2];if(Math.max(r,g,b)<1||Math.min(r,g,b)>25)continue;const neighbors=[];for(let k=0;k<4;k++)for(let step=1;step<=3;step++){const xx=tx+DIRS[k][0]*step,yy=ty+DIRS[k][1]*step;if(xx<0||xx>7||yy<0||yy>7){neighbors.push(0);continue}const i=(yy*4*32+xx*4)*3;neighbors.push(Math.min(mem[i],mem[i+1],mem[i+2])/125)}tiles.push({x:tx,y:ty,signal:g>r?1:-1,neighbors})}
 return {d,dist,cls,x,y,mx,my,mem,tiles}}
-function cuePixel(t){const [dx,dy]=DIRS[t.d];return {x:t.mx*4+1+dx,y:t.my*4+1+dy}}
+function cuePixel(t){const [dx,dy]=DIRS[t.d];return {x:t.mx*4+1-dx,y:t.my*4+1-dy}}
 function visibleImage(t){const m=new Float64Array(t.mem),p=cuePixel(t),i=(p.y*32+p.x)*3;m[i]=0;m[i+1]=255;m[i+2]=255;return m}
 function decodeCue(t){const m=visibleImage(t);for(let k=0;k<4;k++){const [dx,dy]=DIRS[k],px=t.mx*4+1+dx,py=t.my*4+1+dy,i=(py*32+px)*3;if(m[i]===0&&m[i+1]===255&&m[i+2]===255)return k}return -1}
 function cueMatch(o,t,dir){if(dir<0)return 0;const [dx,dy]=DIRS[dir],vx=o.x-t.mx,vy=o.y-t.my;return Number(vx*dx+vy*dy>0&&vx*dy===vy*dx)}
