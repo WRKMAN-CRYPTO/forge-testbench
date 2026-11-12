@@ -1,0 +1,145 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Crash | Star Brain 001</title><style>
+*{box-sizing:border-box}body{margin:0;background:#080e18;color:#e1edf8;font:14px system-ui}header{padding:16px;border-bottom:1px solid #294056;display:flex;justify-content:space-between;gap:12px}h1{margin:3px 0;font-size:22px}small,.muted{color:#9aafc4}a{color:#8cdef4}main{max-width:1200px;margin:auto;padding:12px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:12px}.panel{background:#111c2a;border:1px solid #30435b;border-radius:12px;padding:13px}canvas{width:100%;display:block;image-rendering:pixelated;background:#060a12;border-radius:8px}#game{aspect-ratio:1/1;max-height:65vh;object-fit:contain}button,input,select{font:inherit}button{padding:9px 12px;background:#223c53;color:#e8f8ff;border:1px solid #4c718b;border-radius:8px;cursor:pointer}.actions{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}label{display:block;margin:9px 0}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.stat{padding:9px;background:#0b1522;border-radius:8px}.stat strong{display:block;font-size:19px;color:#b9eaff}.bars{display:grid;gap:8px}.bar{height:9px;background:#25374a;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:#60c4e9}.note{font-size:12px;color:#a6bad0;line-height:1.5}select,input[type=number]{background:#0b1522;color:#fff;border:1px solid #435d76;border-radius:5px;padding:6px}#log{max-height:180px;overflow:auto;font:11px monospace;white-space:pre-wrap;color:#b5cbe1}@media(max-width:750px){main{grid-template-columns:1fr}header{align-items:center}h1{font-size:19px}}
+</style></head><body><header><div><small>CRASH / EXPERIMENTAL COGNITION</small><h1>STAR BRAIN 001</h1><small>100 physical agents · 50-unit spawn cube · invisible chamber</small></div><a href="../../index.html">CRASH HQ</a></header><main><section class="panel"><canvas id="game" width="320" height="320"></canvas><div class="actions"><button id="toggle">Pause</button><button id="stepOne">One vote</button><button id="reset">Reset seed</button><button id="export">Export JSON</button></div><div class="actions"><label>Seed <input id="seed" type="number" value="1001" style="width:90px"></label><label>Speed <select id="speed"><option value="1">1×</option><option value="4">4×</option><option value="12">12×</option></select></label><label><input id="training" type="checkbox" checked> Counterfactual training referee</label><label><input id="thermal" type="checkbox" checked> Heat affects confidence</label></div><p class="note">Stage 1: Catch the ball. Each decision runs the same physics step from the original Thermal Chamber, without rendering the chamber. The referee tests alternate actions from the same game state. Those results never enter the sensory buffer.</p><h3>Last decisions</h3><div id="log"></div></section><aside class="panel"><h3>Observatory</h3><div class="stats" id="stats"></div><h3>Votes</h3><div class="bars" id="votes"></div><h3>Eye channels</h3><div id="eyes" class="note"></div><h3>Individual agents</h3><label>Inspect <select id="inspect"></select></label><div id="agent" class="note"></div><h3>Physics integrity</h3><div id="physics" class="note"></div><p class="note">The original Thermal Chamber's motion, collision, conduction, boundary, radiation, and emission equations are copied into this isolated experiment. The former hottest-agent leader-election/message behavior is intentionally disabled: Agent 0 is the fixed vote counter. Cognitive heat rewards are additional energy injections, not conserved physical processes.</p></aside></main><script>
+"use strict";
+const $=id=>document.getElementById(id),cv=$("game"),cx=cv.getContext("2d");
+const N=100,L=2500,BASE=3.4,DT=.045,K=.18,SPRING=16,DAMP=1.5,COND=.06,EMIT=.018,ABSORB=.42,WAVE_SPEED=32;
+let agents=[],pulses=[],tick=0,pressure=0,emitted=0,absorbed=0,escaped=0,rng,brainRng,gameRng,run=true,decisions=0,catches=0,misses=0,randomCorrect=0,records=[],lastVotes=[0,0,0],lastAction=1,prevBall=null;
+const ACTIONS=["LEFT","STAY","RIGHT"],CHANNELS=["gray","red","green","blue","rgb"],MODES=["live","cumulative","difference"],SLOTS=32;
+let memories=[],eyes=[],ring=[],game={},gameClock=0;
+function randSeed(seed){let s=(seed>>>0)||1;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296}}
+function radius(a){return BASE*(1+.01*Math.min(1,Math.max(0,a.h)/4))}
+function cognitionStep(){}
+function step(){
+let ax=new Float64Array(N),ay=new Float64Array(N),az=new Float64Array(N);
+pressure=0;
+if(N<=300){for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
+let a=agents[i],b=agents[j],dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,d=Math.hypot(dx,dy,dz)||1e-9;
+let f=K*+$('grav').value,nx=dx/d,ny=dy/d,nz=dz/d;
+ax[i]+=f*nx;ay[i]+=f*ny;az[i]+=f*nz;ax[j]-=f*nx;ay[j]-=f*ny;az[j]-=f*nz;
+}
+}else{
+let mx=0,my=0,mz=0;for(let a of agents){mx+=a.x;my+=a.y;mz+=a.z}mx/=N;my/=N;mz/=N;
+for(let i=0;i<N;i++){let a=agents[i],dx=mx-a.x,dy=my-a.y,dz=mz-a.z,d=Math.hypot(dx,dy,dz)||1;let f=K*+$('grav').value*(N-1)*.42;ax[i]=f*dx/d;ay[i]=f*dy/d;az[i]=f*dz/d}
+}
+for(let i=0;i<N;i++){let a=agents[i];a.vx+=ax[i]*DT;a.vy+=ay[i]*DT;a.vz+=az[i]*DT;a.x+=a.vx*DT;a.y+=a.vy*DT;a.z+=a.vz*DT;}
+const restitution=.82;
+for(let pass=0;pass<(N>300?3:6);pass++){
+let pairs=[];
+if(N<=300){for(let i=0;i<N;i++)for(let j=i+1;j<N;j++)pairs.push([i,j])}
+else {let cell=8,map=new Map();for(let i=0;i<N;i++){let a=agents[i],x=Math.floor(a.x/cell),y=Math.floor(a.y/cell),z=Math.floor(a.z/cell),key=x+','+y+','+z;if(!map.has(key))map.set(key,[]);map.get(key).push(i)}
+for(let i=0;i<N;i++){let a=agents[i],x=Math.floor(a.x/cell),y=Math.floor(a.y/cell),z=Math.floor(a.z/cell);for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){let list=map.get((x+dx)+','+(y+dy)+','+(z+dz));if(list)for(let j of list)if(j>i)pairs.push([i,j])}}}
+for(let [i,j] of pairs){
+let a=agents[i],b=agents[j],dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,d=Math.hypot(dx,dy,dz);
+let minD=radius(a)+radius(b),over=minD-d;
+if(over<=0)continue;
+let nx,ny,nz;if(d<1e-9){nx=1;ny=0;nz=0}else{nx=dx/d;ny=dy/d;nz=dz/d}
+let correction=(over+1e-5)*.5;
+a.x-=nx*correction;a.y-=ny*correction;a.z-=nz*correction;
+b.x+=nx*correction;b.y+=ny*correction;b.z+=nz*correction;
+pressure+=over;
+let rv=(b.vx-a.vx)*nx+(b.vy-a.vy)*ny+(b.vz-a.vz)*nz;
+if(rv<0){
+let impulse=-(1+restitution)*rv/2;
+a.vx-=impulse*nx;a.vy-=impulse*ny;a.vz-=impulse*nz;
+b.vx+=impulse*nx;b.vy+=impulse*ny;b.vz+=impulse*nz;
+let loss=(1-restitution*restitution)*rv*rv/4;
+a.h+=loss*.5;b.h+=loss*.5;
+}
+if(pass===0){let q=(a.h-b.h)*COND*DT;a.h-=q;b.h+=q}
+}
+for(let a of agents)for(let k of ['x','y','z']){let r=radius(a),v='v'+k;if(a[k]>L-r){a[k]=L-r;if(a[v]>0){let old=a[v];a[v]=-old*restitution;a.h+=(1-restitution*restitution)*old*old/2}}else if(a[k]<-L+r){a[k]=-L+r;if(a[v]<0){let old=a[v];a[v]=-old*restitution;a.h+=(1-restitution*restitution)*old*old/2}}}
+}
+for(let i=0;i<N;i++){let a=agents[i];if(a.h>+$('threshold').value){let e=Math.min(a.h,EMIT*(a.h-+$('threshold').value)*DT);if(e>1e-5){a.h-=e;pulses.push({x:a.x,y:a.y,z:a.z,r:0,e,hit:new Set([i])});emitted++}}}
+for(let k=pulses.length-1;k>=0;k--){let p=pulses[k],old=p.r;p.r+=WAVE_SPEED*DT;for(let i=0;i<N;i+=(N>300?Math.ceil(N/300):1)){if(p.hit.has(i))continue;let a=agents[i],d=Math.hypot(a.x-p.x,a.y-p.y,a.z-p.z);if(d-radius(a)<=p.r&&d+radius(a)>=old){p.hit.add(i);let take=Math.min(p.e, p.e*ABSORB*Math.min(1,radius(a)*radius(a)/(4*Math.max(d*d,1))));a.h+=take;p.e-=take;absorbed+=take}}if(p.r>2*L*Math.sqrt(3)||p.e<1e-8){escaped+=p.e;pulses.splice(k,1)}}if(pulses.length>(N>300?400:3000)){let overflow=pulses.splice(0,pulses.length-(N>300?400:3000));for(let p of overflow)escaped+=p.e}tick++;}
+
+function reset(){
+rng=randSeed(+$("seed").value);brainRng=randSeed((+$("seed").value)^0x6a09e667);gameRng=randSeed((+$("seed").value)^0x3c6ef372);
+agents=[];pulses=[];tick=0;pressure=emitted=absorbed=escaped=0;
+for(let i=0;i<N;i++)agents.push({x:(rng()-.5)*50,y:(rng()-.5)*50,z:(rng()-.5)*50,vx:0,vy:0,vz:0,h:0,belief:-1,beliefHeat:-1,beliefTime:-Infinity,nextThink:0,lastSignal:-1});
+memories=Array.from({length:N},(_,i)=>i===0?null:{slots:[],attention:{x:Math.floor(brainRng()*8),y:Math.floor(brainRng()*8),size:[1,2,4,8][Math.floor(brainRng()*4)],channel:Math.floor(brainRng()*5),mode:Math.floor(brainRng()*3)},explore:.09+brainRng()*.1});
+ring=[];eyes=[];records=[];decisions=catches=misses=randomCorrect=gameClock=0;lastVotes=[0,0,0];lastAction=1;newBall();$("inspect").innerHTML=Array.from({length:99},(_,i)=>'<option value="'+(i+1)+'">Agent '+(i+1)+'</option>').join("");observe();render();
+}
+function newBall(){game={paddle:160,ballX:35+gameRng()*250,ballY:65,dx:(gameRng()-.5)*2.2,dy:2.5,alive:true};prevBall=null}
+function drawWorld(){cx.fillStyle="#070d17";cx.fillRect(0,0,320,320);cx.fillStyle="#f4f8fc";cx.beginPath();cx.arc(game.ballX,game.ballY,4,0,Math.PI*2);cx.fill();cx.fillStyle="#5ad3ee";cx.fillRect(game.paddle-29,296,58,8);cx.strokeStyle="#253c51";cx.strokeRect(1,1,318,318)}
+function observe(){
+drawWorld();let rgba=cx.getImageData(0,0,320,320).data,frame=new Float32Array(32*32*5);
+for(let y=0;y<32;y++)for(let x=0;x<32;x++){let p=((y*10+5)*320+x*10+5)*4,j=(y*32+x)*5,r=rgba[p]/255,g=rgba[p+1]/255,b=rgba[p+2]/255;frame[j]=(r+g+b)/3;frame[j+1]=r;frame[j+2]=g;frame[j+3]=b;frame[j+4]=(r+g+b)/3}
+ring.push(frame);if(ring.length>10)ring.shift();let cumulative=new Float32Array(frame.length);
+for(let f of ring)for(let j=0;j<f.length;j++)cumulative[j]+=f[j]/ring.length;
+eyes=[frame,cumulative];return eyes;
+}
+function fingerprint(att){
+let {x,y,size,channel,mode}=att,live=eyes[0],sum=eyes[1],out=[];
+const ch=channel===4?0:channel;
+for(let gy=0;gy<2;gy++)for(let gx=0;gx<2;gx++){let acc=0,n=0;for(let yy=y+Math.floor(gy*size/2);yy<Math.min(32,y+Math.max(1,Math.floor((gy+1)*size/2)));yy++)for(let xx=x+Math.floor(gx*size/2);xx<Math.min(32,x+Math.max(1,Math.floor((gx+1)*size/2)));xx++){let j=(yy*32+xx)*5+ch;acc+=mode===0?live[j]:mode===1?sum[j]:Math.abs(live[j]-sum[j]);n++}out.push(n?acc/n:0)}
+return out;
+}
+function similarity(a,b){let s=0;for(let j=0;j<a.length;j++)s+=Math.abs(a[j]-b[j]);return 1-s/a.length}
+function selectMemory(mem,fp){let best=null,score=0;for(let slot of mem.slots){let sim=similarity(slot.fp,fp);if(sim>score){score=sim;best=slot}}return {best,score}}
+function vote(i){
+let mem=memories[i],att=mem.attention,fp=fingerprint(att),match=selectMemory(mem,fp),scores=[0,0,0];
+if(match.best&&match.score>.87)for(let k=0;k<3;k++)scores[k]=match.best.values[k]*match.score;
+let max=Math.max(...scores),choices=[0,1,2].filter(k=>Math.abs(scores[k]-max)<1e-8),preferred=choices[Math.floor(brainRng()*choices.length)];
+let heat=agents[i].h,commit=$("thermal").checked?Math.min(.95,.34+.61*(1-Math.exp(-Math.max(0,heat)/2))):.7;
+let action=brainRng()<commit*(1-mem.explore)?preferred:Math.floor(brainRng()*3);
+return {i,action,fp,att:{...att},matched:!!match.best,score:match.score};
+}
+function adaptAttention(mem,positive){
+if(brainRng()>(positive?.035:.09))return;
+let a=mem.attention;let mutation=Math.floor(brainRng()*5);
+if(mutation===0)a.x=Math.floor(brainRng()*(33-a.size));
+if(mutation===1)a.y=Math.floor(brainRng()*(33-a.size));
+if(mutation===2){a.size=[1,2,4,8][Math.floor(brainRng()*4)];a.x=Math.min(a.x,32-a.size);a.y=Math.min(a.y,32-a.size)}
+if(mutation===3)a.channel=Math.floor(brainRng()*5);
+if(mutation===4)a.mode=Math.floor(brainRng()*3);
+}
+function learn(v,good){
+let m=memories[v.i],slots=m.slots,found=-1,best=0;
+for(let j=0;j<slots.length;j++){let s=similarity(slots[j].fp,v.fp);if(s>best&&s>.96){best=s;found=j}}
+if(found<0){if(slots.length>=SLOTS){let victim=0,min=Infinity;for(let j=0;j<slots.length;j++){let val=slots[j].strength-.0005*(decisions-slots[j].last);if(val<min){min=val;victim=j}}slots.splice(victim,1)}
+slots.push({fp:[...v.fp],values:[0,0,0],strength:0,last:decisions});found=slots.length-1}
+let s=slots[found];s.values[v.action]=Math.max(-3,Math.min(3,s.values[v.action]+(good?.25:-.20)));s.strength=Math.min(10,s.strength+.1);s.last=decisions;
+if(decisions%50===0)for(let q of slots)q.strength*=.995;
+adaptAttention(m,good);
+}
+function evaluateAction(action){
+let g={...game},p=Math.max(29,Math.min(291,g.paddle+(action-1)*8));
+let x=g.ballX,y=g.ballY,dx=g.dx,dy=g.dy;
+for(let t=0;t<125;t++){x+=dx;y+=dy;if(x<5){x=10-x;dx=Math.abs(dx)}if(x>315){x=630-x;dx=-Math.abs(dx)}if(y>=293&&dy>0)return Math.abs(x-p)<=33; if(y>325)return false}
+return null;
+}
+function advanceGame(action){
+game.paddle=Math.max(29,Math.min(291,game.paddle+(action-1)*8));
+for(let k=0;k<3;k++){game.ballX+=game.dx;game.ballY+=game.dy;if(game.ballX<5||game.ballX>315){game.dx*=-1;game.ballX=Math.max(5,Math.min(315,game.ballX))}}
+if(game.ballY>=293){let good=Math.abs(game.ballX-game.paddle)<=33;if(good)catches++;else misses++;newBall();return good}return null;
+}
+function decision(){
+for(let k=0;k<3;k++)step();
+observe();
+let voters=[],counts=[0,0,0];for(let i=1;i<100;i++){let v=vote(i);voters.push(v);counts[v.action]++}
+let mx=Math.max(...counts),tied=[0,1,2].filter(k=>counts[k]===mx),chosen=tied[Math.floor(brainRng()*tied.length)];
+let possibilities=[0,1,2].map(evaluateAction),actual=advanceGame(chosen),reference=possibilities[chosen];
+for(let v of voters){let good=possibilities[v.action];if($("training").checked&&good!==null){learn(v,good);if(good)agents[v.i].h+=.025}else if(actual!==null&&v.action===chosen){learn(v,actual);if(actual)agents[v.i].h+=.025}}
+if(reference===false)agents[0].h=Math.max(0,agents[0].h-.03);else if(reference===true)agents[0].h+=.025;
+decisions++;lastVotes=counts;lastAction=chosen;
+if(reference!==null){randomCorrect+=possibilities[Math.floor(brainRng()*3)]===true?1:0}
+if(decisions%1===0){records.push({decision:decisions,votes:[...counts],action:ACTIONS[chosen],tie:tied.length>1,possible:possibilities,leaderHeat:agents[0].h,catchRate:catches/(catches+misses||1)});if(records.length>3000)records.shift()}
+observe();render();
+}
+function render(){
+drawWorld();let vals=[["Decisions",decisions],["Catches",catches],["Misses",misses],["Catch rate",((catches/(catches+misses||1))*100).toFixed(1)+"%"],["Mean heat",(agents.reduce((s,a)=>s+a.h,0)/100).toFixed(3)],["Physics ticks",tick],["Tie votes",records.filter(r=>r.tie).length],["Memory slots",memories.reduce((s,m)=>s+(m?m.slots.length:0),0)]];
+$("stats").innerHTML=vals.map(v=>'<div class="stat"><small>'+v[0]+'</small><strong>'+v[1]+'</strong></div>').join("");
+$("votes").innerHTML=lastVotes.map((n,i)=>'<div>'+ACTIONS[i]+' · '+n+'<div class="bar"><i style="width:'+(n/99*100)+'%"></i></div></div>').join("");
+$("eyes").textContent="32×32 pixels · RGB / red / green / blue / grayscale · current + 10-frame average + absolute difference. Agents choose region, channel and time mode.";
+let idx=+$("inspect").value||1,m=memories[idx];if(m){let a=m.attention;$("agent").textContent="Agent "+idx+" · heat "+agents[idx].h.toFixed(3)+" · "+m.slots.length+"/32 memories · attention ("+a.x+","+a.y+") "+a.size+"×"+a.size+" · "+CHANNELS[a.channel]+" · "+MODES[a.mode]}
+let mx=agents.reduce((s,a)=>s+a.x,0)/100,my=agents.reduce((s,a)=>s+a.y,0)/100,mz=agents.reduce((s,a)=>s+a.z,0)/100,spread=Math.sqrt(agents.reduce((s,a)=>s+(a.x-mx)**2+(a.y-my)**2+(a.z-mz)**2,0)/100);
+$("physics").textContent="Cluster radius "+spread.toFixed(2)+" · radiation pulses "+pulses.length+" · emitted "+emitted+" · absorbed "+absorbed.toFixed(3)+" · physical world 5000³";
+$("log").textContent=records.slice(-12).reverse().map(r=>"#"+r.decision+" "+r.votes.join("/")+" → "+r.action+" · alternatives "+r.possible.map(x=>x===null?"?":x?"✓":"×").join("/")+(r.tie?" · TIE":"")).join("\n");
+}
+let last=0,acc=0;
+function frame(now){if(!last)last=now;let elapsed=Math.min(.1,(now-last)/1000);last=now;if(run){acc+=elapsed*+$("speed").value*15;let count=0;while(acc>=1&&count++<12){decision();acc--}if(acc>12)acc=0}requestAnimationFrame(frame)}
+$("toggle").onclick=()=>{run=!run;$("toggle").textContent=run?"Pause":"Run"};$("stepOne").onclick=()=>{run=false;$("toggle").textContent="Run";decision()};$("reset").onclick=reset;$("inspect").onchange=render;
+$("export").onclick=()=>{let payload={experiment:"crash-star-brain-001",seed:+$("seed").value,physics:{source:"CRASH/experiments/thermal-chamber-001/index.html",N,L,spawnWidth:50,BASE,DT,K,SPRING,DAMP,COND,EMIT,ABSORB,WAVE_SPEED,tick},stats:{decisions,catches,misses},agents,memories,records,game};let url=URL.createObjectURL(new Blob([JSON.stringify(payload)],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="crash-star-brain-001.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+reset();requestAnimationFrame(frame);
+</script></body></html>
