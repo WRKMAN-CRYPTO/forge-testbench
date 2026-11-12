@@ -44,7 +44,7 @@ let loss=(1-restitution*restitution)*rv*rv/4;
 a.h+=loss*.5;b.h+=loss*.5;
 }
 if(pass===0){let q=(a.h-b.h)*COND*DT;a.h-=q;b.h+=q}
-
+}
 for(let a of agents)for(let k of ['x','y','z']){let r=radius(a),v='v'+k;if(a[k]>L-r){a[k]=L-r;if(a[v]>0){let old=a[v];a[v]=-old*restitution;a.h+=(1-restitution*restitution)*old*old/2}}else if(a[k]<-L+r){a[k]=-L+r;if(a[v]<0){let old=a[v];a[v]=-old*restitution;a.h+=(1-restitution*restitution)*old*old/2}}}
 }
 for(let i=0;i<N;i++){let a=agents[i];if(a.h>+$('threshold').value){let e=Math.min(a.h,EMIT*(a.h-+$('threshold').value)*DT);if(e>1e-5){a.h-=e;pulses.push({x:a.x,y:a.y,z:a.z,r:0,e,hit:new Set([i])});emitted++}}}
