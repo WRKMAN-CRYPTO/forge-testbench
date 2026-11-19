@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#080d18"><title>CRASH · Memristive Duet 001</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080d18;touch-action:none}canvas{display:block;width:100%;height:100%;touch-action:none;-webkit-user-select:none;user-select:none}</style></head><body><canvas id="stage"></canvas><script>
+(()=>{'use strict';
+const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');let W=0,H=0,dpr=1,scale=1,ox=0,oy=0,hit=[],menu='',running=true,mode='COUPLED',tick=0,seed=21,noise=.06,learning=.038,decay=.0007,coupling=.75,drive=.6,frequency=.19,history=[],events=[],a=.25,b=.75,external=0,inspect=0,last=0,acc=0,dt=1/30;
+function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
+function reset(){a=.25;b=.75;tick=0;history=[];events=[];external=0;seed=21}
+function clamp(x,l=0,h=1){return Math.max(l,Math.min(h,x))}
+function step(){tick++;let pulse=Math.sin(tick*frequency)*drive+external;external*=.87;
+let ia=(pulse+coupling*(b-.5)),ib=(pulse-coupling*(a-.5));
+let na=(rnd()-.5)*noise,nb=(rnd()-.5)*noise;
+let oldA=a,oldB=b;
+a=clamp(a+learning*Math.tanh(ia*2)*(1-.5*Math.abs(2*a-1))-decay*(a-.5)+na*.05);
+b=clamp(b+learning*Math.tanh(ib*2)*(1-.5*Math.abs(2*b-1))-decay*(b-.5)+nb*.05);
+if(mode==='ISOLATED'){a=clamp(oldA+learning*Math.tanh(pulse*2)-decay*(oldA-.5)+na*.05);b=clamp(oldB+learning*Math.tanh(pulse*2)-decay*(oldB-.5)+nb*.05)}
+if(mode==='OPPOSED'){b=clamp(oldB-learning*Math.tanh((pulse+coupling*(a-.5))*2)-decay*(oldB-.5)+nb*.05)}
+history.push([a,b,pulse]);if(history.length>850)history.shift();
+if(tick%60===0){events.push({t:tick,a:+a.toFixed(3),b:+b.toFixed(3)});if(events.length>100)events.shift()}
+}
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);scale=Math.min(W/390,H/760);ox=(W-390*scale)/2;oy=(H-760*scale)/2}
+window.addEventListener('resize',resize);resize();
+function rect(x,y,w,h,r=0,fill='#132039',stroke=''){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke()}}
+function txt(t,x,y,size=13,color='#d9e7f6',align='left',weight='400'){ctx.fillStyle=color;ctx.textAlign=align;ctx.font=weight+' '+size+'px system-ui, sans-serif';ctx.fillText(t,x,y)}
+function line(x,y,X,Y,color='#25415c',width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(X,Y);ctx.stroke()}
+function button(label,x,y,w,h,fn,active=false){rect(x,y,w,h,9,active?'#224f60':'#15273e',active?'#48d5c5':'#31506b');txt(label,x+w/2,y+h/2+4,12,active?'#8cfff0':'#dbe7f5','center','600');hit.push({x,y,w,h,fn})}
+function pill(label,x,y,color){rect(x,y,90,25,13,'#15283c');txt(label,x+45,y+17,11,color,'center','600')}
+function plot(x,y,w,h){rect(x,y,w,h,12,'#0c192a','#264059');for(let i=1;i<5;i++)line(x,y+h*i/5,x+w,y+h*i/5,'#1a3046');if(history.length<2)return;
+for(let k=0;k<2;k++){ctx.beginPath();let start=Math.max(0,history.length-320);for(let i=start;i<history.length;i++){let px=x+((i-start)/319)*w,py=y+h-(history[i][k]*h);if(i===start)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.strokeStyle=k===0?'#50e7cc':'#ffb368';ctx.lineWidth=2;ctx.stroke()}}
+function draw(){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#080d18';ctx.fillRect(0,0,W,H);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);hit=[];
+txt('WRKMAN  /  CRASH LAB',18,29,12,'#68e7d2','left','700');txt('MEMRISTIVE DUET',18,58,24,'#f1f7ff','left','800');txt('001 · two states, shared history',18,79,12,'#8ea6bc');
+button('☰ MENU',284,17,88,35,()=>menu=menu?'':'main');
+pill(running?'● RUNNING':'Ⅱ PAUSED',18,95,running?'#50e7cc':'#ffb368');txt('TICK '+tick,370,112,12,'#8ea6bc','right');
+rect(18,135,354,195,15,'#0d1c30','#25425a');
+txt('A · CONDUCTANCE',36,159,12,'#50e7cc','left','700');txt((a*100).toFixed(1)+'%',354,159,13,'#50e7cc','right','700');
+rect(36,170,318,13,6,'#183449');rect(36,170,318*a,13,6,'#50e7cc');
+txt('B · CONDUCTANCE',36,209,12,'#ffb368','left','700');txt((b*100).toFixed(1)+'%',354,209,13,'#ffb368','right','700');
+rect(36,220,318,13,6,'#183449');rect(36,220,318*b,13,6,'#ffb368');
+let diff=Math.abs(a-b);txt('DIVERGENCE',36,263,11,'#8ea6bc');txt((diff*100).toFixed(1)+'%',354,263,12,'#dceaf8','right');
+rect(36,276,318,9,5,'#183449');rect(36,276,318*diff,9,5,'#8da5ff');
+txt('Mode: '+mode.toLowerCase()+'   ·   pulse '+(Math.sin(tick*frequency)*drive).toFixed(2),36,309,11,'#a5bdd0');
+txt('STATE HISTORY',18,355,12,'#afc3d6','left','700');txt('last 320 steps',372,355,11,'#7994ac','right');plot(18,367,354,174);
+line(18,552,372,552,'#29445b');txt('A',20,570,11,'#50e7cc','left','700');txt('B',45,570,11,'#ffb368','left','700');txt('Each pulse modifies a persistent internal state.',372,570,10,'#839bb1','right');
+button(running?'Ⅱ PAUSE':'▶ RUN',18,592,110,46,()=>running=!running,running);
+button('STEP',139,592,110,46,()=>{running=false;step()});
+button('RESET',260,592,112,46,()=>reset());
+button('PULSE +',18,651,110,45,()=>{external+=.8;step()});
+button('PULSE −',139,651,110,45,()=>{external-=.8;step()});
+button('SETTINGS',260,651,112,45,()=>menu='settings');
+txt('Canvas-only controls  •  tap to experiment',195,729,11,'#6c8ba4','center');
+if(menu)overlay();ctx.restore()}
+function slider(name,val,min,max,y,set,fmt){txt(name,42,y,13,'#dce9f6');txt(fmt(val),345,y,12,'#6fe4d3','right');rect(42,y+12,303,7,4,'#233b54');rect(42,y+12,303*(val-min)/(max-min),7,4,'#50d4c1');let px=42+303*(val-min)/(max-min);ctx.beginPath();ctx.arc(px,y+15.5,10,0,7);ctx.fillStyle='#e9fffb';ctx.fill();hit.push({x:30,y:y-2,w:330,h:38,fn:(p)=>set(min+clamp((p.x-42)/303)*(max-min)),drag:true})}
+function overlay(){rect(0,0,390,760,0,'rgba(3,8,17,.78)');rect(22,115,346,530,18,'#101e32','#3c657a');txt(menu==='main'?'CRASH / EXPERIMENT MENU':'PARAMETERS',42,150,19,'#e9f6ff','left','800');button('✕',313,126,36,33,()=>menu='');
+if(menu==='main'){txt('One canvas. Two history-dependent elements.',42,192,12,'#9bb5c9');button('PARAMETERS',42,215,306,47,()=>menu='settings');button('COUPLED',42,275,306,45,()=>{mode='COUPLED';menu=''},mode==='COUPLED');button('ISOLATED',42,331,306,45,()=>{mode='ISOLATED';menu=''},mode==='ISOLATED');button('OPPOSED',42,387,306,45,()=>{mode='OPPOSED';menu=''},mode==='OPPOSED');button('EXPORT RUN JSON',42,465,306,45,exportRun);txt('COUPLED: each element affects the other.',42,547,11,'#9bb5c9');txt('ISOLATED: same drive, no cross-influence.',42,568,11,'#9bb5c9');txt('OPPOSED: second element responds oppositely.',42,589,11,'#9bb5c9')}
+else{slider('Learning per step',learning,.001,.12,200,v=>learning=v,v=>v.toFixed(3));slider('Coupling strength',coupling,0,2,270,v=>coupling=v,v=>v.toFixed(2));slider('Noise',noise,0,.5,340,v=>noise=v,v=>v.toFixed(2));slider('Decay toward midpoint',decay,0,.02,410,v=>decay=v,v=>v.toFixed(4));slider('Drive amplitude',drive,0,1.5,480,v=>drive=v,v=>v.toFixed(2));slider('Drive frequency',frequency,.01,.8,550,v=>frequency=v,v=>v.toFixed(2))}}
+function exportRun(){let data={experiment:'CRASH memristive-duet-001',model:'phenomenological, not physical hardware',tick,mode,parameters:{learning,coupling,noise,decay,drive,frequency},state:{a,b},history,events};let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='crash-memristive-duet-001.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);menu=''}
+function point(e){let r=canvas.getBoundingClientRect();return{x:((e.clientX-r.left)-ox)/scale,y:((e.clientY-r.top)-oy)/scale}}
+function dispatch(p,drag=false){for(let i=hit.length-1;i>=0;i--){let h=hit[i];if(p.x>=h.x&&p.x<=h.x+h.w&&p.y>=h.y&&p.y<=h.y+h.h&&(!drag||h.drag)){h.fn(p);return}}}
+let dragging=false;canvas.addEventListener('pointerdown',e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);let p=point(e);dragging=hit.some(h=>h.drag&&p.x>=h.x&&p.x<=h.x+h.w&&p.y>=h.y&&p.y<=h.y+h.h);dispatch(p)});canvas.addEventListener('pointermove',e=>{if(dragging&&e.buttons)dispatch(point(e),true)});canvas.addEventListener('pointerup',()=>dragging=false);canvas.addEventListener('contextmenu',e=>e.preventDefault());
+function frame(t){let elapsed=Math.min(.1,(t-last)/1000||0);last=t;if(running){acc+=elapsed;let n=0;while(acc>=dt&&n++<5){step();acc-=dt}}draw();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+})();
+</script></body></html>
