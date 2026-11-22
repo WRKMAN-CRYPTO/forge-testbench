@@ -199,6 +199,13 @@ function spawn(s,x,y,p,q,species){var id=++game.nextBody;var base=temper(p,q,s),
 function terrain(){game.trees=[];game.bushes=[];game.stones=[];
  for(var j=0;j<230;j++){var x=r(28,W-28),y=r(27,H-27);if(waterDist(x,y)>22 && dist(x,y,735,364)>74)game.trees.push({x:x,y:y,size:r(4,10),variant:ri(0,3)});}
  for(var i=0;i<91;i++){var x2=r(30,W-30),y2=r(32,H-32);if(waterDist(x2,y2)<19)continue;game.bushes.push({x:x2,y:y2,amount:r(1,4),capacity:4,regen:r(.017,.033)});}
+ // Finite, renewing understory: Spriglets feed here; older grazers feed at bushes.
+ game.meadows=[];
+ for(var i=0;i<105;i++){
+  var spot=i%4===0?{x:r(115,280),y:r(365,580)}:i%4===1?{x:r(755,915),y:r(245,435)}:i%4===2?{x:r(495,700),y:r(385,600)}:{x:r(30,W-30),y:r(28,H-28)};
+  if(waterDist(spot.x,spot.y)<22)continue;
+  game.meadows.push({x:spot.x,y:spot.y,amount:r(1.2,3.3),capacity:r(2.7,4.2),regen:r(.065,.13)});
+ }
  for(var k=0;k<28;k++){game.stones.push({x:r(20,W-20),y:r(30,H-30),size:r(5,12)});}
 }
 function newWorld(seed,social,learning){
@@ -359,7 +366,7 @@ function initFight(a){
 function initEcology(){
  game.carcasses=Array.isArray(game.carcasses)?game.carcasses:[];
  if(game.predatorsIntroduced===undefined)game.predatorsIntroduced=false;
- for(var k of ['strikes','blocks','dodges','predations','meatMeals','fleeChoices','defenseHits','rivalryHits','predatorAttacks','ridgefangBirths'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
+ for(var k of ['strikes','blocks','dodges','predations','meatMeals','fleeChoices','defenseHits','rivalryHits','predatorAttacks','ridgefangBirths','sprigletBirths','sprigletDeaths','sprigletKills','sprigletMeals'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
  for(var a of game.agents)initFight(a);
  for(var p of game.pending)if(!p.species)p.species='grazer';
 }
@@ -392,16 +399,16 @@ function restoreRidgefangFounders(){
 }
 function nearestMeat(a){
  var best=null,d=1e9;
- for(var c of game.carcasses)if(c.meat>0&&c.expires>game.day&&c.species==='grazer'){
+ for(var c of game.carcasses)if(c.meat>0&&c.expires>game.day&&(c.species==='grazer'||c.species==='spriglet')){
   var dd=dist(a.x,a.y,c.x,c.y);if(dd<d){best=c;d=dd;}
  }
  return {c:best,d:d};
 }
 function nearestPrey(a){
  var best=null,cost=1e9;
- for(var b of game.agents)if(kindOf(b)==='grazer'&&b.health>0){
+ for(var b of game.agents)if((kindOf(b)==='grazer'||kindOf(b)==='spriglet')&&b.health>0){
   var dd=dist(a.x,a.y,b.x,b.y);if(dd>170+a.body.senses*160)continue;
-  var cc=dd+(b.body.speed-a.body.speed)*33-(b.health<55?20:0);
+  var cc=dd+(b.body.speed-a.body.speed)*33-(b.health<55?20:0)-(kindOf(b)==='spriglet'?35:0);
   if(cc<cost){cost=cc;best=b;}
  }
  return best;
@@ -419,7 +426,7 @@ function fight(a,b,why){
  initFight(a);initFight(b);
  if(a.health<=0||b.health<=0||a.energy<6||a.nextStrike>game.day||dist(a.x,a.y,b.x,b.y)>30)return false;
  if(kindOf(a)==='carnivore'&&kindOf(b)==='carnivore')return false;
- if(why==='hunt'&&(kindOf(a)!=='carnivore'||kindOf(b)!=='grazer'||a.fullness>=88))return false;
+ if(why==='hunt'&&(kindOf(a)!=='carnivore'||!(kindOf(b)==='grazer'||kindOf(b)==='spriglet')||a.fullness>=88))return false;
  a.nextStrike=game.day+.73+(1-a.body.speed)*.63;a.energy=Math.max(0,a.energy-6);
  a.battle.strikes++;game.metrics.strikes++;
  if(rand()<clamp(.08+b.body.speed*.24+b.t.caution*.15-a.body.senses*.08,.04,.56)&&b.energy>11){
@@ -462,8 +469,8 @@ function resolveFight(a){
 function eatMeat(a){
  if(kindOf(a)!=='carnivore'||a.fullness>=92)return;
  for(var c of game.carcasses){
-  if(c.species!=='grazer'||c.meat<=0||c.expires<game.day||dist(a.x,a.y,c.x,c.y)>22)continue;
-  c.meat--;a.fullness=Math.min(100,a.fullness+34);a.battle.meals++;game.metrics.meatMeals++;
+  if((c.species!=='grazer'&&c.species!=='spriglet')||c.meat<=0||c.expires<game.day||dist(a.x,a.y,c.x,c.y)>22)continue;
+  c.meat--;a.fullness=Math.min(100,a.fullness+34);a.battle.meals++;game.metrics.meatMeals++;if(c.species==='spriglet')game.metrics.sprigletMeals++;
   a.health=Math.min(100,a.health+5);a.decision='Eating meat';a.nextThink=0;return;
  }
 }
@@ -485,11 +492,11 @@ function seekRidgefangCompanion(a){
  return best;
 }
 function chooseAction(a){
- if(kindOf(a)==='grazer'&&game.predatorsIntroduced){
+ if((kindOf(a)==='grazer'||kindOf(a)==='spriglet')&&game.predatorsIntroduced){
   var danger=loomingPredator(a);
   if(danger.a){
    var foe=danger.a,resolve=a.t.aggression*.48+a.body.strength*.30+(1-a.t.caution)*.2;
-   if(danger.d<32&&resolve>.73){a.target={x:foe.x,y:foe.y,kind:'stand',id:foe.id};a.decision='Standing ground';return;}
+   if(kindOf(a)==='grazer'&&danger.d<32&&resolve>.73){a.target={x:foe.x,y:foe.y,kind:'stand',id:foe.id};a.decision='Standing ground';return;}
    var dx=a.x-foe.x,dy=a.y-foe.y,l=Math.max(1,Math.hypot(dx,dy));
    a.target=footprint(a.x+dx/l*110+r(-16,16),a.y+dy/l*110+r(-16,16));
    a.target.kind='flee';a.decision='Fleeing '+foe.name;
@@ -498,6 +505,10 @@ function chooseAction(a){
   }
  }
  // Urgent physiological needs outrank a hunt. Otherwise a hungry Ridgefang may chase until dehydrated.
+ if(kindOf(a)==='spriglet'&&a.fullness>60&&a.water>65&&a.energy>35){
+  var partner=sprigletMate(a);
+  if(partner){a.target={x:partner.x,y:partner.y,id:partner.id,kind:'companion'};a.decision='Seeking Spriglet companion';return;}
+ }
  if(kindOf(a)==='carnivore'&&a.energy<26&&a.water>=65){
   a.target={x:a.x,y:a.y,kind:'rest'};a.decision='Resting between hunts';return;
  }
@@ -523,6 +534,10 @@ function chooseAction(a){
   var sensed=water<80+a.body.senses*175,target=sensed?pointWater(a.x,a.y):known;
   if(target){a.target={x:target.x,y:target.y,kind:'water'};a.decision='Seeking water';return;}
   a.target=footprint(a.x+r(-175,175),a.y+r(-175,175));a.target.kind='search';a.decision='Searching for water';return;}
+ if(kindOf(a)==='spriglet'&&a.fullness<91){
+  var meadow=sprigletField(a);
+  if(meadow){a.target={x:meadow.x,y:meadow.y,kind:'meadow'};a.decision='Nibbling ground cover';return;}
+ }
  if(kindOf(a)==='grazer'&&a.fullness<78){var near=null,nd=1e9;
   for(var b of game.bushes){if(b.amount<.9)continue;var d=dist(a.x,a.y,b.x,b.y);if(d>95+a.body.senses*160)continue;if(d<nd){nd=d;near=b;}}
   var saved=rememberedFood(a);
@@ -554,6 +569,7 @@ function contact(a,b){
   var pulse=.013*((a.t.sociability+b.t.sociability)/2);
   ra.trust=clamp(ra.trust+pulse,-1,1);rb.trust=clamp(rb.trust+pulse,-1,1);
  }
+ if(sameSpecies&&kindOf(a)==='spriglet'){sprigletBreed(a,b);return;}
  if(!game.social||!sameSpecies)return;
  if(a.parentIds.indexOf(b.id)>=0 || b.parentIds.indexOf(a.id)>=0){ra.trust=clamp(ra.trust+.045,-1,1);rb.trust=clamp(rb.trust+.045,-1,1);}
  function give(donor,recv,dr,rr){
@@ -596,11 +612,13 @@ function death(a,cause){
   roaming:clamp((a.stats.travel/Math.max(game.day-a.born,1)-30)/110,-1,1)};
  for(var k in s.im)s.im[k]=clamp(s.im[k]*.68+shift[k]*.32,-1,1);
  game.pending.push({soulId:s.id,species:kindOf(a),due:game.day+r(5,19)});
- if(kindOf(a)==='grazer'){
-  game.carcasses.push({x:a.x,y:a.y,meat:6,expires:game.day+40,species:'grazer',source:a.id});
+ if(kindOf(a)==='grazer'||kindOf(a)==='spriglet'){
+  var small=kindOf(a)==='spriglet';
+  if(small)game.metrics.sprigletDeaths++;
+  game.carcasses.push({x:a.x,y:a.y,meat:small?2:6,expires:game.day+(small?18:40),species:kindOf(a),source:a.id});
   if(game.carcasses.length>70)game.carcasses.shift();
   if(a.lastHit&&a.lastHit.why==='hunt'&&game.day-a.lastHit.day<5){
-   game.metrics.predations++;var killer=game.agents.find(b=>b.id===a.lastHit.id);if(killer)killer.battle.hunts++;
+   game.metrics.predations++;if(small)game.metrics.sprigletKills++;var killer=game.agents.find(b=>b.id===a.lastHit.id);if(killer)killer.battle.hunts++;
   }
  }
  game.metrics.deaths++;game.metrics.lifeDays+=a.age;game.metrics.lifeYearsTotal=(game.metrics.lifeYearsTotal||0)+ageYears(a);game.metrics.lifeYearsCount=(game.metrics.lifeYearsCount||0)+1;
@@ -618,10 +636,11 @@ function tick(){
  game.day+=.06;var dt=.06;
  game.carcasses=game.carcasses.filter(c=>c.meat>0&&c.expires>game.day);
  for(var bush of game.bushes)bush.amount=Math.min(bush.capacity,bush.amount+bush.regen*dt);
+ for(var field of game.meadows)field.amount=Math.min(field.capacity,field.amount+field.regen*dt);
  var remove=[];
  for(var a of game.agents){
   if(a.learning&&a.learning.lastSite&&dist(a.x,a.y,a.learning.lastSite.x,a.learning.lastSite.y)>57)a.learning.lastSite=null;
-  a.age+=dt;a.fullness=Math.max(0,a.fullness-(kindOf(a)==='carnivore'?1.52:1.75+a.body.strength*.35)*dt);
+  a.age+=dt;a.fullness=Math.max(0,a.fullness-(kindOf(a)==='carnivore'?1.52:kindOf(a)==='spriglet'?2.55:1.75+a.body.strength*.35)*dt);
   a.water=Math.max(0,a.water-(2.55+a.body.speed*.3)*dt);
   // Drink before dehydration damage/death is assessed when already at the bank.
   var wasAtWater=drinkNearby(a,dt);
@@ -650,13 +669,21 @@ function tick(){
   }
   if(!wasAtWater)drinkNearby(a,dt);
   var gathered=false;
-  for(var bush2 of (kindOf(a)==='carnivore'?[]:game.bushes)){
+  if(kindOf(a)==='spriglet'){
+   for(var meadow of game.meadows){
+    if(meadow.amount>=.82&&dist(a.x,a.y,meadow.x,meadow.y)<15&&a.fullness<94){
+     meadow.amount-=.82;a.fullness=Math.min(100,a.fullness+24);a.nextThink=0;a.decision='Grazing understory';gathered=true;break;
+    }
+   }
+  }
+  for(var bush2 of (kindOf(a)==='grazer'?game.bushes:[])){
    if(bush2.amount>=1&&dist(a.x,a.y,bush2.x,bush2.y)<16&&(a.fullness<91||a.food<2)){
     bush2.amount-=1;if(a.fullness<84)a.fullness=clamp(a.fullness+27,0,100);else a.food=Math.min(4,a.food+1);
     if(a.food<2&&rand()<.55)a.food++;
     markPlace(a,bush2.x,bush2.y,'food');foodResult(a,true,bush2.x,bush2.y);gathered=true;a.nextThink=0;break;
    }
   }
+  if(t.kind==='meadow'&&dist(a.x,a.y,t.x,t.y)<20&&!gathered){a.target={x:a.x,y:a.y,kind:'search'};a.nextThink=0;}
   if(t.kind==='food'&&dist(a.x,a.y,t.x,t.y)<21){
    if(!gathered && (a.fullness<90||a.food<2)){
     var availableAtTarget=game.bushes.some(function(b){return dist(b.x,b.y,t.x,t.y)<22&&b.amount>=1;});
@@ -669,7 +696,7 @@ function tick(){
   if(a.fullness<42&&a.food>0&&kindOf(a)==='grazer'){a.food--;a.fullness=clamp(a.fullness+30,0,100);}
   if(a.energy<6){a.energy=Math.min(100,a.energy+25*dt);a.decision='Resting';}
   if(a.home===null&&game.day-a.born>35&&a.energy<55){a.home={x:a.x,y:a.y};}
-  if(game.social){
+  if(game.social||game.ecology.rules.spriglets){
    for(var b2 of game.agents){if(b2.id<=a.id||dist(a.x,a.y,b2.x,b2.y)>27)continue;contact(a,b2);}
   }else{
    for(var b3 of game.agents){if(b3.id<=a.id||dist(a.x,a.y,b3.x,b3.y)>27)continue;
@@ -733,6 +760,12 @@ function scene(){
  for(var shltr of [{x:164,y:251},{x:945,y:545}]){
   circle(sx(shltr.x),sy(shltr.y),28*scale,'#344c3b');rr(sx(shltr.x)-11*scale,sy(shltr.y)-8*scale,22*scale,16*scale,4,'#6f6750');
  }
+ for(var field of game.meadows){
+  if(field.amount<.4)continue;
+  var fx=sx(field.x),fy=sy(field.y),sz=Math.max(1.4,3.6*scale);
+  circle(fx,fy,sz,field.amount>=1.4?'#789c5f':'#536e50');
+  if(field.amount>2)circle(fx+2*scale,fy-3*scale,sz*.55,'#bed18a');
+ }
  for(var bush of game.bushes){var bx=sx(bush.x),by=sy(bush.y);circle(bx,by,Math.max(2,4.4*scale),'#3d6245');if(bush.amount>=1)circle(bx+2*scale,by-2*scale,Math.max(1.3,2.6*scale),'#dd9479');}
  for(var carcass of game.carcasses){var mx=sx(carcass.x),my=sy(carcass.y);
   circle(mx,my,Math.max(2.7,7*scale),'#754b49','#bf8973',1);}
@@ -749,14 +782,15 @@ function scene(){
  for(var a of game.agents){
   var cx=sx(a.x),cy=sy(a.y),sz=clamp(scale*.56,.18,.48);
   if(cx<-44||cx>ww+44||cy<topH-70||cy>hh-bottomH+40)continue;
-  drawValleyCritter(a,cx,cy+4,sz*(ageYears(a)<16?.78:1));
+  if(kindOf(a)==='spriglet')drawSpriglet(a,cx,cy+4,Math.max(.66,scale*2.2));
+  else drawValleyCritter(a,cx,cy+4,sz*(ageYears(a)<16?.78:1));
   if(a.health<50)line(cx-10,cy-25,cx+10,cy-25,'#d97b70',2);
   if(a.combatFlash&&a.combatFlash>game.day)circle(cx,cy-22,Math.max(13,sz*60),null,'#e5a17f',2);
   if(a.id===selected){
    circle(cx,cy-11,Math.max(17,sz*95),null,'#f0e0a5',1.6);
    txt(a.name,cx,cy-Math.max(31,sz*150),11,'#fff0c4','center','700');
   }
-  screenPos.push({id:a.id,x:cx,y:cy-12,radius:Math.max(22,sz*110)});
+  screenPos.push({id:a.id,x:cx,y:cy-(kindOf(a)==='spriglet'?7:12),radius:kindOf(a)==='spriglet'?Math.max(12,scale*23):Math.max(22,sz*110)});
 
  }
  if(view==='world'){
