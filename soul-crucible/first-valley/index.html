@@ -36,6 +36,19 @@ function pointWater(x,y){if(dist(x,y,853,158)<155)return {x:853,y:158};return {x
 function footprint(x,y){return {x:clamp(x,20,W-20),y:clamp(y,22,H-22)};}
 function logHistory(a,msg){if(!a)return;if(!Array.isArray(a.history))a.history=[];a.history.unshift(msg);if(a.history.length>12)a.history.length=12;}
 function addEvent(type,msg,a,b){game.events.unshift({day:round(game.day,1),type:type,text:msg,who:[a&&a.id,b&&b.id].filter(Boolean)});if(game.events.length>95)game.events.pop();logHistory(a,msg);logHistory(b,msg);}
+
+function safeSoulRecord(s){
+ if(!s||typeof s!=='object')return null;
+ // Normalize old or partially written saves while retaining all intact soul impressions.
+ if(!s.im||typeof s.im!=='object')s.im={};
+ for(var k of ['social','giving','caution','roaming']){
+  if(!Number.isFinite(s.im[k]))s.im[k]=0;
+ }
+ if(!Array.isArray(s.lifeHistory))s.lifeHistory=[];
+ else s.lifeHistory=s.lifeHistory.filter(function(life){return !!life&&typeof life==='object';}).slice(0,9);
+ if(!Number.isFinite(s.lives))s.lives=s.lifeHistory.length+1;
+ return s;
+}
 function makeSoul(){var s={id:++game.nextSoul,lives:0,im:{social:0,caution:0,giving:0,roaming:0},lastLife:'',lifeHistory:[]};game.souls[s.id]=s;return s;}
 function bodyTraits(p,q){var o={};['speed','strength','resilience','senses'].forEach(function(k){o[k]=clamp(p&&q?(p.body[k]+q.body[k])/2+r(-.16,.16):r(.15,.9),.05,.98);});return o;}
 function temper(p,q,s){var o={};['curiosity','sociability','aggression','caution','generosity'].forEach(function(k){o[k]=clamp(p&&q?(p.base[k]+q.base[k])/2+r(-.24,.24):r(.1,.9),0,1);});return o;}
@@ -118,6 +131,8 @@ function rememberedFood(a){
  return best;
 }
 function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;
+ // Older saved valley states may not have every soul history field.
+ for(var soulID in game.souls)safeSoulRecord(game.souls[soulID]);
  for(var k of ['foodFinds','foodMisses','adaptedChoices'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
  for(var a of game.agents){ensureLearning(a);a.family=a.family||'Wanderer';a.history=Array.isArray(a.history)?a.history.filter(function(entry){return typeof entry==='string'&&entry.trim().length>0;}).slice(0,12):[];a.t=mapTemper(a.base,game.souls[a.soulId]);}return true;}}catch(e){}return false;}
 function nearestAgent(a,filter){var best=null,bd=1e10;for(var b of game.agents){if(a===b)continue;var d=dist(a.x,a.y,b.x,b.y);if(d<bd&&(!filter||filter(b,d))){best=b;bd=d;}}return {agent:best,d:bd};}
@@ -450,12 +465,17 @@ function drawInspector(){
    txt('trust '+round(r0.trust,2)+' · '+r0.meetings+' meetings',x+width,y,10,'#a9c2b6','right');y+=18;}
   if(!relations.length){y+=paragraph('No one is familiar yet. Repeated encounters are necessary.',x,y,width);}
  }else if(tab===2){
+  s=safeSoulRecord(s);
+  if(!s){
+   y+=paragraph('Soul record unavailable in this save. The simulation remains running; other records are intact.',x,y,width,'#e2ae9b')+18;
+  }else{
   txt('SOUL '+s.id+' · '+s.lives+' LIFETIME'+(s.lives===1?'':'S'),x,y,14,'#e8d4bc','left','800');y+=25;
   y+=paragraph('A new body does not inherit names, places, or relationships. Only a faint behavioral bias survives.',x,y,width,'#bad0c4')+18;
   for(var k of ['social','giving','caution','roaming']){txt(k.toUpperCase(),x,y,11,'#c3d2bf');txt((s.im[k]>=0?'+':'')+round(s.im[k],2),x+width,y,12,s.im[k]>=0?'#8bd1b4':'#dda4a1','right');y+=24;}
   y+=10;txt('PREVIOUS LIVES',x,y,11,'#e7d6a7','left','750');y+=20;
   if(!s.lifeHistory.length){txt('None. This is the soul’s first life.',x,y,12,'#a6b5ac');}
-  for(var life of s.lifeHistory){y+=paragraph(life.name+' · '+round(life.days)+' days · '+life.cause,x,y,width)+11;}
+  for(var life of s.lifeHistory){y+=paragraph(String(life.name||'Unnamed life')+' · '+(Number.isFinite(life.days)?round(life.days):'?')+' days · '+String(life.cause||'unknown'),x,y,width)+11;}
+  }
  }else if(tab===3){
   txt('RECORDED MOMENTS',x,y,11,'#e7d6a7','left','750');y+=22;
   if(!a.history.length)txt('No notable encounters yet.',x,y,12,'#afc3b7');
@@ -558,7 +578,12 @@ function overlay(){
 function frame(now){
  var dt=Math.min(.14,(now-lastTime)/1000||0);lastTime=now;
  if(playing){acc+=dt*18*speeds[speedIndex];var steps=0;while(acc>=1&&steps<55){tick();acc-=1;steps++;}if(steps===55)acc=Math.min(acc,1);}
- taps=[];camera();scene();hud();overlay();
+ taps=[];camera();scene();hud();
+ try{overlay();}catch(err){
+  // Never let a broken inspector stop time or leave touch controls unusable.
+  console.error('First Valley inspector error',err);
+  modal=null;scroll=0;announce('Inspector issue · world continues');
+ }
  if(now-lastSave>12000){lastSave=now;save();}
  requestAnimationFrame(frame);
 }
