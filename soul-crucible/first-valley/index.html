@@ -95,7 +95,9 @@ function chooseAction(a){
  // Stay by discovered drinkable water long enough to recover, rather than leaving half-hydrated.
  if(water<30&&a.water<91){a.target={x:a.x,y:a.y,kind:'drink'};a.decision='Drinking';return;}
  if(a.water<65 || (a.target&&(a.target.kind==='water'||a.target.kind==='drink')&&a.water<91)){known=a.places.filter(function(p){return p.kind==='water';}).sort(function(p,q){return dist(a.x,a.y,p.x,p.y)-dist(a.x,a.y,q.x,q.y);})[0];
-  var sensed=water<80+a.body.senses*175,target=known||(sensed?pointWater(a.x,a.y):null);
+  // Live perception overrides an old shoreline memory. A remembered water point is
+  // only a waypoint; once water is sensed, the creature must approach the water itself.
+  var sensed=water<80+a.body.senses*175,target=sensed?pointWater(a.x,a.y):known;
   if(target){a.target={x:target.x,y:target.y,kind:'water'};a.decision='Seeking water';return;}
   a.target=footprint(a.x+r(-175,175),a.y+r(-175,175));a.target.kind='search';a.decision='Searching for water';return;}
  if(a.fullness<78){var near=null,nd=1e9;
