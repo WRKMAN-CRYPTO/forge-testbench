@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#101e20">
+<title>ANANSI • The Price of Stories</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#0d1b1e;overscroll-behavior:none}
+canvas{display:block;width:100%;height:100%;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+</style>
+</head>
+<body><canvas id="game" aria-label="Anansi: The Price of Stories, an interactive folktale game"></canvas>
+<script>
+(()=>{'use strict';
+const canvas=document.querySelector('#game'), c=canvas.getContext('2d',{alpha:false});
+const TAU=Math.PI*2, GOLD='#edc57b', CREAM='#fff0cf', MUTED='#b9c5b8', DARK='#0c2226';
+let W=0,H=0,dpr=1,layout={},time=0,scene=-1,beat=0,interlude=false,dialog='',dialogUntil=0,hintOpen=false,buttons=[],hover=-1,particleSeed=731;
+const chapters=[
+ {name:'MMOBORO',tag:'THE HORNETS',title:'A storm without clouds',tone:'#e8be76',
+ beats:[
+  {prompt:'The hornets are high in the branches. Anansi has a calabash, a small gourd, and a plan.',options:['Invite the hornets inside','Fill the large calabash','Climb to the nest','Ask Nyame for help'],ok:1,success:'Water gathered. Now the sky can be imitated.',miss:['They are not looking for a new home yet.','', 'The nest is well defended. Strength is not the answer.','Nyame set the price. Anansi must find the way.']},
+  {prompt:'The calabash sloshes in Anansi\'s hands. The hornets watch from their tree.',options:['Sprinkle water on himself and the hornets','Leave the calabash in the sun','Tie the gourd to a branch','Run toward the nest'],ok:0,success:'Drip, drip. The hornets believe a storm has begun.',miss:['','The water would disappear before it helped.','A hanging gourd is not yet an invitation.','Running will not make the hornets trust him.']},
+  {prompt:'The hornets are wet and worried. They want somewhere dry.',options:['Plug the gourd immediately','Shake their tree','Offer the little dry gourd','Wait for a real storm'],ok:2,success:'One by one, the hornets fly into the gourd.',miss:['An empty trap catches nothing.','A frightened swarm may attack.','','Anansi has already made a storm of his own.']},
+  {prompt:'The last hornet has vanished inside the gourd. The tiny entrance remains open.',options:['Untie the bamboo','Pour in more water','Call the leopard','Plug the hole with grass'],ok:3,success:'The gourd is sealed. The first price has been paid.',miss:['The bamboo belongs to the next trick.','That could spoil the gourd.','The leopard is nowhere near.','']}
+ ]},
+ {name:'ONINI',tag:'THE PYTHON',title:'A measure of pride',tone:'#a6d1a5',
+ beats:[
+  {prompt:'Onini is immensely powerful. Anansi has a bamboo pole and strong vines.',options:['Pull the python by force','Hide beneath leaves','Argue loudly about Onini\'s size','Build another pit'],ok:2,success:'Onini hears his name. Pride brings him closer.',miss:['A spider cannot overpower a python.','There is no reason for Onini to investigate.','','Another pit belongs to another hunt.']},
+  {prompt:'Onini insists he is longer and stronger than any bamboo pole.',options:['Make the pole into a bridge','Lay the pole on the ground','Throw the pole at Onini','Offer him the hornets'],ok:1,success:'Onini stretches out beside the bamboo to prove his length.',miss:['A bridge proves nothing.','','Onini would become an enemy instead of a volunteer.','Anansi already owes the hornets to Nyame.']},
+  {prompt:'Onini extends his body. Anansi worries he might slip at either end.',options:['Tell him to crawl away','Put the pole in the river','Tie head and tail to the pole','Ask Nyame to judge'],ok:2,success:'The python agrees to be secured for a fair measurement.',miss:['That would end the contest.','The water would carry the trick away.','','Nyame is waiting for a gift, not to settle an argument.']},
+  {prompt:'The python is fixed to the pole, but can still twist between the ends.',options:['Release his head','Wrap the remaining vines around him','Wait for him to sleep','Measure the hornets'],ok:1,success:'The vines hold fast. The second price has been paid.',miss:['Then Onini would escape.','','The great python can still move.','Wrong creature, wrong measurement.']}
+ ]},
+ {name:'OSEBO',tag:'THE LEOPARD',title:'A rescue with a hidden price',tone:'#dfad85',
+ beats:[
+  {prompt:'Osebo walks the same forest path each night. Anansi cannot defeat him in open combat.',options:['Challenge him to race','Dig a deep pit in his path','Offer him the bamboo','Call out from the trees'],ok:1,success:'A deep pit waits beneath the path.',miss:['The leopard is faster.','','The bamboo has already done its work.','Osebo would know someone was nearby.']},
+  {prompt:'A hole is easy to spot in daylight. Osebo must not see it.',options:['Cover it with branches, leaves, and dust','Put a lantern beside it','Fill it with water','Sleep inside the pit'],ok:0,success:'The forest floor looks undisturbed. Night approaches.',miss:['','A light would reveal the trap.','A flooded pit is not the trap from the tale.','Anansi is too clever to become his own prisoner.']},
+  {prompt:'Night falls. Osebo walks into the hidden pit. At dawn, he begs Anansi for help.',options:['Climb down with him','Leave the forest forever','Bend a green tree and lower a rope','Ask the python to carry him'],ok:2,success:'The bent tree holds a powerful spring, and a rope hangs into the pit.',miss:['That puts Anansi within reach of Osebo.','Nyame is still waiting.','','Onini has already been captured.']},
+  {prompt:'Osebo promises not to harm Anansi and ties the hanging rope to his tail.',options:['Invite the hornets to lift him','Cut the rope holding the tree bent','Fill in the pit','Untie the leopard'],ok:1,success:'The tree springs upright and pulls Osebo into the air. Anansi completes the third capture.',miss:['The hornets are already delivered.','','The leopard is still inside.','Osebo would be free.']}
+ ]}
+];
+let totalSolved=0,twinkle=[];
+for(let i=0;i<65;i++){particleSeed=(particleSeed*1664525+1013904223)>>>0;let x=particleSeed/4294967296;particleSeed=(particleSeed*1664525+1013904223)>>>0;twinkle.push({x,y:particleSeed/4294967296,r:.5+(i%4)*.45});}
+function resize(){W=window.innerWidth;H=window.innerHeight;dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);canvas.style.width=W+'px';canvas.style.height=H+'px';c.setTransform(dpr,0,0,dpr,0,0);}
+window.addEventListener('resize',resize,{passive:true});resize();
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function roundRect(x,y,w,h,r,fill,stroke,width=1){if(w<=0||h<=0)return;c.beginPath();c.roundRect(x,y,w,h,Math.max(0,Math.min(r,w/2,h/2)));if(fill){c.fillStyle=fill;c.fill();}if(stroke){c.lineWidth=width;c.strokeStyle=stroke;c.stroke();}}
+function line(x1,y1,x2,y2,color,width=1){c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);c.strokeStyle=color;c.lineWidth=width;c.lineCap='round';c.stroke();}
+function ellipse(x,y,rx,ry,fill,stroke,width=1){c.beginPath();c.ellipse(x,y,Math.max(1,rx),Math.max(1,ry),0,0,TAU);if(fill){c.fillStyle=fill;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=width;c.stroke();}}
+function gradient(x1,y1,x2,y2,stops){const g=c.createLinearGradient(x1,y1,x2,y2);for(const [p,col] of stops)g.addColorStop(p,col);return g;}
+function label(text,x,y,size=16,color=CREAM,weight='600',align='left',font='Georgia,serif'){c.fillStyle=color;c.textAlign=align;c.textBaseline='middle';c.font=weight+' '+size+'px '+font;c.fillText(text,x,y);}
+function wrap(text,x,y,maxW,size=16,color=CREAM,leading=1.35,maxLines=5,weight='400',font='Georgia,serif'){c.textAlign='left';c.textBaseline='top';c.font=weight+' '+size+'px '+font;const words=text.split(' ');let lineText='',lines=[];for(const word of words){let test=lineText?lineText+' '+word:word;if(c.measureText(test).width>maxW&&lineText){lines.push(lineText);lineText=word;}else lineText=test;}if(lineText)lines.push(lineText);c.fillStyle=color;for(let i=0;i<Math.min(lines.length,maxLines);i++)c.fillText(lines[i],x,y+i*size*leading);return Math.min(lines.length,maxLines)*size*leading;}
+function noise(n){let x=Math.sin(n*83.491)*27182.16;return x-Math.floor(x);}
+function drawLeaves(cx,cy,rx,ry,seed,col){for(let i=0;i<22;i++){const a=noise(seed+i*2)*TAU,r=Math.sqrt(noise(seed+i*2+1));ellipse(cx+Math.cos(a)*rx*r,cy+Math.sin(a)*ry*r,18+noise(i+seed)*14,8+noise(i*3+seed)*6,col);}}
+function drawTree(x,y,s=1,leaves=true){c.save();c.translate(x,y);c.scale(s,s);c.strokeStyle='#17292a';c.lineCap='round';c.lineWidth=43;c.beginPath();c.moveTo(0,0);c.bezierCurveTo(-12,-120,13,-238,-5,-380);c.stroke();for(let i=-2;i<=2;i++){const by=-220-i*25;line(-4,by,-100+i*38,by-78,'#213935',18);}if(leaves){drawLeaves(0,-365,170,95,55,'#284a3e');drawLeaves(-135,-290,120,90,70,'#315347');drawLeaves(125,-300,120,85,112,'#3b624c');}c.restore();}
+function forestBackdrop(chapter){const sky=gradient(0,0,0,580,chapter===2?[[0,'#18283a'],[.55,'#314344'],[1,'#24403c']]:[[0,'#132f35'],[.50,'#34574b'],[1,'#57634a']]);c.fillStyle=sky;c.fillRect(0,0,1000,580);const halo=c.createRadialGradient(chapter===2?740:650,chapter===2?115:140,10,620,160,620);halo.addColorStop(0,chapter===2?'#d8b38c55':'#e2bb7e55');halo.addColorStop(1,'#d2b07b00');c.fillStyle=halo;c.fillRect(0,0,1000,580);
+for(let i=0;i<15;i++){let x=i*90-70,ht=190+noise(i+chapter*25)*180;line(x,510,x,510-ht,'#1d3839',20);ellipse(x,510-ht,60,92,'#264740');}
+c.fillStyle='#203b3d';c.beginPath();c.moveTo(0,455);for(let x=0;x<=1000;x+=20)c.lineTo(x,456+Math.sin(x*.012)*12);c.lineTo(1000,580);c.lineTo(0,580);c.fill();
+c.fillStyle='#2f4038';c.beginPath();c.moveTo(0,500);for(let x=0;x<=1000;x+=20)c.lineTo(x,498+Math.sin(x*.02)*10);c.lineTo(1000,580);c.lineTo(0,580);c.fill();
+for(let i=0;i<21;i++){let x=noise(i*4+7)*1000,y=510+noise(i*8+2)*60;ellipse(x,y,4+noise(i)*7,2,'#71806555');}
+}
+function spider(x,y,s=1){c.save();c.translate(x,y);c.scale(s,s);
+ellipse(0,24,34,13,'#06161855');for(let i=0;i<4;i++){const sy=-8+i*13,dy=-36+i*20;line(-21,sy,-48,dy,'#0c1d20',5);line(-48,dy,-69,dy+22,'#0c1d20',4);line(21,sy,48,dy,'#0c1d20',5);line(48,dy,69,dy+22,'#0c1d20',4);}
+ellipse(0,5,32,38,'#142229','#e9bd70',2);ellipse(0,-30,26,25,'#1b292a','#e9bd70',2);
+for(let i=0;i<3;i++)line(-13+i*13,-7,-10+i*10,21,'#dfb77388',2);
+ellipse(-11,-36,8,10,'#fff1d5');ellipse(11,-36,8,10,'#fff1d5');ellipse(-9,-34,3.5,5,'#152a27');ellipse(13,-34,3.5,5,'#152a27');ellipse(0,-19,5,3,'#e7bd7a');c.restore();}
+function gourd(x,y,s=1,filled=false){c.save();c.translate(x,y);c.scale(s,s);c.beginPath();c.moveTo(-18,-73);c.bezierCurveTo(-18,-50,-40,-45,-42,-7);c.bezierCurveTo(-50,50,50,50,42,-7);c.bezierCurveTo(40,-45,18,-50,18,-73);c.closePath();c.fillStyle=gradient(0,-70,45,50,[[0,'#efc882'],[.5,'#ad723c'],[1,'#684d33']]);c.fill();c.strokeStyle='#573c2e';c.lineWidth=5;c.stroke();ellipse(0,-75,20,6,'#91643c');if(filled){for(let i=0;i<9;i++)ellipse(noise(i*2)*50-25,noise(i*7)*55-26,3,2,'#1f1e15');}c.restore();}
+function hornet(x,y,s=1){c.save();c.translate(x,y);c.scale(s,s);ellipse(-2,-3,6,4,'#d9e6c2aa');ellipse(4,-3,6,4,'#d9e6c2aa');ellipse(0,2,11,6,'#e0ad3f');for(let i=-1;i<=1;i++)line(i*5,0,i*5,5,'#1a2420',2);ellipse(12,1,4,4,'#24251b');c.restore();}
+function pythonArt(progress){c.save();c.lineCap='round';c.lineJoin='round';c.strokeStyle='#121f26';c.lineWidth=56;c.beginPath();c.moveTo(310,450);c.bezierCurveTo(440,380,475,550,590,440);c.bezierCurveTo(710,310,810,510,926,405);c.stroke();c.strokeStyle='#98af72';c.lineWidth=46;c.stroke();c.strokeStyle='#d0bd7d';c.lineWidth=7;c.setLineDash([13,30]);c.stroke();c.setLineDash([]);ellipse(926,405,35,26,'#9db779','#24372a',4);ellipse(940,393,6,6,'#f8edaf');ellipse(942,393,3,4,'#162825');if(progress>=2){line(290,486,942,486,'#d9ad70',12);for(let i=0;i<10;i++)line(365+i*57,453,375+i*57,491,'#ceb889',progress>=3?8:4);}c.restore();}
+function leopardArt(x,y,s=1){c.save();c.translate(x,y);c.scale(s,s);ellipse(-12,0,69,34,'#d6a262','#352f25',3);ellipse(49,-22,33,31,'#ddae74','#352f25',3);ellipse(31,-43,11,17,'#d4a06b');ellipse(66,-45,11,17,'#d4a06b');ellipse(67,-20,7,9,'#edebba');ellipse(69,-20,3,5,'#1c292b');ellipse(82,-9,7,5,'#312620');
+for(let i=0;i<17;i++){let a=i*2.39,px=-65+(i%6)*21,py=-18+Math.floor(i/6)*16;ellipse(px,py,3+(i%3),3,'#473728');}
+for(let i=-1;i<=1;i++){line(-48+i*35,19,-53+i*36,67,'#cf9d62',15);}c.beginPath();c.moveTo(-68,0);c.bezierCurveTo(-115,-12,-108,55,-141,20);c.strokeStyle='#d6a062';c.lineWidth=16;c.stroke();c.restore();}
+function drawSceneArt(rect,chapter,progress){c.save();roundRect(rect.x,rect.y,rect.w,rect.h,16,'#182e31','#866f4b',1.5);c.beginPath();c.roundRect(rect.x,rect.y,rect.w,rect.h,16);c.clip();c.translate(rect.x,rect.y);c.scale(rect.w/1000,rect.h/580);
+forestBackdrop(chapter);
+if(chapter===0){drawTree(755,524,.82);ellipse(748,201,53,78,'#967142','#422e20',5);for(let j=0;j<9;j++)line(717,170+j*11,783,165+j*11,'#c7a16b88',3);
+gourd(435,483,1.0,progress>=3);gourd(163,505,.95,false);if(progress>=2){for(let i=0;i<42;i++){const x=(noise(i*9+2)*1000+time*.065*(i%4+1))%1000,y=(noise(i*6+4)*580+time*.23*(i%3+2))%580;line(x,y,x-7,y+16,'#b6d7dc88',2);}}
+for(let i=0;i<14;i++){let target=progress>=3?430:730;let x=target+Math.sin(time*.002+i*2.1)*(progress>=3?18:95),y=(progress>=3?423:235)+Math.cos(time*.003+i*4)* (progress>=3?20:65);hornet(x,y,.6);}
+spider(290,435,.84);if(progress>=4)ellipse(435,414,23,12,'#8db27c');
+}else if(chapter===1){drawTree(95,515,.72);pythonArt(progress);if(progress>=2)line(295,485,960,485,'#c6a06a',12);spider(270,405,.9);
+}else if(chapter===2){const night=progress>=2;c.fillStyle='#121d3299';if(night)c.fillRect(0,0,1000,580);if(night){ellipse(795,112,47,47,'#f8dbad');}
+drawTree(858,480,.58,false);ellipse(664,514,170,58,'#161f24');if(progress>=1){c.fillStyle='#132021';c.beginPath();c.moveTo(505,506);c.lineTo(805,506);c.lineTo(775,578);c.lineTo(532,578);c.fill();}
+if(progress<2){for(let i=0;i<23;i++)line(510+i*14,495+Math.sin(i)*6,535+i*13,492+Math.cos(i)*5,'#566f44',6);}
+if(progress<2)leopardArt(684,440,.91);else if(progress===2){leopardArt(647,542,.82);}else if(progress===3){leopardArt(647,535,.77);c.beginPath();c.moveTo(849,186);c.quadraticCurveTo(728,50,661,485);c.strokeStyle='#bfad86';c.lineWidth=9;c.stroke();}else {leopardArt(706,263,.67);line(855,195,712,231,'#d3b78b',7);}
+spider(298,440,.9);
+}
+for(let i=0;i<35;i++){let x=noise(i+17)*1000,y=noise(i+33)*300;ellipse(x,y,1.4,1.4,'#ecd99e44');}
+c.restore();
+}
+function drawFinalArt(rect){c.save();roundRect(rect.x,rect.y,rect.w,rect.h,16,'#1d3540','#a18a5c',1.5);c.beginPath();c.roundRect(rect.x,rect.y,rect.w,rect.h,16);c.clip();c.translate(rect.x,rect.y);c.scale(rect.w/1000,rect.h/580);
+c.fillStyle=gradient(0,0,1000,580,[[0,'#132f3d'],[.5,'#314d56'],[1,'#735c49']]);c.fillRect(0,0,1000,580);for(let j=0;j<twinkle.length;j++){const p=twinkle[j];ellipse(p.x*1000,p.y*580,p.r*2,p.r*2,'#fff4bf99');}
+const halo=c.createRadialGradient(500,230,45,500,230,350);halo.addColorStop(0,'#f5d68a88');halo.addColorStop(1,'#f5d68a00');c.fillStyle=halo;c.fillRect(0,0,1000,580);
+ellipse(500,200,88,88,'#efc879','#ffebba',4);for(let i=0;i<24;i++){const a=i*TAU/24;line(500+Math.cos(a)*105,200+Math.sin(a)*105,500+Math.cos(a)*141,200+Math.sin(a)*141,'#eac17b77',3);}
+for(let r=1;r<=5;r++){c.beginPath();for(let i=0;i<=9;i++){const a=i*TAU/9;const x=500+Math.cos(a)*r*64,y=300+Math.sin(a)*r*52;if(i===0)c.moveTo(x,y);else c.lineTo(x,y);}c.strokeStyle='#f1d69c33';c.lineWidth=2;c.stroke();}
+for(let i=0;i<9;i++)line(500,300,500+Math.cos(i*TAU/9)*500,300+Math.sin(i*TAU/9)*375,'#f1d69c44',2);
+spider(500,431,1.15);
+const gifts=[{x:210,y:245,txt:'HORNETS'},{x:500,y:80,txt:'PYTHON'},{x:790,y:245,txt:'LEOPARD'}];for(const g of gifts){ellipse(g.x,g.y,63,63,'#263e45','#ebc780',4);label(g.txt,g.x,g.y,17,'#ffe0a8','bold','center','Georgia,serif');}c.restore();}
+function decor(){const bg=gradient(0,0,W,H,[[0,'#0c2024'],[1,'#152b2c']]);c.fillStyle=bg;c.fillRect(0,0,W,H);for(let i=0;i<65;i++){const p=twinkle[i];ellipse(p.x*W,p.y*H,p.r,p.r,'#d1b88716');}c.strokeStyle='#6f644350';c.lineWidth=1;c.strokeRect(7,7,W-14,H-14);}
+function register(x,y,w,h,action){buttons.push({x,y,w,h,action});}
+function actionButton(text,box,index,isBright=false){const {x,y,w,h}=box;roundRect(x,y,w,h,12,isBright?'#3c5148':'#1d3839',isBright?'#eac583':'#536354',1.2);roundRect(x+3,y+3,w-6,h-6,9,null,'#ffffff12');label(String(index+1).padStart(2,'0'),x+13,y+15,10,GOLD,'bold','left','system-ui');wrap(text,x+15,y+(h<60?24:28),w-28,h<60?12.5:14.5,CREAM,1.09,2,'500','Georgia,serif');register(x,y,w,h,()=>choose(index));}
+function drawHeader(){const title=scene===-1?'THE PRICE OF STORIES':scene===3?'ALL TALES':'THE PRICE OF STORIES';label('◈  WRKMAN  /  FOLKTALE LAB',20,25,clamp(W*.023,10,13),GOLD,'700','left','system-ui');if(W>400)label('ANANSI',W/2,25,clamp(W*.026,13,18),'#ffefcb','bold','center');const chapter=scene>=0&&scene<3?scene+1:scene===3?3:0;label(chapter+'/3',W-24,25,12,'#d3d3b0','700','right','system-ui');line(18,46,W-18,46,'#9a814f66');for(let i=0;i<3;i++)ellipse(W-91+i*15,41,3.5,3.5,i<Math.floor(totalSolved/4)?GOLD:'#39504e');}
+function drawIntro(){const wide=W/H>1.28;const r=wide?{x:18,y:63,w:W*.58-24,h:H-81}:{x:15,y:67,w:W-30,h:Math.max(195,H*.43)};drawFinalArt(r);const x=wide?W*.6:24,y=wide?H*.16:r.y+r.h+21,max=wide?W*.36:W-48;
+label('AN ASHANTI (ASANTE) FOLKTALE',x,y,clamp(W*.018,10,13),GOLD,'700','left','system-ui');label('ANANSI',x,y+40,clamp(wide?W*.065:W*.11,32,78),CREAM,'bold');
+label('THE PRICE OF STORIES',x,y+85,clamp(wide?W*.027:W*.06,16,28),GOLD,'bold');
+const des='Nyame, the Sky God, owns every story in the world. A small spider wants them all. Three impossible gifts stand between Anansi and his prize.';
+wrap(des,x,y+115,max,clamp(wide?W*.021:W*.043,13,19),CREAM,1.4,5);
+const by=wide?H-77:H-91,bw=wide?W*.33:W-48;roundRect(x,by,bw,57,13,'#d9b16e','#fce2aa',1.4);label('BEGIN THE TALE   →',x+bw/2,by+28,16,'#142b2b','bold','center','system-ui');register(x,by,bw,57,()=>{scene=0;beat=0;totalSolved=0;interlude=false;dialog='';});}
+function drawGame(){const wide=W/H>1.28;
+const art=wide?{x:15,y:63,w:W*.60-24,h:H-80}:{x:13,y:63,w:W-26,h:Math.max(160,Math.min(H*.47,H-335))};
+drawSceneArt(art,scene,beat);
+register(art.x,art.y,art.w,art.h,()=>{dialog=['Notice the water, the hornets, and the hollow gourd.','A pole measures length, but pride is the true weakness.','A dangerous promise is easier to believe when one is trapped.'][scene];dialogUntil=time+6000;});
+const panel=wide?{x:W*.61,y:63,w:W*.39-17,h:H-80}:{x:13,y:art.y+art.h+10,w:W-26,h:H-(art.y+art.h+17)};
+const chapter=chapters[scene],current=chapter.beats[beat];
+label('ACT '+(scene+1)+'  •  '+chapter.tag,panel.x+5,panel.y+14,clamp(wide?W*.017:W*.034,10,13),chapter.tone,'bold','left','system-ui');
+label(chapter.title,panel.x+4,panel.y+42,clamp(wide?W*.026:W*.052,18,27),CREAM,'bold');
+const prompt=(dialog&&time<dialogUntil)?dialog:current.prompt;
+const msgSize=wide?clamp(W*.018,13,17):clamp(W*.041,14,18);
+const top=panel.y+66;
+wrap(prompt,panel.x+5,top,panel.w-12,msgSize,CREAM,1.32,wide?4:4);
+const optTop=wide?Math.max(top+95,H-162):H-160;
+const gap=8,cellW=(panel.w-gap)/2,cellH=wide?Math.min(72,(H-optTop-15-gap)/2):66;
+for(let i=0;i<4;i++){const col=i%2,row=Math.floor(i/2);actionButton(current.options[i],{x:panel.x+col*(cellW+gap),y:optTop+row*(cellH+gap),w:cellW,h:cellH},i);}
+if(!wide&&H-optTop<145){/* compact screens retain four equal hit targets */}
+}
+function drawInterlude(){c.fillStyle='#091d21de';c.fillRect(0,0,W,H);const pw=Math.min(W-38,530),ph=Math.min(H-55,335),x=(W-pw)/2,y=(H-ph)/2;roundRect(x,y,pw,ph,20,'#18383b','#d9bc81',2);
+label('THREAD '+(scene+1)+' WOVEN',W/2,y+47,13,GOLD,'bold','center','system-ui');
+label(['The hornets','The python','The leopard'][scene],W/2,y+104,36,CREAM,'bold','center');
+wrap(['Nyame accepts Mmօboro, the hornets. Two gifts remain.','Onini is delivered to Nyame. One gift remains.','Osebo is delivered. Anansi has paid the full price.'][scene],x+28,y+147,pw-56,17,CREAM,1.4,4);
+const ry=y+ph-74;roundRect(x+22,ry,pw-44,51,11,'#d5ad71','#fce4b4');label(scene===2?'MEET NYAME  →':'CONTINUE  →',W/2,ry+26,15,'#132a2d','bold','center','system-ui');register(x+22,ry,pw-44,51,()=>{interlude=false;if(scene<2){scene++;beat=0;}else scene=3;dialog='';});}
+function drawFinal(){const wide=W/H>1.28;const art=wide?{x:16,y:64,w:W*.58,h:H-82}:{x:14,y:64,w:W-28,h:Math.max(185,H*.42)};drawFinalArt(art);const x=wide?W*.62:23,y=wide?H*.15:art.y+art.h+27,w=wide?W*.34:W-46;
+label('NYAME\'S GIFT',x,y,14,GOLD,'bold','left','system-ui');label('All stories',x,y+48,clamp(wide?W*.048:W*.088,31,54),CREAM,'bold');label('belong to Anansi.',x,y+90,clamp(wide?W*.027:W*.062,19,29),GOLD,'bold');wrap('The spider has claimed what mighty chiefs could not. His strength was never in his legs. It was in the stories he could make others believe.',x,y+114,w,clamp(wide?W*.019:W*.04,13,17),CREAM,1.4,6);
+const by=wide?H-79:H-112;roundRect(x,by,w,55,12,'#d6b476','#f9e0aa');label('WEAVE THE TALE AGAIN  ↻',x+w/2,by+27,14,'#142b2c','bold','center','system-ui');register(x,by,w,55,()=>{scene=-1;beat=0;totalSolved=0;dialog='';});label('Inspired by the photographed retelling by Harold Courlander.',x,wide?H-14:H-20,Math.min(11,W*.026),'#b7c6b6','400');}
+function choose(index){if(scene<0||scene>2||interlude)return;const b=chapters[scene].beats[beat];if(index===b.ok){dialog='';totalSolved++;beat++;if(beat>=chapters[scene].beats.length){interlude=true;beat=chapters[scene].beats.length;}else{dialog=b.success;dialogUntil=time+4200;}}else{dialog=b.miss[index]||'Anansi studies this idea, then thinks of another.';dialogUntil=time+4300;}}
+function frame(t){time=t;buttons=[];c.setTransform(dpr,0,0,dpr,0,0);decor();drawHeader();if(scene===-1)drawIntro();else if(scene===3)drawFinal();else if(interlude)drawSceneArt(W/H>1.28?{x:15,y:63,w:W*.60-24,h:H-80}:{x:13,y:63,w:W-26,h:Math.max(160,Math.min(H*.47,H-335))},scene,chapters[scene].beats.length);else drawGame();if(interlude)drawInterlude();requestAnimationFrame(frame);}
+function pointer(ev){ev.preventDefault();const x=ev.clientX,y=ev.clientY;for(let i=buttons.length-1;i>=0;i--){const b=buttons[i];if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){b.action();break;}}}
+canvas.addEventListener('pointerdown',pointer,{passive:false});
+window.addEventListener('keydown',ev=>{if(scene>=0&&scene<3&&!interlude&&['1','2','3','4'].includes(ev.key))choose(Number(ev.key)-1);else if(ev.key==='Enter'){if(scene===-1){scene=0;beat=0;}else if(interlude){interlude=false;if(scene<2){scene++;beat=0;}else scene=3;}}});
+document.addEventListener('contextmenu',e=>e.preventDefault());
+requestAnimationFrame(frame);
+})();
+</script></body></html>
