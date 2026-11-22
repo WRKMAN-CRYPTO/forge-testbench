@@ -149,7 +149,9 @@ function contact(a,b){
   a.home={x:a.x,y:a.y};b.home={x:b.x,y:b.y};
  }
  var hostility=(a.t.aggression+b.t.aggression)/2;
- if(hostility>.62&&ra.trust<-.08&&rand()<(hostility-.5)*.09){
+ var scarce=a.fullness<62||b.fullness<62;
+ var territory=(a.home&&dist(a.x,a.y,a.home.x,a.home.y)<45)||(b.home&&dist(b.x,b.y,b.home.x,b.home.y)<45);
+ if(hostility>.66&&ra.trust<.14&&(scarce||territory)&&rand()<(hostility-.52)*.14){
   var attacker=rand()<.5?a:b,victim=attacker===a?b:a;
   var dmg=7+attacker.body.strength*18-victim.body.resilience*6;
   victim.health=clamp(victim.health-dmg,0,100);victim.stats.injuries++;attacker.stats.conflicts++;game.metrics.conflicts++;
@@ -374,7 +376,10 @@ function drawInspector(){
   miniBar('Energy',a.energy/100,x,y,width,'#94c9ac');y+=30;
   txt('TEMPERAMENT',x,y,11,'#e7d6a7','left','750');y+=21;
   ['curiosity','sociability','aggression','caution','generosity'].forEach(function(k){miniBar(k[0].toUpperCase()+k.slice(1),a.t[k],x,y,width);y+=20;});
-  y+=10;txt('PERSONAL HISTORY',x,y,11,'#e7d6a7','left','750');y+=19;
+  y+=10;txt('PLACES LEARNED ('+a.places.length+')',x,y,11,'#e7d6a7','left','750');y+=20;
+  for(var place of a.places.slice(-5)){txt(place.kind.toUpperCase()+' · discovered day '+round(place.day,1),x,y,11,'#b1cabd');y+=19;}
+  if(!a.places.length){txt('No places recognized yet.',x,y,11,'#a8b9b0');y+=21;}
+  y+=15;txt('PERSONAL HISTORY',x,y,11,'#e7d6a7','left','750');y+=19;
   for(var h of a.history.slice(0,9))y+=paragraph('• '+h,x,y,width)+9;
   if(!a.history.length){txt('This life is still unwritten.',x,y,12,'#9baea5');}
  }else if(tab===1){
