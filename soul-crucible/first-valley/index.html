@@ -150,7 +150,7 @@ function spawn(s,x,y,p,q,species){var id=++game.nextBody;var base=temper(p,q,s),
  relations:{},places:[],history:[],home:null,parentIds:p&&q?[p.id,q.id]:[],decision:'Exploring',target:{x:x,y:y,kind:'wander'},
  nextThink:0,nextSocial:0,nextBirth:0,nextStrike:0,threatUntil:-1,battle:{strikes:0,dodges:0,blocks:0,kills:0,hunts:0,meals:0,escapes:0},learning:freshLearning(),stats:{gives:0,receives:0,helps:0,helped:0,conflicts:0,meetings:0,travel:0,waterScares:0,injuries:0},born:game.day};
  a.genome=makeValleyGenome(a,p,q);
- if(p&&q)game.metrics.births++;
+ if(p&&q){game.metrics.births++;if(species==='carnivore')game.metrics.ridgefangBirths=(game.metrics.ridgefangBirths||0)+1;}
  s.lives++;game.agents.push(a);
  if(s.lives>1){game.metrics.rebirths++;addEvent('soul',a.name+' begins life '+s.lives+' (soul '+s.id+')',a);}
  if(p&&q){var birthMessage=a.name+' is born to '+p.name+' and '+q.name;addEvent('birth',birthMessage,a,p);logHistory(q,birthMessage);}
@@ -244,20 +244,36 @@ function initFight(a){
 function initEcology(){
  game.carcasses=Array.isArray(game.carcasses)?game.carcasses:[];
  if(game.predatorsIntroduced===undefined)game.predatorsIntroduced=false;
- for(var k of ['strikes','blocks','dodges','predations','meatMeals','fleeChoices','defenseHits','rivalryHits','predatorAttacks'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
+ for(var k of ['strikes','blocks','dodges','predations','meatMeals','fleeChoices','defenseHits','rivalryHits','predatorAttacks','ridgefangBirths'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
  for(var a of game.agents)initFight(a);
  for(var p of game.pending)if(!p.species)p.species='grazer';
+}
+function addRidgefangFounders(n){
+ var resident=game.agents.find(a=>kindOf(a)==='carnivore');
+ for(var i=0;i<n;i++){
+  // Founders share a habitat rather than spawning at opposite ends of the map.
+  var x=resident?clamp(resident.x+r(-85,85),35,W-35):r(130,225);
+  var y=resident?clamp(resident.y+r(-75,75),35,H-35):r(490,580);
+  var a=spawn(makeSoul(),x,y,null,null,'carnivore');
+  a.age=r(23,34)*YEAR_DAYS;a.food=0;
+  addEvent('wildlife',a.name+' the Ridgefang enters the valley',a);
+  if(!resident)resident=a;
+ }
+ save();
 }
 function releasePredators(){
  initEcology();
  if(game.predatorsIntroduced)return;
  game.predatorsIntroduced=true;
- for(var i=0;i<2;i++){
-  var a=spawn(makeSoul(),i===0?110:W-110,i===0?H-110:115,null,null,'carnivore');
-  a.age=r(23,34)*YEAR_DAYS;a.food=0;
-  addEvent('wildlife',a.name+' the Ridgefang enters the valley',a);
- }
- announce('Two Ridgefangs entered the valley');save();
+ addRidgefangFounders(2);
+ announce('Two Ridgefangs entered the valley');
+}
+function restoreRidgefangFounders(){
+ if(!game.predatorsIntroduced)return;
+ var missing=Math.max(0,2-countKind('carnivore'));
+ if(!missing)return;
+ addRidgefangFounders(missing);
+ announce(missing+' Ridgefang founder'+(missing===1?'':'s')+' introduced by observer');
 }
 function nearestMeat(a){
  var best=null,d=1e9;
@@ -341,6 +357,18 @@ function nearestAgent(a,filter){var best=null,bd=1e10;for(var b of game.agents){
 function relation(a,b){var k=''+b.id;if(!a.relations[k])a.relations[k]={trust:0,familiarity:0,meetings:0,lastMeet:-99,gifts:0,help:0,attacks:0};return a.relations[k];}
 function markPlace(a,x,y,kind){var prev=a.places.find(function(p){return p.kind===kind&&dist(p.x,p.y,x,y)<50;});if(prev){prev.value=clamp(prev.value+.18,0,1);prev.day=game.day;return;}a.places.push({x:x,y:y,kind:kind,value:.6,day:game.day});if(a.places.length>12)a.places.sort(function(p,q){return q.value-p.value;}).length=12;}
 function safeTarget(a){var spot=choice([{x:164,y:251},{x:733,y:358},{x:945,y:545}]);return footprint(spot.x+r(-34,34),spot.y+r(-34,34));}
+function seekRidgefangCompanion(a){
+ if(!game.social||kindOf(a)!=='carnivore'||ageYears(a)<18||a.fullness<58||a.water<69||a.energy<28||a.nextBirth>game.day)return null;
+ var best=null,d=Infinity;
+ for(var other of game.agents){
+  if(other.id===a.id||kindOf(other)!=='carnivore'||other.health<=0||ageYears(other)<18)continue;
+  var dd=dist(a.x,a.y,other.x,other.y);
+  if(dd<280&&dd<d){best=other;d=dd;}
+ }
+ // Seeking company is a probabilistic choice shaped by sociability, never forced mating.
+ if(!best||rand()>(.28+.43*a.t.sociability))return null;
+ return best;
+}
 function chooseAction(a){
  if(kindOf(a)==='grazer'&&game.predatorsIntroduced){
   var danger=loomingPredator(a);
@@ -357,6 +385,13 @@ function chooseAction(a){
  // Urgent physiological needs outrank a hunt. Otherwise a hungry Ridgefang may chase until dehydrated.
  if(kindOf(a)==='carnivore'&&a.energy<26&&a.water>=65){
   a.target={x:a.x,y:a.y,kind:'rest'};a.decision='Resting between hunts';return;
+ }
+ if(kindOf(a)==='carnivore'){
+  var companion=seekRidgefangCompanion(a);
+  if(companion){
+   a.target={x:companion.x,y:companion.y,kind:'companion',id:companion.id};
+   a.decision='Seeking Ridgefang companion';return;
+  }
  }
  if(kindOf(a)==='carnivore'&&a.water>=65&&a.fullness<88){
   var meat=nearestMeat(a);
@@ -484,7 +519,7 @@ function tick(){
   }
   if(a.nextThink<=game.day){a.nextThink=game.day+r(1.0,2.7);chooseAction(a);}
   var t=a.target,tx=t.x,ty=t.y;
-  if(t.kind==='friend'||t.kind==='hunt'){
+  if(t.kind==='friend'||t.kind==='hunt'||t.kind==='companion'){
    var f=game.agents.find(function(b){return b.id===t.id;});if(!f){a.nextThink=0;t=a.target={x:a.x,y:a.y,kind:'wander'};}
    else{tx=f.x;ty=f.y;}
   }
@@ -788,15 +823,20 @@ function drawWorldData(){
  }else if(tab===3){
   txt('COMBAT & ECOLOGY',x,y,14,'#e7d6a7','left','750');y+=27;
   y+=paragraph('Ridgefangs eat meat exclusively. They hunt grazers, scavenge grazer carcasses, and never attack or eat their own species.',x,y,width)+16;
-  var data=[['Living grazers',countKind('grazer')],['Living Ridgefangs',countKind('carnivore')],['Strikes',m.strikes],['Blocks',m.blocks],['Dodges',m.dodges],['Predator attacks',m.predatorAttacks],['Prey flight decisions',m.fleeChoices],['Defense strikes',m.defenseHits],['Predation deaths',m.predations],['Carcass meals',m.meatMeals],['Rivalry strikes',m.rivalryHits]];
+  var data=[['Living grazers',countKind('grazer')],['Living Ridgefangs',countKind('carnivore')],['Ridgefang offspring born',m.ridgefangBirths||0],['Strikes',m.strikes],['Blocks',m.blocks],['Dodges',m.dodges],['Predator attacks',m.predatorAttacks],['Prey flight decisions',m.fleeChoices],['Defense strikes',m.defenseHits],['Predation deaths',m.predations],['Carcass meals',m.meatMeals],['Rivalry strikes',m.rivalryHits]];
   for(var row of data){txt(row[0],x,y,11,'#bcd2c8');txt(row[1]||0,x+width,y,12,'#e8d9b7','right','760');y+=23;}
   y+=9;txt('LIVING ARCHETYPES',x,y,11,'#e7d6a7','left','760');y+=22;
   for(var name of archetypes){txt(name,x,y,11,'#b9d0c2');txt(game.agents.filter(a=>a.family===name).length,x+width,y,12,'#e3dab7','right');y+=21;}
   y+=10;
+  if(game.predatorsIntroduced&&countKind('carnivore')<2){
+   var missing=2-countKind('carnivore');
+   y+=paragraph('Only '+countKind('carnivore')+' Ridgefang'+(countKind('carnivore')===1?' remains.':'s remain.')+' Introduce '+missing+' unrelated founder'+(missing===1?'':'s')+' if you want a second breeding opportunity. This is an observer intervention.',x,y,width)+12;
+   button('INTRODUCE '+missing+' NEW RIDGEFANG'+(missing===1?'':'S'),x,y,width,36,function(){modal='reinforce';scroll=0;},false,'modal');y+=47;
+  }
   if(!game.predatorsIntroduced){y+=paragraph('The current valley has no carnivores. Introducing two founders does not reset the world.',x,y,width)+14;
    button('INTRODUCE 2 RIDGEFANGS',x,y,width,36,function(){modal='introduce';scroll=0;},true,'modal');y+=48;}
   else{txt('RIDGEFANGS RELEASED · ECOSYSTEM ACTIVE',x,y,11,'#98d7b0','left','750');y+=26;}
-  y+=paragraph('Grazers and Ridgefangs have separate population caps (38 and 4). Ridgefang extinction is possible; the game does not replenish them automatically.',x,y,width)+10;
+  y+=paragraph('Grazers and Ridgefangs have separate population caps (38 and 4). Ridgefang extinction remains possible; additional founders require your explicit choice.',x,y,width)+10;
  }else{
   y=linesEvents(game.events,x,y,width,p.contentEnd);
   if(!game.events.length)txt('No recorded events.',x,y,12,'#aabbaf');
@@ -805,11 +845,12 @@ function drawWorldData(){
 }
 function drawConfirm(){
  var isToggle=modal==='toggle',isReplay=modal==='replay',isNew=modal==='new',isLearningToggle=modal==='learningToggle';
- var p=modalBackground(modal==='introduce'?'Introduce Ridgefangs?':isToggle?'Change experiment?':isLearningToggle?'Change learning trial?':isReplay?'Replay world?':'Generate new valley?'),x=p.x+17,y=p.y+73,w=p.w-34;
- var s=modal==='introduce'?'Bring two meat-eating Ridgefang founders into this existing valley? Their hunting may end lives. Your saved population and relationships will not reset.':isToggle?'Switch social memory '+(game.social?'OFF':'ON')+' and restart with the SAME seed? This creates a comparable starting world.':isLearningToggle?'Switch adaptive food learning '+(game.learning?'OFF':'ON')+' and restart the SAME seed? This replaces current progress; your old seed remains reproducible.':isReplay?'Restart day zero with the SAME seed and experiment settings? Current progress will be replaced.':'Start a new world with a NEW seed? You will leave the current lives behind.';
+ var p=modalBackground(modal==='reinforce'?'Introduce another founder?':modal==='introduce'?'Introduce Ridgefangs?':isToggle?'Change experiment?':isLearningToggle?'Change learning trial?':isReplay?'Replay world?':'Generate new valley?'),x=p.x+17,y=p.y+73,w=p.w-34;
+ var s=modal==='reinforce'?'Introduce '+(2-countKind('carnivore'))+' unrelated Ridgefang founder(s)? This changes the experiment without resetting the valley. Reproduction and survival are not guaranteed.':modal==='introduce'?'Bring two meat-eating Ridgefang founders into this existing valley? Their hunting may end lives. Your saved population and relationships will not reset.':isToggle?'Switch social memory '+(game.social?'OFF':'ON')+' and restart with the SAME seed? This creates a comparable starting world.':isLearningToggle?'Switch adaptive food learning '+(game.learning?'OFF':'ON')+' and restart the SAME seed? This replaces current progress; your old seed remains reproducible.':isReplay?'Restart day zero with the SAME seed and experiment settings? Current progress will be replaced.':'Start a new world with a NEW seed? You will leave the current lives behind.';
  y+=paragraph(s,x,y,w,'#c7d8c9')+30;
  button('CANCEL',x,y,w*.46,36,function(){modal=null;},false,'modal');
  button('CONFIRM',x+w*.51,y,w*.49,36,function(){
+  if(modal==='reinforce'){restoreRidgefangFounders();modal=null;return;}
   if(modal==='introduce'){releasePredators();modal=null;return;}
   var seed=isNew?((Date.now()^(Math.random()*0x7fffffff))>>>0):game.seed,social=isToggle?!game.social:game.social,learning=isLearningToggle?!game.learning:game.learning;
   newWorld(seed,social,learning);
