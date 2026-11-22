@@ -16,6 +16,11 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 (function(){'use strict';
 var C=document.getElementById('world'),ctx=C.getContext('2d',{alpha:false});
 var W=1100,H=680, TAU=Math.PI*2, KEY='soul-crucible-first-valley-001';
+// Accelerated simulation calendar: 30 world days = 1 in-world year.
+// This extends lives while keeping generational observation practical on phones.
+var YEAR_DAYS=30,MIN_AGE_YEARS=80,MAX_AGE_YEARS=100,AGE_SYSTEM='years30-v1';
+function ageYears(a){return a.age/YEAR_DAYS;}
+function lifespanYears(a){return a.lifespan/YEAR_DAYS;}
 var clamp=function(n,a,b){return Math.max(a,Math.min(b,n));};
 var round=function(n,k){return Math.round(n*Math.pow(10,k||0))/Math.pow(10,k||0);};
 var namesA=['Ash','Bran','Mira','Korr','Tarn','Fae','Thim','Pip','Rune','Vela','Nim','Orr','Sora','Wisp','Kelp','Venn','Luma','Dorn','Iris','Bram','Nera','Pell','Moth','Vale','Kira','Orin','Tavi','Rill','Fen','Linn','Moss','Kest'];
@@ -71,7 +76,7 @@ function spawn(s,x,y,p,q){var id=++game.nextBody;var base=temper(p,q,s),body=bod
  }
  var t=mapTemper(base,s);
  var a={id:id,soulId:s.id,family:family,name:choice(namesA)+(s.lives>0?' '+(s.lives+1):''),x:x,y:y,vx:0,vy:0,body:body,base:base,t:t,
- age:p&&q?0:r(16,48),lifespan:r(118,174)*(0.77+body.resilience*.52),
+ age:p&&q?0:r(16,48)*YEAR_DAYS,lifespan:r(MIN_AGE_YEARS,MAX_AGE_YEARS)*YEAR_DAYS,
  fullness:r(62,100),water:r(58,100),energy:r(65,99),health:100,food:ri(0,2),
  relations:{},places:[],history:[],home:null,parentIds:p&&q?[p.id,q.id]:[],decision:'Exploring',target:{x:x,y:y,kind:'wander'},
  nextThink:0,nextSocial:0,nextBirth:0,learning:freshLearning(),stats:{gives:0,receives:0,helps:0,helped:0,conflicts:0,meetings:0,travel:0,waterScares:0,injuries:0},born:game.day};
@@ -85,8 +90,8 @@ function terrain(){game.trees=[];game.bushes=[];game.stones=[];
  for(var i=0;i<91;i++){var x2=r(30,W-30),y2=r(32,H-32);if(waterDist(x2,y2)<19)continue;game.bushes.push({x:x2,y:y2,amount:r(1,4),capacity:4,regen:r(.017,.033)});}
  for(var k=0;k<28;k++){game.stones.push({x:r(20,W-20),y:r(30,H-30),size:r(5,12)});}
 }
-function newWorld(seed,social,learning){rngState=(seed>>>0)||1;game={seed:seed>>>0,social:social!==false,learning:learning!==false,day:0,agents:[],souls:{},pending:[],events:[],trees:[],bushes:[],stones:[],nextSoul:0,nextBody:0,
- metrics:{births:0,deaths:0,rebirths:0,given:0,helped:0,conflicts:0,meetings:0,remembered:0,lifeDays:0,foodFinds:0,foodMisses:0,adaptedChoices:0},deaths:[],proximity:{}};
+function newWorld(seed,social,learning){rngState=(seed>>>0)||1;game={seed:seed>>>0,social:social!==false,learning:learning!==false,ageSystem:AGE_SYSTEM,day:0,agents:[],souls:{},pending:[],events:[],trees:[],bushes:[],stones:[],nextSoul:0,nextBody:0,
+ metrics:{births:0,deaths:0,rebirths:0,given:0,helped:0,conflicts:0,meetings:0,remembered:0,lifeDays:0,lifeYearsTotal:0,lifeYearsCount:0,foodFinds:0,foodMisses:0,adaptedChoices:0},deaths:[],proximity:{}};
  terrain();
  for(var i=0;i<24;i++){var soul=makeSoul(),x=0,y=0,tries=0;
  do{x=r(65,W-65);y=r(60,H-60);}while(waterDist(x,y)<20&&++tries<30);
@@ -130,7 +135,26 @@ function rememberedFood(a){
  }
  return best;
 }
-function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;
+function migrateAgeSystem(){
+ if(game.ageSystem===AGE_SYSTEM)return;
+ // Idempotent migration of live bodies only. Completed historical lifetimes retain their original day units.
+ // Map each existing life to its relative age, preserving relationships and history,
+ // with a minimum 10% of the new lifespan remaining.
+ for(var a of game.agents){
+  var oldLimit=Number.isFinite(a.lifespan)&&a.lifespan>0?a.lifespan:160;
+  var oldAge=Number.isFinite(a.age)?a.age:0;
+  var progress=clamp(oldAge/oldLimit,0,.90);
+  var normalizedOldLimit=clamp((oldLimit-91)/133,0,1);
+  var newYears=MIN_AGE_YEARS+(MAX_AGE_YEARS-MIN_AGE_YEARS)*normalizedOldLimit;
+  a.lifespan=newYears*YEAR_DAYS;
+  a.age=progress*a.lifespan;
+ }
+ game.metrics=game.metrics||{};
+ if(!Number.isFinite(game.metrics.lifeYearsTotal))game.metrics.lifeYearsTotal=0;
+ if(!Number.isFinite(game.metrics.lifeYearsCount))game.metrics.lifeYearsCount=0;
+ game.ageSystem=AGE_SYSTEM;
+}
+function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;migrateAgeSystem();
  // Older saved valley states may not have every soul history field.
  for(var soulID in game.souls)safeSoulRecord(game.souls[soulID]);
  for(var k of ['foodFinds','foodMisses','adaptedChoices'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
@@ -196,7 +220,7 @@ function contact(a,b){
   addEvent('aid',donor.name+' tended '+recv.name+"'s wounds",donor,recv);return true;
  }
  if(a.health<b.health)help(b,a,rb,ra);else help(a,b,ra,rb);
- if(a.age>22&&b.age>22&&a.nextBirth<game.day&&b.nextBirth<game.day&&game.agents.length<38&&ra.trust>.23&&rb.trust>.23&&rand()<.14){
+ if(ageYears(a)>=18&&ageYears(b)>=18&&a.nextBirth<game.day&&b.nextBirth<game.day&&game.agents.length<38&&ra.trust>.23&&rb.trust>.23&&rand()<.14){
   a.nextBirth=b.nextBirth=game.day+r(22,36);var s=game.pending.length&&game.souls[game.pending[0].soulId].lives>0?game.souls[game.pending.shift().soulId]:makeSoul();
   var baby=spawn(s,clamp((a.x+b.x)/2+r(-12,12),25,W-25),clamp((a.y+b.y)/2+r(-12,12),25,H-25),a,b);
   relation(a,baby).trust=.7;relation(b,baby).trust=.7;relation(baby,a).trust=.72;relation(baby,b).trust=.72;
@@ -217,14 +241,14 @@ function contact(a,b){
 }
 function death(a,cause){
  var s=game.souls[a.soulId];s.lastLife=a.name+' died of '+cause+' on day '+round(game.day,1);
- s.lifeHistory.unshift({name:a.name,days:round(a.age,1),cause:cause,gives:a.stats.gives,helped:a.stats.helped,contacts:a.stats.meetings});s.lifeHistory.length=9;
+ s.lifeHistory.unshift({name:a.name,days:round(a.age,1),years:round(ageYears(a),1),cause:cause,gives:a.stats.gives,helped:a.stats.helped,contacts:a.stats.meetings});s.lifeHistory.length=9;
  var shift={social:clamp((a.stats.receives+a.stats.helped+a.stats.gives+a.stats.helps-a.stats.conflicts*2)/12,-1,1),
   giving:clamp((a.stats.gives+a.stats.helps-a.stats.conflicts)/9,-1,1),
   caution:clamp((a.stats.injuries+a.stats.waterScares)/6+(cause==='dehydration'?.25:0),-1,1),
-  roaming:clamp((a.stats.travel/Math.max(a.age,1)-30)/110,-1,1)};
+  roaming:clamp((a.stats.travel/Math.max(game.day-a.born,1)-30)/110,-1,1)};
  for(var k in s.im)s.im[k]=clamp(s.im[k]*.68+shift[k]*.32,-1,1);
  game.pending.push({soulId:s.id,due:game.day+r(5,19)});
- game.metrics.deaths++;game.metrics.lifeDays+=a.age;
+ game.metrics.deaths++;game.metrics.lifeDays+=a.age;game.metrics.lifeYearsTotal=(game.metrics.lifeYearsTotal||0)+ageYears(a);game.metrics.lifeYearsCount=(game.metrics.lifeYearsCount||0)+1;
  game.deaths.unshift({x:a.x,y:a.y,day:game.day,name:a.name,cause:cause});game.deaths.length=30;
  addEvent('death',a.name+' died of '+cause+' · soul '+s.id+' persists',a);
  if(selected===a.id){selected=null;modal=null;announce(a.name+' is gone. Their soul remains.');}
@@ -286,7 +310,7 @@ function tick(){
   }
   if(a.fullness<42&&a.food>0){a.food--;a.fullness=clamp(a.fullness+30,0,100);}
   if(a.energy<6){a.energy=Math.min(100,a.energy+25*dt);a.decision='Resting';}
-  if(a.home===null&&a.age>35&&a.energy<55){a.home={x:a.x,y:a.y};}
+  if(a.home===null&&game.day-a.born>35&&a.energy<55){a.home={x:a.x,y:a.y};}
   if(game.social){
    for(var b2 of game.agents){if(b2.id<=a.id||dist(a.x,a.y,b2.x,b2.y)>27)continue;contact(a,b2);}
   }else{
@@ -361,7 +385,7 @@ function scene(){
  }
  screenPos=[];
  for(var a of game.agents){
-  var cx=sx(a.x),cy=sy(a.y),rad=Math.max(4.5,8*scale*(a.age<16?.72:1)),co=colors[a.soulId%colors.length];
+  var cx=sx(a.x),cy=sy(a.y),rad=Math.max(4.5,8*scale*(ageYears(a)<16?.72:1)),co=colors[a.soulId%colors.length];
   if(cx<-24||cx>ww+24||cy<topH-24||cy>hh-bottomH+24)continue;
   circle(cx+1,cy+3,rad+1,'#101d1b');
   if(a.body.resilience>.72){rr(cx-rad,cy-rad,rad*2,rad*2,3,co);}
@@ -390,7 +414,7 @@ function hud(){
  rect(0,0,ww,topH,'#101b22');line(0,topH,ww,topH,'#3c5049',1);
  var titleW=ww<520?104:183;
  txt(ww<520?'SOUL · VALLEY':'SOUL CRUCIBLE',10,topH/2-7,ww<520?11:15,'#e3d7ae','left','800');
- txt((ww<520?'DAY ':'FIRST VALLEY · ')+Math.floor(game.day)+'d',10,topH/2+9,ww<520?9:10,'#8da89b');
+ txt((ww<520?'YEAR ':'FIRST VALLEY · YEAR ')+Math.floor(game.day/YEAR_DAYS)+' · DAY '+Math.floor(game.day%YEAR_DAYS),10,topH/2+9,ww<520?9:10,'#8da89b');
  var gap=4,available=ww-titleW-10,btnW=(available-gap*2)/3;
  button(playing?'PAUSE':'RESUME',titleW,5,btnW,topH-10,function(){playing=!playing;announce(playing?'Time resumes':'Time paused');},!playing);
  button('×'+speeds[speedIndex],titleW+btnW+gap,5,btnW,topH-10,function(){speedIndex=(speedIndex+1)%speeds.length;acc=0;save();},false);
@@ -437,7 +461,7 @@ function drawInspector(){
  ctx.save();ctx.beginPath();ctx.rect(p.x+9,start,p.w-18,p.contentEnd-start);ctx.clip();
  if(tab===0){
   txt(a.decision,x,y,13,'#d8e7bf','left','700');y+=24;
-  txt('Age '+Math.floor(a.age)+' / '+Math.floor(a.lifespan)+' days · '+a.family,x,y,11,'#94aca2');y+=25;
+  txt('Age '+round(ageYears(a),1)+' / '+round(lifespanYears(a),1)+' years · '+a.family,x,y,11,'#94aca2');y+=25;
   miniBar('Health',a.health/100,x,y,width,'#d39c96');y+=24;
   miniBar('Food',a.fullness/100,x,y,width,'#dfc17e');y+=24;
   miniBar('Water',a.water/100,x,y,width,'#80c7d4');y+=24;
@@ -474,7 +498,7 @@ function drawInspector(){
   for(var k of ['social','giving','caution','roaming']){txt(k.toUpperCase(),x,y,11,'#c3d2bf');txt((s.im[k]>=0?'+':'')+round(s.im[k],2),x+width,y,12,s.im[k]>=0?'#8bd1b4':'#dda4a1','right');y+=24;}
   y+=10;txt('PREVIOUS LIVES',x,y,11,'#e7d6a7','left','750');y+=20;
   if(!s.lifeHistory.length){txt('None. This is the soul’s first life.',x,y,12,'#a6b5ac');}
-  for(var life of s.lifeHistory){y+=paragraph(String(life.name||'Unnamed life')+' · '+(Number.isFinite(life.days)?round(life.days):'?')+' days · '+String(life.cause||'unknown'),x,y,width)+11;}
+  for(var life of s.lifeHistory){y+=paragraph(String(life.name||'Unnamed life')+' · '+(Number.isFinite(life.years)?round(life.years,1)+' years':Number.isFinite(life.days)?round(life.days)+' old-scale days':'unknown age')+' · '+String(life.cause||'unknown'),x,y,width)+11;}
   }
  }else if(tab===3){
   txt('RECORDED MOMENTS',x,y,11,'#e7d6a7','left','750');y+=22;
@@ -504,12 +528,12 @@ function drawWorldData(){
  ctx.save();ctx.beginPath();ctx.rect(p.x+9,start,p.w-18,p.contentEnd-start);ctx.clip();
  var m=game.metrics;
  if(tab===0){
-  txt('DAY '+round(game.day,1)+'  ·  SEED '+game.seed,x,y,14,'#f0e1b2','left','780');y+=29;
+  txt('YEAR '+Math.floor(game.day/YEAR_DAYS)+' · DAY '+Math.floor(game.day%YEAR_DAYS)+' · SEED '+game.seed,x,y,12,'#f0e1b2','left','780');y+=29;
   var records=[['Living bodies',game.agents.length],['Persistent souls',Object.keys(game.souls).length],['Relationships',bondsCount()],['Encounters',m.meetings],['Food shared',m.given],['Care given',m.helped],['Conflicts',m.conflicts],['Births',m.births],['Deaths',m.deaths],['Reincarnations',m.rebirths],['Relationship-driven choices',m.remembered]];
   for(var row of records){txt(row[0],x,y,12,'#c1d5c9');txt(row[1],x+width,y,12,'#e6deb9','right','720');y+=25;}
   y+=13;txt('AVERAGE COMPLETED LIFETIME',x,y,11,'#a9c5b7');y+=22;
-  txt(m.deaths?round(m.lifeDays/m.deaths,1)+' days':'No lives completed yet',x,y,13,'#e9d8af');y+=27;
-  y+=paragraph('These numbers are observations. They do not prove friendship, culture, consciousness, or survival benefits.',x,y,width);
+  txt(m.lifeYearsCount?round(m.lifeYearsTotal/m.lifeYearsCount,1)+' years':'No lives completed on new age scale',x,y,13,'#e9d8af');y+=27;
+  y+=paragraph('A year is 30 world days. Natural lifespans are 80–100 years; thirst, hunger or injury may end a life earlier. Historical records from before this update retain their old day units.',x,y,width)+16;y+=paragraph('These observations do not prove friendship, culture, consciousness, or survival benefits.',x,y,width);
  }else if(tab===1){
   txt('SOCIAL MEMORY '+(game.social?'ON':'OFF'),x,y,15,game.social?'#a9dcaf':'#deb49f','left','800');y+=31;
   y+=paragraph('The comparison uses identical terrain and starting random seed. Changing mode restarts the world, so no earlier relationship data leaks across runs.',x,y,width)+21;
@@ -562,6 +586,7 @@ function drawHelp(){
  'MEMORY toggles the relationship system. STATS > LEARNING lets you compare food learning ON/OFF with the same seed.',
  'REPLAY restarts the same seed. NEW SEED creates a different valley.',
  'The three ancient clearings are just geography. They are not settlements or destinations imposed by a director.',
+ 'The calendar uses 30 simulated days per in-world year. Natural lifespans range from 80 to 100 years; other dangers can end life sooner.',
  'Souls retain subtle biases after death; minds, places and relationship memories do not survive reincarnation.',
  'Progress saves in this browser automatically. The original Soul Crucible arena uses a separate save.'
  ];
