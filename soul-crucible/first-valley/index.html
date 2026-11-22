@@ -741,7 +741,7 @@ function drawInspector(){
   y+=paragraph('Body shape follows valley traits and parents. Combat uses physical traits, not the decorative DNA fields.',x,y,width,'#9eb9ae')+12;
  }
  ctx.restore();
- scrollLimit=Math.max(0,y-p.contentEnd+20);
+ scrollLimit=Math.max(0,y+scroll-p.contentEnd+20);
 }
 var scrollLimit=0;
 function drawWorldData(){
@@ -796,7 +796,7 @@ function drawWorldData(){
   y=linesEvents(game.events,x,y,width,p.contentEnd);
   if(!game.events.length)txt('No recorded events.',x,y,12,'#aabbaf');
  }
- ctx.restore();scrollLimit=Math.max(0,y-p.contentEnd+20);
+ ctx.restore();scrollLimit=Math.max(0,y+scroll-p.contentEnd+20);
 }
 function drawConfirm(){
  var isToggle=modal==='toggle',isReplay=modal==='replay',isNew=modal==='new',isLearningToggle=modal==='learningToggle';
@@ -828,7 +828,7 @@ function drawHelp(){
  'Progress saves in this browser automatically. The original Soul Crucible arena uses a separate save.'
  ];
  for(var text0 of paragraphs)y+=paragraph('• '+text0,x,y,w)+19;
- ctx.restore();scrollLimit=Math.max(0,y-p.contentEnd+15);
+ ctx.restore();scrollLimit=Math.max(0,y+scroll-p.contentEnd+15);
 }
 function overlay(){
  if(!modal)return;scrollLimit=0;
