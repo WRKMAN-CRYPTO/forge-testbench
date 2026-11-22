@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#080e19">
-<title>WRKMAN / First Sense 0.6</title>
+<title>WRKMAN / First Sense 0.7</title>
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080e19;overscroll-behavior:none}
 canvas{display:block;width:100vw;height:100dvh;touch-action:none;-webkit-user-select:none;user-select:none}
@@ -21,11 +21,12 @@ window.onerror=function(message,source,line){var el=document.getElementById('sta
 (function(){
 'use strict';
 var canvas=document.getElementById('c'),g=canvas.getContext('2d');
-var W=0,H=0,D=1,paused=false,menu=false,push=false,need=true,mode='quiet';
+var W=0,H=0,D=1,paused=false,menu=false,push=false,need=true,mode='adaptive';
 var tickCount=0,step=0,actionSeed=1337,pushSeed=7349,lastAction=-1;
 var pred=0,actual=0,absError=0,agent={x:.5,y:.5},hits=[],trail=[],errors=[];
 var actionNames=['LEFT','RIGHT','UP','DOWN'],dirs=[[-1,0],[1,0],[0,-1],[0,1]];
 var modes=[
+{id:'adaptive',title:'ADAPTIVE',hint:'Learn when to scout or conserve from actual outcomes'},
 {id:'curious',title:'CURIOUS',hint:'Seek surprising, underexplored action outcomes'},
 {id:'quiet',title:'QUIET',hint:'Prefer familiar, predictable action outcomes'},
 {id:'random',title:'RANDOM',hint:'Unbiased movement control'},
@@ -36,6 +37,10 @@ var lights=originLights.map(function(l){return {x:l.x,y:l.y,r:l.r};});
 var memory=[],binVisits=[],lastBin=0,errTotal=0;
 var energy=70,feedingSteps=0,emptySteps=0,highLight=0;
 var searchDirection=-1,searchLeft=0,searchBouts=0;
+// A contextual two-choice bandit. Its table is updated only from completed experience.
+var driveTable=[],activeDrive='curious',driveContext=0,driveLeft=0,driveSteps=0;
+var driveStartEnergy=70,driveStartFed=0,driveStartEmpty=0,driveStartNovel=0;
+var switches=0,driveTrials=[0,0],driveActions=[0,0],driveReward=0,learnedPairs=0;
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function randomAction(){actionSeed=(Math.imul(actionSeed,1664525)+1013904223)>>>0;return actionSeed/4294967296;}
 function randomPush(){pushSeed=(Math.imul(pushSeed,22695477)+1)>>>0;return pushSeed/4294967296;}
@@ -44,6 +49,10 @@ function reset(full){
   pred=0;actual=0;absError=0;errTotal=0;
   energy=70;feedingSteps=0;emptySteps=0;highLight=0;
   searchDirection=-1;searchLeft=0;searchBouts=0;
+  driveTable=Array.from({length:4},function(){return [{avg:0,n:0},{avg:0,n:0}];});
+  activeDrive='curious';driveContext=0;driveLeft=0;driveSteps=0;switches=0;
+  driveStartEnergy=energy;driveStartFed=0;driveStartEmpty=0;driveStartNovel=0;
+  driveTrials=[0,0];driveActions=[0,0];driveReward=0;learnedPairs=0;
   agent={x:.5,y:.5};trail=[];errors=[];
   memory=Array.from({length:8},function(){return Array.from({length:4},function(){return {mean:0,uncertainty:.03,n:0};});});
   binVisits=Array(8).fill(0);lastBin=0;
@@ -58,8 +67,47 @@ function sense(x,y){
   return maximum;
 }
 function bucket(value){return Math.min(7,Math.floor(value*8));}
+function adaptiveContext(intensity){
+  return (energy<45?0:2)+(intensity>=.32?1:0);
+}
+function completeDrive(){
+  if(driveSteps<=0)return;
+  var idx=activeDrive==='curious'?0:1;
+  var record=driveTable[driveContext][idx];
+  // Actual experienced light and energy, not access to source coordinates.
+  var energyDelta=need?(energy-driveStartEnergy)/driveSteps:0;
+  var fedDelta=(feedingSteps-driveStartFed)/driveSteps;
+  var newlyLearned=learnedPairs-driveStartNovel;
+  var zeroTime=(emptySteps-driveStartEmpty)/driveSteps;
+  var outcome=1.4*fedDelta+2*energyDelta+.09*newlyLearned-.12*zeroTime;
+  record.avg+=(outcome-record.avg)/(++record.n);
+  driveTrials[idx]++;
+  driveReward=outcome;
+  driveSteps=0;
+}
+function startDrive(intensity){
+  var context=adaptiveContext(intensity),arms=driveTable[context];
+  var total=arms[0].n+arms[1].n,choice=0,best=-Infinity;
+  for(var i=0;i<2;i++){
+    var item=arms[i];
+    // Small innate urgency bias. The outcomes remain learned, not hard-coded switches.
+    var prior=i===0?(energy<45?.09:.01):(intensity>.32?.09:0);
+    var ucb=.18*Math.sqrt(Math.log(total+2)/(item.n+1));
+    var score=(item.n?item.avg:0)+ucb+prior+(randomAction()-.5)*.008;
+    if(score>best){best=score;choice=i;}
+  }
+  var next=choice===0?'curious':'quiet';
+  if(step>0 && activeDrive!==next)switches++;
+  activeDrive=next;driveContext=context;driveLeft=24;driveSteps=0;
+  driveStartEnergy=energy;driveStartFed=feedingSteps;driveStartEmpty=emptySteps;
+  driveStartNovel=learnedPairs;
+}
 function chooseAction(bin,oldSense){
-  if(mode==='quiet' && need && energy<64 && oldSense<.35){
+  if(mode==='adaptive' && driveLeft<=0) {
+    completeDrive();startDrive(oldSense);
+  }
+  var style=mode==='adaptive'?activeDrive:mode;
+  if(style==='quiet' && need && energy<64 && oldSense<.35){
     // Survival search: a persistent motor bout, not knowledge of light positions.
     // It is a heuristic. The creature still cannot tell a wall from darkness.
     if(searchLeft<=0){
@@ -79,14 +127,14 @@ function chooseAction(bin,oldSense){
     return searchDirection;
   }
   searchLeft=0;
-  if(mode==='cycle')return step%4;
-  if(mode==='random')return Math.floor(randomAction()*4);
+  if(style==='cycle')return step%4;
+  if(style==='random')return Math.floor(randomAction()*4);
   var best=0,bestScore=-Infinity;
   for(var a=0;a<4;a++){
     var m=memory[bin][a];
     var novelty=1/Math.sqrt(1+m.n);
     var score;
-    if(mode==='quiet'){
+    if(style==='quiet'){
       // An untested action is not treated as proven safe.
       score=-3*Math.abs(m.mean)-2*m.uncertainty-.3*novelty;
       if(need){
@@ -111,6 +159,7 @@ function move(){
   var oldSense=sense(agent.x,agent.y);
   var bin=bucket(oldSense);
   var a=chooseAction(bin,oldSense),m=memory[bin][a],dir=dirs[a];
+  if(mode==='adaptive'){driveLeft--;driveSteps++;driveActions[activeDrive==='curious'?0:1]++;}
   pred=m.mean;
   agent.x=clamp(agent.x+dir[0]*.028,.04,.96);
   agent.y=clamp(agent.y+dir[1]*.028,.04,.96);
@@ -131,6 +180,7 @@ function move(){
   // Update experience only AFTER acting. The decision never uses x/y.
   m.mean+=.13*(actual-m.mean);
   m.uncertainty=.90*m.uncertainty+.10*absError;
+  if(m.n===0)learnedPairs++;
   m.n++;
   binVisits[bin]++;
   lastBin=bin;lastAction=a;errTotal+=absError;
@@ -222,9 +272,17 @@ function render(){
   var label=mode.toUpperCase()+'  ·  '+(need?'NEED ON':'NEED OFF')+(push?'  ·  PUSHES':'');
   text('DRIVE: '+label,14,iy,12,push?'#ffc085':'#8af2da');
   text('STEPS '+step+'   MAE '+mean.toFixed(3)+'   BINS '+visited+'/8   FED '+feedingSteps,14,iy+21,11,'#b8cde0');
-  text('Tap arena to relocate a light.',14,iy+41,11,'#93a9be');
-  text('Prediction error (recent 120 actions)',14,iy+61,11,'#93a9be');
-  var cy=iy+70,ch=Math.max(23,Math.min(62,H-cy-12));
+  if(mode==='adaptive'){
+    var currentArms=driveTable[adaptiveContext(sense(agent.x,agent.y))];
+    text('ACTIVE: '+activeDrive.toUpperCase()+'    SWITCHES '+switches+'    SCOUT '+driveActions[0]+' / GUARD '+driveActions[1],14,iy+41,10,'#a5e2e7');
+    text('Learned returns  S '+currentArms[0].avg.toFixed(2)+' ('+currentArms[0].n+')  G '+currentArms[1].avg.toFixed(2)+' ('+currentArms[1].n+')',14,iy+58,10,'#94adc6');
+    text('Tap arena to relocate a light.',14,iy+75,10,'#93a9be');
+    text('Prediction error (recent 120 actions)',14,iy+92,10,'#93a9be');
+  } else {
+    text('Tap arena to relocate a light.',14,iy+41,11,'#93a9be');
+    text('Prediction error (recent 120 actions)',14,iy+61,11,'#93a9be');
+  }
+  var cy=iy+(mode==='adaptive'?101:70),ch=Math.max(19,Math.min(62,H-cy-12));
   rect(14,cy,W-28,ch,'#14243a');
   if(errors.length){
     var maxErr=Math.max(.08,Math.max.apply(null,errors));
@@ -239,22 +297,25 @@ function render(){
 }
 function renderMenu(){
   rect(0,0,W,H,'rgba(2,6,13,.82)');
-  var mw=Math.min(W-28,470),mh=407,mx=(W-mw)/2,my=(H-mh)/2;
+  var mw=Math.min(W-28,470),mh=Math.min(452,H-24),mx=(W-mw)/2,my=(H-mh)/2;
+  var scale=mh/452;
+  function py(v){return my+v*scale;}
+  function ph(v){return v*scale;}
   rect(mx,my,mw,mh,'#20354b');
-  text('BEHAVIOR LAB',mx+16,my+27,17,'#8af2da');
-  text('Choosing a drive resets experience for comparison.',mx+16,my+48,10,'#a9c2d8');
+  text('BEHAVIOR LAB',mx+16,py(27),17,'#8af2da');
+  text('Changing drive resets experience for comparison.',mx+16,py(48),10,'#a9c2d8');
   var gap=9,cw=(mw-41)/2,bx=mx+16;
   modes.forEach(function(item,i){
-    var x=bx+(i%2)*(cw+gap),y=my+64+Math.floor(i/2)*52;
-    button(item.title,x,y,cw,43,function(){mode=item.id;reset(false);menu=false;},mode===item.id);
+    var x=bx+(i%2)*(cw+gap),y=py(64+Math.floor(i/2)*51);
+    button(item.title,x,y,cw,ph(42),function(){mode=item.id;reset(false);menu=false;},mode===item.id);
   });
   var chosen=modes.filter(function(item){return item.id===mode;})[0];
-  text(chosen.hint,mx+16,my+179,10,'#b7cde1');
-  button(need?'ENERGY NEED: ON':'ENERGY NEED: OFF',mx+16,my+194,mw-32,40,function(){need=!need;reset(false);menu=false;},need);
-  button(push?'DISTURBANCES: ON':'DISTURBANCES: OFF',mx+16,my+240,mw-32,40,function(){push=!push;reset(false);menu=false;},push);
-  button('RESET LIGHT POSITIONS',mx+16,my+286,mw-32,40,function(){reset(true);menu=false;});
-  button('CLOSE',mx+16,my+332,mw-32,40,function(){menu=false;});
-  text('Light restores energy. Search bursts have no map.',mx+16,my+399,10,'#93a9be');
+  text(chosen.hint,mx+16,py(231),10,'#b7cde1');
+  button(need?'ENERGY NEED: ON':'ENERGY NEED: OFF',mx+16,py(242),mw-32,ph(40),function(){need=!need;reset(false);menu=false;},need);
+  button(push?'DISTURBANCES: ON':'DISTURBANCES: OFF',mx+16,py(288),mw-32,ph(40),function(){push=!push;reset(false);menu=false;},push);
+  button('RESET LIGHT POSITIONS',mx+16,py(334),mw-32,ph(40),function(){reset(true);menu=false;});
+  button('CLOSE',mx+16,py(380),mw-32,ph(40),function(){menu=false;});
+  text('Conserve vs scout: reward follows consequences.',mx+16,py(445),10,'#93a9be');
 }
 canvas.addEventListener('pointerdown',function(e){
   e.preventDefault();
@@ -275,7 +336,7 @@ canvas.addEventListener('pointerdown',function(e){
   }
 },{passive:false});
 window.firstSenseDiagnostics=function(){
-  return {mode:mode,push:push,need:need,energy:energy,feedingSteps:feedingSteps,emptySteps:emptySteps,peakLight:highLight,searchBouts:searchBouts,steps:step,binCoverage:binVisits.filter(function(n){return n>0;}).length,
+  return {mode:mode,push:push,need:need,energy:energy,feedingSteps:feedingSteps,emptySteps:emptySteps,peakLight:highLight,searchBouts:searchBouts,steps:step,activeDrive:activeDrive,switches:switches,driveTrials:driveTrials.slice(),driveActions:driveActions.slice(),learnedReturns:driveTable.map(function(row){return row.map(function(item){return {n:item.n,avg:item.avg};});}),binCoverage:binVisits.filter(function(n){return n>0;}).length,
     meanAbsError:errors.length?errors.reduce(function(a,b){return a+b;},0)/errors.length:0,
     allTimeMeanAbsoluteError:step?errTotal/step:0,
     modelSamples:memory.reduce(function(a,row){return a+row.filter(function(m){return m.n>0;}).length;},0)};
