@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#080e19">
-<title>WRKMAN / First Sense 0.5</title>
+<title>WRKMAN / First Sense 0.6</title>
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080e19;overscroll-behavior:none}
 canvas{display:block;width:100vw;height:100dvh;touch-action:none;-webkit-user-select:none;user-select:none}
@@ -21,7 +21,7 @@ window.onerror=function(message,source,line){var el=document.getElementById('sta
 (function(){
 'use strict';
 var canvas=document.getElementById('c'),g=canvas.getContext('2d');
-var W=0,H=0,D=1,paused=false,menu=false,push=false,mode='curious';
+var W=0,H=0,D=1,paused=false,menu=false,push=false,need=true,mode='quiet';
 var tickCount=0,step=0,actionSeed=1337,pushSeed=7349,lastAction=-1;
 var pred=0,actual=0,absError=0,agent={x:.5,y:.5},hits=[],trail=[],errors=[];
 var actionNames=['LEFT','RIGHT','UP','DOWN'],dirs=[[-1,0],[1,0],[0,-1],[0,1]];
@@ -34,12 +34,16 @@ var originLights=[
 {x:.20,y:.25,r:.11},{x:.77,y:.25,r:.13},{x:.60,y:.75,r:.10},{x:.25,y:.78,r:.08}];
 var lights=originLights.map(function(l){return {x:l.x,y:l.y,r:l.r};});
 var memory=[],binVisits=[],lastBin=0,errTotal=0;
+var energy=70,feedingSteps=0,emptySteps=0,highLight=0;
+var searchDirection=-1,searchLeft=0,searchBouts=0;
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function randomAction(){actionSeed=(Math.imul(actionSeed,1664525)+1013904223)>>>0;return actionSeed/4294967296;}
 function randomPush(){pushSeed=(Math.imul(pushSeed,22695477)+1)>>>0;return pushSeed/4294967296;}
 function reset(full){
   tickCount=0;step=0;actionSeed=1337;pushSeed=7349;lastAction=-1;
   pred=0;actual=0;absError=0;errTotal=0;
+  energy=70;feedingSteps=0;emptySteps=0;highLight=0;
+  searchDirection=-1;searchLeft=0;searchBouts=0;
   agent={x:.5,y:.5};trail=[];errors=[];
   memory=Array.from({length:8},function(){return Array.from({length:4},function(){return {mean:0,uncertainty:.03,n:0};});});
   binVisits=Array(8).fill(0);lastBin=0;
@@ -54,7 +58,27 @@ function sense(x,y){
   return maximum;
 }
 function bucket(value){return Math.min(7,Math.floor(value*8));}
-function chooseAction(bin){
+function chooseAction(bin,oldSense){
+  if(mode==='quiet' && need && energy<64 && oldSense<.35){
+    // Survival search: a persistent motor bout, not knowledge of light positions.
+    // It is a heuristic. The creature still cannot tell a wall from darkness.
+    if(searchLeft<=0){
+      var bestPred=.003,learned=-1;
+      for(var j=0;j<4;j++){
+        if(memory[bin][j].n>0 && memory[bin][j].mean>bestPred){
+          bestPred=memory[bin][j].mean;learned=j;
+        }
+      }
+      var heading=learned>=0 && randomAction()<.65?learned:Math.floor(randomAction()*4);
+      if(heading===searchDirection && randomAction()<.75)heading=(heading+1+Math.floor(randomAction()*3))%4;
+      searchDirection=heading;
+      searchLeft=11+Math.floor(randomAction()*23);
+      searchBouts++;
+    }
+    searchLeft--;
+    return searchDirection;
+  }
+  searchLeft=0;
   if(mode==='cycle')return step%4;
   if(mode==='random')return Math.floor(randomAction()*4);
   var best=0,bestScore=-Infinity;
@@ -65,9 +89,14 @@ function chooseAction(bin){
     if(mode==='quiet'){
       // An untested action is not treated as proven safe.
       score=-3*Math.abs(m.mean)-2*m.uncertainty-.3*novelty;
+      if(need){
+        var urgency=1-energy/100;
+        score+=urgency*(5*Math.max(0,m.mean)+1.15*novelty);
+      }
     }else{
       // Uncertainty and sparse experience are only proxies for curiosity.
       score=3*m.uncertainty+.45*novelty;
+      if(need){score+=(1-energy/100)*2.5*Math.max(0,m.mean);}
       if(lastAction>=0 && a===(lastAction^1))score-=.045;
     }
     score+=(randomAction()-.5)*.025;
@@ -81,7 +110,7 @@ function move(){
   if(tickCount%9!==0)return;
   var oldSense=sense(agent.x,agent.y);
   var bin=bucket(oldSense);
-  var a=chooseAction(bin),m=memory[bin][a],dir=dirs[a];
+  var a=chooseAction(bin,oldSense),m=memory[bin][a],dir=dirs[a];
   pred=m.mean;
   agent.x=clamp(agent.x+dir[0]*.028,.04,.96);
   agent.y=clamp(agent.y+dir[1]*.028,.04,.96);
@@ -90,7 +119,14 @@ function move(){
     agent.x=clamp(agent.x+(randomPush()-.5)*.20,.04,.96);
     agent.y=clamp(agent.y+(randomPush()-.5)*.20,.04,.96);
   }
-  actual=sense(agent.x,agent.y)-oldSense;
+  var newSense=sense(agent.x,agent.y);
+  actual=newSense-oldSense;
+  if(need){
+    energy=clamp(energy-.24+.65*newSense,0,100);
+    if(energy<=0)emptySteps++;
+    if(newSense>.37)feedingSteps++;
+  }
+  highLight=Math.max(highLight,newSense);
   absError=Math.abs(actual-pred);
   // Update experience only AFTER acting. The decision never uses x/y.
   m.mean+=.13*(actual-m.mean);
@@ -156,6 +192,11 @@ function render(){
     g.strokeStyle='#e2fff6';g.lineWidth=2;
     g.beginPath();g.moveTo(px,py);g.lineTo(px+dirs[lastAction][0]*14,py+dirs[lastAction][1]*14);g.stroke();
   }
+  // Resource is internal state; the decision system never sees source coordinates.
+  rect(ax+aw-135,ay+12,123,35,'rgba(5,14,25,.77)');
+  text(need?'ENERGY '+energy.toFixed(0)+'%':'NEED OFF',ax+aw-125,ay+27,10,need?'#ffe1a2':'#a8baca');
+  rect(ax+aw-125,ay+34,100,5,'#344b61');
+  if(need)rect(ax+aw-125,ay+34,energy,5,energy>20?'#f3c478':'#ff7979');
   g.restore();
   var sy=mobile?ay+ah+10:ay,sx=mobile?14:ax+aw+12,sw=mobile?W-28:W-sx-14,sh=mobile?122:ah;
   rect(sx,sy,sw,sh,'#14243a');
@@ -178,9 +219,9 @@ function render(){
   button('MENU',28+2*bw,by,bw,38,function(){menu=!menu;});
   var iy=by+55,visited=binVisits.filter(function(n){return n>0;}).length;
   var mean=errors.length?errors.reduce(function(a,b){return a+b;},0)/errors.length:0;
-  var label=mode.toUpperCase()+'  ·  '+(push?'PUSHES ON':'STABLE WORLD');
+  var label=mode.toUpperCase()+'  ·  '+(need?'NEED ON':'NEED OFF')+(push?'  ·  PUSHES':'');
   text('DRIVE: '+label,14,iy,12,push?'#ffc085':'#8af2da');
-  text('STEPS '+step+'   MAE '+mean.toFixed(3)+'   SENSE BINS '+visited+'/8',14,iy+21,11,'#b8cde0');
+  text('STEPS '+step+'   MAE '+mean.toFixed(3)+'   BINS '+visited+'/8   FED '+feedingSteps,14,iy+21,11,'#b8cde0');
   text('Tap arena to relocate a light.',14,iy+41,11,'#93a9be');
   text('Prediction error (recent 120 actions)',14,iy+61,11,'#93a9be');
   var cy=iy+70,ch=Math.max(23,Math.min(62,H-cy-12));
@@ -198,7 +239,7 @@ function render(){
 }
 function renderMenu(){
   rect(0,0,W,H,'rgba(2,6,13,.82)');
-  var mw=Math.min(W-28,470),mh=354,mx=(W-mw)/2,my=(H-mh)/2;
+  var mw=Math.min(W-28,470),mh=407,mx=(W-mw)/2,my=(H-mh)/2;
   rect(mx,my,mw,mh,'#20354b');
   text('BEHAVIOR LAB',mx+16,my+27,17,'#8af2da');
   text('Choosing a drive resets experience for comparison.',mx+16,my+48,10,'#a9c2d8');
@@ -209,10 +250,11 @@ function renderMenu(){
   });
   var chosen=modes.filter(function(item){return item.id===mode;})[0];
   text(chosen.hint,mx+16,my+179,10,'#b7cde1');
-  button(push?'DISTURBANCES: ON':'DISTURBANCES: OFF',mx+16,my+195,mw-32,40,function(){push=!push;reset(false);menu=false;},push);
-  button('RESET LIGHT POSITIONS',mx+16,my+241,mw-32,40,function(){reset(true);menu=false;});
-  button('CLOSE',mx+16,my+287,mw-32,40,function(){menu=false;});
-  text('Low error may just mean avoiding change.',mx+16,my+344,10,'#93a9be');
+  button(need?'ENERGY NEED: ON':'ENERGY NEED: OFF',mx+16,my+194,mw-32,40,function(){need=!need;reset(false);menu=false;},need);
+  button(push?'DISTURBANCES: ON':'DISTURBANCES: OFF',mx+16,my+240,mw-32,40,function(){push=!push;reset(false);menu=false;},push);
+  button('RESET LIGHT POSITIONS',mx+16,my+286,mw-32,40,function(){reset(true);menu=false;});
+  button('CLOSE',mx+16,my+332,mw-32,40,function(){menu=false;});
+  text('Light restores energy. Search bursts have no map.',mx+16,my+399,10,'#93a9be');
 }
 canvas.addEventListener('pointerdown',function(e){
   e.preventDefault();
@@ -233,12 +275,13 @@ canvas.addEventListener('pointerdown',function(e){
   }
 },{passive:false});
 window.firstSenseDiagnostics=function(){
-  return {mode:mode,push:push,steps:step,binCoverage:binVisits.filter(function(n){return n>0;}).length,
+  return {mode:mode,push:push,need:need,energy:energy,feedingSteps:feedingSteps,emptySteps:emptySteps,peakLight:highLight,searchBouts:searchBouts,steps:step,binCoverage:binVisits.filter(function(n){return n>0;}).length,
     meanAbsError:errors.length?errors.reduce(function(a,b){return a+b;},0)/errors.length:0,
     allTimeMeanAbsoluteError:step?errTotal/step:0,
     modelSamples:memory.reduce(function(a,row){return a+row.filter(function(m){return m.n>0;}).length;},0)};
 };
 window.firstSenseChooseMode=function(v){if(modes.some(function(m){return m.id===v;})){mode=v;reset(false);}};
+window.firstSenseSetNeed=function(v){need=!!v;reset(false);};
 var status=document.getElementById('status');
 function loop(){
   try{
