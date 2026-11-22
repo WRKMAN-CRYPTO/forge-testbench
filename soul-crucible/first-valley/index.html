@@ -150,9 +150,10 @@ function spawn(s,x,y,p,q,species){var id=++game.nextBody;var base=temper(p,q,s),
  relations:{},places:[],history:[],home:null,parentIds:p&&q?[p.id,q.id]:[],decision:'Exploring',target:{x:x,y:y,kind:'wander'},
  nextThink:0,nextSocial:0,nextBirth:0,nextStrike:0,threatUntil:-1,battle:{strikes:0,dodges:0,blocks:0,kills:0,hunts:0,meals:0,escapes:0},learning:freshLearning(),stats:{gives:0,receives:0,helps:0,helped:0,conflicts:0,meetings:0,travel:0,waterScares:0,injuries:0},born:game.day};
  a.genome=makeValleyGenome(a,p,q);
+ if(p&&q)game.metrics.births++;
  s.lives++;game.agents.push(a);
  if(s.lives>1){game.metrics.rebirths++;addEvent('soul',a.name+' begins life '+s.lives+' (soul '+s.id+')',a);}
- else if(p&&q){game.metrics.births++;var birthMessage=a.name+' is born to '+p.name+' and '+q.name;addEvent('birth',birthMessage,a,p);logHistory(q,birthMessage);}
+ if(p&&q){var birthMessage=a.name+' is born to '+p.name+' and '+q.name;addEvent('birth',birthMessage,a,p);logHistory(q,birthMessage);}
  return a;
 }
 function terrain(){game.trees=[];game.bushes=[];game.stones=[];
@@ -526,11 +527,11 @@ function tick(){
  for(var dead of remove){death(dead.a,dead.why);}
  if(remove.length)game.agents=game.agents.filter(function(a){return !remove.some(function(d){return d.a===a;});});
  game.deaths=game.deaths.filter(function(d){return game.day-d.day<24;});
- for(var type of ['grazer','carnivore']){
-  var floor=type==='grazer'?24:(game.predatorsIntroduced?2:0);
-  if(countKind(type)>=floor)continue;
-  var idx=game.pending.findIndex(p=>(p.species||'grazer')===type&&p.due<=game.day);
-  if(idx>=0){var spot=game.pending.splice(idx,1)[0];spawn(game.souls[spot.soulId],r(45,W-45),r(45,H-45),null,null,type);}
+ // Grazer population retains its historical recovery rule. Ridgefang extinction is possible:
+ // no automatic replacement if carnivores die out. A carnivore soul can return through carnivore parents.
+ if(countKind('grazer')<24){
+  var idx=game.pending.findIndex(p=>(p.species||'grazer')==='grazer'&&p.due<=game.day);
+  if(idx>=0){var spot=game.pending.splice(idx,1)[0];spawn(game.souls[spot.soulId],r(45,W-45),r(45,H-45),null,null,'grazer');}
  }
  // Keep a world alive even after an extreme collapse, without inventing relationships.
  if(countKind('grazer')<12&&!game.pending.some(p=>(p.species||'grazer')==='grazer')){var so=makeSoul();spawn(so,r(45,W-45),r(45,H-45),null,null,'grazer');}
@@ -745,7 +746,7 @@ function drawInspector(){
 }
 var scrollLimit=0;
 function drawWorldData(){
- var p=modalBackground('Valley Observatory'),start=tabRow(p,['WORLD','EXPERIMENT','LEARNING','COMBAT','CHRONICLE']);
+ var p=modalBackground('Valley Observatory'),start=tabRow(p,ww<520?['WORLD','TEST','LEARN','COMBAT','LOG']:['WORLD','EXPERIMENT','LEARNING','COMBAT','CHRONICLE']);
  var x=p.x+17,y=start+9-scroll,width=p.w-34;
  ctx.save();ctx.beginPath();ctx.rect(p.x+9,start,p.w-18,p.contentEnd-start);ctx.clip();
  var m=game.metrics;
@@ -791,7 +792,7 @@ function drawWorldData(){
   if(!game.predatorsIntroduced){y+=paragraph('The current valley has no carnivores. Introducing two founders does not reset the world.',x,y,width)+14;
    button('INTRODUCE 2 RIDGEFANGS',x,y,width,36,function(){modal='introduce';scroll=0;},true,'modal');y+=48;}
   else{txt('RIDGEFANGS RELEASED · ECOSYSTEM ACTIVE',x,y,11,'#98d7b0','left','750');y+=26;}
-  y+=paragraph('Grazers and Ridgefangs have separate population caps (38 and 4).',x,y,width)+10;
+  y+=paragraph('Grazers and Ridgefangs have separate population caps (38 and 4). Ridgefang extinction is possible; the game does not replenish them automatically.',x,y,width)+10;
  }else{
   y=linesEvents(game.events,x,y,width,p.contentEnd);
   if(!game.events.length)txt('No recorded events.',x,y,12,'#aabbaf');
