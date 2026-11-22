@@ -354,7 +354,11 @@ function chooseAction(a){
    return;
   }
  }
- if(kindOf(a)==='carnivore'&&a.fullness<88){
+ // Urgent physiological needs outrank a hunt. Otherwise a hungry Ridgefang may chase until dehydrated.
+ if(kindOf(a)==='carnivore'&&a.energy<26&&a.water>=65){
+  a.target={x:a.x,y:a.y,kind:'rest'};a.decision='Resting between hunts';return;
+ }
+ if(kindOf(a)==='carnivore'&&a.water>=65&&a.fullness<88){
   var meat=nearestMeat(a);
   if(meat.c&&meat.d<200){a.target={x:meat.c.x,y:meat.c.y,kind:'meat'};a.decision='Following meat scent';return;}
   var prey=nearestPrey(a);
