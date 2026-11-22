@@ -27,7 +27,7 @@ var namesA=['Ash','Bran','Mira','Korr','Tarn','Fae','Thim','Pip','Rune','Vela','
 var colors=['#a4d4a5','#e7b078','#9acbe9','#c4a7f0','#e5d39a','#ed9eb8','#8ad6c2'];
 var archetypes=['Skirmisher','Bruiser','Duelist','Pouncer','Wall','Trickster','Glass Fang'];
 
-const BODY_COLORS={'Skirmisher':'#69d6a4','Bruiser':'#e5aa74','Duelist':'#c0acf6','Pouncer':'#f5b87b','Wall':'#a9bf9f','Trickster':'#90d9ee','Glass Fang':'#f49cc5'};
+const BODY_COLORS={'Ridgefang':'#b06e59','Skirmisher':'#69d6a4','Bruiser':'#e5aa74','Duelist':'#c0acf6','Pouncer':'#f5b87b','Wall':'#a9bf9f','Trickster':'#90d9ee','Glass Fang':'#f49cc5'};
 function bodyNoise(a,k){var z=(Math.imul((a.id+23)>>>0,0x9e3779b1)+Math.imul((a.soulId+k*13+1)>>>0,0x85ebca6b))>>>0;z=Math.imul(z^(z>>>16),0x7feb352d)>>>0;z=Math.imul(z^(z>>>15),0x846ca68b)>>>0;return ((z^(z>>>16))>>>0)/4294967296;}
 function makeValleyGenome(a,p,q){
  var b=a.body||{},noise=i=>bodyNoise(a,i)*2-1;
@@ -38,7 +38,7 @@ function makeValleyGenome(a,p,q){
 function ensureValleyGenome(a){if(!a.genome)a.genome=makeValleyGenome(a,null,null);return a.genome;}
 function tintBodyDNA(hex,v){var n=clamp(v||0,-1,1),c=hex.replace('#','');return '#'+[0,2,4].map(function(i,j){return Math.round(clamp(parseInt(c.slice(i,i+2),16)+[34,8,-27][j]*n,0,255)).toString(16).padStart(2,'0');}).join('');}
 function drawValleyCritter(a,px,ground,s){
- const g=ctx,dna=ensureValleyGenome(a),b={name:a.family||'Skirmisher',color:tintBodyDNA(BODY_COLORS[a.family]||BODY_COLORS.Skirmisher,dna.pigment)};
+ const g=ctx,dna=ensureValleyGenome(a),b={name:kindOf(a)==='carnivore'?'Pouncer':a.family||'Skirmisher',color:tintBodyDNA(BODY_COLORS[a.family]||BODY_COLORS.Skirmisher,dna.pigment)};
  const target=a.target||{x:a.x,y:a.y},dx=target.x-a.x,dir=Math.abs(dx)<1?(a.id%2?1:-1):(dx>=0?1:-1),moving=dist(a.x,a.y,target.x,target.y)>16;
  const t=game.day,phase=t*5.8+a.id*.71,hop=moving?Math.abs(Math.sin(phase))*(2.3+(a.body.speed||.5)*2.5):0;
  const walk=moving?Math.sin(phase)*Math.min(1,.5+(a.body.speed||.5)*.4):0;
@@ -70,6 +70,12 @@ function drawValleyCritter(a,px,ground,s){
  g.fillStyle=bd;g.beginPath();g.ellipse(23,-74,35,32,-.04,0,TAU);g.fill();
  g.fillStyle='#ffffffc9';g.beginPath();g.ellipse(34,-79,9,12,0,0,TAU);g.fill();g.fillStyle='#293249';g.beginPath();g.ellipse(37+(f.attack?2:0),-78,4.5,8,0,0,TAU);g.fill();g.fillStyle='#fff';g.beginPath();g.arc(39,-81,2,0,TAU);g.fill();
  g.fillStyle='#3e375d';g.beginPath();g.ellipse(52,-62,5,3,0,0,TAU);g.fill();
+ // The Ridgefang has a darker mane, pointed teeth, and dorsal spines.
+ if(kindOf(a)==='carnivore'){
+  g.fillStyle='#684440';for(var j=0;j<4;j++){var xx=-50+j*16;g.beginPath();g.moveTo(xx,-80);g.lineTo(xx+7,-112-(j%2)*8);g.lineTo(xx+20,-83);g.fill();}
+  g.fillStyle='#fff2d7';for(var tooth of [44,55]){g.beginPath();g.moveTo(tooth,-57);g.lineTo(tooth+4,-43);g.lineTo(tooth+8,-57);g.fill();}
+  g.fillStyle='#dca876';g.beginPath();g.arc(36,-80,4,0,TAU);g.fill();
+ }
  // arm animated windup
  const swing=f.attack? clamp((f.attack.time-f.attack.wind+.07)/.22,0,1):0;
  const armX=(shape==='Duelist'?59:38)*(f.genome?.limbs||1), armY=-45-(f.attack?swing*18:walk*2);
@@ -126,9 +132,10 @@ function mapTemper(base,s){return {
  caution:clamp(base.caution+s.im.caution*.2,0,1),
  generosity:clamp(base.generosity+s.im.giving*.22,0,1)
 };}
-function spawn(s,x,y,p,q){var id=++game.nextBody;var base=temper(p,q,s),body=bodyTraits(p,q);
- var family=p&&q?(rand()<.5?p.family:q.family):choice(archetypes);
- if(!p){if(family==='Wall'){body.resilience=clamp(body.resilience+.22,0,1);body.speed*=.72;}
+function spawn(s,x,y,p,q,species){var id=++game.nextBody;var base=temper(p,q,s),body=bodyTraits(p,q);species=species||(p?kindOf(p):'grazer');
+ var family=species==='carnivore'?'Ridgefang':p&&q?(rand()<.5?p.family:q.family):choice(archetypes);
+ if(species==='carnivore'&&!p){body.speed=clamp(body.speed+.18,0,1);body.strength=clamp(body.strength+.16,0,1);body.senses=clamp(body.senses+.12,0,1);}
+ if(!p&&species!=='carnivore'){if(family==='Wall'){body.resilience=clamp(body.resilience+.22,0,1);body.speed*=.72;}
   if(family==='Bruiser'){body.strength=clamp(body.strength+.22,0,1);body.resilience=clamp(body.resilience+.1,0,1);}
   if(family==='Skirmisher')body.speed=clamp(body.speed+.23,0,1);
   if(family==='Duelist')body.senses=clamp(body.senses+.23,0,1);
@@ -137,11 +144,11 @@ function spawn(s,x,y,p,q){var id=++game.nextBody;var base=temper(p,q,s),body=bod
   if(family==='Glass Fang'){body.strength=clamp(body.strength+.25,0,1);body.resilience=clamp(body.resilience-.18,0,1);}
  }
  var t=mapTemper(base,s);
- var a={id:id,soulId:s.id,family:family,name:choice(namesA)+(s.lives>0?' '+(s.lives+1):''),x:x,y:y,vx:0,vy:0,body:body,base:base,t:t,
+ var a={id:id,soulId:s.id,species:species,family:family,name:choice(namesA)+(s.lives>0?' '+(s.lives+1):''),x:x,y:y,vx:0,vy:0,body:body,base:base,t:t,
  age:p&&q?0:r(16,48)*YEAR_DAYS,lifespan:r(MIN_AGE_YEARS,MAX_AGE_YEARS)*YEAR_DAYS,
- fullness:r(62,100),water:r(58,100),energy:r(65,99),health:100,food:ri(0,2),
+ fullness:r(62,100),water:r(58,100),energy:r(65,99),health:100,food:species==='carnivore'?0:ri(0,2),
  relations:{},places:[],history:[],home:null,parentIds:p&&q?[p.id,q.id]:[],decision:'Exploring',target:{x:x,y:y,kind:'wander'},
- nextThink:0,nextSocial:0,nextBirth:0,learning:freshLearning(),stats:{gives:0,receives:0,helps:0,helped:0,conflicts:0,meetings:0,travel:0,waterScares:0,injuries:0},born:game.day};
+ nextThink:0,nextSocial:0,nextBirth:0,nextStrike:0,threatUntil:-1,battle:{strikes:0,dodges:0,blocks:0,kills:0,hunts:0,meals:0,escapes:0},learning:freshLearning(),stats:{gives:0,receives:0,helps:0,helped:0,conflicts:0,meetings:0,travel:0,waterScares:0,injuries:0},born:game.day};
  a.genome=makeValleyGenome(a,p,q);
  s.lives++;game.agents.push(a);
  if(s.lives>1){game.metrics.rebirths++;addEvent('soul',a.name+' begins life '+s.lives+' (soul '+s.id+')',a);}
@@ -154,7 +161,7 @@ function terrain(){game.trees=[];game.bushes=[];game.stones=[];
  for(var k=0;k<28;k++){game.stones.push({x:r(20,W-20),y:r(30,H-30),size:r(5,12)});}
 }
 function newWorld(seed,social,learning){rngState=(seed>>>0)||1;game={seed:seed>>>0,social:social!==false,learning:learning!==false,ageSystem:AGE_SYSTEM,day:0,agents:[],souls:{},pending:[],events:[],trees:[],bushes:[],stones:[],nextSoul:0,nextBody:0,
- metrics:{births:0,deaths:0,rebirths:0,given:0,helped:0,conflicts:0,meetings:0,remembered:0,lifeDays:0,lifeYearsTotal:0,lifeYearsCount:0,foodFinds:0,foodMisses:0,adaptedChoices:0},deaths:[],proximity:{}};
+ metrics:{births:0,deaths:0,rebirths:0,given:0,helped:0,conflicts:0,meetings:0,remembered:0,lifeDays:0,lifeYearsTotal:0,lifeYearsCount:0,foodFinds:0,foodMisses:0,adaptedChoices:0,strikes:0,blocks:0,dodges:0,predations:0,meatMeals:0,fleeChoices:0,defenseHits:0,rivalryHits:0,predatorAttacks:0},deaths:[],proximity:{},carcasses:[],predatorsIntroduced:false};
  terrain();
  for(var i=0;i<24;i++){var soul=makeSoul(),x=0,y=0,tries=0;
  do{x=r(65,W-65);y=r(60,H-60);}while(waterDist(x,y)<20&&++tries<30);
@@ -217,16 +224,141 @@ function migrateAgeSystem(){
  if(!Number.isFinite(game.metrics.lifeYearsCount))game.metrics.lifeYearsCount=0;
  game.ageSystem=AGE_SYSTEM;
 }
-function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;migrateAgeSystem();
+function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;migrateAgeSystem();initEcology();
  // Older saved valley states may not have every soul history field.
  for(var soulID in game.souls)safeSoulRecord(game.souls[soulID]);
  for(var k of ['foodFinds','foodMisses','adaptedChoices'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
  for(var a of game.agents){ensureLearning(a);a.family=a.family||'Wanderer';ensureValleyGenome(a);a.history=Array.isArray(a.history)?a.history.filter(function(entry){return typeof entry==='string'&&entry.trim().length>0;}).slice(0,12):[];a.t=mapTemper(a.base,game.souls[a.soulId]);}return true;}}catch(e){}return false;}
+
+const GRAZER_CAP=38,PREDATOR_CAP=4;
+function kindOf(a){return a&&a.species==='carnivore'?'carnivore':'grazer';}
+function countKind(kind){return game.agents.reduce((n,a)=>n+(kindOf(a)===kind?1:0),0);}
+function initFight(a){
+ a.species=kindOf(a);
+ if(!Number.isFinite(a.nextStrike))a.nextStrike=0;
+ if(!Number.isFinite(a.threatUntil))a.threatUntil=-1;
+ if(!a.battle)a.battle={strikes:0,dodges:0,blocks:0,kills:0,hunts:0,meals:0,escapes:0};
+ for(var k of Object.keys({strikes:1,dodges:1,blocks:1,kills:1,hunts:1,meals:1,escapes:1}))if(!Number.isFinite(a.battle[k]))a.battle[k]=0;
+}
+function initEcology(){
+ game.carcasses=Array.isArray(game.carcasses)?game.carcasses:[];
+ if(game.predatorsIntroduced===undefined)game.predatorsIntroduced=false;
+ for(var k of ['strikes','blocks','dodges','predations','meatMeals','fleeChoices','defenseHits','rivalryHits','predatorAttacks'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
+ for(var a of game.agents)initFight(a);
+ for(var p of game.pending)if(!p.species)p.species='grazer';
+}
+function releasePredators(){
+ initEcology();
+ if(game.predatorsIntroduced)return;
+ game.predatorsIntroduced=true;
+ for(var i=0;i<2;i++){
+  var a=spawn(makeSoul(),i===0?110:W-110,i===0?H-110:115,null,null,'carnivore');
+  a.age=r(23,34)*YEAR_DAYS;a.food=0;
+  addEvent('wildlife',a.name+' the Ridgefang enters the valley',a);
+ }
+ announce('Two Ridgefangs entered the valley');save();
+}
+function nearestMeat(a){
+ var best=null,d=1e9;
+ for(var c of game.carcasses)if(c.meat>0&&c.expires>game.day&&c.species==='grazer'){
+  var dd=dist(a.x,a.y,c.x,c.y);if(dd<d){best=c;d=dd;}
+ }
+ return {c:best,d:d};
+}
+function nearestPrey(a){
+ var best=null,cost=1e9;
+ for(var b of game.agents)if(kindOf(b)==='grazer'&&b.health>0){
+  var dd=dist(a.x,a.y,b.x,b.y);if(dd>170+a.body.senses*160)continue;
+  var cc=dd+(b.body.speed-a.body.speed)*33-(b.health<55?20:0);
+  if(cc<cost){cost=cc;best=b;}
+ }
+ return best;
+}
+function loomingPredator(a){
+ var best=null,d=1e9;
+ for(var b of game.agents)if(kindOf(b)==='carnivore'&&b.health>0){
+  var hunting=b.target&&b.target.kind==='hunt'&&b.target.id===a.id;
+  var dd=dist(a.x,a.y,b.x,b.y),radius=(hunting?120:67)+a.body.senses*74;
+  if(dd<d&&dd<radius&&(b.fullness<84||hunting||a.threatUntil>game.day)){best=b;d=dd;}
+ }
+ return {a:best,d:d};
+}
+function fight(a,b,why){
+ initFight(a);initFight(b);
+ if(a.health<=0||b.health<=0||a.energy<6||a.nextStrike>game.day||dist(a.x,a.y,b.x,b.y)>30)return false;
+ if(kindOf(a)==='carnivore'&&kindOf(b)==='carnivore')return false;
+ if(why==='hunt'&&(kindOf(a)!=='carnivore'||kindOf(b)!=='grazer'||a.fullness>=88))return false;
+ a.nextStrike=game.day+.73+(1-a.body.speed)*.63;a.energy=Math.max(0,a.energy-6);
+ a.battle.strikes++;game.metrics.strikes++;
+ if(rand()<clamp(.08+b.body.speed*.24+b.t.caution*.15-a.body.senses*.08,.04,.56)&&b.energy>11){
+  b.energy-=4;b.battle.dodges++;game.metrics.dodges++;b.threatUntil=game.day+4;b.nextThink=0;
+  return true;
+ }
+ var defended=rand()<clamp(.07+b.body.resilience*.21+b.t.caution*.14,.04,.47)&&b.energy>10;
+ if(defended){b.energy-=5;b.battle.blocks++;game.metrics.blocks++;}
+ var damage=Math.max(1.5,(3+a.body.strength*9+(kindOf(a)==='carnivore'?3:0)-b.body.resilience*4.4)*(defended?.38:1));
+ b.health=Math.max(0,b.health-damage);b.stats.injuries++;
+ b.threatUntil=game.day+5;b.nextThink=0;
+ b.lastHit={id:a.id,name:a.name,why:why,day:game.day};
+ b.combatFlash=game.day+.55;a.combatFlash=game.day+.3;
+ markPlace(b,b.x,b.y,'danger');
+ if(why==='hunt')game.metrics.predatorAttacks++;
+ if(why==='defense')game.metrics.defenseHits++;
+ if(why==='rivalry')game.metrics.rivalryHits++;
+ if(kindOf(a)===kindOf(b)){
+  relation(b,a).trust=clamp(relation(b,a).trust-.29,-1,1);
+  relation(a,b).trust=clamp(relation(a,b).trust-.09,-1,1);
+ }
+ if(b.health<=0){a.battle.kills++;addEvent('combat',a.name+' fatally wounded '+b.name,a,b);}
+ else if(a.battle.strikes%8===1)addEvent('combat',a.name+' injured '+b.name+' ('+Math.round(damage)+')',a,b);
+ return true;
+}
+function resolveFight(a){
+ if(a.health<=0)return;
+ var t=a.target||{};
+ if(t.kind==='hunt'&&kindOf(a)==='carnivore'){
+  var prey=game.agents.find(b=>b.id===t.id);
+  if(prey&&kindOf(prey)==='grazer')fight(a,prey,'hunt');
+ }
+ if(kindOf(a)==='grazer'&&a.threatUntil>game.day&&a.lastHit){
+  var enemy=game.agents.find(b=>b.id===a.lastHit.id);
+  if(enemy&&kindOf(enemy)==='carnivore'&&dist(a.x,a.y,enemy.x,enemy.y)<30){
+   if(a.t.aggression*.57+a.body.strength*.36>r(.25,.86))fight(a,enemy,'defense');
+  }
+ }
+}
+function eatMeat(a){
+ if(kindOf(a)!=='carnivore'||a.fullness>=92)return;
+ for(var c of game.carcasses){
+  if(c.species!=='grazer'||c.meat<=0||c.expires<game.day||dist(a.x,a.y,c.x,c.y)>22)continue;
+  c.meat--;a.fullness=Math.min(100,a.fullness+34);a.battle.meals++;game.metrics.meatMeals++;
+  a.decision='Eating meat';a.nextThink=0;return;
+ }
+}
+
 function nearestAgent(a,filter){var best=null,bd=1e10;for(var b of game.agents){if(a===b)continue;var d=dist(a.x,a.y,b.x,b.y);if(d<bd&&(!filter||filter(b,d))){best=b;bd=d;}}return {agent:best,d:bd};}
 function relation(a,b){var k=''+b.id;if(!a.relations[k])a.relations[k]={trust:0,familiarity:0,meetings:0,lastMeet:-99,gifts:0,help:0,attacks:0};return a.relations[k];}
 function markPlace(a,x,y,kind){var prev=a.places.find(function(p){return p.kind===kind&&dist(p.x,p.y,x,y)<50;});if(prev){prev.value=clamp(prev.value+.18,0,1);prev.day=game.day;return;}a.places.push({x:x,y:y,kind:kind,value:.6,day:game.day});if(a.places.length>12)a.places.sort(function(p,q){return q.value-p.value;}).length=12;}
 function safeTarget(a){var spot=choice([{x:164,y:251},{x:733,y:358},{x:945,y:545}]);return footprint(spot.x+r(-34,34),spot.y+r(-34,34));}
 function chooseAction(a){
+ if(kindOf(a)==='grazer'&&game.predatorsIntroduced){
+  var danger=loomingPredator(a);
+  if(danger.a){
+   var foe=danger.a,resolve=a.t.aggression*.48+a.body.strength*.30+(1-a.t.caution)*.2;
+   if(danger.d<32&&resolve>.73){a.target={x:foe.x,y:foe.y,kind:'stand',id:foe.id};a.decision='Standing ground';return;}
+   var dx=a.x-foe.x,dy=a.y-foe.y,l=Math.max(1,Math.hypot(dx,dy));
+   a.target=footprint(a.x+dx/l*110+r(-16,16),a.y+dy/l*110+r(-16,16));
+   a.target.kind='flee';a.decision='Fleeing '+foe.name;
+   if(game.day-(a.lastEscape||-99)>2){a.lastEscape=game.day;a.battle.escapes++;game.metrics.fleeChoices++;}
+   return;
+  }
+ }
+ if(kindOf(a)==='carnivore'&&a.fullness<88){
+  var meat=nearestMeat(a);
+  if(meat.c&&meat.d<200){a.target={x:meat.c.x,y:meat.c.y,kind:'meat'};a.decision='Following meat scent';return;}
+  var prey=nearestPrey(a);
+  if(prey){a.target={x:prey.x,y:prey.y,kind:'hunt',id:prey.id};a.decision='Hunting '+prey.name;return;}
+ }
  var water=waterDist(a.x,a.y),known=null;
  // Stay by discovered drinkable water long enough to recover, rather than leaving half-hydrated.
  if(water<30&&a.water<91){a.target={x:a.x,y:a.y,kind:'drink'};a.decision='Drinking';return;}
@@ -236,7 +368,7 @@ function chooseAction(a){
   var sensed=water<80+a.body.senses*175,target=sensed?pointWater(a.x,a.y):known;
   if(target){a.target={x:target.x,y:target.y,kind:'water'};a.decision='Seeking water';return;}
   a.target=footprint(a.x+r(-175,175),a.y+r(-175,175));a.target.kind='search';a.decision='Searching for water';return;}
- if(a.fullness<78){var near=null,nd=1e9;
+ if(kindOf(a)==='grazer'&&a.fullness<78){var near=null,nd=1e9;
   for(var b of game.bushes){if(b.amount<.9)continue;var d=dist(a.x,a.y,b.x,b.y);if(d>95+a.body.senses*160)continue;if(d<nd){nd=d;near=b;}}
   var saved=rememberedFood(a);
   if(saved&&(!near||dist(a.x,a.y,saved.x,saved.y)<nd*.8))near=saved;
@@ -244,7 +376,7 @@ function chooseAction(a){
  }
  if(a.energy<30){var home=a.home||safeTarget(a);a.target={x:home.x,y:home.y,kind:'rest'};a.decision='Finding rest';return;}
  if(game.social && a.t.sociability>.24 && a.energy>28 && a.water>24 && a.fullness>25){
-  var friend=nearestAgent(a,function(b,d){var rel=a.relations[b.id];return !!rel&&rel.trust>.18&&rel.meetings>=2&&d<275;});
+  var friend=nearestAgent(a,function(b,d){var rel=a.relations[b.id];return kindOf(b)===kindOf(a)&&!!rel&&rel.trust>.18&&rel.meetings>=2&&d<275;});
   var socialBias=a.t.sociability+(.35-Math.min(.35,friend.d/1000));
   if(friend.agent&&rand()<socialBias*.63){
    a.target={x:friend.agent.x,y:friend.agent.y,kind:'friend',id:friend.agent.id};a.decision='Seeking '+friend.agent.name;game.metrics.remembered++;return;
@@ -262,12 +394,12 @@ function contact(a,b){
  ra.lastMeet=rb.lastMeet=game.day;ra.meetings++;rb.meetings++;
  ra.familiarity=clamp(ra.familiarity+.08,0,1);rb.familiarity=clamp(rb.familiarity+.08,0,1);
  a.stats.meetings++;b.stats.meetings++;game.metrics.meetings++;
- var friendly=game.social&&(a.t.sociability+b.t.sociability)/2>.32;
+ var sameSpecies=kindOf(a)===kindOf(b),friendly=game.social&&sameSpecies&&(a.t.sociability+b.t.sociability)/2>.32;
  if(friendly){
   var pulse=.013*((a.t.sociability+b.t.sociability)/2);
   ra.trust=clamp(ra.trust+pulse,-1,1);rb.trust=clamp(rb.trust+pulse,-1,1);
  }
- if(!game.social)return;
+ if(!game.social||!sameSpecies)return;
  if(a.parentIds.indexOf(b.id)>=0 || b.parentIds.indexOf(a.id)>=0){ra.trust=clamp(ra.trust+.045,-1,1);rb.trust=clamp(rb.trust+.045,-1,1);}
  function give(donor,recv,dr,rr){
    if(donor.food<1||recv.fullness>65||donor.fullness<35||donor.t.generosity+dr.trust*.6<r(.32,1.18))return false;
@@ -283,9 +415,12 @@ function contact(a,b){
   addEvent('aid',donor.name+' tended '+recv.name+"'s wounds",donor,recv);return true;
  }
  if(a.health<b.health)help(b,a,rb,ra);else help(a,b,ra,rb);
- if(ageYears(a)>=18&&ageYears(b)>=18&&a.nextBirth<game.day&&b.nextBirth<game.day&&game.agents.length<38&&ra.trust>.23&&rb.trust>.23&&rand()<.14){
-  a.nextBirth=b.nextBirth=game.day+r(22,36);var s=game.pending.length&&game.souls[game.pending[0].soulId].lives>0?game.souls[game.pending.shift().soulId]:makeSoul();
-  var baby=spawn(s,clamp((a.x+b.x)/2+r(-12,12),25,W-25),clamp((a.y+b.y)/2+r(-12,12),25,H-25),a,b);
+ var kind=kindOf(a),cap=kind==='carnivore'?PREDATOR_CAP:GRAZER_CAP;
+ if(ageYears(a)>=18&&ageYears(b)>=18&&a.nextBirth<game.day&&b.nextBirth<game.day&&countKind(kind)<cap&&ra.trust>.23&&rb.trust>.23&&rand()<.14){
+  a.nextBirth=b.nextBirth=game.day+r(22,36);
+  var pend=game.pending.findIndex(p=>(p.species||'grazer')===kind);
+  var s=pend>=0?game.souls[game.pending.splice(pend,1)[0].soulId]:makeSoul();
+  var baby=spawn(s,clamp((a.x+b.x)/2+r(-12,12),25,W-25),clamp((a.y+b.y)/2+r(-12,12),25,H-25),a,b,kind);
   relation(a,baby).trust=.7;relation(b,baby).trust=.7;relation(baby,a).trust=.72;relation(baby,b).trust=.72;
   a.home={x:a.x,y:a.y};b.home={x:b.x,y:b.y};
  }
@@ -294,12 +429,7 @@ function contact(a,b){
  var territory=(a.home&&dist(a.x,a.y,a.home.x,a.home.y)<45)||(b.home&&dist(b.x,b.y,b.home.x,b.home.y)<45);
  if(hostility>.66&&ra.trust<.14&&(scarce||territory)&&rand()<(hostility-.52)*.14){
   var attacker=rand()<.5?a:b,victim=attacker===a?b:a;
-  var dmg=7+attacker.body.strength*18-victim.body.resilience*6;
-  victim.health=clamp(victim.health-dmg,0,100);victim.stats.injuries++;attacker.stats.conflicts++;game.metrics.conflicts++;
-  relation(victim,attacker).trust=clamp(relation(victim,attacker).trust-.36,-1,1);
-  relation(attacker,victim).trust=clamp(relation(attacker,victim).trust-.12,-1,1);
-  markPlace(victim,victim.x,victim.y,'danger');
-  addEvent('conflict',attacker.name+' injured '+victim.name,attacker,victim);
+  if(fight(attacker,victim,'rivalry')){attacker.stats.conflicts++;game.metrics.conflicts++;}
  }
 }
 function death(a,cause){
@@ -310,7 +440,14 @@ function death(a,cause){
   caution:clamp((a.stats.injuries+a.stats.waterScares)/6+(cause==='dehydration'?.25:0),-1,1),
   roaming:clamp((a.stats.travel/Math.max(game.day-a.born,1)-30)/110,-1,1)};
  for(var k in s.im)s.im[k]=clamp(s.im[k]*.68+shift[k]*.32,-1,1);
- game.pending.push({soulId:s.id,due:game.day+r(5,19)});
+ game.pending.push({soulId:s.id,species:kindOf(a),due:game.day+r(5,19)});
+ if(kindOf(a)==='grazer'){
+  game.carcasses.push({x:a.x,y:a.y,meat:6,expires:game.day+40,species:'grazer',source:a.id});
+  if(game.carcasses.length>70)game.carcasses.shift();
+  if(a.lastHit&&a.lastHit.why==='hunt'&&game.day-a.lastHit.day<5){
+   game.metrics.predations++;var killer=game.agents.find(b=>b.id===a.lastHit.id);if(killer)killer.battle.hunts++;
+  }
+ }
  game.metrics.deaths++;game.metrics.lifeDays+=a.age;game.metrics.lifeYearsTotal=(game.metrics.lifeYearsTotal||0)+ageYears(a);game.metrics.lifeYearsCount=(game.metrics.lifeYearsCount||0)+1;
  game.deaths.unshift({x:a.x,y:a.y,day:game.day,name:a.name,cause:cause});game.deaths.length=30;
  addEvent('death',a.name+' died of '+cause+' · soul '+s.id+' persists',a);
@@ -324,11 +461,12 @@ function drinkNearby(a,dt){
 }
 function tick(){
  game.day+=.06;var dt=.06;
+ game.carcasses=game.carcasses.filter(c=>c.meat>0&&c.expires>game.day);
  for(var bush of game.bushes)bush.amount=Math.min(bush.capacity,bush.amount+bush.regen*dt);
  var remove=[];
  for(var a of game.agents){
   if(a.learning&&a.learning.lastSite&&dist(a.x,a.y,a.learning.lastSite.x,a.learning.lastSite.y)>57)a.learning.lastSite=null;
-  a.age+=dt;a.fullness=Math.max(0,a.fullness-(1.75+a.body.strength*.35)*dt);
+  a.age+=dt;a.fullness=Math.max(0,a.fullness-(kindOf(a)==='carnivore'?1.52:1.75+a.body.strength*.35)*dt);
   a.water=Math.max(0,a.water-(2.55+a.body.speed*.3)*dt);
   // Drink before dehydration damage/death is assessed when already at the bank.
   var wasAtWater=drinkNearby(a,dt);
@@ -341,13 +479,13 @@ function tick(){
   }
   if(a.nextThink<=game.day){a.nextThink=game.day+r(1.0,2.7);chooseAction(a);}
   var t=a.target,tx=t.x,ty=t.y;
-  if(t.kind==='friend'){
+  if(t.kind==='friend'||t.kind==='hunt'){
    var f=game.agents.find(function(b){return b.id===t.id;});if(!f){a.nextThink=0;t=a.target={x:a.x,y:a.y,kind:'wander'};}
    else{tx=f.x;ty=f.y;}
   }
   var d=dist(a.x,a.y,tx,ty),moving=d>12;
   if(moving){
-   var ds=(25+a.body.speed*42)*dt*(a.energy<14?.48:1);
+   var ds=(25+a.body.speed*42)*dt*(a.energy<14?.48:1)*(t.kind==='hunt'?1.33:t.kind==='flee'?1.1:1);
    ds=Math.min(ds,d-10);var dx=(tx-a.x)/d*ds,dy=(ty-a.y)/d*ds;
    a.x=clamp(a.x+dx,18,W-18);a.y=clamp(a.y+dy,18,H-18);
    a.stats.travel+=Math.abs(ds);a.energy=Math.max(0,a.energy-.68*dt);
@@ -357,7 +495,7 @@ function tick(){
   }
   if(!wasAtWater)drinkNearby(a,dt);
   var gathered=false;
-  for(var bush2 of game.bushes){
+  for(var bush2 of (kindOf(a)==='carnivore'?[]:game.bushes)){
    if(bush2.amount>=1&&dist(a.x,a.y,bush2.x,bush2.y)<16&&(a.fullness<91||a.food<2)){
     bush2.amount-=1;if(a.fullness<84)a.fullness=clamp(a.fullness+27,0,100);else a.food=Math.min(4,a.food+1);
     if(a.food<2&&rand()<.55)a.food++;
@@ -371,7 +509,9 @@ function tick(){
    }
    if(!gathered){a.target={x:a.x,y:a.y,kind:'search'};a.nextThink=0;}
   }
-  if(a.fullness<42&&a.food>0){a.food--;a.fullness=clamp(a.fullness+30,0,100);}
+  if(kindOf(a)==='carnivore')eatMeat(a);
+  resolveFight(a);
+  if(a.fullness<42&&a.food>0&&kindOf(a)==='grazer'){a.food--;a.fullness=clamp(a.fullness+30,0,100);}
   if(a.energy<6){a.energy=Math.min(100,a.energy+25*dt);a.decision='Resting';}
   if(a.home===null&&game.day-a.born>35&&a.energy<55){a.home={x:a.x,y:a.y};}
   if(game.social){
@@ -386,13 +526,14 @@ function tick(){
  for(var dead of remove){death(dead.a,dead.why);}
  if(remove.length)game.agents=game.agents.filter(function(a){return !remove.some(function(d){return d.a===a;});});
  game.deaths=game.deaths.filter(function(d){return game.day-d.day<24;});
- if(game.agents.length<24&&game.pending.length){
-  game.pending.sort(function(a,b){return a.due-b.due;});
-  var spot=game.pending[0];
-  if(spot.due<=game.day){game.pending.shift();spawn(game.souls[spot.soulId],r(45,W-45),r(45,H-45));}
+ for(var type of ['grazer','carnivore']){
+  var floor=type==='grazer'?24:(game.predatorsIntroduced?2:0);
+  if(countKind(type)>=floor)continue;
+  var idx=game.pending.findIndex(p=>(p.species||'grazer')===type&&p.due<=game.day);
+  if(idx>=0){var spot=game.pending.splice(idx,1)[0];spawn(game.souls[spot.soulId],r(45,W-45),r(45,H-45),null,null,type);}
  }
  // Keep a world alive even after an extreme collapse, without inventing relationships.
- if(game.agents.length<12&&game.pending.length===0){var so=makeSoul();spawn(so,r(45,W-45),r(45,H-45));}
+ if(countKind('grazer')<12&&!game.pending.some(p=>(p.species||'grazer')==='grazer')){var so=makeSoul();spawn(so,r(45,W-45),r(45,H-45),null,null,'grazer');}
 }
 function resize(){
  dpr=Math.min(2,window.devicePixelRatio||1);ww=innerWidth;hh=innerHeight;
@@ -437,6 +578,8 @@ function scene(){
   circle(sx(shltr.x),sy(shltr.y),28*scale,'#344c3b');rr(sx(shltr.x)-11*scale,sy(shltr.y)-8*scale,22*scale,16*scale,4,'#6f6750');
  }
  for(var bush of game.bushes){var bx=sx(bush.x),by=sy(bush.y);circle(bx,by,Math.max(2,4.4*scale),'#3d6245');if(bush.amount>=1)circle(bx+2*scale,by-2*scale,Math.max(1.3,2.6*scale),'#dd9479');}
+ for(var carcass of game.carcasses){var mx=sx(carcass.x),my=sy(carcass.y);
+  circle(mx,my,Math.max(2.7,7*scale),'#754b49','#bf8973',1);}
  for(var grave of game.deaths){var gx=sx(grave.x),gy=sy(grave.y);line(gx-4,gy,gx+4,gy,'#a0a5b1',1);line(gx,gy-5,gx,gy+4,'#a0a5b1',1);}
  var chosen=game.agents.find(function(a){return a.id===selected;});
  if(chosen&&game.social){
@@ -452,6 +595,7 @@ function scene(){
   if(cx<-44||cx>ww+44||cy<topH-70||cy>hh-bottomH+40)continue;
   drawValleyCritter(a,cx,cy+4,sz*(ageYears(a)<16?.78:1));
   if(a.health<50)line(cx-10,cy-25,cx+10,cy-25,'#d97b70',2);
+  if(a.combatFlash&&a.combatFlash>game.day)circle(cx,cy-22,Math.max(13,sz*60),null,'#e5a17f',2);
   if(a.id===selected){
    circle(cx,cy-11,Math.max(17,sz*95),null,'#f0e0a5',1.6);
    txt(a.name,cx,cy-Math.max(31,sz*150),11,'#fff0c4','center','700');
@@ -526,7 +670,9 @@ function drawInspector(){
   miniBar('Health',a.health/100,x,y,width,'#d39c96');y+=24;
   miniBar('Food',a.fullness/100,x,y,width,'#dfc17e');y+=24;
   miniBar('Water',a.water/100,x,y,width,'#80c7d4');y+=24;
-  miniBar('Energy',a.energy/100,x,y,width,'#94c9ac');y+=30;
+  miniBar('Energy',a.energy/100,x,y,width,'#94c9ac');y+=29;
+  txt('SPECIES '+(kindOf(a)==='carnivore'?'RIDGEFANG · MEAT ONLY':'GRAZER'),x,y,11,'#e8d6af','left','720');y+=22;
+  txt('STRIKES '+a.battle.strikes+'  ·  DODGES '+a.battle.dodges+'  ·  KILLS '+a.battle.kills,x,y,11,'#b6cbbb');y+=27;
   txt('TEMPERAMENT',x,y,11,'#e7d6a7','left','750');y+=21;
   ['curiosity','sociability','aggression','caution','generosity'].forEach(function(k){miniBar(k[0].toUpperCase()+k.slice(1),a.t[k],x,y,width);y+=20;});
   y+=10;txt('PLACES LEARNED ('+a.places.length+')',x,y,11,'#e7d6a7','left','750');y+=20;
@@ -592,14 +738,14 @@ function drawInspector(){
    rr(x+90,y-4,Math.max(0,(width-151)*clamp(genome[gene]/2.1,0,1)),7,3,'#80baa0');y+=22;
   }
   y+=10;txt('PIGMENT',x,y,11,'#a8c8ba');txt((genome.pigment>=0?'+':'')+round(genome.pigment,2),x+width,y,11,'#e3e9d3','right');y+=27;
-  y+=paragraph('Visual DNA follows valley traits and parents. It does not change survival or combat statistics yet.',x,y,width,'#9eb9ae')+12;
+  y+=paragraph('Body shape follows valley traits and parents. Combat uses physical traits, not the decorative DNA fields.',x,y,width,'#9eb9ae')+12;
  }
  ctx.restore();
  scrollLimit=Math.max(0,y-p.contentEnd+20);
 }
 var scrollLimit=0;
 function drawWorldData(){
- var p=modalBackground('Valley Observatory'),start=tabRow(p,['WORLD','EXPERIMENT','LEARNING','CHRONICLE']);
+ var p=modalBackground('Valley Observatory'),start=tabRow(p,['WORLD','EXPERIMENT','LEARNING','COMBAT','CHRONICLE']);
  var x=p.x+17,y=start+9-scroll,width=p.w-34;
  ctx.save();ctx.beginPath();ctx.rect(p.x+9,start,p.w-18,p.contentEnd-start);ctx.clip();
  var m=game.metrics;
@@ -634,6 +780,18 @@ function drawWorldData(){
   button(game.learning?'LEARNING: ON':'LEARNING: OFF',x,y,width,35,function(){modal='learningToggle';scroll=0;},game.learning,'modal');y+=51;
   txt('Changing this setting restarts the valley.',x,y,11,'#a6bcb0');y+=23;
   y+=paragraph('To inspect an individual, tap it in the world and open its LEARN tab.',x,y,width)+9;
+ }else if(tab===3){
+  txt('COMBAT & ECOLOGY',x,y,14,'#e7d6a7','left','750');y+=27;
+  y+=paragraph('Ridgefangs eat meat exclusively. They hunt grazers, scavenge grazer carcasses, and never attack or eat their own species.',x,y,width)+16;
+  var data=[['Living grazers',countKind('grazer')],['Living Ridgefangs',countKind('carnivore')],['Strikes',m.strikes],['Blocks',m.blocks],['Dodges',m.dodges],['Predator attacks',m.predatorAttacks],['Prey flight decisions',m.fleeChoices],['Defense strikes',m.defenseHits],['Predation deaths',m.predations],['Carcass meals',m.meatMeals],['Rivalry strikes',m.rivalryHits]];
+  for(var row of data){txt(row[0],x,y,11,'#bcd2c8');txt(row[1]||0,x+width,y,12,'#e8d9b7','right','760');y+=23;}
+  y+=9;txt('LIVING ARCHETYPES',x,y,11,'#e7d6a7','left','760');y+=22;
+  for(var name of archetypes){txt(name,x,y,11,'#b9d0c2');txt(game.agents.filter(a=>a.family===name).length,x+width,y,12,'#e3dab7','right');y+=21;}
+  y+=10;
+  if(!game.predatorsIntroduced){y+=paragraph('The current valley has no carnivores. Introducing two founders does not reset the world.',x,y,width)+14;
+   button('INTRODUCE 2 RIDGEFANGS',x,y,width,36,function(){modal='introduce';scroll=0;},true,'modal');y+=48;}
+  else{txt('RIDGEFANGS RELEASED · ECOSYSTEM ACTIVE',x,y,11,'#98d7b0','left','750');y+=26;}
+  y+=paragraph('Grazers and Ridgefangs have separate population caps (38 and 4).',x,y,width)+10;
  }else{
   y=linesEvents(game.events,x,y,width,p.contentEnd);
   if(!game.events.length)txt('No recorded events.',x,y,12,'#aabbaf');
@@ -642,11 +800,12 @@ function drawWorldData(){
 }
 function drawConfirm(){
  var isToggle=modal==='toggle',isReplay=modal==='replay',isNew=modal==='new',isLearningToggle=modal==='learningToggle';
- var p=modalBackground(isToggle?'Change experiment?':isLearningToggle?'Change learning trial?':isReplay?'Replay world?':'Generate new valley?'),x=p.x+17,y=p.y+73,w=p.w-34;
- var s=isToggle?'Switch social memory '+(game.social?'OFF':'ON')+' and restart with the SAME seed? This creates a comparable starting world.':isLearningToggle?'Switch adaptive food learning '+(game.learning?'OFF':'ON')+' and restart the SAME seed? This replaces current progress; your old seed remains reproducible.':isReplay?'Restart day zero with the SAME seed and experiment settings? Current progress will be replaced.':'Start a new world with a NEW seed? You will leave the current lives behind.';
+ var p=modalBackground(modal==='introduce'?'Introduce Ridgefangs?':isToggle?'Change experiment?':isLearningToggle?'Change learning trial?':isReplay?'Replay world?':'Generate new valley?'),x=p.x+17,y=p.y+73,w=p.w-34;
+ var s=modal==='introduce'?'Bring two meat-eating Ridgefang founders into this existing valley? Their hunting may end lives. Your saved population and relationships will not reset.':isToggle?'Switch social memory '+(game.social?'OFF':'ON')+' and restart with the SAME seed? This creates a comparable starting world.':isLearningToggle?'Switch adaptive food learning '+(game.learning?'OFF':'ON')+' and restart the SAME seed? This replaces current progress; your old seed remains reproducible.':isReplay?'Restart day zero with the SAME seed and experiment settings? Current progress will be replaced.':'Start a new world with a NEW seed? You will leave the current lives behind.';
  y+=paragraph(s,x,y,w,'#c7d8c9')+30;
  button('CANCEL',x,y,w*.46,36,function(){modal=null;},false,'modal');
  button('CONFIRM',x+w*.51,y,w*.49,36,function(){
+  if(modal==='introduce'){releasePredators();modal=null;return;}
   var seed=isNew?((Date.now()^(Math.random()*0x7fffffff))>>>0):game.seed,social=isToggle?!game.social:game.social,learning=isLearningToggle?!game.learning:game.learning;
   newWorld(seed,social,learning);
  },true,'modal');
@@ -663,6 +822,8 @@ function drawHelp(){
  'REPLAY restarts the same seed. NEW SEED creates a different valley.',
  'The three ancient clearings are just geography. They are not settlements or destinations imposed by a director.',
  'The calendar uses 30 simulated days per in-world year. Natural lifespans range from 80 to 100 years; other dangers can end life sooner.',
+ 'Use STATS > COMBAT to inspect attacks, defenses, and introduce two Ridgefang carnivores without resetting your valley.',
+ 'Ridgefangs hunt grazers or eat their carcasses. They never eat other Ridgefangs.',
  'Souls retain subtle biases after death; minds, places and relationship memories do not survive reincarnation.',
  'Progress saves in this browser automatically. The original Soul Crucible arena uses a separate save.'
  ];
