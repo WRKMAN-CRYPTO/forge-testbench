@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101821">
+<title>Soul Crucible · Wild Ecology</title>
+<style>
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101821;overscroll-behavior:none}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+</style>
+</head>
+<body><canvas id="world" aria-label="Wild Ecology autonomous predator prey simulation. Tap a creature to inspect; use canvas controls to pause, compare social memory, or change time speed."></canvas>
+<script>
+(function(){'use strict';
+var C=document.getElementById('world'),ctx=C.getContext('2d',{alpha:false});
+var W=1100,H=680, TAU=Math.PI*2, KEY='soul-crucible-wild-ecology-001';
+// Accelerated simulation calendar: 30 world days = 1 in-world year.
+// This extends lives while keeping generational observation practical on phones.
+var YEAR_DAYS=30,MIN_AGE_YEARS=80,MAX_AGE_YEARS=100,AGE_SYSTEM='years30-v1';
+function ageYears(a){return a.age/YEAR_DAYS;}
+function lifespanYears(a){return a.lifespan/YEAR_DAYS;}
+var clamp=function(n,a,b){return Math.max(a,Math.min(b,n));};
+var round=function(n,k){return Math.round(n*Math.pow(10,k||0))/Math.pow(10,k||0);};
+var namesA=['Ash','Bran','Mira','Korr','Tarn','Fae','Thim','Pip','Rune','Vela','Nim','Orr','Sora','Wisp','Kelp','Venn','Luma','Dorn','Iris','Bram','Nera','Pell','Moth','Vale','Kira','Orin','Tavi','Rill','Fen','Linn','Moss','Kest'];
+var colors=['#a4d4a5','#e7b078','#9acbe9','#c4a7f0','#e5d39a','#ed9eb8','#8ad6c2'];
+var archetypes=['Skirmisher','Bruiser','Duelist','Pouncer','Wall','Trickster','Glass Fang'];
+
+const BODY_COLORS={'Ridgefang':'#b06e59','Skirmisher':'#69d6a4','Bruiser':'#e5aa74','Duelist':'#c0acf6','Pouncer':'#f5b87b','Wall':'#a9bf9f','Trickster':'#90d9ee','Glass Fang':'#f49cc5'};
+function bodyNoise(a,k){var z=(Math.imul((a.id+23)>>>0,0x9e3779b1)+Math.imul((a.soulId+k*13+1)>>>0,0x85ebca6b))>>>0;z=Math.imul(z^(z>>>16),0x7feb352d)>>>0;z=Math.imul(z^(z>>>15),0x846ca68b)>>>0;return ((z^(z>>>16))>>>0)/4294967296;}
+function makeValleyGenome(a,p,q){
+ var b=a.body||{},noise=i=>bodyNoise(a,i)*2-1;
+ var g={frame:.75+(b.resilience||.5)*.6,muscle:.68+(b.strength||.5)*.72,legs:.72+(b.speed||.5)*.62,limbs:.76+(b.senses||.5)*.5,armor:.7+(b.resilience||.5)*.6,recovery:1,crest:.85+noise(6)*.35,tail:.85+noise(7)*.3,pigment:noise(8)*.8};
+ if(p&&q){var pg=ensureValleyGenome(p),qg=ensureValleyGenome(q);for(var k of Object.keys(g))g[k]=(pg[k]+qg[k])*.5+noise(k.length+k.charCodeAt(0))*(k==='pigment'?.13:.095);}
+ for(var k2 of Object.keys(g))g[k2]=clamp(g[k2],k2==='pigment'?-1:.35,k2==='pigment'?1:2.7);return g;
+}
+function ensureValleyGenome(a){if(!a.genome)a.genome=makeValleyGenome(a,null,null);return a.genome;}
+function tintBodyDNA(hex,v){var n=clamp(v||0,-1,1),c=hex.replace('#','');return '#'+[0,2,4].map(function(i,j){return Math.round(clamp(parseInt(c.slice(i,i+2),16)+[34,8,-27][j]*n,0,255)).toString(16).padStart(2,'0');}).join('');}
+function drawValleyCritter(a,px,ground,s){
+ const g=ctx,dna=ensureValleyGenome(a),b={name:kindOf(a)==='carnivore'?'Pouncer':a.family||'Skirmisher',color:tintBodyDNA(BODY_COLORS[a.family]||BODY_COLORS.Skirmisher,dna.pigment)};
+ const target=a.target||{x:a.x,y:a.y},dx=target.x-a.x,dir=Math.abs(dx)<1?(a.id%2?1:-1):(dx>=0?1:-1),moving=dist(a.x,a.y,target.x,target.y)>16;
+ const t=game.day,phase=t*5.8+a.id*.71,hop=moving?Math.abs(Math.sin(phase))*(2.3+(a.body.speed||.5)*2.5):0;
+ const walk=moving?Math.sin(phase)*Math.min(1,.5+(a.body.speed||.5)*.4):0;
+ const f={body:b,genome:dna,phase:phase,attack:null,guard:0,evade:0,soul:{color:colors[a.soulId%colors.length]}},corruption=0,bd=b.color;
+ g.save();g.translate(px,ground-hop*s);g.scale(s*dir,s);const hs=(f.body.name==='Wall'?1.28:f.body.name==='Glass Fang'?.8:1)*Math.pow((f.genome?.frame||1),.31);g.scale(Math.pow(f.genome?.frame||1,.13),Math.pow(f.genome?.legs||1,.10));
+ g.fillStyle='#12182766';g.beginPath();g.ellipse(0,7,64*hs,11,0,0,TAU);g.fill();
+ if(f.guard>0){g.lineWidth=6;g.strokeStyle='#93e6f4b5';g.beginPath();g.ellipse(1,-53,60*hs,57,0,0,TAU);g.stroke();}
+ if(f.evade>0){glow(0,-65,78,'#b3f6ff',.15);}
+ // tail
+ g.save();g.lineCap='round';g.strokeStyle=bd;g.lineWidth=(b.name==='Wall'?21:12)*(f.genome?.tail||1);g.beginPath();g.moveTo(-24,-52);g.quadraticCurveTo(-85*(f.genome?.tail||1),-70+walk*11,-78*(f.genome?.tail||1),-100+Math.sin(t*4+f.phase)*7);g.stroke();g.restore();
+ const shape=b.name;
+ // rear leg feet
+ g.fillStyle='#2d365b';for(let k=-1;k<=1;k+=2){g.beginPath();g.ellipse(-24+k*25+walk*9*k,-10,19*hs*(f.genome?.legs||1)**.20,14*(f.genome?.legs||1)**.45,-.2,0,TAU);g.fill();}
+ if(shape==='Duelist'||shape==='Trickster'){
+ g.fillStyle=bd;g.beginPath();g.ellipse(0,-56,37,54,-.12,0,TAU);g.fill();
+ }else if(shape==='Wall'||shape==='Bruiser'){
+ g.fillStyle=bd;g.beginPath();g.ellipse(0,-54,53*hs,47*hs,.05,0,TAU);g.fill();
+ }else{g.fillStyle=bd;g.beginPath();g.ellipse(0,-51,44*hs,42*hs,-.12,0,TAU);g.fill();}
+ // gradient belly and shoulder patch
+ g.fillStyle='#fff6dc4a';g.beginPath();g.ellipse(17,-41,21,23,.2,0,TAU);g.fill();
+ if(shape==='Wall'||shape==='Bruiser'){g.fillStyle='#394e63';g.beginPath();g.ellipse(-17,-70,27,23,-.5,0,TAU);g.fill();}
+ // mystical crest and ears
+ g.fillStyle=bd;
+ function ear(ex,rot){g.save();g.translate(ex,-88);g.rotate(rot);g.beginPath();g.moveTo(-12,8);g.quadraticCurveTo(-22,-27,-10,-57*(f.genome?.crest||1));g.quadraticCurveTo(12,-47*(f.genome?.crest||1),14,6);g.fill();g.fillStyle='#ffd8ed77';g.beginPath();g.moveTo(-3,1);g.quadraticCurveTo(-10,-23,-6,-42);g.quadraticCurveTo(5,-30,6,1);g.fill();g.restore();}
+ ear(-17,-.19);ear(23,.18);
+ if(shape==='Bruiser'||shape==='Wall'){g.fillStyle='#f1d8b5';for(const xx of [-28,21]){g.beginPath();g.moveTo(xx,-101);g.lineTo(xx+7,-129);g.lineTo(xx+17,-101);g.fill();}}
+ if(shape==='Glass Fang'){g.fillStyle='#fff0f0';for(let i=0;i<3;i++){let xx=-28+i*25;g.beginPath();g.moveTo(xx,-83);g.lineTo(xx+12,-124-8*(i===1));g.lineTo(xx+23,-83);g.fill();}}
+ // head
+ g.fillStyle=bd;g.beginPath();g.ellipse(23,-74,35,32,-.04,0,TAU);g.fill();
+ g.fillStyle='#ffffffc9';g.beginPath();g.ellipse(34,-79,9,12,0,0,TAU);g.fill();g.fillStyle='#293249';g.beginPath();g.ellipse(37+(f.attack?2:0),-78,4.5,8,0,0,TAU);g.fill();g.fillStyle='#fff';g.beginPath();g.arc(39,-81,2,0,TAU);g.fill();
+ g.fillStyle='#3e375d';g.beginPath();g.ellipse(52,-62,5,3,0,0,TAU);g.fill();
+ // The Ridgefang has a darker mane, pointed teeth, and dorsal spines.
+ if(kindOf(a)==='carnivore'){
+  g.fillStyle='#684440';for(var j=0;j<4;j++){var xx=-50+j*16;g.beginPath();g.moveTo(xx,-80);g.lineTo(xx+7,-112-(j%2)*8);g.lineTo(xx+20,-83);g.fill();}
+  g.fillStyle='#fff2d7';for(var tooth of [44,55]){g.beginPath();g.moveTo(tooth,-57);g.lineTo(tooth+4,-43);g.lineTo(tooth+8,-57);g.fill();}
+  g.fillStyle='#dca876';g.beginPath();g.arc(36,-80,4,0,TAU);g.fill();
+ }
+ // arm animated windup
+ const swing=f.attack? clamp((f.attack.time-f.attack.wind+.07)/.22,0,1):0;
+ const armX=(shape==='Duelist'?59:38)*(f.genome?.limbs||1), armY=-45-(f.attack?swing*18:walk*2);
+ g.strokeStyle=bd;g.lineWidth=(shape==='Bruiser'?23:shape==='Glass Fang'?10:16)*Math.sqrt(f.genome?.muscle||1);g.lineCap='round';g.beginPath();g.moveTo(23,-51);g.lineTo(armX+(f.attack?swing*30:0),armY);g.stroke();g.fillStyle='#f8e3c5a3';g.beginPath();g.arc(armX+(f.attack?swing*30:0),armY,shape==='Bruiser'?11:7,0,TAU);g.fill();
+ // soul-like visible magic insignia, *not* a mechanically deterministic soul color
+ g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
+ if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
+ if(corruption>0){
+  // This context is transparent except for the creature. Source-atop is safe here.
+  g.save();g.globalCompositeOperation='source-atop';g.globalAlpha=Math.min(.88,.12+corruption*.76);
+  g.fillStyle='#05050d';g.fillRect(-320,-280,640,350);g.restore();
+  // Eyes remain readable at the highest corruption levels.
+  g.globalAlpha=.35+corruption*.65;g.fillStyle='#e9d6ff';g.shadowColor='#e0baff';g.shadowBlur=8+corruption*15;
+  g.beginPath();g.ellipse(34,-79,3+corruption*2,5+corruption*2,0,0,TAU);g.fill();g.shadowBlur=0;g.globalAlpha=1;
+ }
+ g.restore();}
+
+
+var game=null,rngState=1,ww=0,hh=0,dpr=1,scale=1,ox=0,oy=0,topH=42,bottomH=49,viewportH=200;
+var selected=null,modal=null,tab=0,scroll=0,view='world',speedIndex=0,speeds=[1,3,10,30],playing=true;
+var taps=[],dragStart=null,acc=0,lastTime=0,lastSave=0,toast='',toastUntil=0,screenPos=[],hoverButtons=[];
+var perf={ticks:0};
+const ECO_DEFAULT={grazerCap:false,ridgeCap:false,rescue:false};
+var pendingEcoKey=null,nextEcoConfig=null;
+function ecRules(){return Object.assign({},ECO_DEFAULT,game&&game.ecology?game.ecology.rules:null);}
+function trackEcology(force){
+ if(!game||!game.ecology)return;
+ var e=game.ecology,year=Math.floor(game.day/YEAR_DAYS);
+ if(!force&&e.lastYear===year)return;
+ var grazers=countKind('grazer'),ridgefangs=countKind('carnivore');
+ e.lastYear=year;
+ e.maxG=Math.max(e.maxG,grazers);e.maxR=Math.max(e.maxR,ridgefangs);
+ if(!grazers&&e.goneG===null){e.goneG=game.day/YEAR_DAYS;addEvent('ecology','All grazers have disappeared',null);}
+ if(!ridgefangs&&e.goneR===null){e.goneR=game.day/YEAR_DAYS;addEvent('ecology','All Ridgefangs have disappeared',null);}
+ e.history.push({year:year,g:grazers,r:ridgefangs});
+ if(e.history.length>400)e.history.shift();
+}
+function ecologyChart(x,y,w,h){
+ var hist=game.ecology.history;
+ rr(x,y,w,h,7,'#102323','#436157');
+ var left=x+27,right=x+w-9,top=y+26,bottom=y+h-22;
+ var max=Math.max(6,...hist.map(q=>Math.max(q.g,q.r))),ceiling=Math.ceil(max/10)*10;
+ for(var j=0;j<=4;j++){var yy=top+(bottom-top)*j/4;line(left,yy,right,yy,'#2b4441',1);
+  if(j%2===0)txt(''+Math.round(ceiling*(1-j/4)),left-4,yy+2,8,'#90a69a','right');
+ }
+ var first=hist.length?hist[0].year:0,last=hist.length?hist[hist.length-1].year:0;
+ function stroke(key,color){
+  if(!hist.length)return;
+  ctx.strokeStyle=color;ctx.lineWidth=2.6;ctx.lineJoin='round';ctx.beginPath();
+  for(var i=0;i<hist.length;i++){var d=hist[i],xx=first===last?(left+right)/2:left+(right-left)*(d.year-first)/(last-first),
+   yy=bottom-(bottom-top)*d[key]/ceiling;
+   if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);
+  }
+  if(hist.length===1)ctx.lineTo((left+right)/2+1,bottom-(bottom-top)*hist[0][key]/ceiling);
+  ctx.stroke();
+ }
+ stroke('g','#8ad6b1');stroke('r','#ed9f7a');
+ txt('GRAZERS',left,y+13,9,'#8ad6b1','left','700');txt('RIDGEFANGS',right,y+13,9,'#ed9f7a','right','700');
+ txt('YEAR '+first,left,y+h-8,9,'#8fa69c');txt('YEAR '+last,right,y+h-8,9,'#8fa69c','right');
+}
+function rand(){rngState=(rngState+0x6D2B79F5)>>>0;var t=rngState;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;}
+function r(a,b){return a+rand()*(b-a);}
+function ri(a,b){return Math.floor(r(a,b+1));}
+function choice(list){return list[ri(0,list.length-1)];}
+function dist(x,y,a,b){return Math.hypot(x-a,y-b);}
+function riverX(y){return 505+72*Math.sin(y*.010+0.6)+34*Math.sin(y*.021);}
+function waterDist(x,y){return Math.min(Math.abs(x-riverX(y))-23,dist(x,y,853,158)-62);}
+function pointWater(x,y){if(dist(x,y,853,158)<155)return {x:853,y:158};return {x:riverX(y),y:y};}
+function footprint(x,y){return {x:clamp(x,20,W-20),y:clamp(y,22,H-22)};}
+function logHistory(a,msg){if(!a)return;if(!Array.isArray(a.history))a.history=[];a.history.unshift(msg);if(a.history.length>12)a.history.length=12;}
+function addEvent(type,msg,a,b){game.events.unshift({day:round(game.day,1),type:type,text:msg,who:[a&&a.id,b&&b.id].filter(Boolean)});if(game.events.length>95)game.events.pop();logHistory(a,msg);logHistory(b,msg);}
+
+function safeSoulRecord(s){
+ if(!s||typeof s!=='object')return null;
+ // Normalize old or partially written saves while retaining all intact soul impressions.
+ if(!s.im||typeof s.im!=='object')s.im={};
+ for(var k of ['social','giving','caution','roaming']){
+  if(!Number.isFinite(s.im[k]))s.im[k]=0;
+ }
+ if(!Array.isArray(s.lifeHistory))s.lifeHistory=[];
+ else s.lifeHistory=s.lifeHistory.filter(function(life){return !!life&&typeof life==='object';}).slice(0,9);
+ if(!Number.isFinite(s.lives))s.lives=s.lifeHistory.length+1;
+ return s;
+}
+function makeSoul(){var s={id:++game.nextSoul,lives:0,im:{social:0,caution:0,giving:0,roaming:0},lastLife:'',lifeHistory:[]};game.souls[s.id]=s;return s;}
+function bodyTraits(p,q){var o={};['speed','strength','resilience','senses'].forEach(function(k){o[k]=clamp(p&&q?(p.body[k]+q.body[k])/2+r(-.16,.16):r(.15,.9),.05,.98);});return o;}
+function temper(p,q,s){var o={};['curiosity','sociability','aggression','caution','generosity'].forEach(function(k){o[k]=clamp(p&&q?(p.base[k]+q.base[k])/2+r(-.24,.24):r(.1,.9),0,1);});return o;}
+function mapTemper(base,s){return {
+ curiosity:clamp(base.curiosity+s.im.roaming*.19,0,1),
+ sociability:clamp(base.sociability+s.im.social*.22,0,1),
+ aggression:base.aggression,
+ caution:clamp(base.caution+s.im.caution*.2,0,1),
+ generosity:clamp(base.generosity+s.im.giving*.22,0,1)
+};}
+function spawn(s,x,y,p,q,species){var id=++game.nextBody;var base=temper(p,q,s),body=bodyTraits(p,q);species=species||(p?kindOf(p):'grazer');
+ var family=species==='carnivore'?'Ridgefang':p&&q?(rand()<.5?p.family:q.family):choice(archetypes);
+ if(species==='carnivore'&&!p){body.speed=clamp(body.speed+.18,0,1);body.strength=clamp(body.strength+.16,0,1);body.senses=clamp(body.senses+.12,0,1);body.resilience=clamp(body.resilience+.18,0,1);}
+ if(!p&&species!=='carnivore'){if(family==='Wall'){body.resilience=clamp(body.resilience+.22,0,1);body.speed*=.72;}
+  if(family==='Bruiser'){body.strength=clamp(body.strength+.22,0,1);body.resilience=clamp(body.resilience+.1,0,1);}
+  if(family==='Skirmisher')body.speed=clamp(body.speed+.23,0,1);
+  if(family==='Duelist')body.senses=clamp(body.senses+.23,0,1);
+  if(family==='Pouncer'){body.speed=clamp(body.speed+.14,0,1);body.strength=clamp(body.strength+.12,0,1);}
+  if(family==='Trickster'){body.senses=clamp(body.senses+.16,0,1);base.curiosity=clamp(base.curiosity+.13,0,1);}
+  if(family==='Glass Fang'){body.strength=clamp(body.strength+.25,0,1);body.resilience=clamp(body.resilience-.18,0,1);}
+ }
+ var t=mapTemper(base,s);
+ var a={id:id,soulId:s.id,species:species,family:family,name:choice(namesA)+(s.lives>0?' '+(s.lives+1):''),x:x,y:y,vx:0,vy:0,body:body,base:base,t:t,
+ age:p&&q?0:r(16,48)*YEAR_DAYS,lifespan:r(MIN_AGE_YEARS,MAX_AGE_YEARS)*YEAR_DAYS,
+ fullness:r(62,100),water:r(58,100),energy:r(65,99),health:100,food:species==='carnivore'?0:ri(0,2),
+ relations:{},places:[],history:[],home:null,parentIds:p&&q?[p.id,q.id]:[],decision:'Exploring',target:{x:x,y:y,kind:'wander'},
+ nextThink:0,nextSocial:0,nextBirth:0,nextStrike:0,threatUntil:-1,battle:{strikes:0,dodges:0,blocks:0,kills:0,hunts:0,meals:0,escapes:0},learning:freshLearning(),stats:{gives:0,receives:0,helps:0,helped:0,conflicts:0,meetings:0,travel:0,waterScares:0,injuries:0},born:game.day};
+ a.genome=makeValleyGenome(a,p,q);
+ if(p&&q){game.metrics.births++;if(species==='carnivore')game.metrics.ridgefangBirths=(game.metrics.ridgefangBirths||0)+1;}
+ s.lives++;game.agents.push(a);
+ if(s.lives>1){game.metrics.rebirths++;addEvent('soul',a.name+' begins life '+s.lives+' (soul '+s.id+')',a);}
+ if(p&&q){var birthMessage=a.name+' is born to '+p.name+' and '+q.name;addEvent('birth',birthMessage,a,p);logHistory(q,birthMessage);}
+ return a;
+}
+function terrain(){game.trees=[];game.bushes=[];game.stones=[];
+ for(var j=0;j<230;j++){var x=r(28,W-28),y=r(27,H-27);if(waterDist(x,y)>22 && dist(x,y,735,364)>74)game.trees.push({x:x,y:y,size:r(4,10),variant:ri(0,3)});}
+ for(var i=0;i<91;i++){var x2=r(30,W-30),y2=r(32,H-32);if(waterDist(x2,y2)<19)continue;game.bushes.push({x:x2,y:y2,amount:r(1,4),capacity:4,regen:r(.017,.033)});}
+ for(var k=0;k<28;k++){game.stones.push({x:r(20,W-20),y:r(30,H-30),size:r(5,12)});}
+}
+function newWorld(seed,social,learning){
+ var rules=Object.assign({},ECO_DEFAULT,nextEcoConfig||(game&&game.ecology&&game.ecology.rules)||ECO_DEFAULT);
+ nextEcoConfig=null;
+ rngState=(seed>>>0)||1;game={seed:seed>>>0,social:social!==false,learning:learning!==false,ageSystem:AGE_SYSTEM,day:0,agents:[],souls:{},pending:[],events:[],trees:[],bushes:[],stones:[],nextSoul:0,nextBody:0,
+ metrics:{births:0,deaths:0,rebirths:0,given:0,helped:0,conflicts:0,meetings:0,remembered:0,lifeDays:0,lifeYearsTotal:0,lifeYearsCount:0,foodFinds:0,foodMisses:0,adaptedChoices:0,strikes:0,blocks:0,dodges:0,predations:0,meatMeals:0,fleeChoices:0,defenseHits:0,rivalryHits:0,predatorAttacks:0},deaths:[],proximity:{},carcasses:[],predatorsIntroduced:false};
+ game.ecology={rules:rules,history:[],lastYear:-1,maxG:0,maxR:0,goneG:null,goneR:null};
+ terrain();
+ for(var i=0;i<24;i++){var soul=makeSoul(),x=0,y=0,tries=0;
+ do{x=r(65,W-65);y=r(60,H-60);}while(waterDist(x,y)<20&&++tries<30);
+ spawn(soul,x,y);
+ }
+ for(var k=0;k<game.agents.length;k++)game.agents[k].history=[];
+ game.events=[];selected=null;modal=null;tab=0;scroll=0;view='world';playing=true;acc=0;
+ releasePredators();trackEcology(true);
+ announce('Wild Ecology · 24 grazers and 2 Ridgefangs');save();
+}
+function announce(s){toast=s;toastUntil=performance.now()+2600;}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({version:1,game:game,rng:rngState,selected:selected,view:view,speedIndex:speedIndex}));}catch(e){}}
+function freshLearning(){return {finds:0,misses:0,adapted:0,events:[],lastVisit:-99,lastAdapt:-99,lastSite:null};}
+function ensureLearning(a){if(!a.learning)a.learning=freshLearning();for(var k of ['finds','misses','adapted'])if(!Number.isFinite(a.learning[k]))a.learning[k]=0;
+ if(!Array.isArray(a.learning.events))a.learning.events=[];if(!Number.isFinite(a.learning.lastVisit))a.learning.lastVisit=-99;if(!Number.isFinite(a.learning.lastAdapt))a.learning.lastAdapt=-99;
+ if(!('lastSite' in a.learning))a.learning.lastSite=null;return a.learning;}
+function recordLesson(a,kind,text){var st=ensureLearning(a);st.events.unshift({day:round(game.day,1),kind:kind,text:text});if(st.events.length>12)st.events.length=12;}
+function foodResult(a,success,x,y){
+ var st=ensureLearning(a);
+ // Count a visit once, not every simulation tick spent standing beside the patch.
+ if(st.lastSite&&dist(st.lastSite.x,st.lastSite.y,x,y)<36)return;
+ if(game.day-st.lastVisit<.45)return;
+ st.lastVisit=game.day;st.lastSite={x:x,y:y};
+ var p=a.places.find(function(place){return place.kind==='food'&&dist(place.x,place.y,x,y)<46;});
+ if(success){st.finds++;game.metrics.foodFinds++;if(p){p.successes=(p.successes||0)+1;p.value=clamp(p.value+.10,0,1);}
+  recordLesson(a,'found','Found food at a chosen patch'+(p?' · confidence '+round(p.value,2):''));}
+ else{st.misses++;game.metrics.foodMisses++;
+  if(!p){p={x:x,y:y,kind:'food',value:.5,day:game.day};a.places.push(p);if(a.places.length>12)a.places.shift();}
+  p.failures=(p.failures||0)+1;p.lastFailed=game.day;p.value=clamp(p.value-.43,.05,1);p.day=game.day;
+  recordLesson(a,'empty','Reached a remembered patch, but found no food');}
+}
+function rememberedFood(a){
+ var sites=a.places.filter(function(p){return p.kind==='food'&&game.day-p.day<65;});
+ sites.sort(function(p,q){return dist(a.x,a.y,p.x,p.y)-dist(a.x,a.y,q.x,q.y);});
+ var baseline=sites[0];if(!game.learning||!baseline)return baseline||null;
+ var eligible=sites.filter(function(p){return !(Number.isFinite(p.lastFailed)&&game.day-p.lastFailed<18&&(p.value||0)<.72);});
+ eligible.sort(function(p,q){return dist(a.x,a.y,p.x,p.y)/(.35+.65*clamp(p.value||.5,0,1))-dist(a.x,a.y,q.x,q.y)/(.35+.65*clamp(q.value||.5,0,1));});
+ var best=eligible[0]||null;
+ if(best!==baseline){var st=ensureLearning(a);if(game.day-st.lastAdapt>1.7){
+  st.adapted++;st.lastAdapt=game.day;game.metrics.adaptedChoices++;
+  recordLesson(a,'revised','Changed food choice after earlier experience'+(best?' · another patch preferred':' · searching elsewhere'));}
+ }
+ return best;
+}
+function migrateAgeSystem(){
+ if(game.ageSystem===AGE_SYSTEM)return;
+ // Idempotent migration of live bodies only. Completed historical lifetimes retain their original day units.
+ // Map each existing life to its relative age, preserving relationships and history,
+ // with a minimum 10% of the new lifespan remaining.
+ for(var a of game.agents){
+  var oldLimit=Number.isFinite(a.lifespan)&&a.lifespan>0?a.lifespan:160;
+  var oldAge=Number.isFinite(a.age)?a.age:0;
+  var progress=clamp(oldAge/oldLimit,0,.90);
+  var normalizedOldLimit=clamp((oldLimit-91)/133,0,1);
+  var newYears=MIN_AGE_YEARS+(MAX_AGE_YEARS-MIN_AGE_YEARS)*normalizedOldLimit;
+  a.lifespan=newYears*YEAR_DAYS;
+  a.age=progress*a.lifespan;
+ }
+ game.metrics=game.metrics||{};
+ if(!Number.isFinite(game.metrics.lifeYearsTotal))game.metrics.lifeYearsTotal=0;
+ if(!Number.isFinite(game.metrics.lifeYearsCount))game.metrics.lifeYearsCount=0;
+ game.ageSystem=AGE_SYSTEM;
+}
+function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;migrateAgeSystem();initEcology();
+ if(!game.ecology)game.ecology={rules:Object.assign({},ECO_DEFAULT),history:[],lastYear:-1,maxG:0,maxR:0,goneG:null,goneR:null};
+ game.ecology.rules=Object.assign({},ECO_DEFAULT,game.ecology.rules||{});
+ if(!Array.isArray(game.ecology.history))game.ecology.history=[];
+ if(!Number.isFinite(game.ecology.lastYear))game.ecology.lastYear=-1;
+ for(var prop of ['maxG','maxR'])if(!Number.isFinite(game.ecology[prop]))game.ecology[prop]=0;
+ if(!('goneG' in game.ecology))game.ecology.goneG=null;
+ if(!('goneR' in game.ecology))game.ecology.goneR=null;
+ trackEcology(false);
+ // Older saved valley states may not have every soul history field.
+ for(var soulID in game.souls)safeSoulRecord(game.souls[soulID]);
+ for(var k of ['foodFinds','foodMisses','adaptedChoices'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
+ for(var a of game.agents){ensureLearning(a);a.family=a.family||'Wanderer';ensureValleyGenome(a);a.history=Array.isArray(a.history)?a.history.filter(function(entry){return typeof entry==='string'&&entry.trim().length>0;}).slice(0,12):[];a.t=mapTemper(a.base,game.souls[a.soulId]);}return true;}}catch(e){}return false;}
+
+const GRAZER_CAP=38,PREDATOR_CAP=4;
+function kindOf(a){return a&&a.species==='carnivore'?'carnivore':'grazer';}
+function countKind(kind){return game.agents.reduce((n,a)=>n+(kindOf(a)===kind?1:0),0);}
+function initFight(a){
+ a.species=kindOf(a);
+ if(!Number.isFinite(a.nextStrike))a.nextStrike=0;
+ if(!Number.isFinite(a.threatUntil))a.threatUntil=-1;
+ if(!a.battle)a.battle={strikes:0,dodges:0,blocks:0,kills:0,hunts:0,meals:0,escapes:0};
+ for(var k of Object.keys({strikes:1,dodges:1,blocks:1,kills:1,hunts:1,meals:1,escapes:1}))if(!Number.isFinite(a.battle[k]))a.battle[k]=0;
+}
+function initEcology(){
+ game.carcasses=Array.isArray(game.carcasses)?game.carcasses:[];
+ if(game.predatorsIntroduced===undefined)game.predatorsIntroduced=false;
+ for(var k of ['strikes','blocks','dodges','predations','meatMeals','fleeChoices','defenseHits','rivalryHits','predatorAttacks','ridgefangBirths'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
+ for(var a of game.agents)initFight(a);
+ for(var p of game.pending)if(!p.species)p.species='grazer';
+}
+function addRidgefangFounders(n){
+ var resident=game.agents.find(a=>kindOf(a)==='carnivore');
+ for(var i=0;i<n;i++){
+  // Founders share a habitat rather than spawning at opposite ends of the map.
+  var x=resident?clamp(resident.x+r(-85,85),35,W-35):r(130,225);
+  var y=resident?clamp(resident.y+r(-75,75),35,H-35):r(490,580);
+  var a=spawn(makeSoul(),x,y,null,null,'carnivore');
+  a.age=r(23,34)*YEAR_DAYS;a.food=0;
+  addEvent('wildlife',a.name+' the Ridgefang enters the valley',a);
+  if(!resident)resident=a;
+ }
+ save();
+}
+function releasePredators(){
+ initEcology();
+ if(game.predatorsIntroduced)return;
+ game.predatorsIntroduced=true;
+ addRidgefangFounders(2);
+ announce('Two Ridgefangs entered the valley');
+}
+function restoreRidgefangFounders(){
+ if(!game.predatorsIntroduced)return;
+ var missing=Math.max(0,2-countKind('carnivore'));
+ if(!missing)return;
+ addRidgefangFounders(missing);
+ announce(missing+' Ridgefang founder'+(missing===1?'':'s')+' introduced by observer');
+}
+function nearestMeat(a){
+ var best=null,d=1e9;
+ for(var c of game.carcasses)if(c.meat>0&&c.expires>game.day&&c.species==='grazer'){
+  var dd=dist(a.x,a.y,c.x,c.y);if(dd<d){best=c;d=dd;}
+ }
+ return {c:best,d:d};
+}
+function nearestPrey(a){
+ var best=null,cost=1e9;
+ for(var b of game.agents)if(kindOf(b)==='grazer'&&b.health>0){
+  var dd=dist(a.x,a.y,b.x,b.y);if(dd>170+a.body.senses*160)continue;
+  var cc=dd+(b.body.speed-a.body.speed)*33-(b.health<55?20:0);
+  if(cc<cost){cost=cc;best=b;}
+ }
+ return best;
+}
+function loomingPredator(a){
+ var best=null,d=1e9;
+ for(var b of game.agents)if(kindOf(b)==='carnivore'&&b.health>0){
+  var hunting=b.target&&b.target.kind==='hunt'&&b.target.id===a.id;
+  var dd=dist(a.x,a.y,b.x,b.y),radius=(hunting?120:67)+a.body.senses*74;
+  if(dd<d&&dd<radius&&(b.fullness<84||hunting||a.threatUntil>game.day)){best=b;d=dd;}
+ }
+ return {a:best,d:d};
+}
+function fight(a,b,why){
+ initFight(a);initFight(b);
+ if(a.health<=0||b.health<=0||a.energy<6||a.nextStrike>game.day||dist(a.x,a.y,b.x,b.y)>30)return false;
+ if(kindOf(a)==='carnivore'&&kindOf(b)==='carnivore')return false;
+ if(why==='hunt'&&(kindOf(a)!=='carnivore'||kindOf(b)!=='grazer'||a.fullness>=88))return false;
+ a.nextStrike=game.day+.73+(1-a.body.speed)*.63;a.energy=Math.max(0,a.energy-6);
+ a.battle.strikes++;game.metrics.strikes++;
+ if(rand()<clamp(.08+b.body.speed*.24+b.t.caution*.15-a.body.senses*.08,.04,.56)&&b.energy>11){
+  b.energy-=4;b.battle.dodges++;game.metrics.dodges++;b.threatUntil=game.day+4;b.nextThink=0;
+  return true;
+ }
+ var defended=rand()<clamp(.07+b.body.resilience*.21+b.t.caution*.14,.04,.47)&&b.energy>10;
+ if(defended){b.energy-=5;b.battle.blocks++;game.metrics.blocks++;}
+ var damage=Math.max(1.5,(3+a.body.strength*9+(kindOf(a)==='carnivore'?24:0)-b.body.resilience*4.4)*(defended?.38:1));
+ b.health=Math.max(0,b.health-damage);b.stats.injuries++;
+ b.threatUntil=game.day+5;b.nextThink=0;
+ b.lastHit={id:a.id,name:a.name,why:why,day:game.day};
+ b.combatFlash=game.day+.55;a.combatFlash=game.day+.3;
+ markPlace(b,b.x,b.y,'danger');
+ if(why==='hunt')game.metrics.predatorAttacks++;
+ if(why==='defense')game.metrics.defenseHits++;
+ if(why==='rivalry')game.metrics.rivalryHits++;
+ if(kindOf(a)===kindOf(b)){
+  relation(b,a).trust=clamp(relation(b,a).trust-.29,-1,1);
+  relation(a,b).trust=clamp(relation(a,b).trust-.09,-1,1);
+ }
+ if(b.health<=0){a.battle.kills++;addEvent('combat',a.name+' fatally wounded '+b.name,a,b);}
+ else if(a.battle.strikes%8===1)addEvent('combat',a.name+' injured '+b.name+' ('+Math.round(damage)+')',a,b);
+ return true;
+}
+function resolveFight(a){
+ if(a.health<=0)return;
+ var t=a.target||{};
+ if(t.kind==='hunt'&&kindOf(a)==='carnivore'){
+  var prey=game.agents.find(b=>b.id===t.id);
+  if(prey&&kindOf(prey)==='grazer')fight(a,prey,'hunt');
+ }
+ if(kindOf(a)==='grazer'&&a.threatUntil>game.day&&a.lastHit){
+  var enemy=game.agents.find(b=>b.id===a.lastHit.id);
+  if(enemy&&kindOf(enemy)==='carnivore'&&dist(a.x,a.y,enemy.x,enemy.y)<30){
+   if(a.t.aggression*.57+a.body.strength*.36>r(.25,.86))fight(a,enemy,'defense');
+  }
+ }
+}
+function eatMeat(a){
+ if(kindOf(a)!=='carnivore'||a.fullness>=92)return;
+ for(var c of game.carcasses){
+  if(c.species!=='grazer'||c.meat<=0||c.expires<game.day||dist(a.x,a.y,c.x,c.y)>22)continue;
+  c.meat--;a.fullness=Math.min(100,a.fullness+34);a.battle.meals++;game.metrics.meatMeals++;
+  a.health=Math.min(100,a.health+5);a.decision='Eating meat';a.nextThink=0;return;
+ }
+}
+
+function nearestAgent(a,filter){var best=null,bd=1e10;for(var b of game.agents){if(a===b)continue;var d=dist(a.x,a.y,b.x,b.y);if(d<bd&&(!filter||filter(b,d))){best=b;bd=d;}}return {agent:best,d:bd};}
+function relation(a,b){var k=''+b.id;if(!a.relations[k])a.relations[k]={trust:0,familiarity:0,meetings:0,lastMeet:-99,gifts:0,help:0,attacks:0};return a.relations[k];}
+function markPlace(a,x,y,kind){var prev=a.places.find(function(p){return p.kind===kind&&dist(p.x,p.y,x,y)<50;});if(prev){prev.value=clamp(prev.value+.18,0,1);prev.day=game.day;return;}a.places.push({x:x,y:y,kind:kind,value:.6,day:game.day});if(a.places.length>12)a.places.sort(function(p,q){return q.value-p.value;}).length=12;}
+function safeTarget(a){var spot=choice([{x:164,y:251},{x:733,y:358},{x:945,y:545}]);return footprint(spot.x+r(-34,34),spot.y+r(-34,34));}
+function seekRidgefangCompanion(a){
+ if(!game.social||kindOf(a)!=='carnivore'||ageYears(a)<18||a.fullness<58||a.water<69||a.energy<28||a.nextBirth>game.day)return null;
+ var best=null,d=Infinity;
+ for(var other of game.agents){
+  if(other.id===a.id||kindOf(other)!=='carnivore'||other.health<=0||ageYears(other)<18)continue;
+  var dd=dist(a.x,a.y,other.x,other.y);
+  if(dd<280&&dd<d){best=other;d=dd;}
+ }
+ // Seeking company is a probabilistic choice shaped by sociability, never forced mating.
+ if(!best||rand()>(.28+.43*a.t.sociability))return null;
+ return best;
+}
+function chooseAction(a){
+ if(kindOf(a)==='grazer'&&game.predatorsIntroduced){
+  var danger=loomingPredator(a);
+  if(danger.a){
+   var foe=danger.a,resolve=a.t.aggression*.48+a.body.strength*.30+(1-a.t.caution)*.2;
+   if(danger.d<32&&resolve>.73){a.target={x:foe.x,y:foe.y,kind:'stand',id:foe.id};a.decision='Standing ground';return;}
+   var dx=a.x-foe.x,dy=a.y-foe.y,l=Math.max(1,Math.hypot(dx,dy));
+   a.target=footprint(a.x+dx/l*110+r(-16,16),a.y+dy/l*110+r(-16,16));
+   a.target.kind='flee';a.decision='Fleeing '+foe.name;
+   if(game.day-(a.lastEscape||-99)>2){a.lastEscape=game.day;a.battle.escapes++;game.metrics.fleeChoices++;}
+   return;
+  }
+ }
+ // Urgent physiological needs outrank a hunt. Otherwise a hungry Ridgefang may chase until dehydrated.
+ if(kindOf(a)==='carnivore'&&a.energy<26&&a.water>=65){
+  a.target={x:a.x,y:a.y,kind:'rest'};a.decision='Resting between hunts';return;
+ }
+ if(kindOf(a)==='carnivore'){
+  var companion=seekRidgefangCompanion(a);
+  if(companion){
+   a.target={x:companion.x,y:companion.y,kind:'companion',id:companion.id};
+   a.decision='Seeking Ridgefang companion';return;
+  }
+ }
+ if(kindOf(a)==='carnivore'&&a.water>=65&&a.fullness<88){
+  var meat=nearestMeat(a);
+  if(meat.c&&meat.d<200){a.target={x:meat.c.x,y:meat.c.y,kind:'meat'};a.decision='Following meat scent';return;}
+  var prey=nearestPrey(a);
+  if(prey){a.target={x:prey.x,y:prey.y,kind:'hunt',id:prey.id};a.decision='Hunting '+prey.name;return;}
+ }
+ var water=waterDist(a.x,a.y),known=null;
+ // Stay by discovered drinkable water long enough to recover, rather than leaving half-hydrated.
+ if(water<30&&a.water<91){a.target={x:a.x,y:a.y,kind:'drink'};a.decision='Drinking';return;}
+ if(a.water<65 || (a.target&&(a.target.kind==='water'||a.target.kind==='drink')&&a.water<91)){known=a.places.filter(function(p){return p.kind==='water';}).sort(function(p,q){return dist(a.x,a.y,p.x,p.y)-dist(a.x,a.y,q.x,q.y);})[0];
+  // Live perception overrides an old shoreline memory. A remembered water point is
+  // only a waypoint; once water is sensed, the creature must approach the water itself.
+  var sensed=water<80+a.body.senses*175,target=sensed?pointWater(a.x,a.y):known;
+  if(target){a.target={x:target.x,y:target.y,kind:'water'};a.decision='Seeking water';return;}
+  a.target=footprint(a.x+r(-175,175),a.y+r(-175,175));a.target.kind='search';a.decision='Searching for water';return;}
+ if(kindOf(a)==='grazer'&&a.fullness<78){var near=null,nd=1e9;
+  for(var b of game.bushes){if(b.amount<.9)continue;var d=dist(a.x,a.y,b.x,b.y);if(d>95+a.body.senses*160)continue;if(d<nd){nd=d;near=b;}}
+  var saved=rememberedFood(a);
+  if(saved&&(!near||dist(a.x,a.y,saved.x,saved.y)<nd*.8))near=saved;
+  if(near){a.target={x:near.x,y:near.y,kind:'food'};a.decision='Foraging';return;}
+ }
+ if(a.energy<30){var home=a.home||safeTarget(a);a.target={x:home.x,y:home.y,kind:'rest'};a.decision='Finding rest';return;}
+ if(game.social && a.t.sociability>.24 && a.energy>28 && a.water>24 && a.fullness>25){
+  var friend=nearestAgent(a,function(b,d){var rel=a.relations[b.id];return kindOf(b)===kindOf(a)&&!!rel&&rel.trust>.18&&rel.meetings>=2&&d<275;});
+  var socialBias=a.t.sociability+(.35-Math.min(.35,friend.d/1000));
+  if(friend.agent&&rand()<socialBias*.63){
+   a.target={x:friend.agent.x,y:friend.agent.y,kind:'friend',id:friend.agent.id};a.decision='Seeking '+friend.agent.name;game.metrics.remembered++;return;
+  }
+ }
+ var spot=null;if(a.home&&rand()<.14+(.45-a.t.curiosity)*.3){spot=footprint(a.home.x+r(-50,50),a.home.y+r(-50,50));a.decision='Returning home';}
+ else{spot=footprint(a.x+r(-130,130)*(0.55+a.t.curiosity),a.y+r(-130,130)*(0.55+a.t.curiosity));a.decision='Exploring';}
+ var danger=a.places.find(function(p){return p.kind==='danger'&&dist(spot.x,spot.y,p.x,p.y)<80&&game.day-p.day<60;});
+ if(danger&&a.t.caution>.3){spot=footprint(a.x+(a.x-danger.x)*.5+r(-70,70),a.y+(a.y-danger.y)*.5+r(-70,70));a.decision='Avoiding a remembered danger';}
+ a.target={x:spot.x,y:spot.y,kind:'wander'};
+}
+function contact(a,b){
+ var ra=relation(a,b),rb=relation(b,a);
+ if(game.day-ra.lastMeet<1.8)return;
+ ra.lastMeet=rb.lastMeet=game.day;ra.meetings++;rb.meetings++;
+ ra.familiarity=clamp(ra.familiarity+.08,0,1);rb.familiarity=clamp(rb.familiarity+.08,0,1);
+ a.stats.meetings++;b.stats.meetings++;game.metrics.meetings++;
+ var sameSpecies=kindOf(a)===kindOf(b),friendly=game.social&&sameSpecies&&(a.t.sociability+b.t.sociability)/2>.32;
+ if(friendly){
+  var pulse=.013*((a.t.sociability+b.t.sociability)/2);
+  ra.trust=clamp(ra.trust+pulse,-1,1);rb.trust=clamp(rb.trust+pulse,-1,1);
+ }
+ if(!game.social||!sameSpecies)return;
+ if(a.parentIds.indexOf(b.id)>=0 || b.parentIds.indexOf(a.id)>=0){ra.trust=clamp(ra.trust+.045,-1,1);rb.trust=clamp(rb.trust+.045,-1,1);}
+ function give(donor,recv,dr,rr){
+   if(donor.food<1||recv.fullness>65||donor.fullness<35||donor.t.generosity+dr.trust*.6<r(.32,1.18))return false;
+   donor.food--;recv.fullness=clamp(recv.fullness+24,0,100);dr.trust=clamp(dr.trust+.035,-1,1);rr.trust=clamp(rr.trust+.22,-1,1);
+   dr.gifts++;rr.gifts++;donor.stats.gives++;recv.stats.receives++;game.metrics.given++;
+   addEvent('share',donor.name+' shared food with '+recv.name,donor,recv);return true;
+ }
+ if(a.fullness<b.fullness)give(b,a,rb,ra);else give(a,b,ra,rb);
+ function help(donor,recv,dr,rr){
+  if(recv.health>63||donor.energy<42||donor.health<45||donor.t.generosity+dr.trust*.5<r(.42,1.18))return false;
+  donor.energy-=9;recv.health=clamp(recv.health+13,0,100);dr.trust=clamp(dr.trust+.06,-1,1);rr.trust=clamp(rr.trust+.25,-1,1);
+  dr.help++;rr.help++;donor.stats.helps++;recv.stats.helped++;game.metrics.helped++;
+  addEvent('aid',donor.name+' tended '+recv.name+"'s wounds",donor,recv);return true;
+ }
+ if(a.health<b.health)help(b,a,rb,ra);else help(a,b,ra,rb);
+ var kind=kindOf(a),rules=ecRules(),cap=kind==='carnivore'?(rules.ridgeCap?PREDATOR_CAP:Infinity):(rules.grazerCap?GRAZER_CAP:Infinity);
+ if(ageYears(a)>=18&&ageYears(b)>=18&&a.nextBirth<game.day&&b.nextBirth<game.day&&countKind(kind)<cap&&ra.trust>.23&&rb.trust>.23&&rand()<.14){
+  a.nextBirth=b.nextBirth=game.day+r(22,36);
+  var pend=game.pending.findIndex(p=>(p.species||'grazer')===kind);
+  var s=pend>=0?game.souls[game.pending.splice(pend,1)[0].soulId]:makeSoul();
+  var baby=spawn(s,clamp((a.x+b.x)/2+r(-12,12),25,W-25),clamp((a.y+b.y)/2+r(-12,12),25,H-25),a,b,kind);
+  relation(a,baby).trust=.7;relation(b,baby).trust=.7;relation(baby,a).trust=.72;relation(baby,b).trust=.72;
+  a.home={x:a.x,y:a.y};b.home={x:b.x,y:b.y};
+ }
+ var hostility=(a.t.aggression+b.t.aggression)/2;
+ var scarce=a.fullness<62||b.fullness<62;
+ var territory=(a.home&&dist(a.x,a.y,a.home.x,a.home.y)<45)||(b.home&&dist(b.x,b.y,b.home.x,b.home.y)<45);
+ if(hostility>.66&&ra.trust<.14&&(scarce||territory)&&rand()<(hostility-.52)*.14){
+  var attacker=rand()<.5?a:b,victim=attacker===a?b:a;
+  if(fight(attacker,victim,'rivalry')){attacker.stats.conflicts++;game.metrics.conflicts++;}
+ }
+}
+function death(a,cause){
+ var s=game.souls[a.soulId];s.lastLife=a.name+' died of '+cause+' on day '+round(game.day,1);
+ s.lifeHistory.unshift({name:a.name,days:round(a.age,1),years:round(ageYears(a),1),cause:cause,gives:a.stats.gives,helped:a.stats.helped,contacts:a.stats.meetings});s.lifeHistory.length=9;
+ var shift={social:clamp((a.stats.receives+a.stats.helped+a.stats.gives+a.stats.helps-a.stats.conflicts*2)/12,-1,1),
+  giving:clamp((a.stats.gives+a.stats.helps-a.stats.conflicts)/9,-1,1),
+  caution:clamp((a.stats.injuries+a.stats.waterScares)/6+(cause==='dehydration'?.25:0),-1,1),
+  roaming:clamp((a.stats.travel/Math.max(game.day-a.born,1)-30)/110,-1,1)};
+ for(var k in s.im)s.im[k]=clamp(s.im[k]*.68+shift[k]*.32,-1,1);
+ game.pending.push({soulId:s.id,species:kindOf(a),due:game.day+r(5,19)});
+ if(kindOf(a)==='grazer'){
+  game.carcasses.push({x:a.x,y:a.y,meat:6,expires:game.day+40,species:'grazer',source:a.id});
+  if(game.carcasses.length>70)game.carcasses.shift();
+  if(a.lastHit&&a.lastHit.why==='hunt'&&game.day-a.lastHit.day<5){
+   game.metrics.predations++;var killer=game.agents.find(b=>b.id===a.lastHit.id);if(killer)killer.battle.hunts++;
+  }
+ }
+ game.metrics.deaths++;game.metrics.lifeDays+=a.age;game.metrics.lifeYearsTotal=(game.metrics.lifeYearsTotal||0)+ageYears(a);game.metrics.lifeYearsCount=(game.metrics.lifeYearsCount||0)+1;
+ game.deaths.unshift({x:a.x,y:a.y,day:game.day,name:a.name,cause:cause});game.deaths.length=30;
+ addEvent('death',a.name+' died of '+cause+' · soul '+s.id+' persists',a);
+ if(selected===a.id){selected=null;modal=null;announce(a.name+' is gone. Their soul remains.');}
+}
+function drinkNearby(a,dt){
+ if(waterDist(a.x,a.y)>=30)return false;
+ markPlace(a,a.x,a.y,'water');
+ if(a.water<94){a.water=Math.min(100,a.water+64*dt);a.decision='Drinking';}
+ return true;
+}
+function tick(){
+ game.day+=.06;var dt=.06;
+ game.carcasses=game.carcasses.filter(c=>c.meat>0&&c.expires>game.day);
+ for(var bush of game.bushes)bush.amount=Math.min(bush.capacity,bush.amount+bush.regen*dt);
+ var remove=[];
+ for(var a of game.agents){
+  if(a.learning&&a.learning.lastSite&&dist(a.x,a.y,a.learning.lastSite.x,a.learning.lastSite.y)>57)a.learning.lastSite=null;
+  a.age+=dt;a.fullness=Math.max(0,a.fullness-(kindOf(a)==='carnivore'?1.52:1.75+a.body.strength*.35)*dt);
+  a.water=Math.max(0,a.water-(2.55+a.body.speed*.3)*dt);
+  // Drink before dehydration damage/death is assessed when already at the bank.
+  var wasAtWater=drinkNearby(a,dt);
+  if(a.fullness<5)a.health-=(5-a.fullness)*.31*dt;
+  if(a.water<5)a.health-=(5-a.water)*.62*dt;
+  if(a.energy>30&&a.fullness>60&&a.water>65)a.health=Math.min(100,a.health+.18*dt);
+  if(a.health<=0||a.age>=a.lifespan){
+   var why=a.age>=a.lifespan?'old age':a.water<5?'dehydration':a.fullness<5?'starvation':'injuries';
+   remove.push({a:a,why:why});continue;
+  }
+  if(a.nextThink<=game.day){a.nextThink=game.day+r(1.0,2.7);chooseAction(a);}
+  var t=a.target,tx=t.x,ty=t.y;
+  if(t.kind==='friend'||t.kind==='hunt'||t.kind==='companion'){
+   var f=game.agents.find(function(b){return b.id===t.id;});if(!f){a.nextThink=0;t=a.target={x:a.x,y:a.y,kind:'wander'};}
+   else{tx=f.x;ty=f.y;}
+  }
+  var d=dist(a.x,a.y,tx,ty),moving=d>12;
+  if(moving){
+   var ds=(25+a.body.speed*42)*dt*(a.energy<14?.48:1)*(t.kind==='hunt'?1.33:t.kind==='flee'?1.1:1);
+   ds=Math.min(ds,d-10);var dx=(tx-a.x)/d*ds,dy=(ty-a.y)/d*ds;
+   a.x=clamp(a.x+dx,18,W-18);a.y=clamp(a.y+dy,18,H-18);
+   a.stats.travel+=Math.abs(ds);a.energy=Math.max(0,a.energy-.68*dt);
+  }else{
+   a.energy=clamp(a.energy+(t.kind==='rest'?32:7)*dt,0,100);
+   if(t.kind==='wander'||t.kind==='friend')a.nextThink=Math.min(a.nextThink,game.day+.6);
+  }
+  if(!wasAtWater)drinkNearby(a,dt);
+  var gathered=false;
+  for(var bush2 of (kindOf(a)==='carnivore'?[]:game.bushes)){
+   if(bush2.amount>=1&&dist(a.x,a.y,bush2.x,bush2.y)<16&&(a.fullness<91||a.food<2)){
+    bush2.amount-=1;if(a.fullness<84)a.fullness=clamp(a.fullness+27,0,100);else a.food=Math.min(4,a.food+1);
+    if(a.food<2&&rand()<.55)a.food++;
+    markPlace(a,bush2.x,bush2.y,'food');foodResult(a,true,bush2.x,bush2.y);gathered=true;a.nextThink=0;break;
+   }
+  }
+  if(t.kind==='food'&&dist(a.x,a.y,t.x,t.y)<21){
+   if(!gathered && (a.fullness<90||a.food<2)){
+    var availableAtTarget=game.bushes.some(function(b){return dist(b.x,b.y,t.x,t.y)<22&&b.amount>=1;});
+    if(!availableAtTarget)foodResult(a,false,t.x,t.y);
+   }
+   if(!gathered){a.target={x:a.x,y:a.y,kind:'search'};a.nextThink=0;}
+  }
+  if(kindOf(a)==='carnivore')eatMeat(a);
+  resolveFight(a);
+  if(a.fullness<42&&a.food>0&&kindOf(a)==='grazer'){a.food--;a.fullness=clamp(a.fullness+30,0,100);}
+  if(a.energy<6){a.energy=Math.min(100,a.energy+25*dt);a.decision='Resting';}
+  if(a.home===null&&game.day-a.born>35&&a.energy<55){a.home={x:a.x,y:a.y};}
+  if(game.social){
+   for(var b2 of game.agents){if(b2.id<=a.id||dist(a.x,a.y,b2.x,b2.y)>27)continue;contact(a,b2);}
+  }else{
+   for(var b3 of game.agents){if(b3.id<=a.id||dist(a.x,a.y,b3.x,b3.y)>27)continue;
+    var pair=a.id+':'+b3.id,last=game.proximity[pair];
+    if(last===undefined||game.day-last>1.8){game.proximity[pair]=game.day;game.metrics.meetings++;a.stats.meetings++;b3.stats.meetings++;}
+   }
+  }
+ }
+ for(var dead of remove){death(dead.a,dead.why);}
+ if(remove.length)game.agents=game.agents.filter(function(a){return !remove.some(function(d){return d.a===a;});});
+ game.deaths=game.deaths.filter(function(d){return game.day-d.day<24;});
+ // Grazer population retains its historical recovery rule. Ridgefang extinction is possible:
+ // no automatic replacement if carnivores die out. A carnivore soul can return through carnivore parents.
+ if(game.ecology.rules.rescue&&countKind('grazer')<24){
+  var idx=game.pending.findIndex(p=>(p.species||'grazer')==='grazer'&&p.due<=game.day);
+  if(idx>=0){var spot=game.pending.splice(idx,1)[0];spawn(game.souls[spot.soulId],r(45,W-45),r(45,H-45),null,null,'grazer');}
+ }
+ // Keep a world alive even after an extreme collapse, without inventing relationships.
+ if(game.ecology.rules.rescue&&countKind('grazer')<12&&!game.pending.some(p=>(p.species||'grazer')==='grazer')){var so=makeSoul();spawn(so,r(45,W-45),r(45,H-45),null,null,'grazer');}
+ trackEcology(false);
+}
+function resize(){
+ dpr=Math.min(2,window.devicePixelRatio||1);ww=innerWidth;hh=innerHeight;
+ C.width=Math.max(1,Math.round(ww*dpr));C.height=Math.max(1,Math.round(hh*dpr));
+ C.style.width=ww+'px';C.style.height=hh+'px';ctx.setTransform(dpr,0,0,dpr,0,0);
+ topH=ww<580?40:44;bottomH=ww<580?50:51;viewportH=hh-topH-bottomH;
+}
+function camera(){
+ var base=Math.min(ww/W,viewportH/H);
+ scale=view==='follow'&&selected?Math.max(base,Math.min(ww/475,viewportH/300)):base;
+ var cx=W/2,cy=H/2;
+ if(view==='follow'&&selected){var a=game.agents.find(function(v){return v.id===selected;});if(a){cx=a.x;cy=a.y;}}
+ ox=ww/2-cx*scale;oy=topH+viewportH/2-cy*scale;
+ if(view==='follow'){ox=clamp(ox,ww-W*scale,0);oy=clamp(oy,topH+viewportH-H*scale,topH);}
+}
+function sx(x){return ox+x*scale;}function sy(y){return oy+y*scale;}
+function line(x,y,xx,yy,color,width){ctx.strokeStyle=color;ctx.lineWidth=width||1;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(xx,yy);ctx.stroke();}
+function circle(x,y,rad,fill,stroke,lw){ctx.beginPath();ctx.arc(x,y,rad,0,TAU);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw||1;ctx.stroke();}}
+function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
+function rr(x,y,w,h,radius,fill,stroke){var r2=Math.min(radius,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r2,y);ctx.arcTo(x+w,y,x+w,y+h,r2);ctx.arcTo(x+w,y+h,x,y+h,r2);ctx.arcTo(x,y+h,x,y,r2);ctx.arcTo(x,y,x+w,y,r2);ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
+function txt(s,x,y,size,color,align,weight){ctx.font=(weight||'500')+' '+size+'px system-ui,-apple-system,sans-serif';ctx.textAlign=align||'left';ctx.textBaseline='middle';ctx.fillStyle=color||'#deebd7';ctx.fillText(s,x,y);}
+function strokeRiver(color,width){ctx.beginPath();for(var y=-20;y<=H+20;y+=6){var x=riverX(y);if(y===-20)ctx.moveTo(sx(x),sy(y));else ctx.lineTo(sx(x),sy(y));}ctx.strokeStyle=color;ctx.lineWidth=width*scale;ctx.lineCap='round';ctx.stroke();}
+function scene(){
+ rect(0,topH,ww,viewportH,'#132420');ctx.save();ctx.beginPath();ctx.rect(0,topH,ww,viewportH);ctx.clip();
+ var x=sx(0),y=sy(0),sw=W*scale,sh=H*scale;
+ rect(x,y,sw,sh,'#233e31');
+ for(var i=0;i<12;i++){var px=sx((i*241+98)%W),py=sy((i*157+173)%H);circle(px,py,(48+i*13)*scale,i%2?'#264734':'#2d4a37');}
+ circle(sx(853),sy(158),76*scale,'#2a5a62','#486b65',3*scale);
+ strokeRiver('#335b5c',67);strokeRiver('#38868a',48);strokeRiver('#52979c',21);
+ circle(sx(853),sy(158),55*scale,'#478b91','#74a1a0',3*scale);
+ for(var st of game.stones){rr(sx(st.x)-st.size*scale/2,sy(st.y)-st.size*scale/2,st.size*scale,st.size*.6*scale,2,'#64736b');}
+ for(var tr of game.trees){
+  var tx=sx(tr.x),ty=sy(tr.y),ts=Math.max(2,tr.size*scale);
+  circle(tx+1,ty+2,ts*.85,'#162f25');
+  circle(tx,ty-1,ts,tr.variant%2?'#39634b':'#2f5945');
+  circle(tx-ts*.28,ty-ts*.4,ts*.36,'#56816a');
+ }
+ // Ancient landmark and shelter clearings are geographic features, not scripted settlements.
+ circle(sx(735),sy(355),43*scale,'#48594a');circle(sx(735),sy(355),31*scale,'#425246');
+ for(var q=0;q<7;q++){var an=q*TAU/7;rr(sx(735+27*Math.cos(an))-4*scale,sy(355+27*Math.sin(an))-3*scale,8*scale,6*scale,2,'#9ba59b');}
+ for(var shltr of [{x:164,y:251},{x:945,y:545}]){
+  circle(sx(shltr.x),sy(shltr.y),28*scale,'#344c3b');rr(sx(shltr.x)-11*scale,sy(shltr.y)-8*scale,22*scale,16*scale,4,'#6f6750');
+ }
+ for(var bush of game.bushes){var bx=sx(bush.x),by=sy(bush.y);circle(bx,by,Math.max(2,4.4*scale),'#3d6245');if(bush.amount>=1)circle(bx+2*scale,by-2*scale,Math.max(1.3,2.6*scale),'#dd9479');}
+ for(var carcass of game.carcasses){var mx=sx(carcass.x),my=sy(carcass.y);
+  circle(mx,my,Math.max(2.7,7*scale),'#754b49','#bf8973',1);}
+ for(var grave of game.deaths){var gx=sx(grave.x),gy=sy(grave.y);line(gx-4,gy,gx+4,gy,'#a0a5b1',1);line(gx,gy-5,gx,gy+4,'#a0a5b1',1);}
+ var chosen=game.agents.find(function(a){return a.id===selected;});
+ if(chosen&&game.social){
+  for(var other of game.agents){if(other.id===chosen.id)continue;var bond=chosen.relations[other.id];if(!bond||bond.meetings<2)continue;
+   var color=bond.trust>.14?'#72e2b4':bond.trust<-.12?'#e98c85':'#9cb9cd';
+   ctx.globalAlpha=clamp(Math.abs(bond.trust)*1.9+.22,.18,.76);
+   line(sx(chosen.x),sy(chosen.y),sx(other.x),sy(other.y),color,clamp((Math.abs(bond.trust)+.5)*2,1,3));ctx.globalAlpha=1;
+  }
+ }
+ screenPos=[];
+ for(var a of game.agents){
+  var cx=sx(a.x),cy=sy(a.y),sz=clamp(scale*.56,.18,.48);
+  if(cx<-44||cx>ww+44||cy<topH-70||cy>hh-bottomH+40)continue;
+  drawValleyCritter(a,cx,cy+4,sz*(ageYears(a)<16?.78:1));
+  if(a.health<50)line(cx-10,cy-25,cx+10,cy-25,'#d97b70',2);
+  if(a.combatFlash&&a.combatFlash>game.day)circle(cx,cy-22,Math.max(13,sz*60),null,'#e5a17f',2);
+  if(a.id===selected){
+   circle(cx,cy-11,Math.max(17,sz*95),null,'#f0e0a5',1.6);
+   txt(a.name,cx,cy-Math.max(31,sz*150),11,'#fff0c4','center','700');
+  }
+  screenPos.push({id:a.id,x:cx,y:cy-12,radius:Math.max(22,sz*110)});
+
+ }
+ if(view==='world'){
+  txt('DUSK GROVE',sx(100),sy(120),Math.max(8,11*scale),'#82a593');
+  txt('THE OLD STONES',sx(725),sy(409),Math.max(8,11*scale),'#c9cbaf','center');
+  txt('RIVER VEIL',sx(540),sy(48),Math.max(8,11*scale),'#a0ccca');
+ }
+ ctx.restore();
+}
+function button(label,x,y,w,h,fn,active,layer){
+ rr(x,y,w,h,9,active?'#395c50':'#202f36',active?'#83bd96':'#3a4b50');
+ txt(label,x+w/2,y+h/2,Math.min(12,ww<470?10.5:12),active?'#dcf1cb':'#d8e0db','center','650');
+ taps.push({x:x,y:y,w:w,h:h,fn:fn,layer:layer||'base'});
+}
+function hud(){
+ rect(0,0,ww,topH,'#101b22');line(0,topH,ww,topH,'#3c5049',1);
+ var titleW=ww<520?104:183;
+ txt(ww<520?'WILD · ECO':'SOUL CRUCIBLE · WILD ECOLOGY',10,topH/2-7,ww<520?11:15,'#e3d7ae','left','800');
+ txt((ww<520?'YEAR ':'FIRST VALLEY · YEAR ')+Math.floor(game.day/YEAR_DAYS)+' · DAY '+Math.floor(game.day%YEAR_DAYS),10,topH/2+9,ww<520?9:10,'#8da89b');
+ var gap=4,available=ww-titleW-10,btnW=(available-gap*2)/3;
+ button(playing?'PAUSE':'RESUME',titleW,5,btnW,topH-10,function(){playing=!playing;announce(playing?'Time resumes':'Time paused');},!playing);
+ button('×'+speeds[speedIndex],titleW+btnW+gap,5,btnW,topH-10,function(){speedIndex=(speedIndex+1)%speeds.length;acc=0;save();},false);
+ button(game.social?'MEMORY ON':'MEMORY OFF',titleW+(btnW+gap)*2,5,btnW,topH-10,function(){modal='toggle';tab=0;scroll=0;},game.social);
+ rect(0,hh-bottomH,ww,bottomH,'#101b22');line(0,hh-bottomH,ww,hh-bottomH,'#3c5049');
+ var labels=['REPLAY','NEW SEED',view==='follow'?'OVERVIEW':'FOLLOW',ww<520?'STATS':'WORLD DATA','HELP'];
+ for(var i=0;i<labels.length;i++)(function(index){var cell=ww/5;
+  button(labels[index],index*cell+3,hh-bottomH+6,cell-6,bottomH-12,function(){
+   if(index===0){modal='replay';}
+   if(index===1){modal='new';}
+   if(index===2){view=view==='world'?'follow':'world';if(view==='follow'&&!selected)selected=game.agents[0]?game.agents[0].id:null;save();}
+   if(index===3){modal='world';tab=0;scroll=0;}
+   if(index===4){modal='help';tab=0;scroll=0;}
+  },index===2&&view==='follow');})(i);
+ var y=topH+13;rr(10,y,Math.min(254,ww-20),50,9,'#10211ede','#466156');
+ txt('LIVES  '+game.agents.length+'     SOULS  '+Object.keys(game.souls).length,20,y+15,12,'#e2e7ca','left','700');
+ txt('GRAZERS '+countKind('grazer')+'   RIDGEFANGS '+countKind('carnivore')+'   DAY '+Math.floor(game.day),20,y+35,10,'#b1cabf');
+ if(toast&&performance.now()<toastUntil){var tw=Math.min(ww-30,470),x2=(ww-tw)/2;rr(x2,hh-bottomH-45,tw,32,9,'#1b332eea','#729a88');txt(toast,ww/2,hh-bottomH-29,11,'#e8efcc','center');}
+}
+function wrap(s,x,y,maxW,size,color,lh,limit){var parts=(''+s).split(' '),line1='',rows=0;
+ ctx.font='500 '+size+'px system-ui';for(var word of parts){var tryline=line1?line1+' '+word:word;if(ctx.measureText(tryline).width>maxW&&line1){txt(line1,x,y+rows*lh,size,color);rows++;line1=word;if(limit&&rows>=limit)break;}else line1=tryline;}
+ if(line1&&(!limit||rows<limit)){txt(line1,x,y+rows*lh,size,color);rows++;}return rows*lh;
+}
+function paragraph(str,x,y,width,color){return wrap(str,x,y,width,12,color||'#c5d7d0',17);}
+function miniBar(k,value,x,y,width,color){
+ txt(k,x,y,11,'#a8b9b0');rr(x+82,y-4,width-88,8,4,'#293d40');rr(x+82,y-4,(width-88)*clamp(value,0,1),8,4,color||'#72b89d');
+ txt(Math.round(clamp(value,0,1)*100)+'%',x+width,y,10,'#d8e3cf','right');
+}
+function pairName(a,id){var live=game.agents.find(function(v){return v.id===Number(id);});if(live)return live.name;var ev=game.events.find(function(e){return e.who.indexOf(Number(id))>=0;});return 'Life #'+id;}
+function bondsCount(){var total=0;for(var a of game.agents)for(var key in a.relations){var rel=a.relations[key];if(Number(key)>a.id&&rel.trust>.18&&rel.meetings>=3&&game.agents.some(function(p){return p.id===Number(key);}))total++;}return total;}
+function linesEvents(events,x,y,w,maxY){for(var ev of events){if(y>maxY-15)break;txt('DAY '+ev.day+' · '+ev.type.toUpperCase(),x,y,10,ev.type==='death'?'#e2a7a1':ev.type==='share'||ev.type==='aid'?'#8fdbb5':'#b4b7c6','left','750');y+=16;y+=paragraph(ev.text,x,y,w,'#d0ded1')+9;}return y;}
+function modalBackground(title){
+ rect(0,topH,ww,viewportH,'#050e10b8');var pw=Math.min(ww-18,470),ph=Math.min(hh-topH-bottomH-12,545);
+ var px=(ww-pw)/2,py=topH+6;rr(px,py,pw,ph,15,'#17282b','#648679');
+ txt(title,px+15,py+23,15,'#f0e2b9','left','780');
+ button('✕',px+pw-45,py+8,34,31,function(){modal=null;scroll=0;},false,'modal');
+ return {x:px,y:py,w:pw,h:ph,bodyY:py+51,contentEnd:py+ph-8};
+}
+function tabRow(p,items){var yy=p.y+49,tw=(p.w-20)/items.length;for(var i=0;i<items.length;i++)(function(j){button(items[j],p.x+10+j*tw,yy,tw-3,28,function(){tab=j;scroll=0;},tab===j,'modal');})(i);return yy+37;}
+function drawInspector(){
+ var a=game.agents.find(function(v){return v.id===selected;});if(!a){modal=null;return;}
+ var s=game.souls[a.soulId],p=modalBackground(a.name+' · Life #'+a.id),start=tabRow(p,['LIFE','BONDS','SOUL','STORY','LEARN','BUILD']);
+ var x=p.x+17,y=start+9-scroll,width=p.w-34;
+ ctx.save();ctx.beginPath();ctx.rect(p.x+9,start,p.w-18,p.contentEnd-start);ctx.clip();
+ if(tab===0){
+  txt(a.decision,x,y,13,'#d8e7bf','left','700');y+=24;
+  txt('Age '+round(ageYears(a),1)+' / '+round(lifespanYears(a),1)+' years · '+a.family,x,y,11,'#94aca2');y+=25;
+  miniBar('Health',a.health/100,x,y,width,'#d39c96');y+=24;
+  miniBar('Food',a.fullness/100,x,y,width,'#dfc17e');y+=24;
+  miniBar('Water',a.water/100,x,y,width,'#80c7d4');y+=24;
+  miniBar('Energy',a.energy/100,x,y,width,'#94c9ac');y+=29;
+  txt('SPECIES '+(kindOf(a)==='carnivore'?'RIDGEFANG · MEAT ONLY':'GRAZER'),x,y,11,'#e8d6af','left','720');y+=22;
+  txt('STRIKES '+a.battle.strikes+'  ·  DODGES '+a.battle.dodges+'  ·  KILLS '+a.battle.kills,x,y,11,'#b6cbbb');y+=27;
+  txt('TEMPERAMENT',x,y,11,'#e7d6a7','left','750');y+=21;
+  ['curiosity','sociability','aggression','caution','generosity'].forEach(function(k){miniBar(k[0].toUpperCase()+k.slice(1),a.t[k],x,y,width);y+=20;});
+  y+=10;txt('PLACES LEARNED ('+a.places.length+')',x,y,11,'#e7d6a7','left','750');y+=20;
+  for(var place of a.places.slice(-5)){txt(place.kind.toUpperCase()+' · discovered day '+round(place.day,1),x,y,11,'#b1cabd');y+=19;}
+  if(!a.places.length){txt('No places recognized yet.',x,y,11,'#a8b9b0');y+=21;}
+  y+=15;txt('PERSONAL HISTORY',x,y,11,'#e7d6a7','left','750');y+=19;
+  for(var h of a.history.slice(0,9))y+=paragraph('• '+h,x,y,width)+9;
+  if(!a.history.length){txt('This life is still unwritten.',x,y,12,'#9baea5');}
+ }else if(tab===1){
+  txt('Recognition shapes choices. Lines reflect actual encounters.',x,y,11,'#a8c6bb');y+=17;
+  var relations=Object.keys(a.relations).map(function(id){return {id:id,r:a.relations[id]};}).filter(function(z){return game.agents.some(function(q){return q.id===Number(z.id);});}).sort(function(a,b){return Math.abs(b.r.trust)-Math.abs(a.r.trust);});
+  var graphY=y+71,cx=p.x+p.w/2,cy=graphY;
+  circle(cx,cy,21,'#b99cdb','#ece2b8',2);txt('●',cx,cy,14,'#203032','center');
+  for(var j=0;j<Math.min(7,relations.length);j++){var z=relations[j],angle=j/Math.max(1,Math.min(7,relations.length))*TAU-Math.PI/2;
+   var nx=cx+Math.min(102,p.w*.27)*Math.cos(angle),ny=cy+Math.min(57,p.h*.14)*Math.sin(angle);
+   line(cx,cy,nx,ny,z.r.trust>.12?'#70c7a0':z.r.trust<-.12?'#d28383':'#8c9f9f',1+Math.abs(z.r.trust)*5);
+   circle(nx,ny,10,'#78998f');txt(pairName(a,z.id).slice(0,6),nx,ny+17,9,'#dfe8d9','center');
+  }
+  y+=147;txt('KNOWN INDIVIDUALS ('+relations.length+')',x,y,11,'#e7d6a7','left','750');y+=23;
+  for(var rel of relations.slice(0,15)){var r0=rel.r;txt(pairName(a,rel.id),x,y,12,'#e2e5d7','left','650');
+   txt('trust '+round(r0.trust,2)+' · '+r0.meetings+' meetings',x+width,y,10,'#a9c2b6','right');y+=18;}
+  if(!relations.length){y+=paragraph('No one is familiar yet. Repeated encounters are necessary.',x,y,width);}
+ }else if(tab===2){
+  s=safeSoulRecord(s);
+  if(!s){
+   y+=paragraph('Soul record unavailable in this save. The simulation remains running; other records are intact.',x,y,width,'#e2ae9b')+18;
+  }else{
+  txt('SOUL '+s.id+' · '+s.lives+' LIFETIME'+(s.lives===1?'':'S'),x,y,14,'#e8d4bc','left','800');y+=25;
+  y+=paragraph('A new body does not inherit names, places, or relationships. Only a faint behavioral bias survives.',x,y,width,'#bad0c4')+18;
+  for(var k of ['social','giving','caution','roaming']){txt(k.toUpperCase(),x,y,11,'#c3d2bf');txt((s.im[k]>=0?'+':'')+round(s.im[k],2),x+width,y,12,s.im[k]>=0?'#8bd1b4':'#dda4a1','right');y+=24;}
+  y+=10;txt('PREVIOUS LIVES',x,y,11,'#e7d6a7','left','750');y+=20;
+  if(!s.lifeHistory.length){txt('None. This is the soul’s first life.',x,y,12,'#a6b5ac');}
+  for(var life of s.lifeHistory){y+=paragraph(String(life.name||'Unnamed life')+' · '+(Number.isFinite(life.years)?round(life.years,1)+' years':Number.isFinite(life.days)?round(life.days)+' old-scale days':'unknown age')+' · '+String(life.cause||'unknown'),x,y,width)+11;}
+  }
+ }else if(tab===3){
+  txt('RECORDED MOMENTS',x,y,11,'#e7d6a7','left','750');y+=22;
+  if(!a.history.length)txt('No notable encounters yet.',x,y,12,'#afc3b7');
+  for(var entry of a.history){y+=paragraph('• '+entry,x,y,width)+13;}
+ }else if(tab===4){
+  var st=ensureLearning(a);
+  txt('EXPERIENCE, NOT INHERITED KNOWLEDGE',x,y,11,'#e7d6a7','left','750');y+=26;
+  y+=paragraph('Current learning policy: '+(game.learning?'ADAPTIVE':'CONTROL (no confidence-based change)'),x,y,width)+21;
+  for(var row of [['Rewarding food visits',st.finds],['Empty food visits',st.misses],['Choices revised',st.adapted]]){txt(row[0],x,y,12,'#c5d9cf');txt(row[1],x+width,y,12,'#eee1bd','right','750');y+=25;}
+  y+=10;txt('FOOD SITE EXPECTATIONS',x,y,11,'#e7d6a7','left','750');y+=23;
+  var sites=a.places.filter(function(p){return p.kind==='food';}).sort(function(p,q){return (q.value||0)-(p.value||0);});
+  if(!sites.length){y+=paragraph('No food locations learned yet.',x,y,width)+12;}
+  for(var site of sites.slice(0,8)){txt('('+Math.round(site.x)+', '+Math.round(site.y)+')',x,y,11,'#cbd9cf');
+   txt('confidence '+round(site.value||0,2),x+width,y,11,'#a4dbaf','right');y+=20;}
+  y+=14;txt('RECENT OUTCOMES',x,y,11,'#e7d6a7','left','750');y+=23;
+  if(!st.events.length){y+=paragraph('No completed food-search outcomes yet.',x,y,width)+8;}
+  for(var event of st.events){txt('DAY '+event.day+' · '+event.kind.toUpperCase(),x,y,10,event.kind==='empty'?'#e2ab98':'#8ed3b2','left','750');y+=17;y+=paragraph(event.text,x,y,width)+12;}
+ }else if(tab===5){
+  var genome=ensureValleyGenome(a),shape=a.family||'Skirmisher';
+  txt('SOUL CRUCIBLE BODY · '+shape.toUpperCase(),x,y,12,'#e9dab6','left','800');y+=23;
+  y+=paragraph('Original arena silhouette. The body belongs to this lifetime, not the soul.',x,y,width,'#adc8bd')+10;
+  var centerX=x+width*.5,groundY=y+154;
+  circle(centerX,groundY-36,76,'#25453b');drawValleyCritter(a,centerX,groundY,.85);
+  y=groundY+36;txt('MORPHOLOGY · 1.00 = STANDARD',x,y,11,'#e8dcad','left','750');y+=23;
+  for(var gene of ['frame','muscle','legs','limbs','armor','crest','tail']){
+   txt(gene.toUpperCase(),x,y,11,'#a8c8ba','left','650');
+   txt(round(genome[gene],2)+'×',x+width,y,12,'#e3e9d3','right','740');
+   rr(x+90,y-4,Math.max(40,width-151),7,3,'#293e3c');
+   rr(x+90,y-4,Math.max(0,(width-151)*clamp(genome[gene]/2.1,0,1)),7,3,'#80baa0');y+=22;
+  }
+  y+=10;txt('PIGMENT',x,y,11,'#a8c8ba');txt((genome.pigment>=0?'+':'')+round(genome.pigment,2),x+width,y,11,'#e3e9d3','right');y+=27;
+  y+=paragraph('Body shape follows valley traits and parents. Combat uses physical traits, not the decorative DNA fields.',x,y,width,'#9eb9ae')+12;
+ }
+ ctx.restore();
+ scrollLimit=Math.max(0,y+scroll-p.contentEnd+20);
+}
+var scrollLimit=0;
+function drawWorldData(){
+ var p=modalBackground('Wild Ecology Observatory'),start=tabRow(p,ww<520?['WORLD','TEST','LEARN','ECOLOGY','LOG']:['WORLD','EXPERIMENT','LEARNING','ECOLOGY','CHRONICLE']);
+ var x=p.x+17,y=start+9-scroll,width=p.w-34;
+ ctx.save();ctx.beginPath();ctx.rect(p.x+9,start,p.w-18,p.contentEnd-start);ctx.clip();
+ var m=game.metrics;
+ if(tab===0){
+  txt('YEAR '+Math.floor(game.day/YEAR_DAYS)+' · DAY '+Math.floor(game.day%YEAR_DAYS)+' · SEED '+game.seed,x,y,12,'#f0e1b2','left','780');y+=29;
+  var records=[['Living bodies',game.agents.length],['Persistent souls',Object.keys(game.souls).length],['Relationships',bondsCount()],['Encounters',m.meetings],['Food shared',m.given],['Care given',m.helped],['Conflicts',m.conflicts],['Births',m.births],['Deaths',m.deaths],['Reincarnations',m.rebirths],['Relationship-driven choices',m.remembered]];
+  for(var row of records){txt(row[0],x,y,12,'#c1d5c9');txt(row[1],x+width,y,12,'#e6deb9','right','720');y+=25;}
+  y+=13;txt('AVERAGE COMPLETED LIFETIME',x,y,11,'#a9c5b7');y+=22;
+  txt(m.lifeYearsCount?round(m.lifeYearsTotal/m.lifeYearsCount,1)+' years':'No lives completed on new age scale',x,y,13,'#e9d8af');y+=27;
+  y+=paragraph('A year is 30 world days. Natural lifespans are 80–100 years; thirst, hunger or injury may end a life earlier. Historical records from before this update retain their old day units.',x,y,width)+16;y+=paragraph('These observations do not prove friendship, culture, consciousness, or survival benefits.',x,y,width);
+ }else if(tab===1){
+  txt('SOCIAL MEMORY '+(game.social?'ON':'OFF'),x,y,15,game.social?'#a9dcaf':'#deb49f','left','800');y+=31;
+  y+=paragraph('The comparison uses identical terrain and starting random seed. Changing mode restarts the world, so no earlier relationship data leaks across runs.',x,y,width)+21;
+  y+=paragraph('ON: individuals recognize others, build trust, remember helpful encounters, share food, tend wounds, approach familiar individuals and may reproduce.',x,y,width)+17;
+  y+=paragraph('OFF: individuals forage, drink, rest, wander and age, but social recognition and social actions are disabled. This is an ablation, not a matched random-number trial.',x,y,width)+18;
+  y+=paragraph('Track whether repeated contact actually changes behavior, and whether social behaviors have survival costs or benefits. Multiple seeds are needed.',x,y,width)+20;
+  txt('SEED '+game.seed,x,y,13,'#dfd2a7');y+=25;
+  txt('To change the condition, tap MEMORY at the top.',x,y,11,'#aabeb5');
+ }else if(tab===2){
+  txt('EXPERIENCE-BASED LEARNING',x,y,14,'#e7d6a7','left','760');y+=28;
+  y+=paragraph('An individual may learn whether a remembered food patch is rewarding. Other creatures keep their own histories and temperaments.',x,y,width)+20;
+  for(var row of [['Successful food visits',m.foodFinds||0],['Empty food visits',m.foodMisses||0],['Changed food decisions',m.adaptedChoices||0]]){
+   txt(row[0],x,y,12,'#bed1c5');txt(row[1],x+width,y,12,'#e9dfb8','right','750');y+=27;
+  }
+  y+=12;
+  var solitary=game.agents.filter(function(a){return a.t.sociability<.35;}).length;
+  var outgoing=game.agents.filter(function(a){return a.t.sociability>.65;}).length;
+  txt('CURRENT TEMPERAMENT VARIATION',x,y,11,'#e7d6a7','left','760');y+=22;
+  txt('Low sociability: '+solitary+'     High sociability: '+outgoing,x,y,11,'#bdd7ca');y+=27;
+  y+=paragraph('Temperament diversity is preserved. Learning a food location does not make a solitary creature social.',x,y,width)+19;
+  y+=paragraph('Comparisons use the same seed, but subsequent random choices diverge. Repeated seeds, not a single run, are needed to test benefits.',x,y,width)+23;
+  button(game.learning?'LEARNING: ON':'LEARNING: OFF',x,y,width,35,function(){modal='learningToggle';scroll=0;},game.learning,'modal');y+=51;
+  txt('Changing this setting restarts the valley.',x,y,11,'#a6bcb0');y+=23;
+  y+=paragraph('To inspect an individual, tap it in the world and open its LEARN tab.',x,y,width)+9;
+ }else if(tab===3){
+  var eco=game.ecology,rs=eco.rules,lg=countKind('grazer'),lr=countKind('carnivore');
+  txt('WILD ECOLOGY · POPULATION',x,y,13,'#e7d6a7','left','780');y+=26;
+  txt('SEED '+game.seed+' · YEAR '+Math.floor(game.day/YEAR_DAYS),x,y,11,'#a4c8b9');y+=24;
+  txt('GRAZERS '+lg,x,y,13,'#8bd3b0','left','760');txt('RIDGEFANGS '+lr,x+width,y,13,'#eba281','right','760');y+=17;
+  ecologyChart(x,y,width,155);y+=170;
+  txt('PEAKS  '+eco.maxG+' GRAZERS · '+eco.maxR+' RIDGEFANGS',x,y,11,'#b4cac0');y+=25;
+  txt('Grazers extinct: '+(eco.goneG===null?'not observed':'year '+round(eco.goneG,1)),x,y,11,'#c9d9cf');y+=21;
+  txt('Ridgefangs extinct: '+(eco.goneR===null?'not observed':'year '+round(eco.goneR,1)),x,y,11,'#c9d9cf');y+=28;
+  txt('TRIAL RULES',x,y,11,'#e7d6a7','left','750');y+=22;
+  for(var opt of [['grazerCap','GRAZER CAP · 38'],['ridgeCap','RIDGEFANG CAP · 4'],['rescue','ARTIFICIAL GRAZER RECOVERY']]){
+   (function(key,name){button(name+' : '+(rs[key]?'ON':'OFF'),x,y,width,37,function(){pendingEcoKey=key;modal='ecoRules';scroll=0;},rs[key],'modal');})(opt[0],opt[1]);y+=45;
+  }
+  y+=paragraph('Every rule is independent. Changing one restarts the SAME seed from Year 0. Replays preserve the selected rules. This test never alters First Valley.',x,y,width)+22;
+  if(!lg&&lr)y+=paragraph('Prey extinction. Carnivores may briefly survive on remaining carcasses.',x,y,width,'#e9a991')+17;
+  else if(!lg&&!lr)y+=paragraph('Both populations extinct. The valley has fallen silent.',x,y,width,'#e9a991')+17;
+  y+=10;txt('COMBAT & REPRODUCTION',x,y,11,'#e7d6a7','left','760');y+=24;
+  for(var r0 of [['Predator attacks',m.predatorAttacks||0],['Predation deaths',m.predations||0],['Ridgefang births',m.ridgefangBirths||0],['Defensive strikes',m.defenseHits||0],['Meat meals',m.meatMeals||0]]){
+   txt(r0[0],x,y,11,'#bfd0c7');txt(r0[1],x+width,y,11,'#e7dcbc','right','730');y+=23;
+  }
+  y+=paragraph('Graph samples once each simulated year; latest 400 years are retained. At 160+ creatures the simulation pauses to protect mobile browsers, without blocking new births.',x,y,width)+12;
+ }else{
+  y=linesEvents(game.events,x,y,width,p.contentEnd);
+  if(!game.events.length)txt('No recorded events.',x,y,12,'#aabbaf');
+ }
+ ctx.restore();scrollLimit=Math.max(0,y+scroll-p.contentEnd+20);
+}
+function drawConfirm(){
+ var isToggle=modal==='toggle',isReplay=modal==='replay',isNew=modal==='new',isLearningToggle=modal==='learningToggle';
+ var p=modalBackground(modal==='ecoRules'?'Change ecology rules?':modal==='reinforce'?'Introduce another founder?':modal==='introduce'?'Introduce Ridgefangs?':isToggle?'Change experiment?':isLearningToggle?'Change learning trial?':isReplay?'Replay world?':'Generate new valley?'),x=p.x+17,y=p.y+73,w=p.w-34;
+ var s=modal==='ecoRules'?'Turn '+(pendingEcoKey==='grazerCap'?'grazer cap 38':pendingEcoKey==='ridgeCap'?'Ridgefang cap 4':'artificial grazer recovery')+' '+(game.ecology.rules[pendingEcoKey]?'OFF':'ON')+'? This restarts the SAME seed and overwrites this Wild Ecology trial. First Valley is preserved.':modal==='reinforce'?'Introduce '+(2-countKind('carnivore'))+' unrelated Ridgefang founder(s)? This changes the experiment without resetting the valley. Reproduction and survival are not guaranteed.':modal==='introduce'?'Bring two meat-eating Ridgefang founders into this existing valley? Their hunting may end lives. Your saved population and relationships will not reset.':isToggle?'Switch social memory '+(game.social?'OFF':'ON')+' and restart with the SAME seed? This creates a comparable starting world.':isLearningToggle?'Switch adaptive food learning '+(game.learning?'OFF':'ON')+' and restart the SAME seed? This replaces current progress; your old seed remains reproducible.':isReplay?'Restart day zero with the SAME seed and experiment settings? Current progress will be replaced.':'Start a new world with a NEW seed? You will leave the current lives behind.';
+ y+=paragraph(s,x,y,w,'#c7d8c9')+30;
+ button('CANCEL',x,y,w*.46,36,function(){modal=null;},false,'modal');
+ button('CONFIRM',x+w*.51,y,w*.49,36,function(){
+  if(modal==='ecoRules'){
+   nextEcoConfig=Object.assign({},game.ecology.rules);nextEcoConfig[pendingEcoKey]=!nextEcoConfig[pendingEcoKey];
+   var seed=game.seed,so=game.social,le=game.learning;
+   newWorld(seed,so,le);modal='world';tab=3;scroll=0;return;
+  }
+  if(modal==='reinforce'){restoreRidgefangFounders();modal=null;return;}
+  if(modal==='introduce'){releasePredators();modal=null;return;}
+  var seed=isNew?((Date.now()^(Math.random()*0x7fffffff))>>>0):game.seed,social=isToggle?!game.social:game.social,learning=isLearningToggle?!game.learning:game.learning;
+  newWorld(seed,social,learning);
+ },true,'modal');
+}
+function drawHelp(){
+ var p=modalBackground('Watching the Valley'),x=p.x+17,y=p.y+69-scroll,w=p.w-34;
+ ctx.save();ctx.beginPath();ctx.rect(p.x+9,p.y+51,p.w-18,p.contentEnd-p.y-51);ctx.clip();
+ var paragraphs=[
+ 'This is an autonomous simulation. You are an observer, not a controller.',
+ 'TAP a creature to inspect its life, relationships, soul, learning, and original Soul Crucible body build.',
+ 'FOLLOW zooms toward the selected life. OVERVIEW restores the full valley.',
+ 'PAUSE freezes time. The speed button cycles between ×1, ×3, ×10 and ×30.',
+ 'MEMORY toggles the relationship system. STATS > LEARNING lets you compare food learning ON/OFF with the same seed.',
+ 'REPLAY restarts the same seed and rule settings. NEW SEED creates a different valley.',
+ 'Wild Ecology has its own independent browser save and never changes First Valley.',
+ 'The trial starts with 24 grazers and two Ridgefangs. Neither outcome is scripted.',
+ 'STATS > ECOLOGY controls both population caps and artificial grazer recovery independently. A change restarts the same seed.',
+ 'Grazer recovery ON recalls queued grazer souls below 24 and may create a new grazer below 12. Recovery OFF allows permanent extinction.',
+ 'At 160 living creatures, the app pauses for mobile safety without limiting future reproduction.',
+ 'The three ancient clearings are just geography. They are not settlements or destinations imposed by a director.',
+ 'The calendar uses 30 simulated days per in-world year. Natural lifespans range from 80 to 100 years; other dangers can end life sooner.',
+ 'Use STATS > COMBAT to inspect attacks, defenses, and introduce two Ridgefang carnivores without resetting your valley.',
+ 'Ridgefangs hunt grazers or eat their carcasses. They never eat other Ridgefangs.',
+ 'Souls retain subtle biases after death; minds, places and relationship memories do not survive reincarnation.',
+ 'Wild Ecology autosaves only in this browser and uses a different save from First Valley.'
+ ];
+ for(var text0 of paragraphs)y+=paragraph('• '+text0,x,y,w)+19;
+ ctx.restore();scrollLimit=Math.max(0,y+scroll-p.contentEnd+15);
+}
+function overlay(){
+ if(!modal)return;scrollLimit=0;
+ if(modal==='inspect')drawInspector();
+ else if(modal==='world')drawWorldData();
+ else if(modal==='help')drawHelp();
+ else drawConfirm();
+}
+function frame(now){
+ var dt=Math.min(.14,(now-lastTime)/1000||0);lastTime=now;
+ if(playing){acc+=dt*18*speeds[speedIndex];var steps=0;while(acc>=1&&steps<55){tick();acc-=1;steps++;}if(steps===55)acc=Math.min(acc,1);}
+ taps=[];camera();scene();hud();
+ try{overlay();}catch(err){
+  // Never let a broken inspector stop time or leave touch controls unusable.
+  console.error('First Valley inspector error',err);
+  modal=null;scroll=0;announce('Inspector issue · world continues');
+ }
+ if(game.agents.length>=160&&playing){playing=false;announce('160 creatures reached · paused to protect Safari · no breeding cap');save();}
+ if(now-lastSave>12000){lastSave=now;save();}
+ requestAnimationFrame(frame);
+}
+function onDown(e){e.preventDefault();dragStart={x:e.clientX,y:e.clientY,scroll:scroll,time:performance.now()};try{C.setPointerCapture(e.pointerId);}catch(_){}}
+function onMove(e){if(!dragStart)return;if(modal&&['inspect','world','help'].indexOf(modal)>=0){var dy=e.clientY-dragStart.y;scroll=clamp(dragStart.scroll-dy,0,Math.max(0,scrollLimit));}}
+function onUp(e){
+ e.preventDefault();if(!dragStart)return;
+ var pos={x:e.clientX,y:e.clientY},moved=dist(pos.x,pos.y,dragStart.x,dragStart.y)>13;dragStart=null;
+ if(moved)return;
+ for(var i=taps.length-1;i>=0;i--){var h=taps[i];if(modal&&h.layer!=='modal')continue;if(pos.x>=h.x&&pos.x<=h.x+h.w&&pos.y>=h.y&&pos.y<=h.y+h.h){h.fn();return;}}
+ if(modal){return;}
+ var near=null,nd=Infinity;for(var p of screenPos){var dd=dist(pos.x,pos.y,p.x,p.y);if(dd<(p.radius||25)&&dd<nd){nd=dd;near=p.id;}}
+ if(near){selected=near;modal='inspect';tab=0;scroll=0;save();}
+}
+C.addEventListener('pointerdown',onDown,{passive:false});C.addEventListener('pointermove',onMove,{passive:false});C.addEventListener('pointerup',onUp,{passive:false});
+C.addEventListener('pointercancel',function(){dragStart=null;});
+window.addEventListener('resize',resize);
+document.addEventListener('visibilitychange',function(){if(document.hidden){playing=false;save();}});
+window.addEventListener('pagehide',save);
+if(!load())newWorld(((Date.now()^0x51f00d)>>>0),true);
+resize();requestAnimationFrame(frame);
+})();
+</script></body></html>
