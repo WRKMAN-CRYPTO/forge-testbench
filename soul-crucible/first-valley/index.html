@@ -134,7 +134,7 @@ function mapTemper(base,s){return {
 };}
 function spawn(s,x,y,p,q,species){var id=++game.nextBody;var base=temper(p,q,s),body=bodyTraits(p,q);species=species||(p?kindOf(p):'grazer');
  var family=species==='carnivore'?'Ridgefang':p&&q?(rand()<.5?p.family:q.family):choice(archetypes);
- if(species==='carnivore'&&!p){body.speed=clamp(body.speed+.18,0,1);body.strength=clamp(body.strength+.16,0,1);body.senses=clamp(body.senses+.12,0,1);}
+ if(species==='carnivore'&&!p){body.speed=clamp(body.speed+.18,0,1);body.strength=clamp(body.strength+.16,0,1);body.senses=clamp(body.senses+.12,0,1);body.resilience=clamp(body.resilience+.18,0,1);}
  if(!p&&species!=='carnivore'){if(family==='Wall'){body.resilience=clamp(body.resilience+.22,0,1);body.speed*=.72;}
   if(family==='Bruiser'){body.strength=clamp(body.strength+.22,0,1);body.resilience=clamp(body.resilience+.1,0,1);}
   if(family==='Skirmisher')body.speed=clamp(body.speed+.23,0,1);
@@ -297,7 +297,7 @@ function fight(a,b,why){
  }
  var defended=rand()<clamp(.07+b.body.resilience*.21+b.t.caution*.14,.04,.47)&&b.energy>10;
  if(defended){b.energy-=5;b.battle.blocks++;game.metrics.blocks++;}
- var damage=Math.max(1.5,(3+a.body.strength*9+(kindOf(a)==='carnivore'?3:0)-b.body.resilience*4.4)*(defended?.38:1));
+ var damage=Math.max(1.5,(3+a.body.strength*9+(kindOf(a)==='carnivore'?24:0)-b.body.resilience*4.4)*(defended?.38:1));
  b.health=Math.max(0,b.health-damage);b.stats.injuries++;
  b.threatUntil=game.day+5;b.nextThink=0;
  b.lastHit={id:a.id,name:a.name,why:why,day:game.day};
@@ -333,7 +333,7 @@ function eatMeat(a){
  for(var c of game.carcasses){
   if(c.species!=='grazer'||c.meat<=0||c.expires<game.day||dist(a.x,a.y,c.x,c.y)>22)continue;
   c.meat--;a.fullness=Math.min(100,a.fullness+34);a.battle.meals++;game.metrics.meatMeals++;
-  a.decision='Eating meat';a.nextThink=0;return;
+  a.health=Math.min(100,a.health+5);a.decision='Eating meat';a.nextThink=0;return;
  }
 }
 
