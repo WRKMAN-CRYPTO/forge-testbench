@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#0b1620"><title>PIXEL WORLD · WRKMAN FORGE</title><style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07121b;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}#world{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block;cursor:crosshair}body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+</style></head><body><canvas id="world"></canvas><script>
+(()=>{'use strict';
+const W=1000,H=1000,N=W*H,CW=125,CH=125,CN=CW*CH,SEA=109;
+const canvas=document.getElementById('world'),g=canvas.getContext('2d',{alpha:false});
+const terrainCanvas=document.createElement('canvas');terrainCanvas.width=W;terrainCanvas.height=H;
+const tg=terrainCanvas.getContext('2d',{alpha:false,willReadFrequently:false}),im=tg.createImageData(W,H),px=im.data;
+const cloudCanvas=document.createElement('canvas');cloudCanvas.width=CW;cloudCanvas.height=CH;
+const cg=cloudCanvas.getContext('2d'),cim=cg.createImageData(CW,CH),cp=cim.data;
+let elev=new Uint8Array(N),top=new Int16Array(N),temp=new Int8Array(N),cloud=new Float32Array(CN),cloudNext=new Float32Array(CN);
+let settings={snow:166,evap:1,rain:1,wind:2,speed:1};
+let seed=5831,random=Math.random,genToken=0,loading=true,progress=0,playing=true,rainBrush=false,cloudsOn=true;
+let mode='Surface',panel='',inspect=null,stats={liquid:0,ice:0,clouds:0,evap:0,rain:0},tick=0,last=0,renderTimer=0,cloudTimer=0;
+let sw=390,sh=800,dpr=1,zoom=0.36,minZoom=0.25,offX=0,offY=0,paintPos=null,dragging=null,active=new Map(),pinch=null,hit=[],slider=null;
+let noise=[],lastPaint=0;
+function rng(n){let s=n>>>0;return()=>{s+=0x6D2B79F5;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
+function makeNoise(scale,r){let nx=Math.ceil(W/scale)+2,ny=Math.ceil(H/scale)+2,arr=new Float32Array(nx*ny);for(let i=0;i<arr.length;i++)arr[i]=r();return {scale,nx,arr};}
+function n2(layer,x,y){let a=x/layer.scale,b=y/layer.scale,ix=a|0,iy=b|0;let u=a-ix,v=b-iy;u=u*u*(3-2*u);v=v*v*(3-2*v);let idx=iy*layer.nx+ix,A=layer.arr;return (A[idx]*(1-u)+A[idx+1]*u)*(1-v)+(A[idx+layer.nx]*(1-u)+A[idx+layer.nx+1]*u)*v;}
+function beginWorld(s){seed=s|0;genToken++;let token=genToken,r=rng(seed);random=r;loading=true;progress=0;playing=true;rainBrush=false;panel='';inspect=null;tick=0;stats={liquid:0,ice:0,clouds:0,evap:0,rain:0};
+ elev=new Uint8Array(N);top=new Int16Array(N);temp=new Int8Array(N);cloud=new Float32Array(CN);cloudNext=new Float32Array(CN);
+ noise=[makeNoise(440,r),makeNoise(195,r),makeNoise(89,r),makeNoise(39,r),makeNoise(16,r),makeNoise(160,r)];
+ let y=0;function chunk(){if(token!==genToken)return;let end=Math.min(H,y+24);for(;y<end;y++){let lat=Math.abs((y/999)*2-1),base=33-59*Math.pow(lat,1.36);let row=y*W;for(let x=0;x<W;x++){
+ let n0=n2(noise[0],x,y),n1=n2(noise[1],x,y),n2v=n2(noise[2],x,y),n3=n2(noise[3],x,y),n4=n2(noise[4],x,y);let ridge=Math.pow(1-Math.abs(2*n2v-1),3)*Math.max(0,n0-.48)*66;
+ let e=Math.max(0,Math.min(255,Math.round(109+100*(n0-.5)+65*(n1-.5)+28*(n2v-.5)+12*(n3-.5)+5*(n4-.5)+ridge)));
+ let i=row+x; elev[i]=e;let T=base-(e-SEA)*.21+(n2(noise[5],x,y)-.5)*7;temp[i]=Math.max(-90,Math.min(80,Math.round(T)));
+ if(e<SEA){let d=Math.min(105,SEA-e);top[i]=(T<=0||e>=settings.snow)?-d:d;}
+ }}progress=y/H;if(y<H){requestAnimationFrame(chunk);}else{seedClouds();loading=false;renderGround();}}
+ requestAnimationFrame(chunk);
+}
+function seedClouds(){for(let cy=0;cy<CH;cy++){for(let cx=0;cx<CW;cx++){let x=cx*8+4,y=cy*8+4,i=y*W+x,k=cy*CW+cx;let t=temp[i];cloud[k]=Math.max(0,4+random()*8+(elev[i]<SEA?5:0)+(t>22?3:0));}}}
+function cold(i){return temp[i]<=0||elev[i]>=settings.snow;}
+function stepFluid(budget){for(let n=0;n<budget;n++){
+ let i=(random()*N)|0,a=top[i];if(!a)continue;
+ let e=elev[i],T=temp[i],x=i%W,y=(i/W)|0;
+ if(a>0){if(cold(i)){if(random()<.24){top[i]=-a;stats.ice++;}continue;}
+ if(T>4&&a>1&&random()<settings.evap*(.003+Math.max(0,T)*.00027)){top[i]--;cloud[((y>>3)*CW)+(x>>3)]+=1;stats.evap++;a--;if(!a)continue;}
+ let best=-1,head=e+a,low=head;
+ // Compare hydraulic heads on the four neighbors. Frozen cells block liquid movement.
+ let q0=x?i-1:i+W-1,q1=x<W-1?i+1:i-W+1,q2=y?i-W:-1,q3=y<H-1?i+W:-1;
+ for(let t=0;t<4;t++){let j=t===0?q0:t===1?q1:t===2?q2:q3;if(j<0||top[j]<0)continue;let other=elev[j]+top[j];if(other<low){low=other;best=j;}}
+ if(best>=0&&head-low>1){let diff=head-low,move=Math.min(a,8,Math.max(1,Math.floor(diff*.37)));if(top[best]+move<=300){top[i]-=move;top[best]+=move;}}
+ }else{let ice=-a;
+ // Frozen accumulations can topple across steep slopes, even while frozen.
+ if(ice>9&&random()<.15){let j=-1,lo=e+ice;let ns=[x?i-1:i+W-1,x<W-1?i+1:i-W+1,y?i-W:-1,y<H-1?i+W:-1];for(let k=0;k<4;k++){let v=ns[k];if(v<0)continue;let surface=elev[v]+Math.abs(top[v]);if(surface<lo){lo=surface;j=v;}}if(j>=0&&e+ice-lo>5){let shift=Math.min(4,Math.max(1,Math.floor((e+ice-lo)*.18)),ice);top[i]+=shift;if(top[j]<=0)top[j]-=shift;else top[j]+=shift;continue;}}
+ if(T>1&&e<settings.snow&&random()<Math.min(.48,.025+T*.012)){top[i]=ice;stats.liquid++;}
+ }
+ }}
+function stepAtmosphere(){let wind=settings.wind;let rainCount=0;
+ for(let y=0;y<CH;y++)for(let x=0;x<CW;x++){
+ let k=y*CW+x,up=y*CW+((x+CW-1)%CW),down=y*CW+((x+1)%CW),v=cloud[k],mix=Math.min(.36,wind*.048),v2=v*(1-mix)+cloud[up]*mix;
+ v2=v2*.992+cloud[down]*.006+cloud[k]*.002;
+ // Rising moist air precipitates more readily at altitude and at cooler latitudes.
+ let iy=y*8+4,ix=x*8+4,i=iy*W+ix,threshold=16+(temp[i]>22?2:0)-(elev[i]>150?3:0);
+ if(v2>threshold){let drops=Math.min(3,Math.floor((v2-threshold)*.29*settings.rain)+1);for(let d=0;d<drops;d++){
+ let rx=x*8+((random()*8)|0),ry=y*8+((random()*8)|0),p=ry*W+rx;
+ if(top[p]<0){top[p]--; }else if(cold(p)){if(top[p]>0)top[p]=-top[p]-1;else top[p]=-1;}else top[p]=Math.min(300,top[p]+1);
+ }v2=Math.max(0,v2-drops);rainCount+=drops;}
+ cloudNext[k]=Math.max(0,Math.min(60,v2));
+ }
+ let tmp=cloud;cloud=cloudNext;cloudNext=tmp;stats.rain+=rainCount;stats.clouds=0;
+}
+function palette(e,T,v,k){let r,g,b;if(mode==='Elevation'){r=35+e*.73;g=40+e*.79;b=50+e*.79;}
+ else if(mode==='Temperature'){let u=Math.max(0,Math.min(1,(T+38)/80));r=35+u*212;g=105+Math.sin(u*Math.PI)*108-u*28;b=235-u*198;}
+ else if(mode==='Water'){if(v>0){r=22;g=84+Math.min(80,v);b=140+Math.min(80,v);}else if(v<0){r=194;g=226;b=243;}else{r=27+e*.24;g=29+e*.35;b=38+e*.21;}}
+ else{if(e<SEA-30){r=27;g=53;b=66;}else if(e<SEA){r=41;g=88;b=93;}else if(e<SEA+5){r=171;g=149;b=102;}else if(e<137){r=51;g=111;b=68;}else if(e<157){r=52;g=99;b=70;}else if(e<182){r=101;g=104;b=82;}else{r=132;g=137;b=134;}
+ if(T<0&&e>=SEA){r=r*.55+185*.45;g=g*.55+204*.45;b=b*.55+215*.45;}
+ if(v>0){let amt=Math.min(1,.55+v*.012);r=r*(1-amt)+23*amt;g=g*(1-amt)+118*amt;b=b*(1-amt)+190*amt;}
+ else if(v<0){let f=Math.min(1,.75+(-v)*.01);r=r*(1-f)+211*f;g=g*(1-f)+233*f;b=b*(1-f)+243*f;}
+ }
+ let light=.69+e/255*.54;px[k]=Math.min(255,r*light)|0;px[k+1]=Math.min(255,g*light)|0;px[k+2]=Math.min(255,b*light)|0;px[k+3]=255;}
+function renderGround(){for(let i=0,k=0;i<N;i++,k+=4)palette(elev[i],temp[i],top[i],k);tg.putImageData(im,0,0);}
+function renderClouds(){let j=0;for(let i=0;i<CN;i++){let d=cloud[i],a=Math.max(0,Math.min(150,(d-6)*15));cp[j++]=224;cp[j++]=238;cp[j++]=246;cp[j++]=a;}cg.putImageData(cim,0,0);}
+function resize(){dpr=Math.min(2,window.devicePixelRatio||1);sw=window.innerWidth;sh=window.innerHeight;canvas.width=Math.round(sw*dpr);canvas.height=Math.round(sh*dpr);g.setTransform(dpr,0,0,dpr,0,0);minZoom=Math.min((sw-18)/W,(sh-116)/H);if(!zoom||zoom<minZoom)zoom=minZoom;}
+function rect(x,y,w,h,col,r=0){g.fillStyle=col;if(r){g.beginPath();g.roundRect(x,y,w,h,r);g.fill();}else g.fillRect(x,y,w,h);}
+function txt(s,x,y,size=12,color='#f2f1df',weight=600,align='left'){g.font=weight+' '+size+'px ui-monospace,SFMono-Regular,Menlo,monospace';g.fillStyle=color;g.textAlign=align;g.fillText(s,x,y);g.textAlign='left';}
+function register(x,y,w,h,act){hit.push({x,y,w,h,act});}
+function btn(s,x,y,w,h,act,on=false){rect(x,y,w,h,on?'#246e76':'#122833e9',9);g.strokeStyle=on?'#77dfe0':'#45616b';g.lineWidth=1;g.strokeRect(x+.5,y+.5,w-1,h-1);txt(s,x+w/2,y+h/2+4,Math.max(10,Math.min(12,w/7)),on?'#d6ffff':'#d4e8ea',800,'center');register(x,y,w,h,act);}
+function drawPanel(){let pw=Math.min(sw-20,420),x=(sw-pw)/2,y=sh-340,h=270;rect(x,y,pw,h,'#0c2530f6',14);g.strokeStyle='#50737e';g.strokeRect(x+.5,y+.5,pw-1,h-1);
+ txt(panel==='Layers'?'MAP LAYERS':'WORLD CONTROLS',x+18,y+29,14,'#a0efeb',900);btn('X',x+pw-48,y+9,32,32,()=>panel='');
+ if(panel==='Layers'){['Surface','Elevation','Temperature','Water'].forEach((v,i)=>{let ry=y+47+i*41;btn(v.toUpperCase(),x+15,ry,pw-30,34,()=>{mode=v;panel='';renderGround();},mode===v);});btn(cloudsOn?'CLOUDS: ON':'CLOUDS: OFF',x+15,y+215,pw-30,38,()=>cloudsOn=!cloudsOn,cloudsOn);}
+ if(panel==='Tune'){let items=[['Snowline',110,210,'snow',Math.round(settings.snow)],['Evaporation',.1,4,'evap',settings.evap.toFixed(1)],['Rainfall',.2,4,'rain',settings.rain.toFixed(1)],['Wind',0,5,'wind',settings.wind.toFixed(1)],['Speed',.25,4,'speed',settings.speed.toFixed(2)]];
+ items.forEach((it,i)=>{let yy=y+61+i*37;txt(it[0],x+16,yy,11,'#e2e7df',700);txt(String(it[4]),x+pw-17,yy,11,'#a4eddf',700,'right');let a=x+124,b=x+pw-76;rect(a,yy-6,b-a,5,'#31505a',3);let v=(settings[it[3]]-it[1])/(it[2]-it[1]);rect(a,yy-6,(b-a)*v,5,'#80dfd8',3);rect(a+(b-a)*v-6,yy-12,12,17,'#d6e8de',4);register(a-10,yy-17,b-a+20,27,(p)=>{slider={key:it[3],lo:it[1],hi:it[2],a,b};slide(p.x);});});
+ txt('1,000,000 ground + 1,000,000 surface cells',x+pw/2,y+256,10,'#81a2ae',600,'center');}
+ }
+function draw(){g.setTransform(dpr,0,0,dpr,0,0);g.imageSmoothingEnabled=false;rect(0,0,sw,sh,'#091722');
+ const x=sw*.5+offX-500*zoom,y=(sh-25)*.5+offY-500*zoom,s=W*zoom;
+ g.fillStyle='#050e14';g.fillRect(x-2,y-2,s+4,s+4);
+ if(!loading){g.drawImage(terrainCanvas,x,y,s,s);if(cloudsOn){g.globalAlpha=.7;g.drawImage(cloudCanvas,x,y,s,s);g.globalAlpha=1;}}
+ else{rect(x,y,s,s,'#0a2430');rect(x,y,s*progress,4,'#86e9dc');txt('SEEDING WORLD '+Math.round(progress*100)+'%',sw/2,sh/2,13,'#9eeddf',900,'center');}
+ // Fine world boundary and latitude guides.
+ g.strokeStyle='#a2e6e544';g.lineWidth=1;g.strokeRect(x-.5,y-.5,s+1,s+1);
+ if(!loading&&zoom>.45){g.strokeStyle='#ffffff20';g.beginPath();g.moveTo(x,y+s*.5);g.lineTo(x+s,y+s*.5);g.stroke();}
+ // Header and status.
+ rect(8,8,Math.min(sw-16,390),67,'#091f29df',11);txt('WRKMAN  /  PIXEL WORLD',20,28,13,'#c6f7e8',900);txt('1,000 × 1,000 · 2 LAYERS · SEED '+seed,20,46,10,'#93adb5',700);txt('EVAP '+stats.evap+'  ·  RAIN '+stats.rain+'  ·  CLOUDS '+(cloudsOn?'ON':'OFF'),20,62,10,'#77aaae',700);
+ const info=inspect?'X '+inspect.x+'  Y '+inspect.y+'  ALT '+inspect.alt+'  '+inspect.t+'°C  '+inspect.mat:'TICK '+tick+'  ·  '+mode.toUpperCase()+'  ·  '+(playing?'RUNNING':'PAUSED');
+ rect(8,sh-103,sw-16,26,'#0b2630df',8);txt(info,17,sh-86,Math.min(11,(sw-30)/Math.max(1,info.length)*1.65),'#cceadf',700);
+ let yb=sh-69,bw=(sw-20-4*5)/5;['RAIN','LAYERS','TUNE','NEW','PAUSE'].forEach((s,i)=>{btn(i===4?(playing?'PAUSE':'PLAY'):s,10+i*(bw+5),yb,bw,56,()=>{if(i===0){rainBrush=!rainBrush;panel='';}if(i===1){panel=panel==='Layers'?'':'Layers';rainBrush=false;}if(i===2){panel=panel==='Tune'?'':'Tune';rainBrush=false;}if(i===3){beginWorld(seed+101);offX=offY=0;zoom=minZoom;}if(i===4){playing=!playing;}},i===0&&rainBrush||i===4&&!playing);});
+ if(rainBrush)txt('PAINT WATER: DRAG ON MAP',sw/2,sh-113,11,'#a6f5f0',900,'center');
+ if(panel)drawPanel();
+}
+function screenToMap(x,y){return{x:(x-sw*.5-offX)/zoom+500,y:(y-(sh-25)*.5-offY)/zoom+500};}
+function paint(x,y){let p=screenToMap(x,y),cx=Math.round(p.x),cy=Math.round(p.y);if(cx<0||cx>=W||cy<0||cy>=H)return;
+ let radius=18;for(let yy=Math.max(0,cy-radius);yy<Math.min(H,cy+radius);yy++)for(let xx=Math.max(0,cx-radius);xx<Math.min(W,cx+radius);xx++){let dd=(xx-cx)*(xx-cx)+(yy-cy)*(yy-cy);if(dd>radius*radius||random()>.8)continue;let i=yy*W+xx,amount=dd<100?4:2;if(cold(i)){top[i]=Math.max(-240,Math.min(0,top[i])-amount);}else{top[i]=Math.min(250,Math.max(0,top[i])+amount);}}
+ }
+function slide(x){if(!slider)return;let {key,lo,hi,a,b}=slider,v=lo+Math.max(0,Math.min(1,(x-a)/(b-a)))*(hi-lo);settings[key]=key==='snow'?Math.round(v):Math.round(v*20)/20;}
+function hitAt(x,y){for(let i=hit.length-1;i>=0;i--){let a=hit[i];if(x>=a.x&&x<=a.x+a.w&&y>=a.y&&y<=a.y+a.h)return a;}return null;}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);let p={x:e.clientX,y:e.clientY,ox:e.clientX,oy:e.clientY,moved:0};active.set(e.pointerId,p);
+ if(active.size===1){let h=hitAt(p.x,p.y);if(h){h.act(p);if(slider)slide(p.x);dragging='ui';return;}if(panel){panel='';dragging='ui';return;}dragging=rainBrush?'rain':'pan';if(dragging==='rain')paint(p.x,p.y);}
+ else if(active.size===2){let t=[...active.values()];pinch={dist:Math.hypot(t[0].x-t[1].x,t[0].y-t[1].y),zoom:zoom};dragging='pinch';}
+});
+canvas.addEventListener('pointermove',e=>{if(!active.has(e.pointerId))return;e.preventDefault();let p=active.get(e.pointerId),dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;p.moved+=Math.abs(dx)+Math.abs(dy);
+ if(slider){slide(p.x);return;}if(active.size===2&&pinch){let t=[...active.values()],distance=Math.hypot(t[0].x-t[1].x,t[0].y-t[1].y);zoom=Math.max(minZoom,Math.min(9,pinch.zoom*distance/Math.max(1,pinch.dist)));return;}
+ if(dragging==='pan'){offX+=dx;offY+=dy;}if(dragging==='rain'&&performance.now()-lastPaint>40){paint(p.x,p.y);lastPaint=performance.now();}
+});
+function endPointer(e){let p=active.get(e.pointerId);if(!p)return;if(dragging==='pan'&&p.moved<9&&!loading){let m=screenToMap(p.x,p.y),x=m.x|0,y=m.y|0;if(x>=0&&y>=0&&x<W&&y<H){let i=y*W+x;inspect={x,y,alt:elev[i],t:temp[i],mat:top[i]>0?'WATER '+top[i]:top[i]<0?'ICE '+(-top[i]):'GROUND'};}}
+ active.delete(e.pointerId);if(active.size<2)pinch=null;if(!active.size){dragging=null;slider=null;}
+}
+canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointercancel',endPointer);
+canvas.addEventListener('wheel',e=>{e.preventDefault();let factor=e.deltaY<0?1.16:1/1.16;zoom=Math.max(minZoom,Math.min(9,zoom*factor));},{passive:false});
+canvas.addEventListener('dblclick',e=>{e.preventDefault();zoom=Math.min(9,zoom*1.7);});
+window.addEventListener('resize',resize);
+function loop(now){requestAnimationFrame(loop);let dt=Math.min(.06,(now-last)/1000||0);last=now;
+ if(!loading&&playing){tick++;stepFluid(Math.floor(18000*settings.speed));if(tick%2===0)stepAtmosphere();renderTimer+=dt;cloudTimer+=dt;if(renderTimer>.19){renderTimer=0;renderGround();}if(cloudTimer>.2){cloudTimer=0;renderClouds();}}
+ hit=[];draw();}
+resize();zoom=minZoom;beginWorld(seed);requestAnimationFrame(loop);
+})();
+</script></body></html>
