@@ -26,6 +26,68 @@ var round=function(n,k){return Math.round(n*Math.pow(10,k||0))/Math.pow(10,k||0)
 var namesA=['Ash','Bran','Mira','Korr','Tarn','Fae','Thim','Pip','Rune','Vela','Nim','Orr','Sora','Wisp','Kelp','Venn','Luma','Dorn','Iris','Bram','Nera','Pell','Moth','Vale','Kira','Orin','Tavi','Rill','Fen','Linn','Moss','Kest'];
 var colors=['#a4d4a5','#e7b078','#9acbe9','#c4a7f0','#e5d39a','#ed9eb8','#8ad6c2'];
 var archetypes=['Skirmisher','Bruiser','Duelist','Pouncer','Wall','Trickster','Glass Fang'];
+
+const BODY_COLORS={'Skirmisher':'#69d6a4','Bruiser':'#e5aa74','Duelist':'#c0acf6','Pouncer':'#f5b87b','Wall':'#a9bf9f','Trickster':'#90d9ee','Glass Fang':'#f49cc5'};
+function bodyNoise(a,k){var z=(Math.imul((a.id+23)>>>0,0x9e3779b1)+Math.imul((a.soulId+k*13+1)>>>0,0x85ebca6b))>>>0;z=Math.imul(z^(z>>>16),0x7feb352d)>>>0;z=Math.imul(z^(z>>>15),0x846ca68b)>>>0;return ((z^(z>>>16))>>>0)/4294967296;}
+function makeValleyGenome(a,p,q){
+ var b=a.body||{},noise=i=>bodyNoise(a,i)*2-1;
+ var g={frame:.75+(b.resilience||.5)*.6,muscle:.68+(b.strength||.5)*.72,legs:.72+(b.speed||.5)*.62,limbs:.76+(b.senses||.5)*.5,armor:.7+(b.resilience||.5)*.6,recovery:1,crest:.85+noise(6)*.35,tail:.85+noise(7)*.3,pigment:noise(8)*.8};
+ if(p&&q){var pg=ensureValleyGenome(p),qg=ensureValleyGenome(q);for(var k of Object.keys(g))g[k]=(pg[k]+qg[k])*.5+noise(k.length+k.charCodeAt(0))*(k==='pigment'?.13:.095);}
+ for(var k2 of Object.keys(g))g[k2]=clamp(g[k2],k2==='pigment'?-1:.35,k2==='pigment'?1:2.7);return g;
+}
+function ensureValleyGenome(a){if(!a.genome)a.genome=makeValleyGenome(a,null,null);return a.genome;}
+function tintBodyDNA(hex,v){var n=clamp(v||0,-1,1),c=hex.replace('#','');return '#'+[0,2,4].map(function(i,j){return Math.round(clamp(parseInt(c.slice(i,i+2),16)+[34,8,-27][j]*n,0,255)).toString(16).padStart(2,'0');}).join('');}
+function drawValleyCritter(a,px,ground,s){
+ const g=ctx,dna=ensureValleyGenome(a),b={name:a.family||'Skirmisher',color:tintBodyDNA(BODY_COLORS[a.family]||BODY_COLORS.Skirmisher,dna.pigment)};
+ const target=a.target||{x:a.x,y:a.y},dx=target.x-a.x,dir=Math.abs(dx)<1?(a.id%2?1:-1):(dx>=0?1:-1),moving=dist(a.x,a.y,target.x,target.y)>16;
+ const t=game.day,phase=t*5.8+a.id*.71,hop=moving?Math.abs(Math.sin(phase))*(2.3+(a.body.speed||.5)*2.5):0;
+ const walk=moving?Math.sin(phase)*Math.min(1,.5+(a.body.speed||.5)*.4):0;
+ const f={body:b,genome:dna,phase:phase,attack:null,guard:0,evade:0,soul:{color:colors[a.soulId%colors.length]}},corruption=0,bd=b.color;
+ g.save();g.translate(px,ground-hop*s);g.scale(s*dir,s);const hs=(f.body.name==='Wall'?1.28:f.body.name==='Glass Fang'?.8:1)*Math.pow((f.genome?.frame||1),.31);g.scale(Math.pow(f.genome?.frame||1,.13),Math.pow(f.genome?.legs||1,.10));
+ g.fillStyle='#12182766';g.beginPath();g.ellipse(0,7,64*hs,11,0,0,TAU);g.fill();
+ if(f.guard>0){g.lineWidth=6;g.strokeStyle='#93e6f4b5';g.beginPath();g.ellipse(1,-53,60*hs,57,0,0,TAU);g.stroke();}
+ if(f.evade>0){glow(0,-65,78,'#b3f6ff',.15);}
+ // tail
+ g.save();g.lineCap='round';g.strokeStyle=bd;g.lineWidth=(b.name==='Wall'?21:12)*(f.genome?.tail||1);g.beginPath();g.moveTo(-24,-52);g.quadraticCurveTo(-85*(f.genome?.tail||1),-70+walk*11,-78*(f.genome?.tail||1),-100+Math.sin(t*4+f.phase)*7);g.stroke();g.restore();
+ const shape=b.name;
+ // rear leg feet
+ g.fillStyle='#2d365b';for(let k=-1;k<=1;k+=2){g.beginPath();g.ellipse(-24+k*25+walk*9*k,-10,19*hs*(f.genome?.legs||1)**.20,14*(f.genome?.legs||1)**.45,-.2,0,TAU);g.fill();}
+ if(shape==='Duelist'||shape==='Trickster'){
+ g.fillStyle=bd;g.beginPath();g.ellipse(0,-56,37,54,-.12,0,TAU);g.fill();
+ }else if(shape==='Wall'||shape==='Bruiser'){
+ g.fillStyle=bd;g.beginPath();g.ellipse(0,-54,53*hs,47*hs,.05,0,TAU);g.fill();
+ }else{g.fillStyle=bd;g.beginPath();g.ellipse(0,-51,44*hs,42*hs,-.12,0,TAU);g.fill();}
+ // gradient belly and shoulder patch
+ g.fillStyle='#fff6dc4a';g.beginPath();g.ellipse(17,-41,21,23,.2,0,TAU);g.fill();
+ if(shape==='Wall'||shape==='Bruiser'){g.fillStyle='#394e63';g.beginPath();g.ellipse(-17,-70,27,23,-.5,0,TAU);g.fill();}
+ // mystical crest and ears
+ g.fillStyle=bd;
+ function ear(ex,rot){g.save();g.translate(ex,-88);g.rotate(rot);g.beginPath();g.moveTo(-12,8);g.quadraticCurveTo(-22,-27,-10,-57*(f.genome?.crest||1));g.quadraticCurveTo(12,-47*(f.genome?.crest||1),14,6);g.fill();g.fillStyle='#ffd8ed77';g.beginPath();g.moveTo(-3,1);g.quadraticCurveTo(-10,-23,-6,-42);g.quadraticCurveTo(5,-30,6,1);g.fill();g.restore();}
+ ear(-17,-.19);ear(23,.18);
+ if(shape==='Bruiser'||shape==='Wall'){g.fillStyle='#f1d8b5';for(const xx of [-28,21]){g.beginPath();g.moveTo(xx,-101);g.lineTo(xx+7,-129);g.lineTo(xx+17,-101);g.fill();}}
+ if(shape==='Glass Fang'){g.fillStyle='#fff0f0';for(let i=0;i<3;i++){let xx=-28+i*25;g.beginPath();g.moveTo(xx,-83);g.lineTo(xx+12,-124-8*(i===1));g.lineTo(xx+23,-83);g.fill();}}
+ // head
+ g.fillStyle=bd;g.beginPath();g.ellipse(23,-74,35,32,-.04,0,TAU);g.fill();
+ g.fillStyle='#ffffffc9';g.beginPath();g.ellipse(34,-79,9,12,0,0,TAU);g.fill();g.fillStyle='#293249';g.beginPath();g.ellipse(37+(f.attack?2:0),-78,4.5,8,0,0,TAU);g.fill();g.fillStyle='#fff';g.beginPath();g.arc(39,-81,2,0,TAU);g.fill();
+ g.fillStyle='#3e375d';g.beginPath();g.ellipse(52,-62,5,3,0,0,TAU);g.fill();
+ // arm animated windup
+ const swing=f.attack? clamp((f.attack.time-f.attack.wind+.07)/.22,0,1):0;
+ const armX=(shape==='Duelist'?59:38)*(f.genome?.limbs||1), armY=-45-(f.attack?swing*18:walk*2);
+ g.strokeStyle=bd;g.lineWidth=(shape==='Bruiser'?23:shape==='Glass Fang'?10:16)*Math.sqrt(f.genome?.muscle||1);g.lineCap='round';g.beginPath();g.moveTo(23,-51);g.lineTo(armX+(f.attack?swing*30:0),armY);g.stroke();g.fillStyle='#f8e3c5a3';g.beginPath();g.arc(armX+(f.attack?swing*30:0),armY,shape==='Bruiser'?11:7,0,TAU);g.fill();
+ // soul-like visible magic insignia, *not* a mechanically deterministic soul color
+ g.strokeStyle=f.soul.color;g.lineWidth=2.3;g.globalAlpha=.75;g.beginPath();g.arc(-8,-48,10+Math.sin(t*2+f.phase)*1.2,0,TAU);g.stroke();g.globalAlpha=1;
+ if(shape==='Glass Fang'||shape==='Trickster'){g.fillStyle='#d4f5ff';g.beginPath();g.arc(-16,-92,5,0,TAU);g.fill();}
+ if(corruption>0){
+  // This context is transparent except for the creature. Source-atop is safe here.
+  g.save();g.globalCompositeOperation='source-atop';g.globalAlpha=Math.min(.88,.12+corruption*.76);
+  g.fillStyle='#05050d';g.fillRect(-320,-280,640,350);g.restore();
+  // Eyes remain readable at the highest corruption levels.
+  g.globalAlpha=.35+corruption*.65;g.fillStyle='#e9d6ff';g.shadowColor='#e0baff';g.shadowBlur=8+corruption*15;
+  g.beginPath();g.ellipse(34,-79,3+corruption*2,5+corruption*2,0,0,TAU);g.fill();g.shadowBlur=0;g.globalAlpha=1;
+ }
+ g.restore();}
+
+
 var game=null,rngState=1,ww=0,hh=0,dpr=1,scale=1,ox=0,oy=0,topH=42,bottomH=49,viewportH=200;
 var selected=null,modal=null,tab=0,scroll=0,view='world',speedIndex=0,speeds=[1,3,10,30],playing=true;
 var taps=[],dragStart=null,acc=0,lastTime=0,lastSave=0,toast='',toastUntil=0,screenPos=[],hoverButtons=[];
@@ -80,6 +142,7 @@ function spawn(s,x,y,p,q){var id=++game.nextBody;var base=temper(p,q,s),body=bod
  fullness:r(62,100),water:r(58,100),energy:r(65,99),health:100,food:ri(0,2),
  relations:{},places:[],history:[],home:null,parentIds:p&&q?[p.id,q.id]:[],decision:'Exploring',target:{x:x,y:y,kind:'wander'},
  nextThink:0,nextSocial:0,nextBirth:0,learning:freshLearning(),stats:{gives:0,receives:0,helps:0,helped:0,conflicts:0,meetings:0,travel:0,waterScares:0,injuries:0},born:game.day};
+ a.genome=makeValleyGenome(a,p,q);
  s.lives++;game.agents.push(a);
  if(s.lives>1){game.metrics.rebirths++;addEvent('soul',a.name+' begins life '+s.lives+' (soul '+s.id+')',a);}
  else if(p&&q){game.metrics.births++;var birthMessage=a.name+' is born to '+p.name+' and '+q.name;addEvent('birth',birthMessage,a,p);logHistory(q,birthMessage);}
@@ -158,7 +221,7 @@ function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw
  // Older saved valley states may not have every soul history field.
  for(var soulID in game.souls)safeSoulRecord(game.souls[soulID]);
  for(var k of ['foodFinds','foodMisses','adaptedChoices'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
- for(var a of game.agents){ensureLearning(a);a.family=a.family||'Wanderer';a.history=Array.isArray(a.history)?a.history.filter(function(entry){return typeof entry==='string'&&entry.trim().length>0;}).slice(0,12):[];a.t=mapTemper(a.base,game.souls[a.soulId]);}return true;}}catch(e){}return false;}
+ for(var a of game.agents){ensureLearning(a);a.family=a.family||'Wanderer';ensureValleyGenome(a);a.history=Array.isArray(a.history)?a.history.filter(function(entry){return typeof entry==='string'&&entry.trim().length>0;}).slice(0,12):[];a.t=mapTemper(a.base,game.souls[a.soulId]);}return true;}}catch(e){}return false;}
 function nearestAgent(a,filter){var best=null,bd=1e10;for(var b of game.agents){if(a===b)continue;var d=dist(a.x,a.y,b.x,b.y);if(d<bd&&(!filter||filter(b,d))){best=b;bd=d;}}return {agent:best,d:bd};}
 function relation(a,b){var k=''+b.id;if(!a.relations[k])a.relations[k]={trust:0,familiarity:0,meetings:0,lastMeet:-99,gifts:0,help:0,attacks:0};return a.relations[k];}
 function markPlace(a,x,y,kind){var prev=a.places.find(function(p){return p.kind===kind&&dist(p.x,p.y,x,y)<50;});if(prev){prev.value=clamp(prev.value+.18,0,1);prev.day=game.day;return;}a.places.push({x:x,y:y,kind:kind,value:.6,day:game.day});if(a.places.length>12)a.places.sort(function(p,q){return q.value-p.value;}).length=12;}
@@ -385,18 +448,16 @@ function scene(){
  }
  screenPos=[];
  for(var a of game.agents){
-  var cx=sx(a.x),cy=sy(a.y),rad=Math.max(4.5,8*scale*(ageYears(a)<16?.72:1)),co=colors[a.soulId%colors.length];
-  if(cx<-24||cx>ww+24||cy<topH-24||cy>hh-bottomH+24)continue;
-  circle(cx+1,cy+3,rad+1,'#101d1b');
-  if(a.body.resilience>.72){rr(cx-rad,cy-rad,rad*2,rad*2,3,co);}
-  else if(a.body.speed>.74){ctx.fillStyle=co;ctx.beginPath();ctx.moveTo(cx,cy-rad*1.3);ctx.lineTo(cx+rad,cy+rad);ctx.lineTo(cx-rad,cy+rad);ctx.fill();}
-  else circle(cx,cy,rad,co);
-  circle(cx-rad*.22,cy-rad*.19,Math.max(1.1,rad*.19),'#172527');
-  if(a.health<50){line(cx-rad,cy-rad-3,cx+rad,cy-rad-3,'#d97b70',2);}
+  var cx=sx(a.x),cy=sy(a.y),sz=clamp(scale*.56,.18,.48);
+  if(cx<-44||cx>ww+44||cy<topH-70||cy>hh-bottomH+40)continue;
+  drawValleyCritter(a,cx,cy+4,sz*(ageYears(a)<16?.78:1));
+  if(a.health<50)line(cx-10,cy-25,cx+10,cy-25,'#d97b70',2);
   if(a.id===selected){
-   circle(cx,cy,rad+5,null,'#f0e0a5',2);txt(a.name,cx,cy-rad-14,11,'#fff0c4','center','700');
+   circle(cx,cy-11,Math.max(17,sz*95),null,'#f0e0a5',1.6);
+   txt(a.name,cx,cy-Math.max(31,sz*150),11,'#fff0c4','center','700');
   }
-  screenPos.push({id:a.id,x:cx,y:cy});
+  screenPos.push({id:a.id,x:cx,y:cy-12,radius:Math.max(22,sz*110)});
+
  }
  if(view==='world'){
   txt('DUSK GROVE',sx(100),sy(120),Math.max(8,11*scale),'#82a593');
@@ -456,7 +517,7 @@ function modalBackground(title){
 function tabRow(p,items){var yy=p.y+49,tw=(p.w-20)/items.length;for(var i=0;i<items.length;i++)(function(j){button(items[j],p.x+10+j*tw,yy,tw-3,28,function(){tab=j;scroll=0;},tab===j,'modal');})(i);return yy+37;}
 function drawInspector(){
  var a=game.agents.find(function(v){return v.id===selected;});if(!a){modal=null;return;}
- var s=game.souls[a.soulId],p=modalBackground(a.name+' · Life #'+a.id),start=tabRow(p,['LIFE','BONDS','SOUL','STORY','LEARN']);
+ var s=game.souls[a.soulId],p=modalBackground(a.name+' · Life #'+a.id),start=tabRow(p,['LIFE','BONDS','SOUL','STORY','LEARN','BUILD']);
  var x=p.x+17,y=start+9-scroll,width=p.w-34;
  ctx.save();ctx.beginPath();ctx.rect(p.x+9,start,p.w-18,p.contentEnd-start);ctx.clip();
  if(tab===0){
@@ -517,6 +578,21 @@ function drawInspector(){
   y+=14;txt('RECENT OUTCOMES',x,y,11,'#e7d6a7','left','750');y+=23;
   if(!st.events.length){y+=paragraph('No completed food-search outcomes yet.',x,y,width)+8;}
   for(var event of st.events){txt('DAY '+event.day+' · '+event.kind.toUpperCase(),x,y,10,event.kind==='empty'?'#e2ab98':'#8ed3b2','left','750');y+=17;y+=paragraph(event.text,x,y,width)+12;}
+ }else if(tab===5){
+  var genome=ensureValleyGenome(a),shape=a.family||'Skirmisher';
+  txt('SOUL CRUCIBLE BODY · '+shape.toUpperCase(),x,y,12,'#e9dab6','left','800');y+=23;
+  y+=paragraph('Original arena silhouette. The body belongs to this lifetime, not the soul.',x,y,width,'#adc8bd')+10;
+  var centerX=x+width*.5,groundY=y+154;
+  circle(centerX,groundY-36,76,'#25453b');drawValleyCritter(a,centerX,groundY,.85);
+  y=groundY+36;txt('MORPHOLOGY · 1.00 = STANDARD',x,y,11,'#e8dcad','left','750');y+=23;
+  for(var gene of ['frame','muscle','legs','limbs','armor','crest','tail']){
+   txt(gene.toUpperCase(),x,y,11,'#a8c8ba','left','650');
+   txt(round(genome[gene],2)+'×',x+width,y,12,'#e3e9d3','right','740');
+   rr(x+90,y-4,Math.max(40,width-151),7,3,'#293e3c');
+   rr(x+90,y-4,Math.max(0,(width-151)*clamp(genome[gene]/2.1,0,1)),7,3,'#80baa0');y+=22;
+  }
+  y+=10;txt('PIGMENT',x,y,11,'#a8c8ba');txt((genome.pigment>=0?'+':'')+round(genome.pigment,2),x+width,y,11,'#e3e9d3','right');y+=27;
+  y+=paragraph('Visual DNA follows valley traits and parents. It does not change survival or combat statistics yet.',x,y,width,'#9eb9ae')+12;
  }
  ctx.restore();
  scrollLimit=Math.max(0,y-p.contentEnd+20);
@@ -580,7 +656,7 @@ function drawHelp(){
  ctx.save();ctx.beginPath();ctx.rect(p.x+9,p.y+51,p.w-18,p.contentEnd-p.y-51);ctx.clip();
  var paragraphs=[
  'This is an autonomous simulation. You are an observer, not a controller.',
- 'TAP a creature to inspect its health, temperament, memories, relationships, soul, story and learning outcomes.',
+ 'TAP a creature to inspect its life, relationships, soul, learning, and original Soul Crucible body build.',
  'FOLLOW zooms toward the selected life. OVERVIEW restores the full valley.',
  'PAUSE freezes time. The speed button cycles between ×1, ×3, ×10 and ×30.',
  'MEMORY toggles the relationship system. STATS > LEARNING lets you compare food learning ON/OFF with the same seed.',
@@ -620,7 +696,7 @@ function onUp(e){
  if(moved)return;
  for(var i=taps.length-1;i>=0;i--){var h=taps[i];if(modal&&h.layer!=='modal')continue;if(pos.x>=h.x&&pos.x<=h.x+h.w&&pos.y>=h.y&&pos.y<=h.y+h.h){h.fn();return;}}
  if(modal){return;}
- var near=null,nd=25;for(var p of screenPos){var dd=dist(pos.x,pos.y,p.x,p.y);if(dd<nd){nd=dd;near=p.id;}}
+ var near=null,nd=Infinity;for(var p of screenPos){var dd=dist(pos.x,pos.y,p.x,p.y);if(dd<(p.radius||25)&&dd<nd){nd=dd;near=p.id;}}
  if(near){selected=near;modal='inspect';tab=0;scroll=0;save();}
 }
 C.addEventListener('pointerdown',onDown,{passive:false});C.addEventListener('pointermove',onMove,{passive:false});C.addEventListener('pointerup',onUp,{passive:false});
