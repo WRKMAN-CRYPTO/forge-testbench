@@ -85,13 +85,17 @@ function newWorld(seed,social,learning){rngState=(seed>>>0)||1;game={seed:seed>>
 }
 function announce(s){toast=s;toastUntil=performance.now()+2600;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify({version:1,game:game,rng:rngState,selected:selected,view:view,speedIndex:speedIndex}));}catch(e){}}
-function freshLearning(){return {finds:0,misses:0,adapted:0,events:[],lastVisit:-99,lastAdapt:-99};}
+function freshLearning(){return {finds:0,misses:0,adapted:0,events:[],lastVisit:-99,lastAdapt:-99,lastSite:null};}
 function ensureLearning(a){if(!a.learning)a.learning=freshLearning();for(var k of ['finds','misses','adapted'])if(!Number.isFinite(a.learning[k]))a.learning[k]=0;
  if(!Array.isArray(a.learning.events))a.learning.events=[];if(!Number.isFinite(a.learning.lastVisit))a.learning.lastVisit=-99;if(!Number.isFinite(a.learning.lastAdapt))a.learning.lastAdapt=-99;
- return a.learning;}
+ if(!('lastSite' in a.learning))a.learning.lastSite=null;return a.learning;}
 function recordLesson(a,kind,text){var st=ensureLearning(a);st.events.unshift({day:round(game.day,1),kind:kind,text:text});if(st.events.length>12)st.events.length=12;}
 function foodResult(a,success,x,y){
- var st=ensureLearning(a);if(game.day-st.lastVisit<.85)return;st.lastVisit=game.day;
+ var st=ensureLearning(a);
+ // Count a visit once, not every simulation tick spent standing beside the patch.
+ if(st.lastSite&&dist(st.lastSite.x,st.lastSite.y,x,y)<36)return;
+ if(game.day-st.lastVisit<.45)return;
+ st.lastVisit=game.day;st.lastSite={x:x,y:y};
  var p=a.places.find(function(place){return place.kind==='food'&&dist(place.x,place.y,x,y)<46;});
  if(success){st.finds++;game.metrics.foodFinds++;if(p){p.successes=(p.successes||0)+1;p.value=clamp(p.value+.10,0,1);}
   recordLesson(a,'found','Found food at a chosen patch'+(p?' · confidence '+round(p.value,2):''));}
@@ -221,6 +225,7 @@ function tick(){
  for(var bush of game.bushes)bush.amount=Math.min(bush.capacity,bush.amount+bush.regen*dt);
  var remove=[];
  for(var a of game.agents){
+  if(a.learning&&a.learning.lastSite&&dist(a.x,a.y,a.learning.lastSite.x,a.learning.lastSite.y)>57)a.learning.lastSite=null;
   a.age+=dt;a.fullness=Math.max(0,a.fullness-(1.75+a.body.strength*.35)*dt);
   a.water=Math.max(0,a.water-(2.55+a.body.speed*.3)*dt);
   // Drink before dehydration damage/death is assessed when already at the bank.
@@ -254,11 +259,14 @@ function tick(){
    if(bush2.amount>=1&&dist(a.x,a.y,bush2.x,bush2.y)<16&&(a.fullness<91||a.food<2)){
     bush2.amount-=1;if(a.fullness<84)a.fullness=clamp(a.fullness+27,0,100);else a.food=Math.min(4,a.food+1);
     if(a.food<2&&rand()<.55)a.food++;
-    markPlace(a,bush2.x,bush2.y,'food');gathered=true;a.nextThink=0;break;
+    markPlace(a,bush2.x,bush2.y,'food');foodResult(a,true,bush2.x,bush2.y);gathered=true;a.nextThink=0;break;
    }
   }
   if(t.kind==='food'&&dist(a.x,a.y,t.x,t.y)<21){
-   foodResult(a,gathered,t.x,t.y);
+   if(!gathered && (a.fullness<90||a.food<2)){
+    var availableAtTarget=game.bushes.some(function(b){return dist(b.x,b.y,t.x,t.y)<22&&b.amount>=1;});
+    if(!availableAtTarget)foodResult(a,false,t.x,t.y);
+   }
    if(!gathered){a.target={x:a.x,y:a.y,kind:'search'};a.nextThink=0;}
   }
   if(a.fullness<42&&a.food>0){a.food--;a.fullness=clamp(a.fullness+30,0,100);}
