@@ -40,8 +40,111 @@ function create(seed){
     distance[j]=distance[i]+1;nearest[j]=nearest[i];queue[tail++]=j;
    }
   }
-  f.nav={walkable,nearest,distance};
+  // Components distinguish reachable prey from animals on separate islands.
+  let component=new Int16Array(10000);component.fill(-1);
+  let count=0,queued=new Int16Array(10000);
+  for(let i=0;i<10000;i++){
+   if(!walkable[i]||component[i]!==-1)continue;
+   let head=0,tail=0;queued[tail++]=i;component[i]=count;
+   while(head<tail){
+    let node=queued[head++],x=node%100,y=(node/100)|0;
+    for(let n of [x>0?node-1:-1,x<99?node+1:-1,y>0?node-100:-1,y<99?node+100:-1]){
+     if(n<0||!walkable[n]||component[n]!==-1)continue;component[n]=count;queued[tail++]=n;
+    }
+   }
+   count++;
+  }
+  f.nav={walkable,nearest,distance,component,revision:(f.nav?.revision||0)+1};
  }
+
+ function nodeAt(x,y){
+  let cx=clamp(Math.floor(x/STEP),0,99),cy=clamp(Math.floor(y/STEP),0,99),i=cy*100+cx;
+  if(!f.nav)return -1;
+  if(f.nav.walkable[i])return i;
+  for(let rad=1;rad<=3;rad++)for(let yy=-rad;yy<=rad;yy++)for(let xx=-rad;xx<=rad;xx++){
+   if(Math.max(Math.abs(xx),Math.abs(yy))!==rad)continue;
+   let ax=cx+xx,ay=cy+yy;if(ax<0||ay<0||ax>99||ay>99)continue;
+   let j=ay*100+ax;if(f.nav.walkable[j])return j;
+  }
+  return -1;
+ }
+ function sameLand(x,y,tx,ty){
+  let a=nodeAt(x,y),b=nodeAt(tx,ty);
+  return a>=0&&b>=0&&f.nav.component[a]===f.nav.component[b];
+ }
+ function clearLand(x,y,tx,ty){
+  if(!walk(x,y)||!walk(tx,ty))return false;
+  let d=Math.hypot(tx-x,ty-y),steps=Math.ceil(d/5),height=at(x,y).elev;
+  for(let i=1;i<=steps;i++){
+   let px=x+(tx-x)*i/steps,py=y+(ty-y)*i/steps;
+   if(!walk(px,py))return false;
+   let h=at(px,py).elev;if(Math.abs(height-h)>14)return false;height=h;
+  }
+  return true;
+ }
+ function landRoute(x,y,tx,ty){
+  if(!f.nav)return null;
+  let start=nodeAt(x,y),goal=nodeAt(tx,ty);
+  if(start<0||goal<0||f.nav.component[start]!==f.nav.component[goal])return null;
+  if(clearLand(x,y,tx,ty))return [];
+  const nav=f.nav,g=new Float32Array(10000),parent=new Int16Array(10000),
+   closed=new Uint8Array(10000),heap=[],delta=[-101,-100,-99,-1,1,99,100,101];
+  g.fill(Infinity);parent.fill(-1);
+  const heuristic=i=>10*Math.hypot(i%100-goal%100,Math.floor(i/100)-Math.floor(goal/100));
+  function push(node,score){
+   let at=heap.length;heap.push({node,score});
+   while(at>0){let parentIndex=(at-1)>>1;if(heap[parentIndex].score<=score)break;heap[at]=heap[parentIndex];at=parentIndex;}
+   heap[at]={node,score};
+  }
+  function pop(){
+   let root=heap[0],last=heap.pop();if(heap.length){
+    let at=0,length=heap.length;
+    while(true){let child=at*2+1;if(child>=length)break;
+     if(child+1<length&&heap[child+1].score<heap[child].score)child++;
+     if(heap[child].score>=last.score)break;
+     heap[at]=heap[child];at=child;
+    }heap[at]=last;
+   }return root;
+  }
+  g[start]=0;push(start,heuristic(start));
+  let loops=0;
+  while(heap.length&&loops++<10000){
+   let cur=pop().node;if(closed[cur])continue;
+   if(cur===goal){
+    let trail=[],pos=goal;
+    while(pos!==start&&trail.length<10000){
+     trail.push({x:pos%100*10+5,y:Math.floor(pos/100)*10+5});
+     pos=parent[pos];if(pos<0)return null;
+    }
+    trail.reverse();
+    // Let steering replace grid stair-steps when there is a verified clear shortcut.
+    let result=[],from={x,y},idx=0;
+    while(idx<trail.length){
+     let end=Math.min(trail.length-1,idx+9),pick=idx;
+     for(let k=end;k>=idx;k--)if(clearLand(from.x,from.y,trail[k].x,trail[k].y)){pick=k;break;}
+     result.push(trail[pick]);from=trail[pick];idx=pick+1;
+    }
+    if(clearLand(from.x,from.y,tx,ty))result.push({x:tx,y:ty});
+    return result;
+   }
+   closed[cur]=1;
+   let cx=cur%100,cy=(cur/100)|0;
+   for(let change of delta){
+    let next=cur+change,nx=next%100,ny=(next/100)|0;
+    if(next<0||next>=10000||Math.abs(nx-cx)>1||Math.abs(ny-cy)>1||!nav.walkable[next]||closed[next])continue;
+    // Forbid corners that would cross a water/rock cell diagonally.
+    let diagonal=Math.abs(nx-cx)===1&&Math.abs(ny-cy)===1;
+    if(diagonal&&(!nav.walkable[cy*100+nx]||!nav.walkable[ny*100+cx]))continue;
+    let penalty=Math.abs(f.elev[idx(nx*10+5,ny*10+5)]-f.elev[idx(cx*10+5,cy*10+5)])*.3;
+    let candidate=g[cur]+(diagonal?14.142:10)+penalty;
+    if(candidate>=g[next])continue;
+    g[next]=candidate;parent[next]=cur;
+    push(next,candidate+heuristic(next));
+   }
+  }
+  return null;
+ }
+
  function shore(x,y){
   let i=f.nav?f.nav.nearest[navIdx(x,y)]:-1;
   return i===undefined||i<0?null:{x:i%100*10+5,y:Math.floor(i/100)*10+5};
@@ -179,6 +282,7 @@ function create(seed){
  }
  f.at=at;f.idx=idx;f.walk=walk;f.shore=shore;f.waterDistance=waterDistance;f.liquidNear=liquidNear;f.safe=safe;
  f.biome=biome;f.growth=growth;f.generate=generate;f.weather=weather;f.palette=palette;f.paintClouds=paintClouds;f.buildNav=buildNav;
+ f.nodeAt=nodeAt;f.sameLand=sameLand;f.clearLand=clearLand;f.route=landRoute;
  return f;
 }
 root.FrontierWorld={create,W,H,SEA};
