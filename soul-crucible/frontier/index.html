@@ -20,6 +20,8 @@ var W=1000,H=1000, TAU=Math.PI*2, KEY='soul-crucible-frontier-001';
 // Accelerated simulation calendar: 30 world days = 1 in-world year.
 // This extends lives while keeping generational observation practical on phones.
 var YEAR_DAYS=30,MIN_AGE_YEARS=80,MAX_AGE_YEARS=100,AGE_SYSTEM='years30-v1';
+// 3x locomotion trial. Biological time and resource drain remain unchanged.
+var LOCOMOTION_MULTIPLIER=3;
 
 // PHASE 3 · PLACE ATTACHMENT: learned locally and forgotten between lives.
 // Recording a birthplace does not make it a good place to live.
@@ -1137,7 +1139,7 @@ function tick(stepDays){
   }
   var d=dist(a.x,a.y,tx,ty),moving=d>12;
   if(moving){
-   var ds=(25+a.body.speed*42)*dt*(a.energy<14?.48:1)*(t.kind==='hunt'?1.33:t.kind==='flee'?1.1:1);
+   var ds=(25+a.body.speed*42)*dt*LOCOMOTION_MULTIPLIER*(a.energy<14?.48:1)*(t.kind==='hunt'?1.33:t.kind==='flee'?1.1:1);
    ds=Math.min(ds,d-10);
    terrainTraverse(a,tx,ty,ds,dt);
   }else{
@@ -1508,6 +1510,7 @@ function drawWorldData(){
   txt('YEAR '+Math.floor(game.day/YEAR_DAYS)+' · DAY '+Math.floor(game.day%YEAR_DAYS)+' · SEED '+game.seed,x,y,12,'#f0e1b2','left','780');y+=29;
   var records=[['Living bodies',game.agents.length],['Persistent souls',Object.keys(game.souls).length],['Relationships',bondsCount()],['Encounters',m.meetings],['Food shared',m.given],['Care given',m.helped],['Conflicts',m.conflicts],['Births',m.births],['Deaths',m.deaths],['Reincarnations',m.rebirths],['Relationship-driven choices',m.remembered],['Learned homes (living)',game.agents.filter(a=>a.placeMemory&&a.placeMemory.homeId).length],['Recorded home returns',m.placeReturns||0],['Birthplace returns',m.placeNatalReturns||0],
   ['World clock',clockText()+' · '+(sunlight()>.65?'DAYLIGHT':sunlight()<.18?'NIGHT':'TWILIGHT')],
+  ['Locomotion','×3 · trial'],
   ['Sleeping now',game.agents.filter(a=>a.sleep?.sleeping).length],
   ['Total sleep episodes',m.sleepEpisodes||0],['Completed sleep episodes',m.sleepCompleted||0],
   ['Sleep hours accumulated',round(m.sleepHours||0,1)],['Woken by danger',m.sleepDangerWakes||0],
@@ -1599,6 +1602,7 @@ function drawHelp(){
  'This is an autonomous simulation. You are an observer, not a controller.',
  'TAP a creature to inspect its life, relationships, soul, learning, original body, and the PLACE tab for birthplace attachment.',
  'A world day lasts 24 simulated hours. Watch dawn, sunset and sleeping in OBSERVE; accelerated speeds use steady lighting to avoid flicker. Temperatures and seasons do not yet vary daily.',
+ 'Locomotion trial: animals move 3× faster than before, with the same biological clocks and hunger and thirst. Faster travel may change survival.',
  'Sleep pressure rises during wakefulness and falls during sleep. Preferred sleep times vary by species and individual and are inherited with mutation.',
  'Sleeping animals stop moving, feeding, hunting, and socializing, but continue using food and water. Attackers may surprise sleeping prey.',
  'Tap a creature > LIFE to inspect sleep pressure, activity and preferred sleep time. STATS > WORLD shows sleep episodes and interruptions.',
