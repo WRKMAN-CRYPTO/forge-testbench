@@ -175,7 +175,16 @@ function terrainTraverse(a,tx,ty,ds){
    game.day-route.created>10;
   if(newDestination){
    let nodes=geography.route(ox,oy,tx,ty);
-   if(nodes===null){
+   let tooCostly=false;
+   if(nodes&&nodes.length){
+    let previous={x:ox,y:oy},length=0;
+    for(let p of nodes){length+=dist(previous.x,previous.y,p.x,p.y);previous=p;}
+    length+=dist(previous.x,previous.y,tx,ty);
+    let direct=dist(ox,oy,tx,ty);
+    // Seeing food across a bay does not justify crossing an entire continent.
+    tooCostly=length>Math.max(kind==='hunt'?650:260,direct*(kind==='hunt'?3.1:2.8));
+   }
+   if(nodes===null||tooCostly){
     a.unreachablePlace={x:tx,y:ty,kind,id:a.target.id||null,until:game.day+12};
     a.landRoute=null;a.nextThink=game.day+.3;
     a.target={kind:'search',x:ox,y:oy};a.decision='Searching for a passable route';
@@ -183,10 +192,27 @@ function terrainTraverse(a,tx,ty,ds){
     return false;
    }
    route=a.landRoute={kind,id:a.target.id||null,navRev:nav.revision,
-    goalX:tx,goalY:ty,created:game.day,index:0,points:nodes};
+    goalX:tx,goalY:ty,created:game.day,index:0,points:nodes,
+    checkDay:game.day,checkX:ox,checkY:oy,checkIndex:0};
    if(nodes.length)game.metrics.landDetours=(game.metrics.landDetours||0)+1;
   }
   if(route.points.length){
+   // Progress must be toward the route, not just movement along a wall.
+   if(game.day-route.checkDay>5){
+    if(route.index===route.checkIndex&&
+       dist(route.checkX,route.checkY,ox)<14){
+      a.unreachablePlace={x:route.goalX,y:route.goalY,kind:route.kind,
+       id:route.id,until:game.day+12};
+      a.landRoute=null;
+      a.target={x:ox,y:oy,kind:'search'};
+      a.nextThink=game.day+.3;
+      a.decision='Abandoning blocked path';
+      game.metrics.stalledRoutes=(game.metrics.stalledRoutes||0)+1;
+      return false;
+    }
+    route.checkDay=game.day;route.checkX=ox;route.checkY=oy;
+    route.checkIndex=route.index;
+   }
    while(route.index<route.points.length&&
       dist(ox,oy,route.points[route.index].x,route.points[route.index].y)<9)route.index++;
    if(route.index<route.points.length){
@@ -200,7 +226,7 @@ function terrainTraverse(a,tx,ty,ds){
  for(let angle of headings){
   let dx=ux*Math.cos(angle)-uy*Math.sin(angle),dy=ux*Math.sin(angle)+uy*Math.cos(angle);
   let xx=clamp(ox+dx*ds,18,W-18),yy=clamp(oy+dy*ds,18,H-18);
-  if(!geography.walk(xx,yy)||Math.abs(geography.at(xx,yy).elev-old)>14)continue;
+  if(!geography.clearLand(ox,oy,xx,yy)||Math.abs(geography.at(xx,yy).elev-old)>14)continue;
   a.x=xx;a.y=yy;a.stats.travel+=ds;a.energy=Math.max(0,a.energy-.68*.06);
   a.blocked=0;return true;
  }
@@ -724,7 +750,10 @@ function chooseAction(a){
     (!near||dist(a.x,a.y,saved.x,saved.y)<nd*.8))near=saved;
   if(near){a.target={x:near.x,y:near.y,kind:'food'};a.decision='Foraging';return;}
  }
- if(a.energy<30){var home=a.home||safeTarget(a);a.target={x:home.x,y:home.y,kind:'rest'};a.decision='Finding rest';return;}
+ if(a.energy<30){
+  // Resting is local. Don't attempt an exhausting journey home when exhausted.
+  a.target={x:a.x,y:a.y,kind:'rest'};a.decision='Resting';return;
+ }
  if(game.social && a.t.sociability>.24 && a.energy>28 && a.water>24 && a.fullness>25){
   var friend=nearestAgent(a,function(b,d){var rel=a.relations[b.id];return kindOf(b)===kindOf(a)&&!!rel&&rel.trust>.18&&rel.meetings>=2&&d<275;});
   var socialBias=a.t.sociability+(.35-Math.min(.35,friend.d/1000));
@@ -732,7 +761,12 @@ function chooseAction(a){
    a.target={x:friend.agent.x,y:friend.agent.y,kind:'friend',id:friend.agent.id};a.decision='Seeking '+friend.agent.name;game.metrics.remembered++;return;
   }
  }
- var spot=null;if(a.home&&rand()<.14+(.45-a.t.curiosity)*.3){spot=footprint(a.home.x+r(-50,50),a.home.y+r(-50,50));a.decision='Returning home';}
+ var spot=null;if(a.home&&geography.sameLand(a.x,a.y,a.home.x,a.home.y)&&
+    !recentlyUnreachable(a,a.home.x,a.home.y,'wander',null)&&
+    rand()<.14+(.45-a.t.curiosity)*.3){
+    spot=footprint(a.home.x+r(-50,50),a.home.y+r(-50,50));
+    a.decision='Returning home';
+ }
  else{spot=footprint(a.x+r(-130,130)*(0.55+a.t.curiosity),a.y+r(-130,130)*(0.55+a.t.curiosity));a.decision='Exploring';}
  var danger=a.places.find(function(p){return p.kind==='danger'&&dist(spot.x,spot.y,p.x,p.y)<80&&game.day-p.day<60;});
  if(danger&&a.t.caution>.3){spot=footprint(a.x+(a.x-danger.x)*.5+r(-70,70),a.y+(a.y-danger.y)*.5+r(-70,70));a.decision='Avoiding a remembered danger';}
@@ -1234,7 +1268,7 @@ function drawWorldData(){
   if(!lg&&!countKind('spriglet')&&lr)y+=paragraph('All prey extinct. Carnivores may briefly survive on remaining carcasses.',x,y,width,'#e9a991')+17;
   else if(!lg&&!lr&&!countKind('spriglet'))y+=paragraph('Every species extinct. The valley has fallen silent.',x,y,width,'#e9a991')+17;
   y+=10;txt('COMBAT & REPRODUCTION',x,y,11,'#e7d6a7','left','760');y+=24;
-  for(var r0 of [['Predator attacks',m.predatorAttacks||0],['Land detours',m.landDetours||0],['Unreachable route attempts',m.unreachableRoutes||0],['Predation deaths',m.predations||0],['Spriglet births',m.sprigletBirths||0],['Spriglet predation deaths',m.sprigletKills||0],['Ridgefang births',m.ridgefangBirths||0],['Defensive strikes',m.defenseHits||0],['Spriglet meat meals',m.sprigletMeals||0],['Total meat meals',m.meatMeals||0]]){
+  for(var r0 of [['Predator attacks',m.predatorAttacks||0],['Land detours',m.landDetours||0],['Unreachable route attempts',m.unreachableRoutes||0],['Abandoned stalled routes',m.stalledRoutes||0],['Predation deaths',m.predations||0],['Spriglet births',m.sprigletBirths||0],['Spriglet predation deaths',m.sprigletKills||0],['Ridgefang births',m.ridgefangBirths||0],['Defensive strikes',m.defenseHits||0],['Spriglet meat meals',m.sprigletMeals||0],['Total meat meals',m.meatMeals||0]]){
    txt(r0[0],x,y,11,'#bfd0c7');txt(r0[1],x+width,y,11,'#e7dcbc','right','730');y+=23;
   }
   y+=paragraph('Graph samples once each simulated year; latest 400 years are retained. At 340+ creatures the simulation takes a safety pause; simulation speed automatically scales down before that.',x,y,width)+12;
