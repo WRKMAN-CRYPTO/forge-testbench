@@ -173,7 +173,7 @@ function mapTemper(base,s){return {
 };}
 function spawn(s,x,y,p,q,species){var id=++game.nextBody;var base=temper(p,q,s),body=bodyTraits(p,q);species=species||(p?kindOf(p):'grazer');
  var family=species==='carnivore'?'Ridgefang':species==='spriglet'?'Spriglet':p&&q?(rand()<.5?p.family:q.family):choice(archetypes);
- if(species==='spriglet'){body.speed=clamp(body.speed+.25,0,1);body.senses=clamp(body.senses+.1,0,1);body.strength=clamp(body.strength*.52,0,1);body.resilience=clamp(body.resilience*.55,0,1);base.caution=clamp(base.caution+.15,0,1);base.aggression*=.2;}
+ if(species==='spriglet'){body.speed=clamp(body.speed+.04,.35,.77);body.senses=clamp(body.senses+.03,0,1);body.strength=clamp(body.strength*.52,0,1);body.resilience=clamp(body.resilience*.55,0,1);base.caution=clamp(base.caution+.15,0,1);base.aggression*=.2;}
  if(species==='carnivore'&&!p){body.speed=clamp(body.speed+.18,0,1);body.strength=clamp(body.strength+.16,0,1);body.senses=clamp(body.senses+.12,0,1);body.resilience=clamp(body.resilience+.18,0,1);}
  if(!p&&species==='grazer'){if(family==='Wall'){body.resilience=clamp(body.resilience+.22,0,1);body.speed*=.72;}
   if(family==='Bruiser'){body.strength=clamp(body.strength+.22,0,1);body.resilience=clamp(body.resilience+.1,0,1);}
@@ -303,25 +303,25 @@ const GRAZER_CAP=38,PREDATOR_CAP=4;
 function kindOf(a){return a&&a.species==='carnivore'?'carnivore':a&&a.species==='spriglet'?'spriglet':'grazer';}
 
 function sprigletReady(a){
- if(a.fullness<58||a.water<57||a.energy<35||a.health<23)return 0;
+ if(a.fullness<69||a.water<62||a.energy<38||a.health<30)return 0;
  var biomass=0,neighbors=0;
  for(var f of game.meadows||[])if(dist(a.x,a.y,f.x,f.y)<112)biomass+=Math.max(0,f.amount);
  for(var b of game.agents)if(b.id!==a.id&&kindOf(b)==='spriglet'&&dist(a.x,a.y,b.x,b.y)<102)neighbors++;
  // Finite food and local crowding control breeding, without a population cap.
- return clamp(biomass/7,0,1)*clamp((21-neighbors)/18,.04,1);
+ return clamp(biomass/11,0,1)*clamp((15-neighbors)/13,0,1);
 }
 function sprigletMate(a){
- if(ageYears(a)<1.6||a.fullness<58||a.water<58||a.energy<32||a.nextBirth>game.day)return null;
+ if(ageYears(a)<2.0||a.fullness<66||a.water<64||a.energy<38||a.nextBirth>game.day)return null;
  var near=nearestAgent(a,(b,d)=>kindOf(b)==='spriglet'&&ageYears(b)>=1.6&&b.nextBirth<game.day&&d<185);
  if(!near.agent||rand()>.4+.32*a.t.sociability)return null;
  return near.agent;
 }
 function sprigletBreed(a,b){
- if(ageYears(a)<1.6||ageYears(b)<1.6||a.nextBirth>game.day||b.nextBirth>game.day)return;
+ if(ageYears(a)<2.0||ageYears(b)<2.0||a.nextBirth>game.day||b.nextBirth>game.day)return;
  var score=Math.min(sprigletReady(a),sprigletReady(b));
- if(score<.14||rand()>.34*score)return;
- a.nextBirth=b.nextBirth=game.day+r(10,17);
- var litter=rand()<.25?1:rand()<.82?2:3;
+ if(score<.18||rand()>.30*score)return;
+ a.nextBirth=b.nextBirth=game.day+r(27,44);
+ var litter=rand()<.57?1:2;
  for(var i=0;i<litter;i++){
   var ix=game.pending.findIndex(q=>q.species==='spriglet'),s=ix>=0?game.souls[game.pending.splice(ix,1)[0].soulId]:makeSoul();
   var baby=spawn(s,clamp((a.x+b.x)/2+r(-12,12),20,W-20),clamp((a.y+b.y)/2+r(-12,12),20,H-20),a,b,'spriglet');
@@ -425,7 +425,7 @@ function loomingPredator(a){
  var best=null,d=1e9;
  for(var b of game.agents)if(kindOf(b)==='carnivore'&&b.health>0){
   var hunting=b.target&&b.target.kind==='hunt'&&b.target.id===a.id;
-  var dd=dist(a.x,a.y,b.x,b.y),radius=(hunting?120:67)+a.body.senses*74;
+  var dd=dist(a.x,a.y,b.x,b.y),radius=kindOf(a)==='spriglet'?(hunting?62:36)+a.body.senses*48:(hunting?120:67)+a.body.senses*74;
   if(dd<d&&dd<radius&&(b.fullness<84||hunting||a.threatUntil>game.day)){best=b;d=dd;}
  }
  return {a:best,d:d};
@@ -531,7 +531,12 @@ function chooseAction(a){
   var meat=nearestMeat(a);
   if(meat.c&&meat.d<200){a.target={x:meat.c.x,y:meat.c.y,kind:'meat'};a.decision='Following meat scent';return;}
   var prey=nearestPrey(a);
-  if(prey){a.target={x:prey.x,y:prey.y,kind:'hunt',id:prey.id};a.decision='Hunting '+prey.name;return;}
+  var lastTarget=a.target&&a.target.kind==='hunt'?game.agents.find(b=>b.id===a.target.id):null;
+  if(lastTarget&&lastTarget.health>0&&game.day<(a.huntUntil||0)&&dist(a.x,a.y,lastTarget.x,lastTarget.y)<390)prey=lastTarget;
+  if(prey){
+   if(a.huntId!==prey.id){a.huntId=prey.id;a.huntUntil=game.day+10;}
+   a.target={x:prey.x,y:prey.y,kind:'hunt',id:prey.id};a.decision='Hunting '+prey.name;return;
+  }
  }
  var water=waterDist(a.x,a.y),known=null;
  // Stay by discovered drinkable water long enough to recover, rather than leaving half-hydrated.
@@ -1038,7 +1043,7 @@ function drawHelp(){
  'REPLAY restarts the same seed and rule settings. NEW SEED creates a different valley.',
  'Wild Ecology has its own independent browser save and never changes First Valley.',
  'A new Spriglet-enabled seed starts with 24 grazers, 12 Spriglets, and two Ridgefangs. Existing saved worlds keep their original occupants.',
- 'Spriglets live 10 to 15 years, mature around age 1.6, and breed in litters only when food, water and local space support it.',
+ 'Spriglets live 10 to 15 years, mature around age 2, and have small litters only when food, water and local space support it.',
  'Spriglets eat regrowing meadow ground cover. They yield two meat portions; large grazers yield six. Neither species is replenished automatically.',
  'STATS > ECOLOGY lets you toggle Spriglets and compare the same seed with the original two-species world.',
  'STATS > ECOLOGY controls both population caps and artificial grazer recovery independently. A change restarts the same seed.',
