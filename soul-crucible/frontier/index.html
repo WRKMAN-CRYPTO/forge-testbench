@@ -311,6 +311,7 @@ var game=null,rngState=1,ww=0,hh=0,dpr=1,scale=1,ox=0,oy=0,topH=42,bottomH=49,vi
 var selected=null,modal=null,tab=0,scroll=0,view='world',speedIndex=0,speeds=[1,3,10,30],playing=true;
 var taps=[],dragStart=null,acc=0,lastTime=0,lastSave=0,toast='',toastUntil=0,screenPos=[],hoverButtons=[];
 var perf={ticks:0};
+var visualSunlight=1; // Smoothed presentation; the biological clock is never slowed.
 var viewZoom=1,panX=0,panY=0,activeTouches=new Map(),pinchStart=null,pinchUsed=false,groundInspect=null;
 
 var geography=null,worldReady=false,frontierToken=0,mapMode='Surface',cloudsVisible=true,worldSaveState='Seeded terrain',worldPaintAt=0;
@@ -1301,7 +1302,7 @@ function scene(){
  }
  // Physical light cycle overlays the simulated world, never HUD or analytical maps.
  if(mapMode==='Surface'){
-  var darkness=(1-sunlight())*.58;
+  var darkness=(1-visualSunlight)*.58;
   if(darkness>.003){ctx.fillStyle='rgba(8,15,41,'+darkness+')';ctx.fillRect(0,topH,ww,viewportH);}
  }
  ctx.restore();
@@ -1335,7 +1336,8 @@ function hud(){
   },index===2&&view==='follow');})(i);
  var y=topH+13;rr(10,y,Math.min(254,ww-20),50,9,'#10211ede','#466156');
  txt('LIVES  '+game.agents.length+'     SOULS  '+Object.keys(game.souls).length,20,y+15,12,'#e2e7ca','left','700');
- txt('G '+countKind('grazer')+' · S '+countKind('spriglet')+' · R '+countKind('carnivore')+' · '+(sunlight()<.18?'☾':'☀')+' '+clockText(),20,y+35,10,'#b1cabf');
+ var shownClock=playing&&speeds[speedIndex]>1?'FAST DAY/NIGHT':(sunlight()<.18?'☾':'☀')+' '+clockText();
+ txt('G '+countKind('grazer')+' · S '+countKind('spriglet')+' · R '+countKind('carnivore')+' · '+shownClock,20,y+35,10,'#b1cabf');
  if(groundInspect&&worldReady){
   let gi=groundInspect,w=Math.min(ww-20,305);
   rr(10,topH+68,w,57,9,'#102525e9','#5a8377');
@@ -1571,7 +1573,7 @@ function drawHelp(){
  var paragraphs=[
  'This is an autonomous simulation. You are an observer, not a controller.',
  'TAP a creature to inspect its life, relationships, soul, learning, original body, and the PLACE tab for birthplace attachment.',
- 'A world day lasts 24 simulated hours. Surface daylight changes with the clock; temperatures and seasons do not yet vary daily.',
+ 'A world day lasts 24 simulated hours. Surface daylight changes with the clock at ×1; accelerated speeds use steady lighting to avoid flicker. Temperatures and seasons do not yet vary daily.',
  'Sleep pressure rises during wakefulness and falls during sleep. Preferred sleep times vary by species and individual and are inherited with mutation.',
  'Sleeping animals stop moving, feeding, hunting, and socializing, but continue using food and water. Attackers may surprise sleeping prey.',
  'Tap a creature > LIFE to inspect sleep pressure, activity and preferred sleep time. STATS > WORLD shows sleep episodes and interruptions.',
@@ -1614,6 +1616,10 @@ function overlay(){
 }
 function frame(now){
  var dt=Math.min(.14,(now-lastTime)/1000||0);lastTime=now;
+ // More than one simulated day per real second would make sunrise/sunset
+ // strobe. At accelerated speeds show a stable neutral light level instead.
+ var lightTarget=playing&&speeds[speedIndex]>1?.83:sunlight();
+ visualSunlight+=(lightTarget-visualSunlight)*Math.min(1,dt*3);
  if(playing&&worldReady){
   acc+=dt*18*speeds[speedIndex];
   // Adjust simulation tick budget rather than applying a hidden breeding restriction.
