@@ -25,7 +25,21 @@ function create(seed){
  function buildNav(){
   let walkable=new Uint8Array(10000),nearest=new Int16Array(10000),distance=new Uint16Array(10000);
   nearest.fill(-1);distance.fill(65535);
-  for(let y=0;y<NAV;y++)for(let x=0;x<NAV;x++)walkable[y*NAV+x]=walk(x*STEP+5,y*STEP+5)?1:0;
+  for(let y=0;y<NAV;y++)for(let x=0;x<NAV;x++){
+    let xx=x*STEP+5,yy=y*STEP+5,i=y*NAV+x;
+    walkable[i]=walk(xx,yy)&&walk(xx-4,yy)&&walk(xx+4,yy)&&
+       walk(xx,yy-4)&&walk(xx,yy+4)?1:0;
+  }
+  let edges=new Uint8Array(10000);
+  for(let y=0;y<NAV;y++)for(let x=0;x<NAV;x++){
+    let i=y*NAV+x;if(!walkable[i])continue;
+    if(x<99&&walkable[i+1]&&clearLand(x*10+5,y*10+5,x*10+15,y*10+5)){
+      edges[i]|=2;edges[i+1]|=1;
+    }
+    if(y<99&&walkable[i+100]&&clearLand(x*10+5,y*10+5,x*10+5,y*10+15)){
+      edges[i]|=8;edges[i+100]|=4;
+    }
+  }
   let queue=new Int16Array(10000),head=0,tail=0;
   for(let y=1;y<99;y++)for(let x=1;x<99;x++){
    let i=y*100+x;if(!walkable[i])continue;
@@ -35,8 +49,9 @@ function create(seed){
    }
   }
   while(head<tail){
-   let i=queue[head++],x=i%100,y=Math.floor(i/100),list=[x>0?i-1:-1,x<99?i+1:-1,y>0?i-100:-1,y<99?i+100:-1];
-   for(let j of list){if(j<0||!walkable[j]||distance[j]!==65535)continue;
+   let i=queue[head++],mask=edges[i];
+   let list=[mask&1?i-1:-1,mask&2?i+1:-1,mask&4?i-100:-1,mask&8?i+100:-1];
+   for(let j of list){if(j<0||distance[j]!==65535)continue;
     distance[j]=distance[i]+1;nearest[j]=nearest[i];queue[tail++]=j;
    }
   }
@@ -47,14 +62,14 @@ function create(seed){
    if(!walkable[i]||component[i]!==-1)continue;
    let head=0,tail=0;queued[tail++]=i;component[i]=count;
    while(head<tail){
-    let node=queued[head++],x=node%100,y=(node/100)|0;
-    for(let n of [x>0?node-1:-1,x<99?node+1:-1,y>0?node-100:-1,y<99?node+100:-1]){
-     if(n<0||!walkable[n]||component[n]!==-1)continue;component[n]=count;queued[tail++]=n;
+    let node=queued[head++],mask=edges[node];
+    for(let n of [mask&1?node-1:-1,mask&2?node+1:-1,mask&4?node-100:-1,mask&8?node+100:-1]){
+     if(n<0||component[n]!==-1)continue;component[n]=count;queued[tail++]=n;
     }
    }
    count++;
   }
-  f.nav={walkable,nearest,distance,component,revision:(f.nav?.revision||0)+1};
+  f.nav={walkable,nearest,distance,component,edges,revision:(f.nav?.revision||0)+1};
  }
 
  function nodeAt(x,y){
@@ -74,7 +89,7 @@ function create(seed){
  }
  function clearLand(x,y,tx,ty){
   if(!walk(x,y)||!walk(tx,ty))return false;
-  let d=Math.hypot(tx-x,ty-y),steps=Math.ceil(d/5),height=at(x,y).elev;
+  let d=Math.hypot(tx-x,ty-y),steps=Math.max(1,Math.ceil(d)),height=at(x,y).elev;
   for(let i=1;i<=steps;i++){
    let px=x+(tx-x)*i/steps,py=y+(ty-y)*i/steps;
    if(!walk(px,py))return false;
@@ -133,8 +148,17 @@ function create(seed){
     let next=cur+change,nx=next%100,ny=(next/100)|0;
     if(next<0||next>=10000||Math.abs(nx-cx)>1||Math.abs(ny-cy)>1||!nav.walkable[next]||closed[next])continue;
     // Forbid corners that would cross a water/rock cell diagonally.
-    let diagonal=Math.abs(nx-cx)===1&&Math.abs(ny-cy)===1;
-    if(diagonal&&(!nav.walkable[cy*100+nx]||!nav.walkable[ny*100+cx]))continue;
+    let diagonal=Math.abs(nx-cx)===1&&Math.abs(ny-cy)===1,mask=nav.edges[cur];
+    if(!diagonal){
+      let pass=nx<cx?(mask&1):nx>cx?(mask&2):ny<cy?(mask&4):(mask&8);
+      if(!pass)continue;
+    }else{
+      let horiz=nx<cx?1:2,vertical=ny<cy?4:8;
+      let sideH=cy*100+nx,sideV=ny*100+cx;
+      if(!(mask&horiz)||!(mask&vertical)||
+         !(nav.edges[sideH]&vertical)||!(nav.edges[sideV]&horiz))continue;
+      if(!clearLand(cx*10+5,cy*10+5,nx*10+5,ny*10+5))continue;
+    }
     let penalty=Math.abs(f.elev[idx(nx*10+5,ny*10+5)]-f.elev[idx(cx*10+5,cy*10+5)])*.3;
     let candidate=g[cur]+(diagonal?14.142:10)+penalty;
     if(candidate>=g[next])continue;
