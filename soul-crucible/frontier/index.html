@@ -235,7 +235,7 @@ function mapTemper(base,s){return {
  caution:clamp(base.caution+s.im.caution*.2,0,1),
  generosity:clamp(base.generosity+s.im.giving*.22,0,1)
 };}
-function spawn(s,x,y,p,q,species){var id=++game.nextBody;var base=temper(p,q,s),body=bodyTraits(p,q);species=species||(p?kindOf(p):'grazer');
+function spawn(s,x,y,p,q,species){var land=footprint(x,y);x=land.x;y=land.y;var id=++game.nextBody;var base=temper(p,q,s),body=bodyTraits(p,q);species=species||(p?kindOf(p):'grazer');
  var family=species==='carnivore'?'Ridgefang':species==='spriglet'?'Spriglet':p&&q?(rand()<.5?p.family:q.family):choice(archetypes);
  if(species==='spriglet'){body.speed=clamp(body.speed+.04,.35,.77);body.senses=clamp(body.senses+.03,0,1);body.strength=clamp(body.strength*.52,0,1);body.resilience=clamp(body.resilience*.55,0,1);base.caution=clamp(base.caution+.15,0,1);base.aggression*=.2;}
  if(species==='carnivore'&&!p){body.speed=clamp(body.speed+.18,0,1);body.strength=clamp(body.strength+.16,0,1);body.senses=clamp(body.senses+.12,0,1);body.resilience=clamp(body.resilience+.18,0,1);}
@@ -428,13 +428,19 @@ function sprigletField(a){
  return near;
 }
 function introduceSpriglets(){
- var sites=[{x:200,y:420},{x:808,y:340},{x:575,y:500}];
+ var sites=[];
+ for(var i=0;i<3;i++){
+  var field=game.meadows[(i*47+11)%Math.max(1,game.meadows.length)];
+  if(field)sites.push(field);
+ }
  for(var loc of sites)for(var i=0;i<4;i++){
-  var b=spawn(makeSoul(),clamp(loc.x+r(-35,35),25,W-25),clamp(loc.y+r(-35,35),25,H-25),null,null,'spriglet');
+  var p=footprint(loc.x+r(-28,28),loc.y+r(-28,28));
+  var b=spawn(makeSoul(),p.x,p.y,null,null,'spriglet');
   b.age=r(2.2,5)*YEAR_DAYS;b.health=39;b.food=0;
  }
  game.ecology.sprigletsIntroduced=true;
 }
+
 function drawSpriglet(a,x,y,s){
  const g=ctx,dna=ensureValleyGenome(a);
  const dir=a.id%2?1:-1,active=dist(a.x,a.y,a.target?.x??a.x,a.target?.y??a.y)>12;
@@ -472,8 +478,9 @@ function addRidgefangFounders(n){
  var resident=game.agents.find(a=>kindOf(a)==='carnivore');
  for(var i=0;i<n;i++){
   // Founders share a habitat rather than spawning at opposite ends of the map.
-  var x=resident?clamp(resident.x+r(-85,85),35,W-35):r(130,225);
-  var y=resident?clamp(resident.y+r(-75,75),35,H-35):r(490,580);
+  var origin=resident||game.agents.find(a=>kindOf(a)==='grazer')||{x:500,y:500};
+  var site=footprint(origin.x+r(-65,65),origin.y+r(-65,65));
+  var x=site.x,y=site.y;
   var a=spawn(makeSoul(),x,y,null,null,'carnivore');
   a.age=r(23,34)*YEAR_DAYS;a.food=0;
   addEvent('wildlife',a.name+' the Ridgefang enters the valley',a);
@@ -576,7 +583,7 @@ function eatMeat(a){
 function nearestAgent(a,filter){var best=null,bd=1e10;for(var b of game.agents){if(a===b)continue;var d=dist(a.x,a.y,b.x,b.y);if(d<bd&&(!filter||filter(b,d))){best=b;bd=d;}}return {agent:best,d:bd};}
 function relation(a,b){var k=''+b.id;if(!a.relations[k])a.relations[k]={trust:0,familiarity:0,meetings:0,lastMeet:-99,gifts:0,help:0,attacks:0};return a.relations[k];}
 function markPlace(a,x,y,kind){var prev=a.places.find(function(p){return p.kind===kind&&dist(p.x,p.y,x,y)<50;});if(prev){prev.value=clamp(prev.value+.18,0,1);prev.day=game.day;return;}a.places.push({x:x,y:y,kind:kind,value:.6,day:game.day});if(a.places.length>12)a.places.sort(function(p,q){return q.value-p.value;}).length=12;}
-function safeTarget(a){var spot=choice([{x:164,y:251},{x:733,y:358},{x:945,y:545}]);return footprint(spot.x+r(-34,34),spot.y+r(-34,34));}
+function safeTarget(a){return footprint(a.x+r(-135,135),a.y+r(-135,135));}
 function seekRidgefangCompanion(a){
  if(!game.social||kindOf(a)!=='carnivore'||ageYears(a)<18||a.fullness<58||a.water<69||a.energy<28||a.nextBirth>game.day)return null;
  var best=null,d=Infinity;
@@ -730,7 +737,7 @@ function death(a,cause){
  if(selected===a.id){selected=null;modal=null;announce(a.name+' is gone. Their soul remains.');}
 }
 function drinkNearby(a,dt){
- if(waterDist(a.x,a.y)>=30)return false;
+ if(!worldReady||!geography.liquidNear(a.x,a.y))return false;
  markPlace(a,a.x,a.y,'water');
  if(a.water<94){a.water=Math.min(100,a.water+64*dt);a.decision='Drinking';}
  return true;
@@ -738,13 +745,19 @@ function drinkNearby(a,dt){
 function tick(){
  game.day+=.06;var dt=.06;
  game.carcasses=game.carcasses.filter(c=>c.meat>0&&c.expires>game.day);
- for(var bush of game.bushes)bush.amount=Math.min(bush.capacity,bush.amount+bush.regen*dt);
- for(var field of game.meadows)field.amount=Math.min(field.capacity,field.amount+field.regen*dt);
+ for(var bush of game.bushes)bush.amount=Math.min(bush.capacity,bush.amount+bush.regen*dt*geography.growth(bush.x,bush.y)*1.4);
+ for(var field of game.meadows)field.amount=Math.min(field.capacity,field.amount+field.regen*dt*geography.growth(field.x,field.y)*1.5);
+ if(!Number.isFinite(game.weatherCounter))game.weatherCounter=0;
+ if(++game.weatherCounter%15===0)geography.weather();
  var remove=[];
  for(var a of game.agents){
   if(a.learning&&a.learning.lastSite&&dist(a.x,a.y,a.learning.lastSite.x,a.learning.lastSite.y)>57)a.learning.lastSite=null;
   a.age+=dt;a.fullness=Math.max(0,a.fullness-(kindOf(a)==='carnivore'?1.52:kindOf(a)==='spriglet'?2.55:1.75+a.body.strength*.35)*dt);
-  a.water=Math.max(0,a.water-(2.55+a.body.speed*.3)*dt);
+  var air=terrainTemperature(a),heat=air>30?Math.min(2.1,(air-30)*.11):0;
+  a.water=Math.max(0,a.water-(2.55+a.body.speed*.3+heat)*dt);
+  if(air<-11){a.energy=Math.max(0,a.energy-(Math.abs(air+11)*.085)*dt);
+   if(air<-25)a.health-=Math.min(2.3,Math.abs(air+25)*.09)*(1-a.body.resilience*.5)*dt;
+  }
   // Drink before dehydration damage/death is assessed when already at the bank.
   var wasAtWater=drinkNearby(a,dt);
   if(a.fullness<5)a.health-=(5-a.fullness)*.31*dt;
@@ -763,9 +776,8 @@ function tick(){
   var d=dist(a.x,a.y,tx,ty),moving=d>12;
   if(moving){
    var ds=(25+a.body.speed*42)*dt*(a.energy<14?.48:1)*(t.kind==='hunt'?1.33:t.kind==='flee'?1.1:1);
-   ds=Math.min(ds,d-10);var dx=(tx-a.x)/d*ds,dy=(ty-a.y)/d*ds;
-   a.x=clamp(a.x+dx,18,W-18);a.y=clamp(a.y+dy,18,H-18);
-   a.stats.travel+=Math.abs(ds);a.energy=Math.max(0,a.energy-.68*dt);
+   ds=Math.min(ds,d-10);
+   terrainTraverse(a,tx,ty,ds);
   }else{
    a.energy=clamp(a.energy+(t.kind==='rest'?32:7)*dt,0,100);
    if(t.kind==='wander'||t.kind==='friend')a.nextThink=Math.min(a.nextThink,game.day+.6);
@@ -843,25 +855,24 @@ function rr(x,y,w,h,radius,fill,stroke){var r2=Math.min(radius,w/2,h/2);ctx.begi
 function txt(s,x,y,size,color,align,weight){ctx.font=(weight||'500')+' '+size+'px system-ui,-apple-system,sans-serif';ctx.textAlign=align||'left';ctx.textBaseline='middle';ctx.fillStyle=color||'#deebd7';ctx.fillText(s,x,y);}
 function strokeRiver(color,width){ctx.beginPath();for(var y=-20;y<=H+20;y+=6){var x=riverX(y);if(y===-20)ctx.moveTo(sx(x),sy(y));else ctx.lineTo(sx(x),sy(y));}ctx.strokeStyle=color;ctx.lineWidth=width*scale;ctx.lineCap='round';ctx.stroke();}
 function scene(){
- rect(0,topH,ww,viewportH,'#132420');ctx.save();ctx.beginPath();ctx.rect(0,topH,ww,viewportH);ctx.clip();
+ rect(0,topH,ww,viewportH,'#091b22');ctx.save();ctx.beginPath();ctx.rect(0,topH,ww,viewportH);ctx.clip();
  var x=sx(0),y=sy(0),sw=W*scale,sh=H*scale;
- rect(x,y,sw,sh,'#233e31');
- for(var i=0;i<12;i++){var px=sx((i*241+98)%W),py=sy((i*157+173)%H);circle(px,py,(48+i*13)*scale,i%2?'#264734':'#2d4a37');}
- circle(sx(853),sy(158),76*scale,'#2a5a62','#486b65',3*scale);
- strokeRiver('#335b5c',67);strokeRiver('#38868a',48);strokeRiver('#52979c',21);
- circle(sx(853),sy(158),55*scale,'#478b91','#74a1a0',3*scale);
- for(var st of game.stones){rr(sx(st.x)-st.size*scale/2,sy(st.y)-st.size*scale/2,st.size*scale,st.size*.6*scale,2,'#64736b');}
+ if(!worldReady){
+  rect(x,y,sw,sh,'#102b30');
+  var progress=geography?geography.progress:0;
+  rr(ww*.16,topH+viewportH*.53,ww*.68,13,7,'#223d44');
+  rr(ww*.16,topH+viewportH*.53,ww*.68*progress,13,7,'#8ed2b4');
+  txt('GENERATING TERRAIN  '+Math.round(progress*100)+'%',ww/2,topH+viewportH*.50,13,'#c5f3d7','center','800');
+  ctx.restore();screenPos=[];return;
+ }
+ ctx.imageSmoothingEnabled=false;
+ ctx.drawImage(geography.ground,x,y,sw,sh);
+ if(cloudsVisible&&mapMode==='Surface'){ctx.save();ctx.globalAlpha=.44;ctx.drawImage(geography.atmosphere,x,y,sw,sh);ctx.restore();}
+ for(var st of game.stones){rr(sx(st.x)-st.size*scale/2,sy(st.y)-st.size*scale/2,st.size*scale,st.size*.6*scale,2,'#7c8078');}
  for(var tr of game.trees){
   var tx=sx(tr.x),ty=sy(tr.y),ts=Math.max(2,tr.size*scale);
-  circle(tx+1,ty+2,ts*.85,'#162f25');
-  circle(tx,ty-1,ts,tr.variant%2?'#39634b':'#2f5945');
-  circle(tx-ts*.28,ty-ts*.4,ts*.36,'#56816a');
- }
- // Ancient landmark and shelter clearings are geographic features, not scripted settlements.
- circle(sx(735),sy(355),43*scale,'#48594a');circle(sx(735),sy(355),31*scale,'#425246');
- for(var q=0;q<7;q++){var an=q*TAU/7;rr(sx(735+27*Math.cos(an))-4*scale,sy(355+27*Math.sin(an))-3*scale,8*scale,6*scale,2,'#9ba59b');}
- for(var shltr of [{x:164,y:251},{x:945,y:545}]){
-  circle(sx(shltr.x),sy(shltr.y),28*scale,'#344c3b');rr(sx(shltr.x)-11*scale,sy(shltr.y)-8*scale,22*scale,16*scale,4,'#6f6750');
+  circle(tx+1,ty+2,ts*.85,'#142c22');circle(tx,ty-1,ts,tr.variant%2?'#345d48':'#2d5642');
+  circle(tx-ts*.28,ty-ts*.4,ts*.36,'#5d8967');
  }
  for(var field of game.meadows){
   if(field.amount<.4)continue;
@@ -896,10 +907,9 @@ function scene(){
   screenPos.push({id:a.id,x:cx,y:cy-(kindOf(a)==='spriglet'?7:12),radius:kindOf(a)==='spriglet'?Math.max(12,scale*23):Math.max(22,sz*110)});
 
  }
- if(view==='world'){
-  txt('DUSK GROVE',sx(100),sy(120),Math.max(8,11*scale),'#82a593');
-  txt('THE OLD STONES',sx(725),sy(409),Math.max(8,11*scale),'#c9cbaf','center');
-  txt('RIVER VEIL',sx(540),sy(48),Math.max(8,11*scale),'#a0ccca');
+ if(view==='world'&&mapMode==='Surface'){
+  txt('LATITUDE 0°',sx(60),sy(506),Math.max(8,10*scale),'#c5c3a4');
+  txt('NORTH POLAR REGION',sx(60),sy(82),Math.max(8,10*scale),'#c9d7da');
  }
  ctx.restore();
 }
@@ -911,12 +921,15 @@ function button(label,x,y,w,h,fn,active,layer){
 function hud(){
  rect(0,0,ww,topH,'#101b22');line(0,topH,ww,topH,'#3c5049',1);
  var titleW=ww<520?104:183;
- txt(ww<520?'WILD · ECO':'SOUL CRUCIBLE · WILD ECOLOGY',10,topH/2-7,ww<520?11:15,'#e3d7ae','left','800');
+ txt(ww<520?'FRONTIER':'SOUL CRUCIBLE · FRONTIER',10,topH/2-7,ww<520?11:15,'#e3d7ae','left','800');
  txt((ww<520?'YEAR ':'FIRST VALLEY · YEAR ')+Math.floor(game.day/YEAR_DAYS)+' · DAY '+Math.floor(game.day%YEAR_DAYS),10,topH/2+9,ww<520?9:10,'#8da89b');
  var gap=4,available=ww-titleW-10,btnW=(available-gap*2)/3;
  button(playing?'PAUSE':'RESUME',titleW,5,btnW,topH-10,function(){playing=!playing;announce(playing?'Time resumes':'Time paused');},!playing);
  button('×'+speeds[speedIndex],titleW+btnW+gap,5,btnW,topH-10,function(){speedIndex=(speedIndex+1)%speeds.length;acc=0;save();},false);
- button(game.social?'MEMORY ON':'MEMORY OFF',titleW+(btnW+gap)*2,5,btnW,topH-10,function(){modal='toggle';tab=0;scroll=0;},game.social);
+ button('MAP '+(mapMode==='Surface'?'LAND':mapMode==='Elevation'?'ALT':mapMode==='Temperature'?'TEMP':'WATER'),titleW+(btnW+gap)*2,5,btnW,topH-10,function(){
+  var types=['Surface','Elevation','Temperature','Water'];mapMode=types[(types.indexOf(mapMode)+1)%types.length];
+  if(worldReady)geography.palette(mapMode);
+ },false);
  rect(0,hh-bottomH,ww,bottomH,'#101b22');line(0,hh-bottomH,ww,hh-bottomH,'#3c5049');
  var labels=['REPLAY','NEW SEED',view==='follow'?'OVERVIEW':'FOLLOW',ww<520?'STATS':'WORLD DATA','HELP'];
  for(var i=0;i<labels.length;i++)(function(index){var cell=ww/5;
@@ -1038,7 +1051,7 @@ function drawInspector(){
 }
 var scrollLimit=0;
 function drawWorldData(){
- var p=modalBackground('Wild Ecology Observatory'),start=tabRow(p,ww<520?['WORLD','TEST','LEARN','ECOLOGY','LOG']:['WORLD','EXPERIMENT','LEARNING','ECOLOGY','CHRONICLE']);
+ var p=modalBackground('Frontier Observatory'),start=tabRow(p,ww<520?['WORLD','TEST','LEARN','ECOLOGY','LOG']:['WORLD','EXPERIMENT','LEARNING','ECOLOGY','CHRONICLE']);
  var x=p.x+17,y=start+9-scroll,width=p.w-34;
  ctx.save();ctx.beginPath();ctx.rect(p.x+9,start,p.w-18,p.contentEnd-start);ctx.clip();
  var m=game.metrics;
@@ -1075,7 +1088,7 @@ function drawWorldData(){
   y+=paragraph('To inspect an individual, tap it in the world and open its LEARN tab.',x,y,width)+9;
  }else if(tab===3){
   var eco=game.ecology,rs=eco.rules,lg=countKind('grazer'),lr=countKind('carnivore');
-  txt('WILD ECOLOGY · POPULATION',x,y,13,'#e7d6a7','left','780');y+=26;
+  txt('FRONTIER · FOOD WEB',x,y,13,'#e7d6a7','left','780');y+=26;
   txt('SEED '+game.seed+' · YEAR '+Math.floor(game.day/YEAR_DAYS),x,y,11,'#a4c8b9');y+=24;
   txt('GRAZERS '+lg,x,y,12,'#8bd3b0','left','760');
   txt('SPRIGLETS '+countKind('spriglet'),x+width*.54,y,12,'#eddb8d','right','760');
@@ -1085,6 +1098,10 @@ function drawWorldData(){
   txt('Grazers extinct: '+(eco.goneG===null?'not observed':'year '+round(eco.goneG,1)),x,y,11,'#c9d9cf');y+=21;
   txt('Ridgefangs extinct: '+(eco.goneR===null?'not observed':'year '+round(eco.goneR,1)),x,y,11,'#c9d9cf');y+=21;
   txt('Spriglets extinct: '+(eco.goneS===null?'not observed':'year '+round(eco.goneS,1)),x,y,11,'#c9d9cf');y+=26;
+  txt('ENVIRONMENT',x,y,11,'#e7d6a7','left','750');y+=22;
+  txt('Land '+geography.landCount+' px · water '+geography.waterCount+' px · ice '+geography.iceCount+' px',x,y,10,'#a9c5bf');y+=19;
+  txt('Evap '+geography.stats.evap+'  · Rain '+geography.stats.rain+'  · Water flow '+geography.stats.flow,x,y,10,'#a9c5bf');y+=20;
+  txt('Water persistence: '+worldSaveState,x,y,10,'#a9c5bf');y+=24;
   txt('TRIAL RULES',x,y,11,'#e7d6a7','left','750');y+=22;
   for(var opt of [['spriglets','SPRIGLETS'],['grazerCap','GRAZER CAP · 38'],['ridgeCap','RIDGEFANG CAP · 4'],['rescue','ARTIFICIAL GRAZER RECOVERY']]){
    (function(key,name){button(name+' : '+(rs[key]?'ON':'OFF'),x,y,width,37,function(){pendingEcoKey=key;modal='ecoRules';scroll=0;},rs[key],'modal');})(opt[0],opt[1]);y+=45;
@@ -1158,7 +1175,10 @@ function overlay(){
 }
 function frame(now){
  var dt=Math.min(.14,(now-lastTime)/1000||0);lastTime=now;
- if(playing){acc+=dt*18*speeds[speedIndex];var steps=0;while(acc>=1&&steps<55){tick();acc-=1;steps++;}if(steps===55)acc=Math.min(acc,1);}
+ if(playing&&worldReady){acc+=dt*18*speeds[speedIndex];var steps=0;while(acc>=1&&steps<55){tick();acc-=1;steps++;}if(steps===55)acc=Math.min(acc,1);}
+ if(worldReady&&geography&&geography.drawPending&&now-worldPaintAt>1300){
+  geography.palette(mapMode);geography.paintClouds();worldPaintAt=now;
+ }
  taps=[];camera();scene();hud();
  try{overlay();}catch(err){
   // Never let a broken inspector stop time or leave touch controls unusable.
@@ -1166,7 +1186,7 @@ function frame(now){
   modal=null;scroll=0;announce('Inspector issue · world continues');
  }
  if(game.agents.length>=160&&playing){playing=false;announce('160 creatures reached · paused to protect Safari · no breeding cap');save();}
- if(now-lastSave>12000){lastSave=now;save();}
+ if(now-lastSave>12000&&worldReady){lastSave=now;save();}
  requestAnimationFrame(frame);
 }
 function onDown(e){e.preventDefault();dragStart={x:e.clientX,y:e.clientY,scroll:scroll,time:performance.now()};try{C.setPointerCapture(e.pointerId);}catch(_){}}
