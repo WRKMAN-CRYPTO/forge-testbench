@@ -465,7 +465,7 @@ function resolveFight(a){
  var t=a.target||{};
  if(t.kind==='hunt'&&kindOf(a)==='carnivore'){
   var prey=game.agents.find(b=>b.id===t.id);
-  if(prey&&kindOf(prey)==='grazer')fight(a,prey,'hunt');
+  if(prey&&(kindOf(prey)==='grazer'||kindOf(prey)==='spriglet'))fight(a,prey,'hunt');
  }
  if(kindOf(a)==='grazer'&&a.threatUntil>game.day&&a.lastHit){
   var enemy=game.agents.find(b=>b.id===a.lastHit.id);
