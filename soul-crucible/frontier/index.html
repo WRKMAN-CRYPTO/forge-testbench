@@ -704,15 +704,28 @@ function contact(a,b){
  }
  if(a.fullness<b.fullness)give(b,a,rb,ra);else give(a,b,ra,rb);
  function help(donor,recv,dr,rr){
-  if(recv.health>63||donor.energy<42||donor.health<45||donor.t.generosity+dr.trust*.5<r(.42,1.18))return false;
-  donor.energy-=9;recv.health=clamp(recv.health+13,0,100);dr.trust=clamp(dr.trust+.06,-1,1);rr.trust=clamp(rr.trust+.25,-1,1);
+  // Caring for wounds cannot substitute for food or drinking water.
+  // A caregiver spends its own finite reserves rather than creating health from rest alone.
+  if(recv.health>63||donor.energy<42||donor.health<45||
+     donor.fullness<48||donor.water<42||recv.fullness<18||recv.water<18||
+     donor.t.generosity+dr.trust*.5<r(.42,1.18))return false;
+  donor.energy-=9;donor.fullness=Math.max(0,donor.fullness-12);
+  donor.water=Math.max(0,donor.water-4);
+  recv.health=clamp(recv.health+13,0,100);dr.trust=clamp(dr.trust+.06,-1,1);rr.trust=clamp(rr.trust+.25,-1,1);
   dr.help++;rr.help++;donor.stats.helps++;recv.stats.helped++;game.metrics.helped++;
   addEvent('aid',donor.name+' tended '+recv.name+"'s wounds",donor,recv);return true;
  }
  if(a.health<b.health)help(b,a,rb,ra);else help(a,b,ra,rb);
  var kind=kindOf(a),rules=ecRules(),cap=kind==='carnivore'?(rules.ridgeCap?PREDATOR_CAP:Infinity):(rules.grazerCap?GRAZER_CAP:Infinity);
- if(ageYears(a)>=18&&ageYears(b)>=18&&a.nextBirth<game.day&&b.nextBirth<game.day&&countKind(kind)<cap&&ra.trust>.23&&rb.trust>.23&&rand()<.14){
+ // Breeding requires both parents to be physically capable of raising offspring.
+ // This prevents new life from replenishing a completely foodless population.
+ if(ageYears(a)>=18&&ageYears(b)>=18&&a.nextBirth<game.day&&b.nextBirth<game.day&&
+    a.fullness>=68&&b.fullness>=68&&a.water>=62&&b.water>=62&&
+    a.health>=55&&b.health>=55&&a.energy>=35&&b.energy>=35&&
+    countKind(kind)<cap&&ra.trust>.23&&rb.trust>.23&&rand()<.14){
   a.nextBirth=b.nextBirth=game.day+r(22,36);
+  a.fullness=Math.max(0,a.fullness-20);b.fullness=Math.max(0,b.fullness-20);
+  a.energy=Math.max(0,a.energy-9);b.energy=Math.max(0,b.energy-9);
   var pend=game.pending.findIndex(p=>(p.species||'grazer')===kind);
   var s=pend>=0?game.souls[game.pending.splice(pend,1)[0].soulId]:makeSoul();
   var baby=spawn(s,clamp((a.x+b.x)/2+r(-12,12),25,W-25),clamp((a.y+b.y)/2+r(-12,12),25,H-25),a,b,kind);
