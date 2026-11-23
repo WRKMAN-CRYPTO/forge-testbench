@@ -208,7 +208,8 @@ function sleepBiology(a,dt){
  if(s.sleeping){
   if(a.water<25||a.fullness<22||a.health<19){wakeCreature(a,'needs');return false;}
   // Reduced vigilance: some approaching predators are not detected in time.
-  if(sleepDanger(a)&&rand()<.24){wakeCreature(a,'danger');return false;}
+  // Wake probability is per original .06-day interval, not per new frame.
+  if(sleepDanger(a)&&rand()<1-Math.pow(.76,dt/.06)){wakeCreature(a,'danger');return false;}
   s.pressure=Math.max(0,s.pressure-2.25*dt);
   s.slept+=dt;game.metrics.sleepHours+=dt*24;
   a.energy=clamp(a.energy+19*dt,0,100);
@@ -308,7 +309,15 @@ function drawValleyCritter(a,px,ground,s){
 
 
 var game=null,rngState=1,ww=0,hh=0,dpr=1,scale=1,ox=0,oy=0,topH=42,bottomH=49,viewportH=200;
-var selected=null,modal=null,tab=0,scroll=0,view='world',speedIndex=0,speeds=[1,3,10,30],playing=true;
+var selected=null,modal=null,tab=0,scroll=0,view='world',speedIndex=0,playing=true;
+// Presets use actual world-days per wall-clock second. Fast preserves the
+// original ×30 engine's target rate (18 ticks/s × .06 days × 30).
+var SPEED_MODES=[
+ {label:'OBSERVE',daysPerSecond:1/30,stepDays:.003,description:'1 day / 30 sec'},
+ {label:'×10',daysPerSecond:1/3,stepDays:.012,description:'1 day / 3 sec'},
+ {label:'×30',daysPerSecond:1,stepDays:.03,description:'1 day / 1 sec'},
+ {label:'FAST',daysPerSecond:32.4,stepDays:.06,description:'Legacy fast-forward'}
+];
 var taps=[],dragStart=null,acc=0,lastTime=0,lastSave=0,toast='',toastUntil=0,screenPos=[],hoverButtons=[];
 var perf={ticks:0};
 var visualSunlight=1; // Smoothed presentation; the biological clock is never slowed.
@@ -366,7 +375,8 @@ function recentlyUnreachable(a,x,y,kind,id){
  return !!(last&&game.day<last.until&&last.kind===kind&&
   (id===undefined||id===null||last.id===id)&&dist(last.x,last.y,x,y)<38);
 }
-function terrainTraverse(a,tx,ty,ds){
+function terrainTraverse(a,tx,ty,ds,dt){
+ if(dt===undefined)dt=.06;
  let ox=a.x,oy=a.y,nav=geography.nav,kind=a.target&&a.target.kind;
  if(kind==='water'&&nav&&!geography.liquidNear(ox,oy)){
   // Follow a field toward a real, reachable drinking shore.
@@ -440,7 +450,7 @@ function terrainTraverse(a,tx,ty,ds){
   let dx=ux*Math.cos(angle)-uy*Math.sin(angle),dy=ux*Math.sin(angle)+uy*Math.cos(angle);
   let xx=clamp(ox+dx*ds,18,W-18),yy=clamp(oy+dy*ds,18,H-18);
   if(!geography.clearLand(ox,oy,xx,yy)||Math.abs(geography.at(xx,yy).elev-old)>14)continue;
-  a.x=xx;a.y=yy;a.stats.travel+=ds;a.energy=Math.max(0,a.energy-.68*.06);
+  a.x=xx;a.y=yy;a.stats.travel+=ds;a.energy=Math.max(0,a.energy-.68*dt);
   a.blocked=0;return true;
  }
  a.blocked=(a.blocked||0)+1;
@@ -605,7 +615,7 @@ function newWorld(seed,social,learning){
  startFrontier(seed,false,frontierPopulate);
 }
 function announce(s){toast=s;toastUntil=performance.now()+2600;}
-function save(){try{if(!game)return;localStorage.setItem(KEY,JSON.stringify({version:1,game:game,rng:rngState,selected:selected,view:view,speedIndex:speedIndex}));saveHydrology();}catch(e){}}
+function save(){try{if(!game)return;localStorage.setItem(KEY,JSON.stringify({version:1,game:game,rng:rngState,selected:selected,view:view,speedIndex:speedIndex,speedScheme:'daily-observe-v1'}));saveHydrology();}catch(e){}}
 function freshLearning(){return {finds:0,misses:0,adapted:0,events:[],lastVisit:-99,lastAdapt:-99,lastSite:null};}
 function ensureLearning(a){if(!a.learning)a.learning=freshLearning();for(var k of ['finds','misses','adapted'])if(!Number.isFinite(a.learning[k]))a.learning[k]=0;
  if(!Array.isArray(a.learning.events))a.learning.events=[];if(!Number.isFinite(a.learning.lastVisit))a.learning.lastVisit=-99;if(!Number.isFinite(a.learning.lastAdapt))a.learning.lastAdapt=-99;
@@ -657,7 +667,11 @@ function migrateAgeSystem(){
  if(!Number.isFinite(game.metrics.lifeYearsCount))game.metrics.lifeYearsCount=0;
  game.ageSystem=AGE_SYSTEM;
 }
-function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;migrateAgeSystem();initEcology();initPlaceStats();initSleepMetrics();
+function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';// Old saves used ×1/×3/×10/×30 but were already time-lapses.
+ // Resume slower by default, unless the observer explicitly used old ×30.
+ speedIndex=raw.speedScheme==='daily-observe-v1'?
+  clamp(raw.speedIndex||0,0,SPEED_MODES.length-1):
+  ((raw.speedIndex||0)===3?3:0);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;migrateAgeSystem();initEcology();initPlaceStats();initSleepMetrics();
  if(!game.ecology)game.ecology={rules:Object.assign({},ECO_DEFAULT),history:[],lastYear:-1,maxG:0,maxR:0,goneG:null,goneR:null};
  // An older stored run is left unchanged. It gains meadow patches on a restarted seed.
  if(!game.ecology.rules||!Object.prototype.hasOwnProperty.call(game.ecology.rules,'spriglets'))game.ecology.rules=Object.assign({},game.ecology.rules||{},{spriglets:false});
@@ -1081,13 +1095,21 @@ function drinkNearby(a,dt){
  if(a.water<94){if(a.water<78)placeExperience(a,'water');a.water=Math.min(100,a.water+64*dt);a.decision='Drinking';}
  return true;
 }
-function tick(){
- game.day+=.06;var dt=.06;
+function tick(stepDays){
+ var dt=stepDays===undefined?.06:stepDays;
+ game.day+=dt;
  game.carcasses=game.carcasses.filter(c=>c.meat>0&&c.expires>game.day);
  for(var bush of game.bushes)bush.amount=Math.min(bush.capacity,bush.amount+bush.regen*dt*geography.growth(bush.x,bush.y)*1.4);
  for(var field of game.meadows)field.amount=Math.min(field.capacity,field.amount+field.regen*dt*geography.growth(field.x,field.y)*1.5);
  if(!Number.isFinite(game.weatherCounter))game.weatherCounter=0;
- if(++game.weatherCounter%15===0)geography.weather();
+ // The hydraulic model needs a consistent cadence across varying step sizes.
+ if(!Number.isFinite(game.weatherAccumDays))
+  game.weatherAccumDays=(game.weatherCounter%15)*.06;
+ game.weatherAccumDays+=dt;
+ if(game.weatherAccumDays>=.9){
+  geography.weather();game.weatherAccumDays-=.9;
+ }
+ game.weatherCounter++;
  var remove=[];
  for(var a of game.agents){
   if(a.learning&&a.learning.lastSite&&dist(a.x,a.y,a.learning.lastSite.x,a.learning.lastSite.y)>57)a.learning.lastSite=null;
@@ -1117,7 +1139,7 @@ function tick(){
   if(moving){
    var ds=(25+a.body.speed*42)*dt*(a.energy<14?.48:1)*(t.kind==='hunt'?1.33:t.kind==='flee'?1.1:1);
    ds=Math.min(ds,d-10);
-   terrainTraverse(a,tx,ty,ds);
+   terrainTraverse(a,tx,ty,ds,dt);
   }else{
    a.energy=clamp(a.energy+(t.kind==='rest'?32:7)*dt,0,100);
    if(t.kind==='wander'||t.kind==='friend')a.nextThink=Math.min(a.nextThink,game.day+.6);
@@ -1319,7 +1341,10 @@ function hud(){
  txt((ww<520?'YEAR ':'FIRST VALLEY · YEAR ')+Math.floor(game.day/YEAR_DAYS)+' · DAY '+Math.floor(game.day%YEAR_DAYS),10,topH/2+9,ww<520?9:10,'#8da89b');
  var gap=4,available=ww-titleW-10,btnW=(available-gap*2)/3;
  button(playing?'PAUSE':'RESUME',titleW,5,btnW,topH-10,function(){playing=!playing;announce(playing?'Time resumes':'Time paused');},!playing);
- button('×'+speeds[speedIndex],titleW+btnW+gap,5,btnW,topH-10,function(){speedIndex=(speedIndex+1)%speeds.length;acc=0;save();},false);
+ button(SPEED_MODES[speedIndex].label,titleW+btnW+gap,5,btnW,topH-10,function(){
+  speedIndex=(speedIndex+1)%SPEED_MODES.length;acc=0;
+  announce(SPEED_MODES[speedIndex].description);save();
+ },false);
  button('MAP '+(mapMode==='Surface'?'LAND':mapMode==='Elevation'?'ALT':mapMode==='Temperature'?'TEMP':'WATER'),titleW+(btnW+gap)*2,5,btnW,topH-10,function(){
   var types=['Surface','Elevation','Temperature','Water'];mapMode=types[(types.indexOf(mapMode)+1)%types.length];
   if(worldReady)geography.palette(mapMode);
@@ -1336,7 +1361,7 @@ function hud(){
   },index===2&&view==='follow');})(i);
  var y=topH+13;rr(10,y,Math.min(254,ww-20),50,9,'#10211ede','#466156');
  txt('LIVES  '+game.agents.length+'     SOULS  '+Object.keys(game.souls).length,20,y+15,12,'#e2e7ca','left','700');
- var shownClock=playing&&speeds[speedIndex]>1?'FAST DAY/NIGHT':(sunlight()<.18?'☾':'☀')+' '+clockText();
+ var shownClock=playing&&speedIndex>0?'FAST DAY/NIGHT':(sunlight()<.18?'☾':'☀')+' '+clockText();
  txt('G '+countKind('grazer')+' · S '+countKind('spriglet')+' · R '+countKind('carnivore')+' · '+shownClock,20,y+35,10,'#b1cabf');
  if(groundInspect&&worldReady){
   let gi=groundInspect,w=Math.min(ww-20,305);
@@ -1573,7 +1598,7 @@ function drawHelp(){
  var paragraphs=[
  'This is an autonomous simulation. You are an observer, not a controller.',
  'TAP a creature to inspect its life, relationships, soul, learning, original body, and the PLACE tab for birthplace attachment.',
- 'A world day lasts 24 simulated hours. Surface daylight changes with the clock at ×1; accelerated speeds use steady lighting to avoid flicker. Temperatures and seasons do not yet vary daily.',
+ 'A world day lasts 24 simulated hours. Watch dawn, sunset and sleeping in OBSERVE; accelerated speeds use steady lighting to avoid flicker. Temperatures and seasons do not yet vary daily.',
  'Sleep pressure rises during wakefulness and falls during sleep. Preferred sleep times vary by species and individual and are inherited with mutation.',
  'Sleeping animals stop moving, feeding, hunting, and socializing, but continue using food and water. Attackers may surprise sleeping prey.',
  'Tap a creature > LIFE to inspect sleep pressure, activity and preferred sleep time. STATS > WORLD shows sleep episodes and interruptions.',
@@ -1582,7 +1607,7 @@ function drawHelp(){
  'Successful feeding and drinking strengthen local attachment. Injury and sustained hunger weaken it. A home is acquired after repeated positive experiences.',
  'Watch BORN and HOME markers when a creature is selected. Home-return attempts and completed returns are tracked separately. No place memory is inherited across lifetimes.',
  'FOLLOW zooms toward the selected life. OVERVIEW restores the full valley.',
- 'PAUSE freezes time. The speed button cycles between ×1, ×3, ×10 and ×30.',
+ 'PAUSE freezes time. Speed: OBSERVE = 1 day / 30 real seconds; ×10 = 1 day / 3 seconds; ×30 = 1 day / second; FAST = legacy high-speed time-lapse. Actual fast-forward can slow when many creatures are alive.',
  'MEMORY toggles the relationship system. STATS > LEARNING lets you compare food learning ON/OFF with the same seed.',
  'REPLAY restarts the same seed and rule settings. NEW SEED creates a different valley.',
  'Frontier has its own save and never changes Pixel World, First Valley, or Wild Ecology.',
@@ -1618,16 +1643,17 @@ function frame(now){
  var dt=Math.min(.14,(now-lastTime)/1000||0);lastTime=now;
  // More than one simulated day per real second would make sunrise/sunset
  // strobe. At accelerated speeds show a stable neutral light level instead.
- var lightTarget=playing&&speeds[speedIndex]>1?.83:sunlight();
+ var lightTarget=playing&&speedIndex>0?.83:sunlight();
  visualSunlight+=(lightTarget-visualSunlight)*Math.min(1,dt*3);
  if(playing&&worldReady){
-  acc+=dt*18*speeds[speedIndex];
+  var speed=SPEED_MODES[speedIndex];
+  acc+=dt*speed.daysPerSecond;
   // Adjust simulation tick budget rather than applying a hidden breeding restriction.
   // Contacts are currently O(n^2), so reduce tick bursts as population rises.
   var maxSteps=Math.max(2,Math.min(55,Math.floor(1600/Math.max(35,game.agents.length))));
   var steps=0;
-  while(acc>=1&&steps<maxSteps){tick();acc-=1;steps++;}
-  if(steps===maxSteps)acc=Math.min(acc,2);
+  while(acc+1e-10>=speed.stepDays&&steps<maxSteps){tick(speed.stepDays);acc-=speed.stepDays;steps++;}
+  if(steps===maxSteps)acc=Math.min(acc,speed.stepDays*2);
  }
  if(worldReady&&geography&&geography.drawPending&&now-worldPaintAt>1300){
   geography.palette(mapMode);geography.paintClouds();worldPaintAt=now;
