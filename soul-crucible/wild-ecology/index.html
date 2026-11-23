@@ -213,7 +213,8 @@ function newWorld(seed,social,learning){
  nextEcoConfig=null;
  rngState=(seed>>>0)||1;game={seed:seed>>>0,social:social!==false,learning:learning!==false,ageSystem:AGE_SYSTEM,day:0,agents:[],souls:{},pending:[],events:[],trees:[],bushes:[],stones:[],nextSoul:0,nextBody:0,
  metrics:{births:0,deaths:0,rebirths:0,given:0,helped:0,conflicts:0,meetings:0,remembered:0,lifeDays:0,lifeYearsTotal:0,lifeYearsCount:0,foodFinds:0,foodMisses:0,adaptedChoices:0,strikes:0,blocks:0,dodges:0,predations:0,meatMeals:0,fleeChoices:0,defenseHits:0,rivalryHits:0,predatorAttacks:0},deaths:[],proximity:{},carcasses:[],predatorsIntroduced:false};
- game.ecology={rules:rules,history:[],lastYear:-1,maxG:0,maxR:0,goneG:null,goneR:null};
+ game.ecology={rules:rules,history:[],lastYear:-1,maxG:0,maxR:0,maxS:0,goneG:null,goneR:null,goneS:null,sprigletsIntroduced:false};
+ initEcology();
  terrain();
  for(var i=0;i<24;i++){var soul=makeSoul(),x=0,y=0,tries=0;
  do{x=r(65,W-65);y=r(60,H-60);}while(waterDist(x,y)<20&&++tries<30);
@@ -221,8 +222,8 @@ function newWorld(seed,social,learning){
  }
  for(var k=0;k<game.agents.length;k++)game.agents[k].history=[];
  game.events=[];selected=null;modal=null;tab=0;scroll=0;view='world';playing=true;acc=0;
- releasePredators();trackEcology(true);
- announce('Wild Ecology · 24 grazers and 2 Ridgefangs');save();
+ releasePredators();if(rules.spriglets)introduceSpriglets();trackEcology(true);
+ announce('Wild Ecology · '+countKind('grazer')+' grazers · '+countKind('spriglet')+' Spriglets · 2 Ridgefangs');save();
 }
 function announce(s){toast=s;toastUntil=performance.now()+2600;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify({version:1,game:game,rng:rngState,selected:selected,view:view,speedIndex:speedIndex}));}catch(e){}}
@@ -279,7 +280,14 @@ function migrateAgeSystem(){
 }
 function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;migrateAgeSystem();initEcology();
  if(!game.ecology)game.ecology={rules:Object.assign({},ECO_DEFAULT),history:[],lastYear:-1,maxG:0,maxR:0,goneG:null,goneR:null};
+ // An older stored run is left unchanged. It gains meadow patches on a restarted seed.
+ if(!game.ecology.rules||!Object.prototype.hasOwnProperty.call(game.ecology.rules,'spriglets'))game.ecology.rules=Object.assign({},game.ecology.rules||{},{spriglets:false});
  game.ecology.rules=Object.assign({},ECO_DEFAULT,game.ecology.rules||{});
+ game.meadows=Array.isArray(game.meadows)?game.meadows:[];
+ if(!Number.isFinite(game.ecology.maxS))game.ecology.maxS=0;
+ if(!('goneS' in game.ecology))game.ecology.goneS=null;
+ if(game.ecology.sprigletsIntroduced===undefined)game.ecology.sprigletsIntroduced=game.agents.some(a=>kindOf(a)==='spriglet');
+ for(var tickRecord of game.ecology.history||[])if(!Number.isFinite(tickRecord.s))tickRecord.s=0;
  if(!Array.isArray(game.ecology.history))game.ecology.history=[];
  if(!Number.isFinite(game.ecology.lastYear))game.ecology.lastYear=-1;
  for(var prop of ['maxG','maxR'])if(!Number.isFinite(game.ecology[prop]))game.ecology[prop]=0;
@@ -826,7 +834,7 @@ function hud(){
   },index===2&&view==='follow');})(i);
  var y=topH+13;rr(10,y,Math.min(254,ww-20),50,9,'#10211ede','#466156');
  txt('LIVES  '+game.agents.length+'     SOULS  '+Object.keys(game.souls).length,20,y+15,12,'#e2e7ca','left','700');
- txt('GRAZERS '+countKind('grazer')+'   RIDGEFANGS '+countKind('carnivore')+'   DAY '+Math.floor(game.day),20,y+35,10,'#b1cabf');
+ txt('G '+countKind('grazer')+'  ·  S '+countKind('spriglet')+'  ·  R '+countKind('carnivore')+'  ·  DAY '+Math.floor(game.day),20,y+35,10,'#b1cabf');
  if(toast&&performance.now()<toastUntil){var tw=Math.min(ww-30,470),x2=(ww-tw)/2;rr(x2,hh-bottomH-45,tw,32,9,'#1b332eea','#729a88');txt(toast,ww/2,hh-bottomH-29,11,'#e8efcc','center');}
 }
 function wrap(s,x,y,maxW,size,color,lh,limit){var parts=(''+s).split(' '),line1='',rows=0;
@@ -861,7 +869,7 @@ function drawInspector(){
   miniBar('Food',a.fullness/100,x,y,width,'#dfc17e');y+=24;
   miniBar('Water',a.water/100,x,y,width,'#80c7d4');y+=24;
   miniBar('Energy',a.energy/100,x,y,width,'#94c9ac');y+=29;
-  txt('SPECIES '+(kindOf(a)==='carnivore'?'RIDGEFANG · MEAT ONLY':'GRAZER'),x,y,11,'#e8d6af','left','720');y+=22;
+  txt('SPECIES '+(kindOf(a)==='carnivore'?'RIDGEFANG · MEAT ONLY':kindOf(a)==='spriglet'?'SPRIGLET · MEADOW PLANTS':'GRAZER · BUSH PLANTS'),x,y,11,'#e8d6af','left','720');y+=22;
   txt('STRIKES '+a.battle.strikes+'  ·  DODGES '+a.battle.dodges+'  ·  KILLS '+a.battle.kills,x,y,11,'#b6cbbb');y+=27;
   txt('TEMPERAMENT',x,y,11,'#e7d6a7','left','750');y+=21;
   ['curiosity','sociability','aggression','caution','generosity'].forEach(function(k){miniBar(k[0].toUpperCase()+k.slice(1),a.t[k],x,y,width);y+=20;});
@@ -919,7 +927,7 @@ function drawInspector(){
   txt('SOUL CRUCIBLE BODY · '+shape.toUpperCase(),x,y,12,'#e9dab6','left','800');y+=23;
   y+=paragraph('Original arena silhouette. The body belongs to this lifetime, not the soul.',x,y,width,'#adc8bd')+10;
   var centerX=x+width*.5,groundY=y+154;
-  circle(centerX,groundY-36,76,'#25453b');drawValleyCritter(a,centerX,groundY,.85);
+  circle(centerX,groundY-36,76,'#25453b');if(kindOf(a)==='spriglet')drawSpriglet(a,centerX,groundY,4.3);else drawValleyCritter(a,centerX,groundY,.85);
   y=groundY+36;txt('MORPHOLOGY · 1.00 = STANDARD',x,y,11,'#e8dcad','left','750');y+=23;
   for(var gene of ['frame','muscle','legs','limbs','armor','crest','tail']){
    txt(gene.toUpperCase(),x,y,11,'#a8c8ba','left','650');
@@ -974,20 +982,23 @@ function drawWorldData(){
   var eco=game.ecology,rs=eco.rules,lg=countKind('grazer'),lr=countKind('carnivore');
   txt('WILD ECOLOGY · POPULATION',x,y,13,'#e7d6a7','left','780');y+=26;
   txt('SEED '+game.seed+' · YEAR '+Math.floor(game.day/YEAR_DAYS),x,y,11,'#a4c8b9');y+=24;
-  txt('GRAZERS '+lg,x,y,13,'#8bd3b0','left','760');txt('RIDGEFANGS '+lr,x+width,y,13,'#eba281','right','760');y+=17;
+  txt('GRAZERS '+lg,x,y,12,'#8bd3b0','left','760');
+  txt('SPRIGLETS '+countKind('spriglet'),x+width*.54,y,12,'#eddb8d','right','760');
+  txt('RIDGEFANGS '+lr,x+width,y,12,'#eba281','right','760');y+=17;
   ecologyChart(x,y,width,155);y+=170;
-  txt('PEAKS  '+eco.maxG+' GRAZERS · '+eco.maxR+' RIDGEFANGS',x,y,11,'#b4cac0');y+=25;
+  txt('PEAKS  '+eco.maxG+' G · '+(eco.maxS||0)+' S · '+eco.maxR+' R',x,y,11,'#b4cac0');y+=25;
   txt('Grazers extinct: '+(eco.goneG===null?'not observed':'year '+round(eco.goneG,1)),x,y,11,'#c9d9cf');y+=21;
-  txt('Ridgefangs extinct: '+(eco.goneR===null?'not observed':'year '+round(eco.goneR,1)),x,y,11,'#c9d9cf');y+=28;
+  txt('Ridgefangs extinct: '+(eco.goneR===null?'not observed':'year '+round(eco.goneR,1)),x,y,11,'#c9d9cf');y+=21;
+  txt('Spriglets extinct: '+(eco.goneS===null?'not observed':'year '+round(eco.goneS,1)),x,y,11,'#c9d9cf');y+=26;
   txt('TRIAL RULES',x,y,11,'#e7d6a7','left','750');y+=22;
-  for(var opt of [['grazerCap','GRAZER CAP · 38'],['ridgeCap','RIDGEFANG CAP · 4'],['rescue','ARTIFICIAL GRAZER RECOVERY']]){
+  for(var opt of [['spriglets','SPRIGLETS'],['grazerCap','GRAZER CAP · 38'],['ridgeCap','RIDGEFANG CAP · 4'],['rescue','ARTIFICIAL GRAZER RECOVERY']]){
    (function(key,name){button(name+' : '+(rs[key]?'ON':'OFF'),x,y,width,37,function(){pendingEcoKey=key;modal='ecoRules';scroll=0;},rs[key],'modal');})(opt[0],opt[1]);y+=45;
   }
   y+=paragraph('Every rule is independent. Changing one restarts the SAME seed from Year 0. Replays preserve the selected rules. This test never alters First Valley.',x,y,width)+22;
-  if(!lg&&lr)y+=paragraph('Prey extinction. Carnivores may briefly survive on remaining carcasses.',x,y,width,'#e9a991')+17;
-  else if(!lg&&!lr)y+=paragraph('Both populations extinct. The valley has fallen silent.',x,y,width,'#e9a991')+17;
+  if(!lg&&!countKind('spriglet')&&lr)y+=paragraph('All prey extinct. Carnivores may briefly survive on remaining carcasses.',x,y,width,'#e9a991')+17;
+  else if(!lg&&!lr&&!countKind('spriglet'))y+=paragraph('Every species extinct. The valley has fallen silent.',x,y,width,'#e9a991')+17;
   y+=10;txt('COMBAT & REPRODUCTION',x,y,11,'#e7d6a7','left','760');y+=24;
-  for(var r0 of [['Predator attacks',m.predatorAttacks||0],['Predation deaths',m.predations||0],['Ridgefang births',m.ridgefangBirths||0],['Defensive strikes',m.defenseHits||0],['Meat meals',m.meatMeals||0]]){
+  for(var r0 of [['Predator attacks',m.predatorAttacks||0],['Predation deaths',m.predations||0],['Spriglet births',m.sprigletBirths||0],['Spriglet predation deaths',m.sprigletKills||0],['Ridgefang births',m.ridgefangBirths||0],['Defensive strikes',m.defenseHits||0],['Spriglet meat meals',m.sprigletMeals||0],['Total meat meals',m.meatMeals||0]]){
    txt(r0[0],x,y,11,'#bfd0c7');txt(r0[1],x+width,y,11,'#e7dcbc','right','730');y+=23;
   }
   y+=paragraph('Graph samples once each simulated year; latest 400 years are retained. At 160+ creatures the simulation pauses to protect mobile browsers, without blocking new births.',x,y,width)+12;
@@ -1000,7 +1011,7 @@ function drawWorldData(){
 function drawConfirm(){
  var isToggle=modal==='toggle',isReplay=modal==='replay',isNew=modal==='new',isLearningToggle=modal==='learningToggle';
  var p=modalBackground(modal==='ecoRules'?'Change ecology rules?':modal==='reinforce'?'Introduce another founder?':modal==='introduce'?'Introduce Ridgefangs?':isToggle?'Change experiment?':isLearningToggle?'Change learning trial?':isReplay?'Replay world?':'Generate new valley?'),x=p.x+17,y=p.y+73,w=p.w-34;
- var s=modal==='ecoRules'?'Turn '+(pendingEcoKey==='grazerCap'?'grazer cap 38':pendingEcoKey==='ridgeCap'?'Ridgefang cap 4':'artificial grazer recovery')+' '+(game.ecology.rules[pendingEcoKey]?'OFF':'ON')+'? This restarts the SAME seed and overwrites this Wild Ecology trial. First Valley is preserved.':modal==='reinforce'?'Introduce '+(2-countKind('carnivore'))+' unrelated Ridgefang founder(s)? This changes the experiment without resetting the valley. Reproduction and survival are not guaranteed.':modal==='introduce'?'Bring two meat-eating Ridgefang founders into this existing valley? Their hunting may end lives. Your saved population and relationships will not reset.':isToggle?'Switch social memory '+(game.social?'OFF':'ON')+' and restart with the SAME seed? This creates a comparable starting world.':isLearningToggle?'Switch adaptive food learning '+(game.learning?'OFF':'ON')+' and restart the SAME seed? This replaces current progress; your old seed remains reproducible.':isReplay?'Restart day zero with the SAME seed and experiment settings? Current progress will be replaced.':'Start a new world with a NEW seed? You will leave the current lives behind.';
+ var s=modal==='ecoRules'?'Turn '+(pendingEcoKey==='spriglets'?'Spriglets':pendingEcoKey==='grazerCap'?'grazer cap 38':pendingEcoKey==='ridgeCap'?'Ridgefang cap 4':'artificial grazer recovery')+' '+(game.ecology.rules[pendingEcoKey]?'OFF':'ON')+'? This restarts the SAME seed and overwrites this Wild Ecology trial. First Valley is preserved.':modal==='reinforce'?'Introduce '+(2-countKind('carnivore'))+' unrelated Ridgefang founder(s)? This changes the experiment without resetting the valley. Reproduction and survival are not guaranteed.':modal==='introduce'?'Bring two meat-eating Ridgefang founders into this existing valley? Their hunting may end lives. Your saved population and relationships will not reset.':isToggle?'Switch social memory '+(game.social?'OFF':'ON')+' and restart with the SAME seed? This creates a comparable starting world.':isLearningToggle?'Switch adaptive food learning '+(game.learning?'OFF':'ON')+' and restart the SAME seed? This replaces current progress; your old seed remains reproducible.':isReplay?'Restart day zero with the SAME seed and experiment settings? Current progress will be replaced.':'Start a new world with a NEW seed? You will leave the current lives behind.';
  y+=paragraph(s,x,y,w,'#c7d8c9')+30;
  button('CANCEL',x,y,w*.46,36,function(){modal=null;},false,'modal');
  button('CONFIRM',x+w*.51,y,w*.49,36,function(){
@@ -1026,9 +1037,12 @@ function drawHelp(){
  'MEMORY toggles the relationship system. STATS > LEARNING lets you compare food learning ON/OFF with the same seed.',
  'REPLAY restarts the same seed and rule settings. NEW SEED creates a different valley.',
  'Wild Ecology has its own independent browser save and never changes First Valley.',
- 'The trial starts with 24 grazers and two Ridgefangs. Neither outcome is scripted.',
+ 'A new Spriglet-enabled seed starts with 24 grazers, 12 Spriglets, and two Ridgefangs. Existing saved worlds keep their original occupants.',
+ 'Spriglets live 10 to 15 years, mature around age 1.6, and breed in litters only when food, water and local space support it.',
+ 'Spriglets eat regrowing meadow ground cover. They yield two meat portions; large grazers yield six. Neither species is replenished automatically.',
+ 'STATS > ECOLOGY lets you toggle Spriglets and compare the same seed with the original two-species world.',
  'STATS > ECOLOGY controls both population caps and artificial grazer recovery independently. A change restarts the same seed.',
- 'Grazer recovery ON recalls queued grazer souls below 24 and may create a new grazer below 12. Recovery OFF allows permanent extinction.',
+ 'Artificial grazer recovery ON replenishes only the large grazers. Spriglets have no such recovery rule, even when it is enabled.',
  'At 160 living creatures, the app pauses for mobile safety without limiting future reproduction.',
  'The three ancient clearings are just geography. They are not settlements or destinations imposed by a director.',
  'The calendar uses 30 simulated days per in-world year. Natural lifespans range from 80 to 100 years; other dangers can end life sooner.',
