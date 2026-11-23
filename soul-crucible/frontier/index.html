@@ -1032,7 +1032,8 @@ function chooseAction(a){
  a.target={x:spot.x,y:spot.y,kind:'wander'};
 }
 function contact(a,b){
- if(a.sleep?.sleeping||b.sleep?.sleeping)return;
+ // Social care and reproduction can only involve creatures still alive.
+ if(a.health<=0||b.health<=0||a.sleep?.sleeping||b.sleep?.sleeping)return;
  var ra=relation(a,b),rb=relation(b,a);
  if(game.day-ra.lastMeet<1.8)return;
  ra.lastMeet=rb.lastMeet=game.day;ra.meetings++;rb.meetings++;
@@ -1056,7 +1057,7 @@ function contact(a,b){
  function help(donor,recv,dr,rr){
   // Caring for wounds cannot substitute for food or drinking water.
   // A caregiver spends its own finite reserves rather than creating health from rest alone.
-  if(recv.health>63||donor.energy<42||donor.health<45||
+  if(recv.health<=0||recv.health>63||donor.energy<42||donor.health<45||
      donor.fullness<48||donor.water<42||recv.fullness<18||recv.water<18||
      donor.t.generosity+dr.trust*.5<r(.42,1.18))return false;
   donor.energy-=9;donor.fullness=Math.max(0,donor.fullness-12);
@@ -1136,6 +1137,12 @@ function tick(stepDays){
  game.weatherCounter++;
  var remove=[];
  for(var a of game.agents){
+  // A lethal attack must be irreversible: never let the next tick heal a
+  // creature that has already reached zero health.
+  if(a.health<=0||a.age>=a.lifespan){
+   var deadCause=a.age>=a.lifespan?'old age':a.water<5?'dehydration':a.fullness<5?'starvation':'injuries';
+   remove.push({a:a,why:deadCause});continue;
+  }
   if(a.learning&&a.learning.lastSite&&dist(a.x,a.y,a.learning.lastSite.x,a.learning.lastSite.y)>57)a.learning.lastSite=null;
   a.age+=dt;a.fullness=Math.max(0,a.fullness-(kindOf(a)==='carnivore'?1.52:kindOf(a)==='spriglet'?2.55:1.75+a.body.strength*.35)*dt);
   var air=terrainTemperature(a),heat=air>30?Math.min(2.1,(air-30)*.11):0;
@@ -1147,7 +1154,7 @@ function tick(stepDays){
   var wasAtWater=!a.sleep?.sleeping&&drinkNearby(a,dt);
   if(a.fullness<5)a.health-=(5-a.fullness)*.31*dt;
   if(a.water<5)a.health-=(5-a.water)*.62*dt;
-  if(a.energy>30&&a.fullness>60&&a.water>65)a.health=Math.min(100,a.health+.18*dt);
+  if(a.health>0&&a.energy>30&&a.fullness>60&&a.water>65)a.health=Math.min(100,a.health+.18*dt);
   if(a.health<=0||a.age>=a.lifespan){
    var why=a.age>=a.lifespan?'old age':a.water<5?'dehydration':a.fullness<5?'starvation':'injuries';
    remove.push({a:a,why:why});continue;
@@ -1206,6 +1213,15 @@ function tick(stepDays){
     if(last===undefined||game.day-last>1.8){game.proximity[pair]=game.day;game.metrics.meetings++;a.stats.meetings++;b3.stats.meetings++;}
    }
   }
+ }
+ // Also collect victims fatally injured AFTER their own turn this tick.
+ // Without this sweep, a predator may log a fatal strike but the victim
+ // would remain active until the following tick.
+ var markedDead=new Set(remove.map(d=>d.a));
+ for(var victim of game.agents){
+  if(victim.health>0||markedDead.has(victim))continue;
+  var reason=victim.water<5?'dehydration':victim.fullness<5?'starvation':'injuries';
+  remove.push({a:victim,why:reason});markedDead.add(victim);
  }
  for(var dead of remove){death(dead.a,dead.why);}
  if(remove.length)game.agents=game.agents.filter(function(a){return !remove.some(function(d){return d.a===a;});});
@@ -1402,7 +1418,7 @@ function wrap(s,x,y,maxW,size,color,lh,limit){var parts=(''+s).split(' '),line1=
 function paragraph(str,x,y,width,color){return wrap(str,x,y,width,12,color||'#c5d7d0',17);}
 function miniBar(k,value,x,y,width,color){
  txt(k,x,y,11,'#a8b9b0');rr(x+82,y-4,width-88,8,4,'#293d40');rr(x+82,y-4,(width-88)*clamp(value,0,1),8,4,color||'#72b89d');
- txt(Math.round(clamp(value,0,1)*100)+'%',x+width,y,10,'#d8e3cf','right');
+ var pct=clamp(value,0,1)*100;txt(pct>0&&pct<.5?'<1%':Math.round(pct)+'%',x+width,y,10,'#d8e3cf','right');
 }
 function pairName(a,id){var live=game.agents.find(function(v){return v.id===Number(id);});if(live)return live.name;var ev=game.events.find(function(e){return e.who.indexOf(Number(id))>=0;});return 'Life #'+id;}
 function bondsCount(){var total=0;for(var a of game.agents)for(var key in a.relations){var rel=a.relations[key];if(Number(key)>a.id&&rel.trust>.18&&rel.meetings>=3&&game.agents.some(function(p){return p.id===Number(key);}))total++;}return total;}
