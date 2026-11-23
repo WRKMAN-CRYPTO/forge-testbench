@@ -746,14 +746,35 @@ function sprigletBreed(a,b){
  }
  a.fullness=Math.max(0,a.fullness-14);b.fullness=Math.max(0,b.fullness-14);
 }
+// A visible resource is not necessarily accessible across an island or bay.
+function viableFoodRoute(a,x,y,kind){
+ if(recentlyUnreachable(a,x,y,kind,null)||!geography.sameLand(a.x,a.y,x,y))return null;
+ var direct=dist(a.x,a.y,x,y);
+ if(geography.clearLand(a.x,a.y,x,y))return direct;
+ var route=geography.route(a.x,a.y,x,y);
+ if(!route)return null;
+ var previous={x:a.x,y:a.y},length=0;
+ for(var node of route){length+=dist(previous.x,previous.y,node.x,node.y);previous=node;}
+ length+=dist(previous.x,previous.y,x,y);
+ return length>Math.max(260,direct*2.8)?null:length;
+}
+function chooseReachableFood(a,candidates,kind,limit){
+ candidates.sort(function(p,q){return p.d-q.d;});
+ var best=null,cost=Infinity;
+ for(var c of candidates.slice(0,limit||8)){
+  var length=viableFoodRoute(a,c.x,c.y,kind);
+  if(length!==null&&length<cost){best=c.ref;cost=length;}
+ }
+ return best;
+}
 function sprigletField(a){
- var near=null,closest=Infinity;
+ var candidates=[],range=155+a.body.senses*185;
  for(var meadow of game.meadows||[])if(meadow.amount>=.8){
   var d=dist(a.x,a.y,meadow.x,meadow.y);
-  if(recentlyUnreachable(a,meadow.x,meadow.y,'meadow',null))continue;
-  if(d<closest&&d<155+a.body.senses*185){closest=d;near=meadow;}
+  if(d<range&&!recentlyUnreachable(a,meadow.x,meadow.y,'meadow',null))
+   candidates.push({x:meadow.x,y:meadow.y,d:d,ref:meadow});
  }
- return near;
+ return chooseReachableFood(a,candidates,'meadow',8);
 }
 function introduceSpriglets(){
  var sites=[];
@@ -997,11 +1018,17 @@ function chooseAction(a){
   var meadow=sprigletField(a);
   if(meadow){a.target={x:meadow.x,y:meadow.y,kind:'meadow'};a.decision='Nibbling ground cover';return;}
  }
- if(kindOf(a)==='grazer'&&a.fullness<78){var near=null,nd=1e9;
-  for(var b of game.bushes){if(b.amount<.9||recentlyUnreachable(a,b.x,b.y,'food',null))continue;var d=dist(a.x,a.y,b.x,b.y);if(d>95+a.body.senses*160)continue;if(d<nd){nd=d;near=b;}}
-  var saved=rememberedFood(a);
-  if(saved&&!recentlyUnreachable(a,saved.x,saved.y,'food',null)&&
-    (!near||dist(a.x,a.y,saved.x,saved.y)<nd*.8))near=saved;
+ if(kindOf(a)==='grazer'&&a.fullness<78){
+  var candidates=[],range=95+a.body.senses*160;
+  for(var b of game.bushes){
+   if(b.amount<.9)continue;
+   var d=dist(a.x,a.y,b.x,b.y);
+   if(d<=range&&!recentlyUnreachable(a,b.x,b.y,'food',null))
+    candidates.push({x:b.x,y:b.y,d:d,ref:b});
+  }
+  var near=chooseReachableFood(a,candidates,'food',8),saved=rememberedFood(a);
+  if(saved&&viableFoodRoute(a,saved.x,saved.y,'food')!==null&&
+    (!near||dist(a.x,a.y,saved.x,saved.y)<dist(a.x,a.y,near.x,near.y)*.8))near=saved;
   if(near){a.target={x:near.x,y:near.y,kind:'food'};a.decision='Foraging';return;}
  }
  if(a.energy<30){
@@ -1553,7 +1580,11 @@ function drawWorldData(){
   ['Sleeping now',game.agents.filter(a=>a.sleep?.sleeping).length],
   ['Total sleep episodes',m.sleepEpisodes||0],['Completed sleep episodes',m.sleepCompleted||0],
   ['Sleep hours accumulated',round(m.sleepHours||0,1)],['Involuntary naps',m.forcedSleepEpisodes||0],['Involuntary nap hours',round(m.forcedSleepHours||0,1)],['Woken by danger',m.sleepDangerWakes||0],
-  ['Sleep deprived now',game.agents.filter(a=>a.sleep&&a.sleep.pressure>.95).length]];
+  ['Sleep deprived now',game.agents.filter(a=>a.sleep&&a.sleep.pressure>.95).length],
+  ['Inaccessible route attempts',m.unreachableRoutes||0],['Abandoned stalled journeys',m.stalledRoutes||0],
+  ['Terrain detours',m.landDetours||0],['Successful food patch visits',m.foodFinds||0],
+  ['Empty food patch visits',m.foodMisses||0],['Ridgefang predations',m.predations||0],
+  ['Grazers now',countKind('grazer')],['Spriglets now',countKind('spriglet')],['Ridgefangs now',countKind('carnivore')]];
   for(var row of records){txt(row[0],x,y,12,'#c1d5c9');txt(row[1],x+width,y,12,'#e6deb9','right','720');y+=25;}
   y+=13;txt('AVERAGE COMPLETED LIFETIME',x,y,11,'#a9c5b7');y+=22;
   txt(m.lifeYearsCount?round(m.lifeYearsTotal/m.lifeYearsCount,1)+' years':'No lives completed on new age scale',x,y,13,'#e9d8af');y+=27;
