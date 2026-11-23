@@ -890,6 +890,14 @@ function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
 function rr(x,y,w,h,radius,fill,stroke){var r2=Math.min(radius,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r2,y);ctx.arcTo(x+w,y,x+w,y+h,r2);ctx.arcTo(x+w,y+h,x,y+h,r2);ctx.arcTo(x,y+h,x,y,r2);ctx.arcTo(x,y,x+w,y,r2);ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
 function txt(s,x,y,size,color,align,weight){ctx.font=(weight||'500')+' '+size+'px system-ui,-apple-system,sans-serif';ctx.textAlign=align||'left';ctx.textBaseline='middle';ctx.fillStyle=color||'#deebd7';ctx.fillText(s,x,y);}
 function strokeRiver(color,width){ctx.beginPath();for(var y=-20;y<=H+20;y+=6){var x=riverX(y);if(y===-20)ctx.moveTo(sx(x),sy(y));else ctx.lineTo(sx(x),sy(y));}ctx.strokeStyle=color;ctx.lineWidth=width*scale;ctx.lineCap='round';ctx.stroke();}
+// Display-only scaling. Simulation coordinates and interactions stay unchanged.
+// The spriglet silhouette is much narrower in its native drawing, so its
+// canvas transform is ~1.2x an adult's transform to achieve ~1/4 adult width.
+function worldSpriteScale(a,base){
+ var species=kindOf(a);
+ if(species==='spriglet')return Math.max(.14,base*.58*1.2);
+ return base*(species==='carnivore'?.62:.58)*(ageYears(a)<16?.78:1);
+}
 function scene(){
  rect(0,topH,ww,viewportH,'#091b22');ctx.save();ctx.beginPath();ctx.rect(0,topH,ww,viewportH);ctx.clip();
  var x=sx(0),y=sy(0),sw=W*scale,sh=H*scale;
@@ -930,17 +938,24 @@ function scene(){
  }
  screenPos=[];
  for(var a of game.agents){
-  var cx=sx(a.x),cy=sy(a.y),sz=clamp(scale*.56,.18,.48);
+  var cx=sx(a.x),cy=sy(a.y),baseSize=clamp(scale*.56,.18,.48);
   if(cx<-44||cx>ww+44||cy<topH-70||cy>hh-bottomH+40)continue;
-  if(kindOf(a)==='spriglet')drawSpriglet(a,cx,cy+4,Math.max(.66,scale*2.2));
-  else drawValleyCritter(a,cx,cy+4,sz*(ageYears(a)<16?.78:1));
-  if(a.health<50)line(cx-10,cy-25,cx+10,cy-25,'#d97b70',2);
-  if(a.combatFlash&&a.combatFlash>game.day)circle(cx,cy-22,Math.max(13,sz*60),null,'#e5a17f',2);
+  var small=kindOf(a)==='spriglet',spriteSize=worldSpriteScale(a,baseSize);
+  if(small)drawSpriglet(a,cx,cy+4,spriteSize);
+  else drawValleyCritter(a,cx,cy+4,spriteSize);
+  // The visual indicators follow the smaller sprites, but the touch target
+  // remains deliberately generous and independent of their rendered size.
+  var topOffset=small?Math.max(7,spriteSize*37):Math.max(13,spriteSize*150);
+  var barHalf=small?Math.max(5,spriteSize*18):Math.max(7,spriteSize*54);
+  if(a.health<50)line(cx-barHalf,cy-topOffset-3,cx+barHalf,cy-topOffset-3,'#d97b70',2);
+  if(a.combatFlash&&a.combatFlash>game.day)
+   circle(cx,cy-topOffset*.52,small?Math.max(6,spriteSize*29):Math.max(10,spriteSize*57),null,'#e5a17f',2);
   if(a.id===selected){
-   circle(cx,cy-11,Math.max(17,sz*95),null,'#f0e0a5',1.6);
-   txt(a.name,cx,cy-Math.max(31,sz*150),11,'#fff0c4','center','700');
+   circle(cx,cy-topOffset*.48,small?Math.max(7,spriteSize*25):Math.max(10,spriteSize*80),null,'#f0e0a5',1.6);
+   txt(a.name,cx,cy-topOffset-13,11,'#fff0c4','center','700');
   }
-  screenPos.push({id:a.id,x:cx,y:cy-(kindOf(a)==='spriglet'?7:12),radius:kindOf(a)==='spriglet'?Math.max(12,scale*23):Math.max(22,sz*110)});
+  screenPos.push({id:a.id,x:cx,y:cy-(small?5:9),
+   radius:small?Math.max(16,spriteSize*35):Math.max(22,spriteSize*112)});
 
  }
  if(view==='world'&&mapMode==='Surface'){
