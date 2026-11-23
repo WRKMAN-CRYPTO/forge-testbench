@@ -20,6 +20,114 @@ var W=1000,H=1000, TAU=Math.PI*2, KEY='soul-crucible-frontier-001';
 // Accelerated simulation calendar: 30 world days = 1 in-world year.
 // This extends lives while keeping generational observation practical on phones.
 var YEAR_DAYS=30,MIN_AGE_YEARS=80,MAX_AGE_YEARS=100,AGE_SYSTEM='years30-v1';
+
+// PHASE 3 · PLACE ATTACHMENT: learned locally and forgotten between lives.
+// Recording a birthplace does not make it a good place to live.
+const PLACE_KEYS=['placeFinds','placeLosses','placeHomes','placeHomeMoves','placeReturnAttempts','placeReturns','placeNatalReturns'];
+function initPlaceStats(){for(var k of PLACE_KEYS)if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;}
+function newPlaceMemory(a,born){
+ return {birth:born?{x:a.x,y:a.y}:null,
+  sites:born?[{id:'birth',x:a.x,y:a.y,good:0,bad:0,affinity:0,visits:0,
+   lastSeen:game.day,lastReward:-100,lastRisk:-100}]:[],
+  nextId:1,homeId:null,homeChanges:0,returns:0,natalReturns:0,attempts:0,
+  returnCooldown:0,homeChangedAt:-100,nextRegion:game.day+3.5,lastStress:-100};
+}
+function placeMemory(a){
+ if(!a.placeMemory)a.placeMemory=newPlaceMemory(a,false);
+ var m=a.placeMemory;if(!Array.isArray(m.sites))m.sites=[];
+ if(!Number.isFinite(m.nextId))m.nextId=1;
+ if(!Number.isFinite(m.nextRegion))m.nextRegion=game.day+3.5;
+ if(!Number.isFinite(m.homeChangedAt))m.homeChangedAt=-100;
+ if(!Number.isFinite(m.returnCooldown))m.returnCooldown=0;
+ for(var p of m.sites){
+  if(!Number.isFinite(p.affinity))p.affinity=0;
+  if(!Number.isFinite(p.good))p.good=0;
+  if(!Number.isFinite(p.bad))p.bad=0;
+  if(!Number.isFinite(p.visits))p.visits=0;
+  if(!Number.isFinite(p.lastReward))p.lastReward=-100;
+  if(!Number.isFinite(p.lastRisk))p.lastRisk=-100;
+  if(!Number.isFinite(p.lastSeen))p.lastSeen=game.day;
+ }
+ return m;
+}
+function localSite(a,x,y,create){
+ var m=placeMemory(a),site=null,closest=85;
+ for(var q of m.sites){var d=dist(x,y,q.x,q.y);if(d<closest){closest=d;site=q;}}
+ if(site||!create)return site;
+ if(m.sites.length>=6){
+  var evict=m.sites.filter(p=>p.id!=='birth'&&p.id!==m.homeId);
+  if(!evict.length)return null;
+  evict.sort((a,b)=>(a.affinity+.03*a.good)-(b.affinity+.03*b.good));
+  m.sites.splice(m.sites.indexOf(evict[0]),1);
+ }
+ site={id:'site'+m.nextId++,x,y,good:0,bad:0,affinity:0,visits:0,lastSeen:game.day,lastReward:-100,lastRisk:-100};
+ m.sites.push(site);return site;
+}
+function updateLearnedHome(a){
+ var m=placeMemory(a),eligible=m.sites.filter(p=>p.good>=2&&p.affinity>=.34&&p.visits>=1);
+ if(!eligible.length)return;
+ eligible.sort((a,b)=>(b.affinity+Math.min(.2,b.good*.02))-(a.affinity+Math.min(.2,a.good*.02)));
+ var best=eligible[0],current=m.sites.find(p=>p.id===m.homeId);
+ if(current&&current.id===best.id)return;
+ if(current&&best.affinity<current.affinity+.15)return;
+ if(game.day-m.homeChangedAt<18)return;
+ var previous=m.homeId;m.homeId=best.id;m.homeChangedAt=game.day;
+ m.homeChanges=(m.homeChanges||0)+1;
+ a.home={x:best.x,y:best.y};
+ if(previous)game.metrics.placeHomeMoves++;else game.metrics.placeHomes++;
+ if(m.homeChanges<=2||m.homeChanges%4===0)
+  logHistory(a,'Established a '+(previous?'new ':'')+'familiar home near ('+Math.round(best.x)+', '+Math.round(best.y)+')');
+}
+function placeExperience(a,reason){
+ var reward=reason==='food'||reason==='water'||reason==='meat',site=localSite(a,a.x,a.y,true);
+ if(!site)return false;
+ var last=reward?site.lastReward:site.lastRisk,cooldown=reward?2.1:1.6;
+ if(game.day-last<cooldown)return false;
+ if(reward){
+  site.good++;site.affinity=clamp(site.affinity+(reason==='water'?.15:.21),-1,1);
+  site.lastReward=game.day;game.metrics.placeFinds++;
+ }else{
+  site.bad++;site.affinity=clamp(site.affinity-(reason==='injury'?.38:.25),-1,1);
+  site.lastRisk=game.day;game.metrics.placeLosses++;
+ }
+ site.visits++;site.lastSeen=game.day;updateLearnedHome(a);return true;
+}
+function samplePlace(a){
+ var m=placeMemory(a);if(game.day<m.nextRegion)return;
+ m.nextRegion=game.day+3.5;
+ var site=localSite(a,a.x,a.y,false);
+ if(site&&game.day-site.lastSeen>1){site.visits++;site.lastSeen=game.day;}
+ if((a.fullness<14||a.water<14)&&game.day-(m.lastStress||-100)>4){
+  if(site&&placeExperience(a,'hardship'))m.lastStress=game.day;
+ }
+}
+function chooseFamiliarGround(a){
+ var m=placeMemory(a),home=m.sites.find(p=>p.id===m.homeId);
+ if(!home||home.affinity<.26||m.returnCooldown>game.day||
+    a.fullness<70||a.water<72||a.energy<48)return false;
+ var d=dist(a.x,a.y,home.x,home.y);
+ if(d<78||d>310||!geography.sameLand(a.x,a.y,home.x,home.y)||
+    recentlyUnreachable(a,home.x,home.y,'homeward',null))return false;
+ var chance=clamp(.17+home.affinity*.2+a.t.caution*.08-a.t.curiosity*.13,.06,.33);
+ if(rand()>=chance)return false;
+ a.target={x:home.x,y:home.y,kind:'homeward',siteId:home.id};
+ a.decision=home.id==='birth'?'Returning to birthplace':'Returning to familiar ground';
+ m.attempts++;game.metrics.placeReturnAttempts++;
+ m.returnCooldown=game.day+12;return true;
+}
+function registerPlaceReturn(a){
+ if(!a.target||a.target.kind!=='homeward')return;
+ var m=placeMemory(a),site=m.sites.find(p=>p.id===a.target.siteId);
+ if(!site||dist(a.x,a.y,site.x,site.y)>24)return;
+ m.returns++;game.metrics.placeReturns++;
+ if(site.id==='birth'){m.natalReturns++;game.metrics.placeNatalReturns++;}
+ m.returnCooldown=game.day+25;
+ if(m.returns<=2||m.returns%7===0)
+  logHistory(a,'Returned to '+(site.id==='birth'?'birthplace':'familiar ground')+' after travelling away');
+ a.target={x:a.x,y:a.y,kind:'rest'};a.decision='Resting at familiar ground';
+ a.nextThink=game.day+2;
+}
+
 function ageYears(a){return a.age/YEAR_DAYS;}
 function lifespanYears(a){return a.lifespan/YEAR_DAYS;}
 var clamp=function(n,a,b){return Math.max(a,Math.min(b,n));};
@@ -328,6 +436,7 @@ function spawn(s,x,y,p,q,species){var land=footprint(x,y);x=land.x;y=land.y;var 
  relations:{},places:[],history:[],home:null,parentIds:p&&q?[p.id,q.id]:[],decision:'Exploring',target:{x:x,y:y,kind:'wander'},
  nextThink:0,nextSocial:0,nextBirth:0,nextStrike:0,threatUntil:-1,battle:{strikes:0,dodges:0,blocks:0,kills:0,hunts:0,meals:0,escapes:0},learning:freshLearning(),stats:{gives:0,receives:0,helps:0,helped:0,conflicts:0,meetings:0,travel:0,waterScares:0,injuries:0},born:game.day};
  a.genome=makeValleyGenome(a,p,q);
+ a.placeMemory=newPlaceMemory(a,!!(p&&q));
  if(p&&q){game.metrics.births++;if(species==='carnivore')game.metrics.ridgefangBirths=(game.metrics.ridgefangBirths||0)+1;if(species==='spriglet')game.metrics.sprigletBirths=(game.metrics.sprigletBirths||0)+1;}
  s.lives++;game.agents.push(a);
  if(s.lives>1){game.metrics.rebirths++;addEvent('soul',a.name+' begins life '+s.lives+' (soul '+s.id+')',a);}
@@ -386,7 +495,7 @@ function newWorld(seed,social,learning){
  rngState=(seed>>>0)||1;game={seed:seed>>>0,social:social!==false,learning:learning!==false,ageSystem:AGE_SYSTEM,day:0,agents:[],souls:{},pending:[],events:[],trees:[],bushes:[],stones:[],nextSoul:0,nextBody:0,
  metrics:{births:0,deaths:0,rebirths:0,given:0,helped:0,conflicts:0,meetings:0,remembered:0,lifeDays:0,lifeYearsTotal:0,lifeYearsCount:0,foodFinds:0,foodMisses:0,adaptedChoices:0,strikes:0,blocks:0,dodges:0,predations:0,meatMeals:0,fleeChoices:0,defenseHits:0,rivalryHits:0,predatorAttacks:0},deaths:[],proximity:{},carcasses:[],predatorsIntroduced:false};
  game.ecology={rules:rules,history:[],lastYear:-1,maxG:0,maxR:0,maxS:0,goneG:null,goneR:null,goneS:null,sprigletsIntroduced:false};
- initEcology();
+ initEcology();initPlaceStats();
  startFrontier(seed,false,frontierPopulate);
 }
 function announce(s){toast=s;toastUntil=performance.now()+2600;}
@@ -442,7 +551,7 @@ function migrateAgeSystem(){
  if(!Number.isFinite(game.metrics.lifeYearsCount))game.metrics.lifeYearsCount=0;
  game.ageSystem=AGE_SYSTEM;
 }
-function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;migrateAgeSystem();initEcology();
+function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw&&raw.version===1&&raw.game&&raw.game.agents&&raw.game.bushes){game=raw.game;rngState=raw.rng>>>0;selected=raw.selected||null;view=raw.view||'world';speedIndex=clamp(raw.speedIndex||0,0,3);game.proximity=game.proximity||{};if(game.learning===undefined)game.learning=true;migrateAgeSystem();initEcology();initPlaceStats();
  if(!game.ecology)game.ecology={rules:Object.assign({},ECO_DEFAULT),history:[],lastYear:-1,maxG:0,maxR:0,goneG:null,goneR:null};
  // An older stored run is left unchanged. It gains meadow patches on a restarted seed.
  if(!game.ecology.rules||!Object.prototype.hasOwnProperty.call(game.ecology.rules,'spriglets'))game.ecology.rules=Object.assign({},game.ecology.rules||{},{spriglets:false});
@@ -461,7 +570,7 @@ function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw
  // Older saved valley states may not have every soul history field.
  for(var soulID in game.souls)safeSoulRecord(game.souls[soulID]);
  for(var k of ['foodFinds','foodMisses','adaptedChoices'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
- for(var a of game.agents){ensureLearning(a);a.family=a.family||'Wanderer';ensureValleyGenome(a);a.history=Array.isArray(a.history)?a.history.filter(function(entry){return typeof entry==='string'&&entry.trim().length>0;}).slice(0,12):[];a.t=mapTemper(a.base,game.souls[a.soulId]);}return true;}}catch(e){}return false;}
+ for(var a of game.agents){ensureLearning(a);placeMemory(a);a.family=a.family||'Wanderer';ensureValleyGenome(a);a.history=Array.isArray(a.history)?a.history.filter(function(entry){return typeof entry==='string'&&entry.trim().length>0;}).slice(0,12):[];a.t=mapTemper(a.base,game.souls[a.soulId]);}return true;}}catch(e){}return false;}
 
 const GRAZER_CAP=38,PREDATOR_CAP=4;
 function kindOf(a){return a&&a.species==='carnivore'?'carnivore':a&&a.species==='spriglet'?'spriglet':'grazer';}
@@ -636,7 +745,7 @@ function fight(a,b,why){
  var defended=rand()<clamp(.07+b.body.resilience*.21+b.t.caution*.14,.04,.47)&&b.energy>10;
  if(defended){b.energy-=5;b.battle.blocks++;game.metrics.blocks++;}
  var damage=Math.max(1.5,(3+a.body.strength*9+(kindOf(a)==='carnivore'?24:0)-b.body.resilience*4.4)*(defended?.38:1));
- b.health=Math.max(0,b.health-damage);b.stats.injuries++;
+ b.health=Math.max(0,b.health-damage);b.stats.injuries++;placeExperience(b,'injury');
  b.threatUntil=game.day+5;b.nextThink=0;
  b.lastHit={id:a.id,name:a.name,why:why,day:game.day};
  b.combatFlash=game.day+.55;a.combatFlash=game.day+.3;
@@ -671,7 +780,7 @@ function eatMeat(a){
  for(var c of game.carcasses){
   if((c.species!=='grazer'&&c.species!=='spriglet')||c.meat<=0||c.expires<game.day||dist(a.x,a.y,c.x,c.y)>22)continue;
   c.meat--;a.fullness=Math.min(100,a.fullness+34);a.battle.meals++;game.metrics.meatMeals++;if(c.species==='spriglet')game.metrics.sprigletMeals++;
-  a.health=Math.min(100,a.health+5);a.decision='Eating meat';a.nextThink=0;return;
+  a.health=Math.min(100,a.health+5);a.decision='Eating meat';a.nextThink=0;placeExperience(a,'meat');return;
  }
 }
 
@@ -754,6 +863,15 @@ function chooseAction(a){
   // Resting is local. Don't attempt an exhausting journey home when exhausted.
   a.target={x:a.x,y:a.y,kind:'rest'};a.decision='Resting';return;
  }
+ if(a.target&&a.target.kind==='homeward'){
+  var pm=placeMemory(a),remembered=pm.sites.find(p=>p.id===a.target.siteId);
+  if(remembered&&dist(a.x,a.y,remembered.x,remembered.y)>26&&
+     a.fullness>63&&a.water>65&&a.energy>28&&
+     !recentlyUnreachable(a,remembered.x,remembered.y,'homeward',null)){
+   a.decision='Travelling to familiar ground';return;
+  }
+ }
+ if(chooseFamiliarGround(a))return;
  if(game.social && a.t.sociability>.24 && a.energy>28 && a.water>24 && a.fullness>25){
   var friend=nearestAgent(a,function(b,d){var rel=a.relations[b.id];return kindOf(b)===kindOf(a)&&!!rel&&rel.trust>.18&&rel.meetings>=2&&d<275;});
   var socialBias=a.t.sociability+(.35-Math.min(.35,friend.d/1000));
@@ -761,13 +879,9 @@ function chooseAction(a){
    a.target={x:friend.agent.x,y:friend.agent.y,kind:'friend',id:friend.agent.id};a.decision='Seeking '+friend.agent.name;game.metrics.remembered++;return;
   }
  }
- var spot=null;if(a.home&&geography.sameLand(a.x,a.y,a.home.x,a.home.y)&&
-    !recentlyUnreachable(a,a.home.x,a.home.y,'wander',null)&&
-    rand()<.14+(.45-a.t.curiosity)*.3){
-    spot=footprint(a.home.x+r(-50,50),a.home.y+r(-50,50));
-    a.decision='Returning home';
- }
- else{spot=footprint(a.x+r(-130,130)*(0.55+a.t.curiosity),a.y+r(-130,130)*(0.55+a.t.curiosity));a.decision='Exploring';}
+ var spot=footprint(a.x+r(-130,130)*(0.55+a.t.curiosity),
+  a.y+r(-130,130)*(0.55+a.t.curiosity));
+ a.decision='Exploring';
  var danger=a.places.find(function(p){return p.kind==='danger'&&dist(spot.x,spot.y,p.x,p.y)<80&&game.day-p.day<60;});
  if(danger&&a.t.caution>.3){spot=footprint(a.x+(a.x-danger.x)*.5+r(-70,70),a.y+(a.y-danger.y)*.5+r(-70,70));a.decision='Avoiding a remembered danger';}
  a.target={x:spot.x,y:spot.y,kind:'wander'};
@@ -820,7 +934,7 @@ function contact(a,b){
   var s=pend>=0?game.souls[game.pending.splice(pend,1)[0].soulId]:makeSoul();
   var baby=spawn(s,clamp((a.x+b.x)/2+r(-12,12),25,W-25),clamp((a.y+b.y)/2+r(-12,12),25,H-25),a,b,kind);
   relation(a,baby).trust=.7;relation(b,baby).trust=.7;relation(baby,a).trust=.72;relation(baby,b).trust=.72;
-  a.home={x:a.x,y:a.y};b.home={x:b.x,y:b.y};
+  // Parenthood is not evidence that this location makes a good home.
  }
  var hostility=(a.t.aggression+b.t.aggression)/2;
  var scarce=a.fullness<62||b.fullness<62;
@@ -856,7 +970,7 @@ function death(a,cause){
 function drinkNearby(a,dt){
  if(!worldReady||!geography.liquidNear(a.x,a.y))return false;
  markPlace(a,a.x,a.y,'water');
- if(a.water<94){a.water=Math.min(100,a.water+64*dt);a.decision='Drinking';}
+ if(a.water<94){if(a.water<78)placeExperience(a,'water');a.water=Math.min(100,a.water+64*dt);a.decision='Drinking';}
  return true;
 }
 function tick(){
@@ -904,7 +1018,7 @@ function tick(){
   if(kindOf(a)==='spriglet'){
    for(var meadow of game.meadows){
     if(meadow.amount>=.82&&dist(a.x,a.y,meadow.x,meadow.y)<15&&a.fullness<94){
-     meadow.amount-=.82;a.fullness=Math.min(100,a.fullness+24);a.nextThink=0;a.decision='Grazing understory';gathered=true;break;
+     meadow.amount-=.82;a.fullness=Math.min(100,a.fullness+24);placeExperience(a,'food');a.nextThink=0;a.decision='Grazing understory';gathered=true;break;
     }
    }
   }
@@ -912,7 +1026,7 @@ function tick(){
    if(bush2.amount>=1&&dist(a.x,a.y,bush2.x,bush2.y)<16&&(a.fullness<91||a.food<2)){
     bush2.amount-=1;if(a.fullness<84)a.fullness=clamp(a.fullness+27,0,100);else a.food=Math.min(4,a.food+1);
     if(a.food<2&&rand()<.55)a.food++;
-    markPlace(a,bush2.x,bush2.y,'food');foodResult(a,true,bush2.x,bush2.y);gathered=true;a.nextThink=0;break;
+    markPlace(a,bush2.x,bush2.y,'food');foodResult(a,true,bush2.x,bush2.y);placeExperience(a,'food');gathered=true;a.nextThink=0;break;
    }
   }
   if(t.kind==='meadow'&&dist(a.x,a.y,t.x,t.y)<20&&!gathered){a.target={x:a.x,y:a.y,kind:'search'};a.nextThink=0;}
@@ -925,9 +1039,10 @@ function tick(){
   }
   if(kindOf(a)==='carnivore')eatMeat(a);
   resolveFight(a);
+  samplePlace(a);registerPlaceReturn(a);
   if(a.fullness<42&&a.food>0&&kindOf(a)==='grazer'){a.food--;a.fullness=clamp(a.fullness+30,0,100);}
   if(a.energy<6){a.energy=Math.min(100,a.energy+25*dt);a.decision='Resting';}
-  if(a.home===null&&game.day-a.born>35&&a.energy<55){a.home={x:a.x,y:a.y};}
+  // Fatigue alone no longer creates a home. A home must be earned by experience.
   if(game.social||game.ecology.rules.spriglets){
    for(var b2 of game.agents){if(b2.id<=a.id||dist(a.x,a.y,b2.x,b2.y)>27)continue;contact(a,b2);}
   }else{
@@ -1019,6 +1134,17 @@ function scene(){
   circle(mx,my,Math.max(2.7,7*scale),'#754b49','#bf8973',1);}
  for(var grave of game.deaths){var gx=sx(grave.x),gy=sy(grave.y);line(gx-4,gy,gx+4,gy,'#a0a5b1',1);line(gx,gy-5,gx,gy+4,'#a0a5b1',1);}
  var chosen=game.agents.find(function(a){return a.id===selected;});
+ if(chosen&&chosen.placeMemory){
+  var pm=chosen.placeMemory,origin=pm.birth,known=pm.sites.find(p=>p.id===pm.homeId);
+  if(origin){
+   circle(sx(origin.x),sy(origin.y),Math.max(6,scale*14),null,'#e8c4f7',1.6);
+   txt('BORN',sx(origin.x),sy(origin.y)-11,9,'#efc8f0','center','800');
+  }
+  if(known){
+   circle(sx(known.x),sy(known.y),Math.max(7,scale*19),null,'#a4e4ad',2);
+   txt('HOME',sx(known.x),sy(known.y)-12,9,'#b9eec0','center','800');
+  }
+ }
  if(chosen&&game.social){
   for(var other of game.agents){if(other.id===chosen.id)continue;var bond=chosen.relations[other.id];if(!bond||bond.meetings<2)continue;
    var color=bond.trust>.14?'#72e2b4':bond.trust<-.12?'#e98c85':'#9cb9cd';
@@ -1125,7 +1251,7 @@ function modalBackground(title){
 function tabRow(p,items){var yy=p.y+49,tw=(p.w-20)/items.length;for(var i=0;i<items.length;i++)(function(j){button(items[j],p.x+10+j*tw,yy,tw-3,28,function(){tab=j;scroll=0;},tab===j,'modal');})(i);return yy+37;}
 function drawInspector(){
  var a=game.agents.find(function(v){return v.id===selected;});if(!a){modal=null;return;}
- var s=game.souls[a.soulId],p=modalBackground(a.name+' · Life #'+a.id),start=tabRow(p,['LIFE','BONDS','SOUL','STORY','LEARN','BUILD']);
+ var s=game.souls[a.soulId],p=modalBackground(a.name+' · Life #'+a.id),start=tabRow(p,['LIFE','BONDS','SOUL','STORY','LEARN','BUILD','PLACE']);
  var x=p.x+17,y=start+9-scroll,width=p.w-34;
  ctx.save();ctx.beginPath();ctx.rect(p.x+9,start,p.w-18,p.contentEnd-start);ctx.clip();
  if(tab===0){
@@ -1203,6 +1329,25 @@ function drawInspector(){
   }
   y+=10;txt('PIGMENT',x,y,11,'#a8c8ba');txt((genome.pigment>=0?'+':'')+round(genome.pigment,2),x+width,y,11,'#e3e9d3','right');y+=27;
   y+=paragraph('Body shape follows valley traits and parents. Combat uses physical traits, not the decorative DNA fields.',x,y,width,'#9eb9ae')+12;
+ }else if(tab===6){
+  var memories=placeMemory(a),currentHome=memories.sites.find(p=>p.id===memories.homeId);
+  txt('PLACE ATTACHMENT · PHASE 3',x,y,12,'#f1dea7','left','800');y+=25;
+  y+=paragraph('A birthplace is recorded, not assumed safe. Food, water, and injury change how each place feels.',x,y,width)+18;
+  txt('BIRTHPLACE',x,y,11,'#a8c9bc','left','760');y+=19;
+  y+=paragraph(memories.birth?'('+Math.round(memories.birth.x)+', '+Math.round(memories.birth.y)+')':'Unknown in this life (adult founder or pre-update save)',x,y,width)+13;
+  txt('LEARNED HOME',x,y,11,'#a8c9bc','left','760');y+=21;
+  y+=paragraph(currentHome?'('+Math.round(currentHome.x)+', '+Math.round(currentHome.y)+') · confidence '+round(currentHome.affinity,2):'No place has earned that status yet',x,y,width)+17;
+  txt('Home attempts '+(memories.attempts||0)+' · completed '+(memories.returns||0),x,y,11,'#d0dcc8');y+=21;
+  txt('Birthplace returns '+(memories.natalReturns||0)+' · home changes '+(memories.homeChanges||0),x,y,11,'#d0dcc8');y+=29;
+  txt('PERSONAL PLACE MEMORIES ('+memories.sites.length+')',x,y,11,'#e7d6a7','left','760');y+=23;
+  if(!memories.sites.length)y+=paragraph('No places experienced yet.',x,y,width)+13;
+  for(var site of memories.sites.slice().sort((u,v)=>v.affinity-u.affinity)){
+   var placeTitle=site.id==='birth'?'BIRTH SITE':site.id===memories.homeId?'HOME':'KNOWN SITE';
+   txt(placeTitle+'  ('+Math.round(site.x)+', '+Math.round(site.y)+')',x,y,10,'#d9e6ce','left','760');y+=18;
+   txt('affinity '+round(site.affinity,2)+' · rewarding '+site.good+' · harmful '+site.bad,x,y,10,
+    site.affinity>=.34?'#95d5ad':site.affinity<0?'#dfa29d':'#afc3b7');y+=26;
+  }
+  y+=paragraph('Place memories belong to this body and are not inherited by its soul.',x,y,width)+10;
  }
  ctx.restore();
  scrollLimit=Math.max(0,y+scroll-p.contentEnd+20);
@@ -1215,7 +1360,7 @@ function drawWorldData(){
  var m=game.metrics;
  if(tab===0){
   txt('YEAR '+Math.floor(game.day/YEAR_DAYS)+' · DAY '+Math.floor(game.day%YEAR_DAYS)+' · SEED '+game.seed,x,y,12,'#f0e1b2','left','780');y+=29;
-  var records=[['Living bodies',game.agents.length],['Persistent souls',Object.keys(game.souls).length],['Relationships',bondsCount()],['Encounters',m.meetings],['Food shared',m.given],['Care given',m.helped],['Conflicts',m.conflicts],['Births',m.births],['Deaths',m.deaths],['Reincarnations',m.rebirths],['Relationship-driven choices',m.remembered]];
+  var records=[['Living bodies',game.agents.length],['Persistent souls',Object.keys(game.souls).length],['Relationships',bondsCount()],['Encounters',m.meetings],['Food shared',m.given],['Care given',m.helped],['Conflicts',m.conflicts],['Births',m.births],['Deaths',m.deaths],['Reincarnations',m.rebirths],['Relationship-driven choices',m.remembered],['Learned homes (living)',game.agents.filter(a=>a.placeMemory&&a.placeMemory.homeId).length],['Recorded home returns',m.placeReturns||0],['Birthplace returns',m.placeNatalReturns||0]];
   for(var row of records){txt(row[0],x,y,12,'#c1d5c9');txt(row[1],x+width,y,12,'#e6deb9','right','720');y+=25;}
   y+=13;txt('AVERAGE COMPLETED LIFETIME',x,y,11,'#a9c5b7');y+=22;
   txt(m.lifeYearsCount?round(m.lifeYearsTotal/m.lifeYearsCount,1)+' years':'No lives completed on new age scale',x,y,13,'#e9d8af');y+=27;
@@ -1301,7 +1446,10 @@ function drawHelp(){
  ctx.save();ctx.beginPath();ctx.rect(p.x+9,p.y+51,p.w-18,p.contentEnd-p.y-51);ctx.clip();
  var paragraphs=[
  'This is an autonomous simulation. You are an observer, not a controller.',
- 'TAP a creature to inspect its life, relationships, soul, learning, and original Soul Crucible body build.',
+ 'TAP a creature to inspect its life, relationships, soul, learning, original body, and the PLACE tab for birthplace attachment.',
+ 'Phase 3: newborns remember their birth coordinates, but no birthplace is automatically treated as safe or a home.',
+ 'Successful feeding and drinking strengthen local attachment. Injury and sustained hunger weaken it. A home is acquired after repeated positive experiences.',
+ 'Watch BORN and HOME markers when a creature is selected. Home-return attempts and completed returns are tracked separately. No place memory is inherited across lifetimes.',
  'FOLLOW zooms toward the selected life. OVERVIEW restores the full valley.',
  'PAUSE freezes time. The speed button cycles between ×1, ×3, ×10 and ×30.',
  'MEMORY toggles the relationship system. STATS > LEARNING lets you compare food learning ON/OFF with the same seed.',
