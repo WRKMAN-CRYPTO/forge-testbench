@@ -99,6 +99,7 @@ var game=null,rngState=1,ww=0,hh=0,dpr=1,scale=1,ox=0,oy=0,topH=42,bottomH=49,vi
 var selected=null,modal=null,tab=0,scroll=0,view='world',speedIndex=0,speeds=[1,3,10,30],playing=true;
 var taps=[],dragStart=null,acc=0,lastTime=0,lastSave=0,toast='',toastUntil=0,screenPos=[],hoverButtons=[];
 var perf={ticks:0};
+var viewZoom=1,panX=0,panY=0,activeTouches=new Map(),pinchStart=null,pinchUsed=false,groundInspect=null;
 
 var geography=null,worldReady=false,frontierToken=0,mapMode='Surface',cloudsVisible=true,worldSaveState='Seeded terrain',worldPaintAt=0;
 function startFrontier(seed,restore,callback){
@@ -422,9 +423,9 @@ function sprigletMate(a){
 function sprigletBreed(a,b){
  if(ageYears(a)<2.0||ageYears(b)<2.0||a.nextBirth>game.day||b.nextBirth>game.day)return;
  var score=Math.min(sprigletReady(a),sprigletReady(b));
- if(score<.18||rand()>.30*score)return;
- a.nextBirth=b.nextBirth=game.day+r(27,44);
- var litter=rand()<.57?1:2;
+ if(score<.18||rand()>.14*score)return;
+ a.nextBirth=b.nextBirth=game.day+r(52,85);
+ var litter=rand()<.87?1:2;
  for(var i=0;i<litter;i++){
   var ix=game.pending.findIndex(q=>q.species==='spriglet'),s=ix>=0?game.souls[game.pending.splice(ix,1)[0].soulId]:makeSoul();
   var baby=spawn(s,clamp((a.x+b.x)/2+r(-12,12),20,W-20),clamp((a.y+b.y)/2+r(-12,12),20,H-20),a,b,'spriglet');
@@ -854,12 +855,21 @@ function resize(){
 }
 function camera(){
  var base=Math.min(ww/W,viewportH/H);
- scale=view==='follow'&&selected?Math.max(base,Math.min(ww/475,viewportH/300)):base;
+ scale=view==='follow'&&selected?Math.max(base,Math.min(ww/475,viewportH/300)):base*viewZoom;
  var cx=W/2,cy=H/2;
- if(view==='follow'&&selected){var a=game.agents.find(function(v){return v.id===selected;});if(a){cx=a.x;cy=a.y;}}
- ox=ww/2-cx*scale;oy=topH+viewportH/2-cy*scale;
- if(view==='follow'){ox=clamp(ox,ww-W*scale,0);oy=clamp(oy,topH+viewportH-H*scale,topH);}
+ if(view==='follow'&&selected){
+  var agent=game.agents.find(v=>v.id===selected);
+  if(agent){cx=agent.x;cy=agent.y;}
+  ox=ww/2-cx*scale;oy=topH+viewportH/2-cy*scale;
+ }else{
+  ox=ww/2-W*scale/2+panX;
+  oy=topH+viewportH/2-H*scale/2+panY;
+ }
+ if(W*scale<=ww)ox=(ww-W*scale)/2;else ox=clamp(ox,ww-W*scale,0);
+ if(H*scale<=viewportH)oy=topH+(viewportH-H*scale)/2;else oy=clamp(oy,topH+viewportH-H*scale,topH);
+ if(view==='world'){panX=ox-(ww-W*scale)/2;panY=oy-(topH+(viewportH-H*scale)/2);}
 }
+
 function sx(x){return ox+x*scale;}function sy(y){return oy+y*scale;}
 function line(x,y,xx,yy,color,width){ctx.strokeStyle=color;ctx.lineWidth=width||1;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(xx,yy);ctx.stroke();}
 function circle(x,y,rad,fill,stroke,lw){ctx.beginPath();ctx.arc(x,y,rad,0,TAU);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw||1;ctx.stroke();}}
@@ -949,13 +959,19 @@ function hud(){
   button(labels[index],index*cell+3,hh-bottomH+6,cell-6,bottomH-12,function(){
    if(index===0){modal='replay';}
    if(index===1){modal='new';}
-   if(index===2){view=view==='world'?'follow':'world';if(view==='follow'&&!selected)selected=game.agents[0]?game.agents[0].id:null;save();}
+   if(index===2){view=view==='world'?'follow':'world';if(view==='follow'&&!selected)selected=game.agents[0]?game.agents[0].id:null;if(view==='world'){viewZoom=1;panX=panY=0;}save();}
    if(index===3){modal='world';tab=0;scroll=0;}
    if(index===4){modal='help';tab=0;scroll=0;}
   },index===2&&view==='follow');})(i);
  var y=topH+13;rr(10,y,Math.min(254,ww-20),50,9,'#10211ede','#466156');
  txt('LIVES  '+game.agents.length+'     SOULS  '+Object.keys(game.souls).length,20,y+15,12,'#e2e7ca','left','700');
  txt('G '+countKind('grazer')+'  ·  S '+countKind('spriglet')+'  ·  R '+countKind('carnivore')+'  ·  DAY '+Math.floor(game.day),20,y+35,10,'#b1cabf');
+ if(groundInspect&&worldReady){
+  let gi=groundInspect,w=Math.min(ww-20,305);
+  rr(10,topH+68,w,57,9,'#102525e9','#5a8377');
+  txt('X '+gi.x+' Y '+gi.y+'  ·  '+gi.biome.toUpperCase(),20,topH+85,11,'#e4f0d4','left','760');
+  txt('ALT '+gi.elev+' · '+gi.temp+'°C · WATER '+gi.water+' · ICE '+gi.ice,20,topH+104,10,'#b8d8ce');
+ }
  if(toast&&performance.now()<toastUntil){var tw=Math.min(ww-30,470),x2=(ww-tw)/2;rr(x2,hh-bottomH-45,tw,32,9,'#1b332eea','#729a88');txt(toast,ww/2,hh-bottomH-29,11,'#e8efcc','center');}
 }
 function wrap(s,x,y,maxW,size,color,lh,limit){var parts=(''+s).split(' '),line1='',rows=0;
@@ -1161,7 +1177,11 @@ function drawHelp(){
  'PAUSE freezes time. The speed button cycles between ×1, ×3, ×10 and ×30.',
  'MEMORY toggles the relationship system. STATS > LEARNING lets you compare food learning ON/OFF with the same seed.',
  'REPLAY restarts the same seed and rule settings. NEW SEED creates a different valley.',
- 'Wild Ecology has its own independent browser save and never changes First Valley.',
+ 'Frontier has its own save and never changes Pixel World, First Valley, or Wild Ecology.',
+ 'Drag on the landscape to pan; pinch with two fingers to zoom. Tap empty ground to inspect elevation, temperature, liquid water, and ice.',
+ 'MAP switches between Surface, Elevation, Temperature, and Water views.',
+ 'Terrain is seeded from Pixel World. Large water bodies obstruct travel; drinkable shorelines are found using a coarse navigation map.',
+ 'Climate varies from poles to equator and with elevation. Cold can exhaust or harm creatures; heat increases water needs.',
  'A new Spriglet-enabled seed starts with 24 grazers, 12 Spriglets, and two Ridgefangs. Existing saved worlds keep their original occupants.',
  'Spriglets live 10 to 15 years, mature around age 2, and have small litters only when food, water and local space support it.',
  'Spriglets eat regrowing meadow ground cover. They yield two meat portions; large grazers yield six. Neither species is replenished automatically.',
@@ -1202,19 +1222,58 @@ function frame(now){
  if(now-lastSave>12000&&worldReady){lastSave=now;save();}
  requestAnimationFrame(frame);
 }
-function onDown(e){e.preventDefault();dragStart={x:e.clientX,y:e.clientY,scroll:scroll,time:performance.now()};try{C.setPointerCapture(e.pointerId);}catch(_){}}
-function onMove(e){if(!dragStart)return;if(modal&&['inspect','world','help'].indexOf(modal)>=0){var dy=e.clientY-dragStart.y;scroll=clamp(dragStart.scroll-dy,0,Math.max(0,scrollLimit));}}
-function onUp(e){
- e.preventDefault();if(!dragStart)return;
- var pos={x:e.clientX,y:e.clientY},moved=dist(pos.x,pos.y,dragStart.x,dragStart.y)>13;dragStart=null;
- if(moved)return;
- for(var i=taps.length-1;i>=0;i--){var h=taps[i];if(modal&&h.layer!=='modal')continue;if(pos.x>=h.x&&pos.x<=h.x+h.w&&pos.y>=h.y&&pos.y<=h.y+h.h){h.fn();return;}}
- if(modal){return;}
- var near=null,nd=Infinity;for(var p of screenPos){var dd=dist(pos.x,pos.y,p.x,p.y);if(dd<(p.radius||25)&&dd<nd){nd=dd;near=p.id;}}
- if(near){selected=near;modal='inspect';tab=0;scroll=0;save();}
+function onDown(e){
+ e.preventDefault();
+ try{C.setPointerCapture(e.pointerId);}catch(_){}
+ activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(activeTouches.size===1){dragStart={x:e.clientX,y:e.clientY,scroll,time:performance.now()};pinchUsed=false;}
+ if(activeTouches.size===2&&!modal){
+  let t=[...activeTouches.values()],dx=t[0].x-t[1].x,dy=t[0].y-t[1].y;
+  pinchStart={distance:Math.max(1,Math.hypot(dx,dy)),zoom:viewZoom};pinchUsed=true;
+ }
 }
+function onMove(e){
+ let prior=activeTouches.get(e.pointerId);if(!prior)return;
+ e.preventDefault();
+ let dx=e.clientX-prior.x,dy=e.clientY-prior.y;
+ prior.x=e.clientX;prior.y=e.clientY;
+ if(modal&&dragStart&&['inspect','world','help'].includes(modal)){
+  scroll=clamp(dragStart.scroll-(e.clientY-dragStart.y),0,Math.max(0,scrollLimit));return;
+ }
+ if(modal)return;
+ if(activeTouches.size===2&&pinchStart){
+  let p=[...activeTouches.values()],dd=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+  view='world';viewZoom=clamp(pinchStart.zoom*dd/pinchStart.distance,1,6);pinchUsed=true;return;
+ }
+ if(view==='world'&&dragStart&&(Math.abs(e.clientX-dragStart.x)+Math.abs(e.clientY-dragStart.y)>8)){
+  panX+=dx;panY+=dy;
+ }
+}
+function onUp(e){
+ e.preventDefault();
+ let old=activeTouches.get(e.pointerId),pos={x:e.clientX,y:e.clientY};
+ if(!old)return;
+ activeTouches.delete(e.pointerId);
+ let moved=pinchUsed||!dragStart||dist(pos.x,pos.y,dragStart.x,dragStart.y)>13;
+ if(activeTouches.size===0){dragStart=null;pinchStart=null;pinchUsed=false;}
+ if(moved)return;
+ for(let i=taps.length-1;i>=0;i--){let h=taps[i];if(modal&&h.layer!=='modal')continue;
+  if(pos.x>=h.x&&pos.x<=h.x+h.w&&pos.y>=h.y&&pos.y<=h.y+h.h){h.fn();return;}
+ }
+ if(modal)return;
+ let near=null,nd=Infinity;
+ for(let p of screenPos){let d=dist(pos.x,pos.y,p.x,p.y);if(d<(p.radius||25)&&d<nd){nd=d;near=p.id;}}
+ if(near){selected=near;modal='inspect';tab=0;scroll=0;save();return;}
+ if(worldReady){
+  let xx=Math.round((pos.x-ox)/scale),yy=Math.round((pos.y-oy)/scale);
+  if(xx>=0&&xx<W&&yy>=0&&yy<H){
+   let t=geography.at(xx,yy);groundInspect={x:xx,y:yy,elev:t.elev,temp:t.temp,water:t.water,ice:t.ice,biome:geography.biome(xx,yy)};
+  }
+ }
+}
+
 C.addEventListener('pointerdown',onDown,{passive:false});C.addEventListener('pointermove',onMove,{passive:false});C.addEventListener('pointerup',onUp,{passive:false});
-C.addEventListener('pointercancel',function(){dragStart=null;});
+C.addEventListener('pointercancel',function(){dragStart=null;pinchStart=null;pinchUsed=false;activeTouches.clear();});
 window.addEventListener('resize',resize);
 document.addEventListener('visibilitychange',function(){if(document.hidden){playing=false;save();}});
 window.addEventListener('pagehide',save);
