@@ -1142,7 +1142,7 @@ function drawWorldData(){
   for(var r0 of [['Predator attacks',m.predatorAttacks||0],['Predation deaths',m.predations||0],['Spriglet births',m.sprigletBirths||0],['Spriglet predation deaths',m.sprigletKills||0],['Ridgefang births',m.ridgefangBirths||0],['Defensive strikes',m.defenseHits||0],['Spriglet meat meals',m.sprigletMeals||0],['Total meat meals',m.meatMeals||0]]){
    txt(r0[0],x,y,11,'#bfd0c7');txt(r0[1],x+width,y,11,'#e7dcbc','right','730');y+=23;
   }
-  y+=paragraph('Graph samples once each simulated year; latest 400 years are retained. At 160+ creatures the simulation pauses to protect mobile browsers, without blocking new births.',x,y,width)+12;
+  y+=paragraph('Graph samples once each simulated year; latest 400 years are retained. At 340+ creatures the simulation takes a safety pause; simulation speed automatically scales down before that.',x,y,width)+12;
  }else{
   y=linesEvents(game.events,x,y,width,p.contentEnd);
   if(!game.events.length)txt('No recorded events.',x,y,12,'#aabbaf');
@@ -1188,7 +1188,7 @@ function drawHelp(){
  'STATS > ECOLOGY lets you toggle Spriglets and compare the same seed with the original two-species world.',
  'STATS > ECOLOGY controls both population caps and artificial grazer recovery independently. A change restarts the same seed.',
  'Artificial grazer recovery ON replenishes only the large grazers. Spriglets have no such recovery rule, even when it is enabled.',
- 'At 160 living creatures, the app pauses for mobile safety without limiting future reproduction.',
+ 'Simulation speed adapts to the number of creatures. A safety pause at 340 protects mobile Safari without changing reproductive rules.',
  'The three ancient clearings are just geography. They are not settlements or destinations imposed by a director.',
  'The calendar uses 30 simulated days per in-world year. Natural lifespans range from 80 to 100 years; other dangers can end life sooner.',
  'Use STATS > COMBAT to inspect attacks, defenses, and introduce two Ridgefang carnivores without resetting your valley.',
@@ -1208,7 +1208,15 @@ function overlay(){
 }
 function frame(now){
  var dt=Math.min(.14,(now-lastTime)/1000||0);lastTime=now;
- if(playing&&worldReady){acc+=dt*18*speeds[speedIndex];var steps=0;while(acc>=1&&steps<55){tick();acc-=1;steps++;}if(steps===55)acc=Math.min(acc,1);}
+ if(playing&&worldReady){
+  acc+=dt*18*speeds[speedIndex];
+  // Adjust simulation tick budget rather than applying a hidden breeding restriction.
+  // Contacts are currently O(n^2), so reduce tick bursts as population rises.
+  var maxSteps=Math.max(2,Math.min(55,Math.floor(1600/Math.max(35,game.agents.length))));
+  var steps=0;
+  while(acc>=1&&steps<maxSteps){tick();acc-=1;steps++;}
+  if(steps===maxSteps)acc=Math.min(acc,2);
+ }
  if(worldReady&&geography&&geography.drawPending&&now-worldPaintAt>1300){
   geography.palette(mapMode);geography.paintClouds();worldPaintAt=now;
  }
@@ -1218,7 +1226,7 @@ function frame(now){
   console.error('First Valley inspector error',err);
   modal=null;scroll=0;announce('Inspector issue · world continues');
  }
- if(game.agents.length>=160&&playing){playing=false;announce('160 creatures reached · paused to protect Safari · no breeding cap');save();}
+ if(game.agents.length>=340&&playing){playing=false;announce('340 creatures reached · safety pause for Safari · no breeding cap');save();}
  if(now-lastSave>12000&&worldReady){lastSave=now;save();}
  requestAnimationFrame(frame);
 }
