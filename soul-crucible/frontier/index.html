@@ -146,7 +146,20 @@ function saveHydrology(){
 }
 function terrainTemperature(a){return geography?geography.at(a.x,a.y).temp:15;}
 function terrainTraverse(a,tx,ty,ds){
- let ox=a.x,oy=a.y,d=dist(ox,oy,tx,ty);if(d<1)return false;
+ let ox=a.x,oy=a.y,nav=geography.nav;
+ if(a.target&&a.target.kind==='water'&&nav&&!geography.liquidNear(ox,oy)){
+  // Follow the precomputed reachable-shore distance field around lakes and cliffs.
+  let col=clamp(Math.floor(ox/10),0,99),row=clamp(Math.floor(oy/10),0,99),i=row*100+col;
+  let current=nav.distance[i],best=i,bestDistance=current;
+  if(current>0&&current<65535){
+   let neighbors=[col>0?i-1:-1,col<99?i+1:-1,row>0?i-100:-1,row<99?i+100:-1];
+   for(let j of neighbors)if(j>=0&&nav.walkable[j]&&nav.distance[j]<bestDistance){best=j;bestDistance=nav.distance[j];}
+   if(best!==i){tx=best%100*10+5;ty=Math.floor(best/100)*10+5;}
+  }else if(current===0){
+   let shore=geography.shore(ox,oy);if(shore){tx=shore.x;ty=shore.y;}
+  }
+ }
+ let d=dist(ox,oy,tx,ty);if(d<.8)return false;
  let ux=(tx-ox)/d,uy=(ty-oy)/d,old=geography.at(ox,oy).elev;
  let headings=[0,Math.PI/4,-Math.PI/4,Math.PI/2,-Math.PI/2,Math.PI*.75,-Math.PI*.75,Math.PI];
  for(let angle of headings){
@@ -637,11 +650,11 @@ function chooseAction(a){
  }
  var water=waterDist(a.x,a.y),known=null;
  // Stay by discovered drinkable water long enough to recover, rather than leaving half-hydrated.
- if(water<30&&a.water<91){a.target={x:a.x,y:a.y,kind:'drink'};a.decision='Drinking';return;}
+ if(worldReady&&geography.liquidNear(a.x,a.y)&&a.water<91){a.target={x:a.x,y:a.y,kind:'drink'};a.decision='Drinking';return;}
  if(a.water<65 || (a.target&&(a.target.kind==='water'||a.target.kind==='drink')&&a.water<91)){known=a.places.filter(function(p){return p.kind==='water';}).sort(function(p,q){return dist(a.x,a.y,p.x,p.y)-dist(a.x,a.y,q.x,q.y);})[0];
   // Live perception overrides an old shoreline memory. A remembered water point is
   // only a waypoint; once water is sensed, the creature must approach the water itself.
-  var sensed=water<80+a.body.senses*175,target=sensed?pointWater(a.x,a.y):known;
+  var sensed=water<120+a.body.senses*260,target=sensed?pointWater(a.x,a.y):known;
   if(target){a.target={x:target.x,y:target.y,kind:'water'};a.decision='Seeking water';return;}
   a.target=footprint(a.x+r(-175,175),a.y+r(-175,175));a.target.kind='search';a.decision='Searching for water';return;}
  if(kindOf(a)==='spriglet'&&a.fullness<91){
