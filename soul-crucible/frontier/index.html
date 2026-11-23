@@ -156,7 +156,7 @@ function inheritedSleepPhase(a,p,q){
 }
 function newSleepState(a,p,q){
  return {phase:inheritedSleepPhase(a,p,q),pressure:.12+sleepSeed(a.id*101)*.30,
-  sleeping:false,started:-1,slept:0,episodes:0,completed:0,interrupted:0,
+  sleeping:false,forced:false,forcedEpisodes:0,started:-1,slept:0,episodes:0,completed:0,interrupted:0,
   lastWake:-100,earliestNext:game.day,lowSleepDays:0};
 }
 function sleepState(a){
@@ -164,16 +164,17 @@ function sleepState(a){
  var s=a.sleep;
  if(!Number.isFinite(s.phase))s.phase=inheritedSleepPhase(a,null,null);
  if(!Number.isFinite(s.pressure))s.pressure=.2;
- for(var k of ['slept','episodes','completed','interrupted','lowSleepDays'])
+ for(var k of ['slept','episodes','completed','interrupted','lowSleepDays','forcedEpisodes'])
   if(!Number.isFinite(s[k]))s[k]=0;
  if(!Number.isFinite(s.earliestNext))s.earliestNext=game.day;
  if(!Number.isFinite(s.started))s.started=-1;
  if(!Number.isFinite(s.lastWake))s.lastWake=-100;
  if(typeof s.sleeping!=='boolean')s.sleeping=false;
+ if(typeof s.forced!=='boolean')s.forced=false;
  return s;
 }
 function initSleepMetrics(){
- for(var k of ['sleepEpisodes','sleepCompleted','sleepHours','sleepInterruptions','sleepDangerWakes','sleepDebtHours'])
+ for(var k of ['sleepEpisodes','sleepCompleted','sleepHours','sleepInterruptions','sleepDangerWakes','sleepDebtHours','forcedSleepEpisodes','forcedSleepHours','forcedSleepCompleted'])
   if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
  if(game.sleepEnabled===undefined)game.sleepEnabled=true;
 }
@@ -188,16 +189,20 @@ function sleepDanger(a){
   dist(a.x,a.y,b.x,b.y)<radius)return true;
  return false;
 }
+
 function wakeCreature(a,reason){
  var s=sleepState(a);if(!s.sleeping)return;
- var duration=Math.max(0,game.day-s.started);
- s.sleeping=false;s.lastWake=game.day;
- s.earliestNext=game.day+(reason==='danger'||reason==='attack'?.16:.27);
+ var duration=Math.max(0,game.day-s.started),forced=!!s.forced;
+ s.sleeping=false;s.forced=false;s.lastWake=game.day;
+ s.earliestNext=game.day+(reason==='danger'||reason==='attack'?.16:forced?.14:.27);
  a.nextThink=0;a.target={kind:'rest',x:a.x,y:a.y};
- if(reason==='rested'&&duration>=.17){
+ var completed=reason==='rested'&&duration>=(forced?.07:.17);
+ if(completed){
   s.completed++;game.metrics.sleepCompleted++;
-  if(a.fullness>22&&a.water>22)placeExperience(a,'sleep');
-  a.decision='Waking rested';
+  if(forced)game.metrics.forcedSleepCompleted++;
+  // Emergency sleep relieves sleep pressure without generating calories or healing.
+  if(!forced&&a.fullness>22&&a.water>22)placeExperience(a,'sleep');
+  a.decision=forced?'Waking after involuntary sleep':'Waking rested';
  }else{
   s.interrupted++;game.metrics.sleepInterruptions++;
   if(reason==='danger'||reason==='attack')game.metrics.sleepDangerWakes++;
@@ -208,15 +213,25 @@ function sleepBiology(a,dt){
  var s=sleepState(a);
  if(!game.sleepEnabled){if(s.sleeping)wakeCreature(a,'disabled');return false;}
  if(s.sleeping){
-  if(a.water<25||a.fullness<22||a.health<19){wakeCreature(a,'needs');return false;}
-  // Reduced vigilance: some approaching predators are not detected in time.
-  // Wake probability is per original .06-day interval, not per new frame.
-  if(sleepDanger(a)&&rand()<1-Math.pow(.76,dt/.06)){wakeCreature(a,'danger');return false;}
+  // Normal sleepers wake to urgent needs. Emergency sleepers cannot be
+  // awakened instantly by the same shortage that forced them to doze.
+  if(!s.forced&&(a.water<25||a.fullness<22||a.health<19)){
+   wakeCreature(a,'needs');return false;
+  }
+  if(sleepDanger(a)&&rand()<1-Math.pow(.76,dt/.06)){
+   wakeCreature(a,'danger');return false;
+  }
   s.pressure=Math.max(0,s.pressure-2.25*dt);
   s.slept+=dt;game.metrics.sleepHours+=dt*24;
+  if(s.forced)game.metrics.forcedSleepHours+=dt*24;
   a.energy=clamp(a.energy+19*dt,0,100);
-  a.decision='Sleeping';
-  if((game.day-s.started>=.18&&s.pressure<=.11)||game.day-s.started>=.46)
+  a.decision=s.forced?'Involuntary sleep':'Sleeping';
+  var duration=game.day-s.started;
+  // A brief 2–3 hour nap makes room to search for food and water afterward.
+  if(s.forced){
+   if((duration>=.075&&s.pressure<=.9)||duration>=.13)
+    wakeCreature(a,'rested');
+  }else if((duration>=.18&&s.pressure<=.11)||duration>=.46)
    wakeCreature(a,'rested');
   return true;
  }
@@ -226,12 +241,19 @@ function sleepBiology(a,dt){
   a.energy=Math.max(0,a.energy-(s.pressure-.95)*1.9*dt);
  }
  var preference=preferredSleepNow(a),
-    compelled=s.pressure>1.13||(s.pressure>.76&&preference>.2),
-    ordinary=s.pressure>.40&&preference>.64;
- if(!(compelled||ordinary)||game.day<s.earliestNext||
-  a.fullness<31||a.water<37||a.health<22||sleepDanger(a))return false;
- s.sleeping=true;s.started=game.day;s.episodes++;game.metrics.sleepEpisodes++;
- a.target={kind:'sleep',x:a.x,y:a.y};a.landRoute=null;a.decision='Falling asleep';
+     compelled=s.pressure>1.13||(s.pressure>.76&&preference>.2),
+     ordinary=s.pressure>.40&&preference>.64,
+     urgentNeeds=a.fullness<31||a.water<37||a.health<22,
+     threatened=sleepDanger(a),
+     // Exhaustion eventually overcomes food/injury-related sleep avoidance.
+     forced=(urgentNeeds&&s.pressure>=1.2)||(threatened&&s.pressure>=1.42);
+ if(game.day<s.earliestNext||(!forced&&(!(compelled||ordinary)||urgentNeeds||threatened)))
+  return false;
+ s.sleeping=true;s.forced=forced;s.started=game.day;
+ s.episodes++;game.metrics.sleepEpisodes++;
+ if(forced){s.forcedEpisodes++;game.metrics.forcedSleepEpisodes++;}
+ a.target={kind:'sleep',x:a.x,y:a.y};a.landRoute=null;
+ a.decision=forced?'Overcome by exhaustion':'Falling asleep';
  return true;
 }
 
@@ -1408,7 +1430,8 @@ function drawInspector(){
   var ss=sleepState(a);
   miniBar('Sleep pressure',ss.pressure/1.5,x,y,width,'#b7a3de');y+=24;
   txt((ss.sleeping?'ASLEEP':'AWAKE')+' · prefers '+String(Math.round(ss.phase)%24).padStart(2,'0')+':00',x,y,11,ss.sleeping?'#d3bcf1':'#aec7d5','left','700');y+=19;
-  txt('Slept '+round(ss.slept*24,1)+' hours · '+ss.episodes+' sleep episodes',x,y,10,'#9db9b5');y+=24;
+  txt('Slept '+round(ss.slept*24,1)+' hours · '+ss.episodes+' sleep episodes',x,y,10,'#9db9b5');y+=19;
+  txt('Involuntary naps '+ss.forcedEpisodes+(ss.forced?' · CURRENTLY FORCED':''),x,y,10,ss.forced?'#e7c4a6':'#9db9b5');y+=24;
   txt('SPECIES '+(kindOf(a)==='carnivore'?'RIDGEFANG · MEAT ONLY':kindOf(a)==='spriglet'?'SPRIGLET · MEADOW PLANTS':'GRAZER · BUSH PLANTS'),x,y,11,'#e8d6af','left','720');y+=22;
   txt('STRIKES '+a.battle.strikes+'  ·  DODGES '+a.battle.dodges+'  ·  KILLS '+a.battle.kills,x,y,11,'#b6cbbb');y+=27;
   txt('TEMPERAMENT',x,y,11,'#e7d6a7','left','750');y+=21;
@@ -1513,7 +1536,7 @@ function drawWorldData(){
   ['Locomotion','×3 · trial'],
   ['Sleeping now',game.agents.filter(a=>a.sleep?.sleeping).length],
   ['Total sleep episodes',m.sleepEpisodes||0],['Completed sleep episodes',m.sleepCompleted||0],
-  ['Sleep hours accumulated',round(m.sleepHours||0,1)],['Woken by danger',m.sleepDangerWakes||0],
+  ['Sleep hours accumulated',round(m.sleepHours||0,1)],['Involuntary naps',m.forcedSleepEpisodes||0],['Involuntary nap hours',round(m.forcedSleepHours||0,1)],['Woken by danger',m.sleepDangerWakes||0],
   ['Sleep deprived now',game.agents.filter(a=>a.sleep&&a.sleep.pressure>.95).length]];
   for(var row of records){txt(row[0],x,y,12,'#c1d5c9');txt(row[1],x+width,y,12,'#e6deb9','right','720');y+=25;}
   y+=13;txt('AVERAGE COMPLETED LIFETIME',x,y,11,'#a9c5b7');y+=22;
@@ -1604,6 +1627,7 @@ function drawHelp(){
  'A world day lasts 24 simulated hours. Watch dawn, sunset and sleeping in OBSERVE; accelerated speeds use steady lighting to avoid flicker. Temperatures and seasons do not yet vary daily.',
  'Locomotion trial: animals move 3× faster than before, with the same biological clocks and hunger and thirst. Faster travel may change survival.',
  'Sleep pressure rises during wakefulness and falls during sleep. Preferred sleep times vary by species and individual and are inherited with mutation.',
+ 'Severely sleep-deprived animals can involuntarily sleep for a few hours even when starving or injured. They still consume food and water, can be attacked, and must wake to seek survival resources.',
  'Sleeping animals stop moving, feeding, hunting, and socializing, but continue using food and water. Attackers may surprise sleeping prey.',
  'Tap a creature > LIFE to inspect sleep pressure, activity and preferred sleep time. STATS > WORLD shows sleep episodes and interruptions.',
  'Good, uninterrupted sleep may strengthen learned attachment to a place. Sleep memories are not reincarnated.',
