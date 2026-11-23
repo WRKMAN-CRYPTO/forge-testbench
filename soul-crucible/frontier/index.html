@@ -147,9 +147,9 @@ function saveHydrology(){
 }
 function terrainTemperature(a){return geography?geography.at(a.x,a.y).temp:15;}
 function terrainTraverse(a,tx,ty,ds){
- let ox=a.x,oy=a.y,nav=geography.nav;
- if(a.target&&a.target.kind==='water'&&nav&&!geography.liquidNear(ox,oy)){
-  // Follow the precomputed reachable-shore distance field around lakes and cliffs.
+ let ox=a.x,oy=a.y,nav=geography.nav,kind=a.target&&a.target.kind;
+ if(kind==='water'&&nav&&!geography.liquidNear(ox,oy)){
+  // Follow a field toward a real, reachable drinking shore.
   let col=clamp(Math.floor(ox/10),0,99),row=clamp(Math.floor(oy/10),0,99),i=row*100+col;
   let current=nav.distance[i],best=i,bestDistance=current;
   if(current>0&&current<65535){
@@ -158,6 +158,32 @@ function terrainTraverse(a,tx,ty,ds){
    if(best!==i){tx=best%100*10+5;ty=Math.floor(best/100)*10+5;}
   }else if(current===0){
    let shore=geography.shore(ox,oy);if(shore){tx=shore.x;ty=shore.y;}
+  }
+ }else if(kind!=='water'&&kind!=='flee'&&kind!=='stand'&&kind!=='rest'&&kind!=='drink'){
+  // Hunters, foragers and social creatures now route around terrain.
+  // Plan at coarse resolution, then check real pixels for every actual step.
+  let route=a.landRoute;
+  let newDestination=!route||route.kind!==kind||route.id!==(a.target.id||null)||
+   route.navRev!==nav.revision||dist(route.goalX,route.goalY,tx,ty)>44||
+   game.day-route.created>10;
+  if(newDestination){
+   let nodes=geography.route(ox,oy,tx,ty);
+   if(nodes===null){
+    a.landRoute=null;a.nextThink=game.day+.3;
+    a.target={kind:'search',x:ox,y:oy};a.decision='Searching for a passable route';
+    game.metrics.unreachableRoutes=(game.metrics.unreachableRoutes||0)+1;
+    return false;
+   }
+   route=a.landRoute={kind,id:a.target.id||null,navRev:nav.revision,
+    goalX:tx,goalY:ty,created:game.day,index:0,points:nodes};
+   if(nodes.length)game.metrics.landDetours=(game.metrics.landDetours||0)+1;
+  }
+  if(route.points.length){
+   while(route.index<route.points.length&&
+      dist(ox,oy,route.points[route.index].x,route.points[route.index].y)<9)route.index++;
+   if(route.index<route.points.length){
+    tx=route.points[route.index].x;ty=route.points[route.index].y;
+   }
   }
  }
  let d=dist(ox,oy,tx,ty);if(d<.8)return false;
@@ -171,7 +197,7 @@ function terrainTraverse(a,tx,ty,ds){
   a.blocked=0;return true;
  }
  a.blocked=(a.blocked||0)+1;
- if(a.blocked>3){a.nextThink=0;a.blocked=0;}
+ if(a.blocked>3){a.nextThink=0;a.blocked=0;a.landRoute=null;}
  return false;
 }
 function habitatLabel(a){return geography?geography.biome(a.x,a.y):'generating';}
@@ -519,18 +545,36 @@ function restoreRidgefangFounders(){
 function nearestMeat(a){
  var best=null,d=1e9;
  for(var c of game.carcasses)if(c.meat>0&&c.expires>game.day&&(c.species==='grazer'||c.species==='spriglet')){
-  var dd=dist(a.x,a.y,c.x,c.y);if(dd<d){best=c;d=dd;}
+  var dd=dist(a.x,a.y,c.x,c.y);if(dd<d&&geography.sameLand(a.x,a.y,c.x,c.y)){best=c;d=dd;}
  }
  return {c:best,d:d};
 }
 function nearestPrey(a){
- var best=null,cost=1e9;
+ var candidates=[],radius=170+a.body.senses*160;
  for(var b of game.agents)if((kindOf(b)==='grazer'||kindOf(b)==='spriglet')&&b.health>0){
-  var dd=dist(a.x,a.y,b.x,b.y);if(dd>170+a.body.senses*160)continue;
-  var cc=dd+(b.body.speed-a.body.speed)*33-(b.health<55?20:0)-(kindOf(b)==='spriglet'?35:0);
-  if(cc<cost){cost=cc;best=b;}
+  var dd=dist(a.x,a.y,b.x,b.y);if(dd>radius)continue;
+  if(!geography.sameLand(a.x,a.y,b.x,b.y))continue;
+  var cost=dd+(b.body.speed-a.body.speed)*33-(b.health<55?20:0)-(kindOf(b)==='spriglet'?35:0);
+  candidates.push({b,dd,cost});
  }
- return best;
+ candidates.sort((a,b)=>a.cost-b.cost);
+ // A prey creature on directly accessible land is preferred over one across a lake.
+ for(let candidate of candidates.slice(0,16)){
+  if(geography.clearLand(a.x,a.y,candidate.b.x,candidate.b.y))return candidate.b;
+ }
+ let chosen=null,best=Infinity;
+ for(let candidate of candidates.slice(0,6)){
+  let route=geography.route(a.x,a.y,candidate.b.x,candidate.b.y);
+  if(!route)continue;
+  let length=0,px=a.x,py=a.y;
+  for(let waypoint of route){length+=dist(px,py,waypoint.x,waypoint.y);px=waypoint.x;py=waypoint.y;}
+  length+=dist(px,py,candidate.b.x,candidate.b.y);
+  // A chase across nearly the whole world is not a realistic nearby meal.
+  if(length>Math.max(650,candidate.dd*2.8))continue;
+  let score=length+(candidate.cost-candidate.dd);
+  if(score<best){best=score;chosen=candidate.b;}
+ }
+ return chosen;
 }
 function loomingPredator(a){
  var best=null,d=1e9;
@@ -543,7 +587,7 @@ function loomingPredator(a){
 }
 function fight(a,b,why){
  initFight(a);initFight(b);
- if(a.health<=0||b.health<=0||a.energy<6||a.nextStrike>game.day||dist(a.x,a.y,b.x,b.y)>30)return false;
+ if(a.health<=0||b.health<=0||a.energy<6||a.nextStrike>game.day||dist(a.x,a.y,b.x,b.y)>30||!geography.clearLand(a.x,a.y,b.x,b.y))return false;
  if(kindOf(a)==='carnivore'&&kindOf(b)==='carnivore')return false;
  if(why==='hunt'&&(kindOf(a)!=='carnivore'||!(kindOf(b)==='grazer'||kindOf(b)==='spriglet')||a.fullness>=88))return false;
  a.nextStrike=game.day+.73+(1-a.body.speed)*.63;a.energy=Math.max(0,a.energy-6);
@@ -604,7 +648,7 @@ function seekRidgefangCompanion(a){
  for(var other of game.agents){
   if(other.id===a.id||kindOf(other)!=='carnivore'||other.health<=0||ageYears(other)<18)continue;
   var dd=dist(a.x,a.y,other.x,other.y);
-  if(dd<280&&dd<d){best=other;d=dd;}
+  if(dd<280&&dd<d&&geography.sameLand(a.x,a.y,other.x,other.y)){best=other;d=dd;}
  }
  // Seeking company is a probabilistic choice shaped by sociability, never forced mating.
  if(!best||rand()>(.28+.43*a.t.sociability))return null;
@@ -643,7 +687,7 @@ function chooseAction(a){
   if(meat.c&&meat.d<200){a.target={x:meat.c.x,y:meat.c.y,kind:'meat'};a.decision='Following meat scent';return;}
   var prey=nearestPrey(a);
   var lastTarget=a.target&&a.target.kind==='hunt'?game.agents.find(b=>b.id===a.target.id):null;
-  if(lastTarget&&lastTarget.health>0&&game.day<(a.huntUntil||0)&&dist(a.x,a.y,lastTarget.x,lastTarget.y)<390)prey=lastTarget;
+  if(lastTarget&&lastTarget.health>0&&game.day<(a.huntUntil||0)&&dist(a.x,a.y,lastTarget.x,lastTarget.y)<390&&geography.sameLand(a.x,a.y,lastTarget.x,lastTarget.y))prey=lastTarget;
   if(prey){
    if(a.huntId!==prey.id){a.huntId=prey.id;a.huntUntil=game.day+10;}
    a.target={x:prey.x,y:prey.y,kind:'hunt',id:prey.id};a.decision='Hunting '+prey.name;return;
@@ -1167,7 +1211,7 @@ function drawWorldData(){
   if(!lg&&!countKind('spriglet')&&lr)y+=paragraph('All prey extinct. Carnivores may briefly survive on remaining carcasses.',x,y,width,'#e9a991')+17;
   else if(!lg&&!lr&&!countKind('spriglet'))y+=paragraph('Every species extinct. The valley has fallen silent.',x,y,width,'#e9a991')+17;
   y+=10;txt('COMBAT & REPRODUCTION',x,y,11,'#e7d6a7','left','760');y+=24;
-  for(var r0 of [['Predator attacks',m.predatorAttacks||0],['Predation deaths',m.predations||0],['Spriglet births',m.sprigletBirths||0],['Spriglet predation deaths',m.sprigletKills||0],['Ridgefang births',m.ridgefangBirths||0],['Defensive strikes',m.defenseHits||0],['Spriglet meat meals',m.sprigletMeals||0],['Total meat meals',m.meatMeals||0]]){
+  for(var r0 of [['Predator attacks',m.predatorAttacks||0],['Land detours',m.landDetours||0],['Unreachable route attempts',m.unreachableRoutes||0],['Predation deaths',m.predations||0],['Spriglet births',m.sprigletBirths||0],['Spriglet predation deaths',m.sprigletKills||0],['Ridgefang births',m.ridgefangBirths||0],['Defensive strikes',m.defenseHits||0],['Spriglet meat meals',m.sprigletMeals||0],['Total meat meals',m.meatMeals||0]]){
    txt(r0[0],x,y,11,'#bfd0c7');txt(r0[1],x+width,y,11,'#e7dcbc','right','730');y+=23;
   }
   y+=paragraph('Graph samples once each simulated year; latest 400 years are retained. At 340+ creatures the simulation takes a safety pause; simulation speed automatically scales down before that.',x,y,width)+12;
