@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>CRASH | Genesis 006 Living Medium</title><style>*{box-sizing:border-box;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}html,body{margin:0;overflow:hidden;background:#060c15}canvas{display:block;width:100vw;height:100dvh}</style></head><body><canvas aria-label="Living medium simulator"></canvas><script>function engine(seed=1001,count=360,neural=false){
- const N=48,L=120,S=N*N,dx=L/N,cap=2000,cl=(v,a,b)=>Math.max(a,Math.min(b,v)),wrap=(x,n)=>((x%n)+n)%n;let state=seed>>>0||1;
+ const N=48,L=120,S=N*N,dx=L/N,cap=2000,cl=(v,a,b)=>Math.max(a,Math.min(b,v)),wrap=(x,n)=>((x%n)+n)%n;let state=seed>>>0||1,bathState=(seed^0x9e3779b9)>>>0;function bathRand(){bathState=(Math.imul(bathState,1664525)+1013904223)>>>0;return bathState/4294967296}
  function rand(){state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296}const signed=()=>rand()*2-1;
  const arr=()=>new Float64Array(S), w={seed,count,tick:0,neural,initialNeural:neural,flow:true,drive:.09,supply:1,mutation:.12,viscosity:.055,heatCoupling:.018,agents:[],next:0,births:0,deaths:0,gen:0,injected:0,spent:0,heatLost:0,initial:0,history:[],events:[],energy:arr(),heat:arr(),p:arr(),u:arr(),v:arr(),rate:arr(),peak:0,hold:0,bestHold:0,prior:[],neuralSpent:0};
  const R=new Int32Array(S),D=new Int32Array(S),A=new Int32Array(S),B=new Int32Array(S);for(let y=0;y<N;y++)for(let x=0;x<N;x++){let i=x+N*y;R[i]=wrap(x+1,N)+N*y;A[i]=wrap(x-1,N)+N*y;D[i]=x+N*wrap(y+1,N);B[i]=x+N*wrap(y-1,N);let f=0;for(const [a,b] of [[.25,.3],[.72,.62],[.35,.8]]){let xx=Math.abs(x/N-a),yy=Math.abs(y/N-b);xx=Math.min(xx,1-xx);yy=Math.min(yy,1-yy);f+=Math.exp(-(xx*xx+yy*yy)/.028)}w.energy[i]=2+3*f;w.rate[i]=.003+.021*f;w.p[i]=signed()*.035}
@@ -29,7 +29,7 @@
  }w._prevBirths=w.births;w.agents=next;
  if(w.flow){ // Damped compressible pressure-wave lattice, not a Navier-Stokes solver.
  for(let i=0;i<S;i++){let gradx=(w.p[R[i]]-w.p[A[i]])*.5,grady=(w.p[D[i]]-w.p[B[i]])*.5,hx=(w.heat[R[i]]-w.heat[A[i]])*.5,hy=(w.heat[D[i]]-w.heat[B[i]])*.5,lapu=w.u[R[i]]+w.u[A[i]]+w.u[D[i]]+w.u[B[i]]-4*w.u[i],lapv=w.v[R[i]]+w.v[A[i]]+w.v[D[i]]+w.v[B[i]]-4*w.v[i];pu[i]=cl(.99*w.u[i]-.18*gradx-w.heatCoupling*hx+w.viscosity*lapu+du[i],-.18,.18);pv[i]=cl(.99*w.v[i]-.18*grady-w.heatCoupling*hy+w.viscosity*lapv+dv[i],-.18,.18)}
- if(w.tick%5===0){let i=rand()*S|0,amp=signed()*w.drive;dp[i]+=amp;dp[R[i]]-=amp}
+ if(w.tick%5===0){let i=bathRand()*S|0,amp=(bathRand()*2-1)*w.drive;dp[i]+=amp;dp[R[i]]-=amp}
  for(let i=0;i<S;i++){let divergence=(pu[R[i]]-pu[A[i]]+pv[D[i]]-pv[B[i]])*.5;pp[i]=cl(.994*w.p[i]-.25*divergence+dp[i],-2,2)}
  w.u.set(pu);w.v.set(pv);w.p.set(pp);
  for(const a of w.agents){a.x=wrap(a.x+dx*sample(w.u,a.x,a.y),L);a.y=wrap(a.y+dx*sample(w.v,a.x,a.y),L)}
