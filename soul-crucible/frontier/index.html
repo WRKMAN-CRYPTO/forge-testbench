@@ -635,7 +635,7 @@ function newWorld(seed,social,learning){
  rngState=(seed>>>0)||1;game={seed:seed>>>0,social:social!==false,learning:learning!==false,ageSystem:AGE_SYSTEM,day:0,agents:[],souls:{},pending:[],events:[],trees:[],bushes:[],stones:[],nextSoul:0,nextBody:0,
  metrics:{births:0,deaths:0,rebirths:0,given:0,helped:0,conflicts:0,meetings:0,remembered:0,lifeDays:0,lifeYearsTotal:0,lifeYearsCount:0,foodFinds:0,foodMisses:0,adaptedChoices:0,strikes:0,blocks:0,dodges:0,predations:0,meatMeals:0,fleeChoices:0,defenseHits:0,rivalryHits:0,predatorAttacks:0},deaths:[],proximity:{},carcasses:[],predatorsIntroduced:false};
  game.ecology={rules:rules,history:[],lastYear:-1,maxG:0,maxR:0,maxS:0,goneG:null,goneR:null,goneS:null,sprigletsIntroduced:false};
- initEcology();initPlaceStats();initSleepMetrics();
+ initEcology();initPlaceStats();initSleepMetrics();socialStats();
  startFrontier(seed,false,frontierPopulate);
 }
 function announce(s){toast=s;toastUntil=performance.now()+2600;}
@@ -714,6 +714,7 @@ function load(){try{var raw=JSON.parse(localStorage.getItem(KEY)||'null');if(raw
  // Older saved valley states may not have every soul history field.
  for(var soulID in game.souls)safeSoulRecord(game.souls[soulID]);
  for(var k of ['foodFinds','foodMisses','adaptedChoices'])if(!Number.isFinite(game.metrics[k]))game.metrics[k]=0;
+ socialStats();
  for(var a of game.agents){ensureLearning(a);placeMemory(a);sleepState(a);a.family=a.family||'Wanderer';ensureValleyGenome(a);a.history=Array.isArray(a.history)?a.history.filter(function(entry){return typeof entry==='string'&&entry.trim().length>0;}).slice(0,12):[];a.t=mapTemper(a.base,game.souls[a.soulId]);}return true;}}catch(e){}return false;}
 
 const GRAZER_CAP=38,PREDATOR_CAP=4;
@@ -905,6 +906,7 @@ function fight(a,b,why){
  a.battle.strikes++;game.metrics.strikes++;
  if(!b.sleep?.sleeping&&rand()<clamp(.08+b.body.speed*.24+b.t.caution*.15-a.body.senses*.08,.04,.56)&&b.energy>11){
   b.energy-=4;b.battle.dodges++;game.metrics.dodges++;b.threatUntil=game.day+4;b.nextThink=0;
+  if(game.social&&kindOf(a)===kindOf(b)){socialMemory(b,a,'evaded','Dodged a strike');game.metrics.socialThreatMemories++;}
   return true;
  }
  var defended=!b.sleep?.sleeping&&rand()<clamp(.07+b.body.resilience*.21+b.t.caution*.14,.04,.47)&&b.energy>10;
@@ -919,9 +921,14 @@ function fight(a,b,why){
  if(why==='hunt')game.metrics.predatorAttacks++;
  if(why==='defense')game.metrics.defenseHits++;
  if(why==='rivalry')game.metrics.rivalryHits++;
- if(kindOf(a)===kindOf(b)){
-  relation(b,a).trust=clamp(relation(b,a).trust-.29,-1,1);
-  relation(a,b).trust=clamp(relation(a,b).trust-.09,-1,1);
+ if(game.social&&kindOf(a)===kindOf(b)){
+  var victimMemory=relation(b,a),aggressorMemory=relation(a,b);
+  victimMemory.trust=clamp(victimMemory.trust-.29,-1,1);
+  aggressorMemory.trust=clamp(aggressorMemory.trust-.09,-1,1);
+  victimMemory.attacks=(victimMemory.attacks||0)+1;
+  socialMemory(b,a,'hurt','Injured by '+a.name+' ('+Math.round(damage)+')');
+  socialMemory(a,b,'struck','Struck '+b.name+' ('+Math.round(damage)+')');
+  game.metrics.socialThreatMemories++;
  }
  if(b.health<=0){a.battle.kills++;addEvent('combat',a.name+' fatally wounded '+b.name,a,b);}
  else if(a.battle.strikes%8===1)addEvent('combat',a.name+' injured '+b.name+' ('+Math.round(damage)+')',a,b);
@@ -952,6 +959,32 @@ function eatMeat(a){
 
 function nearestAgent(a,filter){var best=null,bd=1e10;for(var b of game.agents){if(a===b)continue;var d=dist(a.x,a.y,b.x,b.y);if(d<bd&&(!filter||filter(b,d))){best=b;bd=d;}}return {agent:best,d:bd};}
 function relation(a,b){var k=''+b.id;if(!a.relations[k])a.relations[k]={trust:0,familiarity:0,meetings:0,lastMeet:-99,gifts:0,help:0,attacks:0};return a.relations[k];}
+// Per-lifetime social histories: memories are individual, finite, and not inherited.
+function socialMemory(a,b,kind,detail){
+ if(!a||!b||a===b)return;
+ var r=relation(a,b);
+ if(!Array.isArray(r.moments))r.moments=[];
+ r.moments.unshift({day:round(game.day,1),kind:kind,detail:detail||''});
+ if(r.moments.length>6)r.moments.length=6;
+ r.lastMoment=game.day;
+}
+function socialStats(){
+ for(var key of ['socialAvoidances','socialTrustedChoices','socialRivalryChoices','socialAidMemories','socialThreatMemories'])
+  if(!Number.isFinite(game.metrics[key]))game.metrics[key]=0;
+}
+function rememberedRival(a){
+ if(!game.social||a.fullness<48||a.water<53)return null;
+ var closest=null,score=Infinity;
+ for(var other of game.agents){
+  if(other===a||other.health<=0||kindOf(other)!==kindOf(a))continue;
+  var r=a.relations[other.id];if(!r||r.trust>-.18||!r.attacks)continue;
+  var d=dist(a.x,a.y,other.x,other.y);
+  if(d>65+a.body.senses*54||!geography.sameLand(a.x,a.y,other.x,other.y))continue;
+  var priority=d/(.25+Math.min(1,r.attacks*.4));
+  if(priority<score){score=priority;closest=other;}
+ }
+ return closest;
+}
 function markPlace(a,x,y,kind){var prev=a.places.find(function(p){return p.kind===kind&&dist(p.x,p.y,x,y)<50;});if(prev){prev.value=clamp(prev.value+.18,0,1);prev.day=game.day;return;}a.places.push({x:x,y:y,kind:kind,value:.6,day:game.day});if(a.places.length>12)a.places.sort(function(p,q){return q.value-p.value;}).length=12;}
 function safeTarget(a){return footprint(a.x+r(-135,135),a.y+r(-135,135));}
 function seekRidgefangCompanion(a){
@@ -1043,12 +1076,28 @@ function chooseAction(a){
    a.decision='Travelling to familiar ground';return;
   }
  }
+ if(game.social&&a.energy>28){
+  var rival=rememberedRival(a);
+  if(rival){
+   var awayX=a.x-rival.x,awayY=a.y-rival.y,awayLength=Math.max(1,Math.hypot(awayX,awayY));
+   var away=footprint(a.x+awayX/awayLength*95,a.y+awayY/awayLength*95);
+   if(viableFoodRoute(a,away.x,away.y,'wander')!==null){
+    a.target={x:away.x,y:away.y,kind:'wander'};
+    a.decision='Avoiding remembered rival '+rival.name;
+    game.metrics.socialAvoidances++;return;
+   }
+  }
+ }
  if(chooseFamiliarGround(a))return;
  if(game.social && a.t.sociability>.24 && a.energy>28 && a.water>24 && a.fullness>25){
-  var friend=nearestAgent(a,function(b,d){var rel=a.relations[b.id];return kindOf(b)===kindOf(a)&&!!rel&&rel.trust>.18&&rel.meetings>=2&&d<275;});
+  var friend=nearestAgent(a,function(b,d){var rel=a.relations[b.id];return b.health>0&&kindOf(b)===kindOf(a)&&!!rel&&rel.trust>.18&&rel.meetings>=2&&d<275;});
   var socialBias=a.t.sociability+(.35-Math.min(.35,friend.d/1000));
   if(friend.agent&&rand()<socialBias*.63){
-   a.target={x:friend.agent.x,y:friend.agent.y,kind:'friend',id:friend.agent.id};a.decision='Seeking '+friend.agent.name;game.metrics.remembered++;return;
+   var known=a.relations[friend.agent.id];
+   a.target={x:friend.agent.x,y:friend.agent.y,kind:'friend',id:friend.agent.id};
+   a.decision='Seeking '+friend.agent.name;game.metrics.remembered++;
+   if((known.help||0)>0||(known.gifts||0)>0){game.metrics.socialTrustedChoices++;}
+   return;
   }
  }
  var spot=footprint(a.x+r(-130,130)*(0.55+a.t.curiosity),
@@ -1078,6 +1127,8 @@ function contact(a,b){
    if(donor.food<1||recv.fullness>65||donor.fullness<35||donor.t.generosity+dr.trust*.6<r(.32,1.18))return false;
    donor.food--;recv.fullness=clamp(recv.fullness+24,0,100);dr.trust=clamp(dr.trust+.035,-1,1);rr.trust=clamp(rr.trust+.22,-1,1);
    dr.gifts++;rr.gifts++;donor.stats.gives++;recv.stats.receives++;game.metrics.given++;
+   socialMemory(recv,donor,'received','Received food from '+donor.name);
+   socialMemory(donor,recv,'shared','Gave food to '+recv.name);
    addEvent('share',donor.name+' shared food with '+recv.name,donor,recv);return true;
  }
  if(a.fullness<b.fullness)give(b,a,rb,ra);else give(a,b,ra,rb);
@@ -1091,6 +1142,9 @@ function contact(a,b){
   donor.water=Math.max(0,donor.water-4);
   recv.health=clamp(recv.health+13,0,100);dr.trust=clamp(dr.trust+.06,-1,1);rr.trust=clamp(rr.trust+.25,-1,1);
   dr.help++;rr.help++;donor.stats.helps++;recv.stats.helped++;game.metrics.helped++;
+  socialMemory(recv,donor,'helped','Wounds tended by '+donor.name);
+  socialMemory(donor,recv,'cared','Tended '+recv.name+"'s wounds");
+  game.metrics.socialAidMemories++;
   addEvent('aid',donor.name+' tended '+recv.name+"'s wounds",donor,recv);return true;
  }
  if(a.health<b.health)help(b,a,rb,ra);else help(a,b,ra,rb);
@@ -1113,7 +1167,10 @@ function contact(a,b){
  var hostility=(a.t.aggression+b.t.aggression)/2;
  var scarce=a.fullness<62||b.fullness<62;
  var territory=(a.home&&dist(a.x,a.y,a.home.x,a.home.y)<45)||(b.home&&dist(b.x,b.y,b.home.x,b.home.y)<45);
- if(hostility>.66&&ra.trust<.14&&(scarce||territory)&&rand()<(hostility-.52)*.14){
+ var rememberedHostility=Math.max(0,-Math.min(ra.trust,rb.trust));
+ if(hostility>.66&&ra.trust<.14&&(scarce||territory||rememberedHostility>.24)&&
+    rand()<((hostility-.52)*.14)*(1+Math.min(.75,rememberedHostility*.8))){
+  if(rememberedHostility>.18)game.metrics.socialRivalryChoices++;
   var attacker=rand()<.5?a:b,victim=attacker===a?b:a;
   if(fight(attacker,victim,'rivalry')){attacker.stats.conflicts++;game.metrics.conflicts++;}
  }
@@ -1496,8 +1553,17 @@ function drawInspector(){
    circle(nx,ny,10,'#78998f');txt(pairName(a,z.id).slice(0,6),nx,ny+17,9,'#dfe8d9','center');
   }
   y+=147;txt('KNOWN INDIVIDUALS ('+relations.length+')',x,y,11,'#e7d6a7','left','750');y+=23;
-  for(var rel of relations.slice(0,15)){var r0=rel.r;txt(pairName(a,rel.id),x,y,12,'#e2e5d7','left','650');
-   txt('trust '+round(r0.trust,2)+' · '+r0.meetings+' meetings',x+width,y,10,'#a9c2b6','right');y+=18;}
+  for(var rel of relations.slice(0,15)){
+   var r0=rel.r;
+   txt(pairName(a,rel.id),x,y,12,'#e2e5d7','left','650');
+   txt('trust '+round(r0.trust,2)+' · '+r0.meetings+' meetings',x+width,y,10,r0.trust<-.15?'#dba2a2':'#a9c2b6','right');y+=18;
+   if(r0.attacks||r0.gifts||r0.help){
+    txt('Injuries '+(r0.attacks||0)+' · food '+(r0.gifts||0)+' · care '+(r0.help||0),x+9,y,10,'#9bb7a9');y+=17;
+   }
+   for(var moment of (r0.moments||[]).slice(0,2)){
+    y+=paragraph('Day '+moment.day+' · '+moment.detail,x+9,y,width-12,'#9eb5aa')+4;
+   }
+  }
   if(!relations.length){y+=paragraph('No one is familiar yet. Repeated encounters are necessary.',x,y,width);}
  }else if(tab===2){
   s=safeSoulRecord(s);
@@ -1574,7 +1640,7 @@ function drawWorldData(){
  var m=game.metrics;
  if(tab===0){
   txt('YEAR '+Math.floor(game.day/YEAR_DAYS)+' · DAY '+Math.floor(game.day%YEAR_DAYS)+' · SEED '+game.seed,x,y,12,'#f0e1b2','left','780');y+=29;
-  var records=[['Living bodies',game.agents.length],['Persistent souls',Object.keys(game.souls).length],['Relationships',bondsCount()],['Encounters',m.meetings],['Food shared',m.given],['Care given',m.helped],['Conflicts',m.conflicts],['Births',m.births],['Deaths',m.deaths],['Reincarnations',m.rebirths],['Relationship-driven choices',m.remembered],['Learned homes (living)',game.agents.filter(a=>a.placeMemory&&a.placeMemory.homeId).length],['Recorded home returns',m.placeReturns||0],['Birthplace returns',m.placeNatalReturns||0],
+  var records=[['Living bodies',game.agents.length],['Persistent souls',Object.keys(game.souls).length],['Relationships',bondsCount()],['Encounters',m.meetings],['Food shared',m.given],['Care given',m.helped],['Conflicts',m.conflicts],['Births',m.births],['Deaths',m.deaths],['Reincarnations',m.rebirths],['Relationship-driven choices',m.remembered],['Avoided known rivals',m.socialAvoidances||0],['Returned to helpful contacts',m.socialTrustedChoices||0],['Remembered rivalry choices',m.socialRivalryChoices||0],['Wound-care memories',m.socialAidMemories||0],['Learned homes (living)',game.agents.filter(a=>a.placeMemory&&a.placeMemory.homeId).length],['Recorded home returns',m.placeReturns||0],['Birthplace returns',m.placeNatalReturns||0],
   ['World clock',clockText()+' · '+(sunlight()>.65?'DAYLIGHT':sunlight()<.18?'NIGHT':'TWILIGHT')],
   ['Locomotion','×3 · trial'],
   ['Sleeping now',game.agents.filter(a=>a.sleep?.sleeping).length],
